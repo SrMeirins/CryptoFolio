@@ -24,6 +24,13 @@ export interface ImportRecord {
   imported_at: string
   row_count: number
   skipped_count: number
+  transaction_count: string
+  date_from: string | null
+  date_to: string | null
+  buy_count: string
+  sell_count: string
+  withdraw_count: string
+  deposit_count: string
 }
 
 export interface AssetMetadata {

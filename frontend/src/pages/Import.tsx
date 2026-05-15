@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { portfolioApi } from '../api/portfolio'
+import { portfolioApi, ImportRecord } from '../api/portfolio'
 import {
   Upload, FileText, Trash2, RefreshCw, CheckCircle,
   AlertCircle, ChevronDown, ChevronUp, Eye, Play,
@@ -9,6 +9,7 @@ import {
 import { OperationWizard, WizardResult } from '../components/OperationWizard'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { useNavigate } from 'react-router-dom'
+
 
 interface ValidationResult {
   valid: boolean
@@ -656,7 +657,7 @@ function ProgressStage({ log, done, onGoToDashboard }: {
 }
 
 function ImportsList({ imports, onDelete }: {
-  imports: { id: string; filename: string; imported_at: string; row_count: number; skipped_count: number }[]
+  imports: ImportRecord[]
   onDelete: (id: string) => void
 }) {
   const [confirmId, setConfirmId] = useState<string | null>(null)
@@ -669,25 +670,76 @@ function ImportsList({ imports, onDelete }: {
           <h3 className="font-medium text-sm">CSVs importados</h3>
         </div>
         <div className="divide-y divide-border">
-          {imports.map(imp => (
-            <div key={imp.id} className="flex items-center justify-between px-5 py-3">
-              <div className="flex items-center gap-3">
-                <FileText size={15} className="text-gray-500 shrink-0" />
-                <div>
-                  <p className="text-sm font-medium">{imp.filename}</p>
-                  <p className="text-xs text-gray-500">
-                    {`${new Date(imp.imported_at).toLocaleString('es-ES')} · ${imp.row_count} filas · ${imp.skipped_count} ignoradas`}
-                  </p>
+          {imports.map(imp => {
+            const txCount = parseInt(imp.transaction_count)
+            const isActive = txCount > 0
+            const dateFrom = imp.date_from ? new Date(imp.date_from).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }) : null
+            const dateTo = imp.date_to ? new Date(imp.date_to).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }) : null
+            const buyCount = parseInt(imp.buy_count)
+            const withdrawCount = parseInt(imp.withdraw_count)
+            const depositCount = parseInt(imp.deposit_count)
+
+            return (
+              <div key={imp.id} className="px-5 py-4 space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <FileText size={15} className="text-gray-500 shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{imp.filename}</p>
+                        {isActive && (
+                          <span className="flex items-center gap-1 text-xs text-accent-green shrink-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-accent-green inline-block" />
+                            Activo
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {`Importado ${new Date(imp.imported_at).toLocaleString('es-ES')}`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setConfirmId(imp.id)}
+                    className="text-gray-600 hover:text-accent-red transition-colors p-1 shrink-0"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+
+                {/* Stats row */}
+                <div className="flex items-center gap-3 ml-6 flex-wrap">
+                  {dateFrom && dateTo && (
+                    <span className="text-xs text-gray-400 mono">
+                      {dateFrom} — {dateTo}
+                    </span>
+                  )}
+                  <span className="text-gray-700">·</span>
+                  <span className="text-xs text-gray-500">
+                    {txCount} transacciones
+                  </span>
+                  {buyCount > 0 && (
+                    <>
+                      <span className="text-gray-700">·</span>
+                      <span className="text-xs text-accent-green">{buyCount} compras</span>
+                    </>
+                  )}
+                  {withdrawCount > 0 && (
+                    <>
+                      <span className="text-gray-700">·</span>
+                      <span className="text-xs text-accent-amber">{withdrawCount} retiradas</span>
+                    </>
+                  )}
+                  {depositCount > 0 && (
+                    <>
+                      <span className="text-gray-700">·</span>
+                      <span className="text-xs text-accent-blue">{depositCount} depositos</span>
+                    </>
+                  )}
                 </div>
               </div>
-              <button
-                onClick={() => setConfirmId(imp.id)}
-                className="text-gray-600 hover:text-accent-red transition-colors p-1"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 

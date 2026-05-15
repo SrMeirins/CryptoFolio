@@ -158,8 +158,23 @@ router.post('/', upload.single('file'), async (req: Request, res: Response) => {
 // GET /api/imports
 router.get('/', async (_req: Request, res: Response) => {
   const result = await db.query(
-    `SELECT id, filename, imported_at, row_count, skipped_count, notes
-     FROM csv_imports ORDER BY imported_at DESC`
+    `SELECT
+       ci.id,
+       ci.filename,
+       ci.imported_at,
+       ci.row_count,
+       ci.skipped_count,
+       COUNT(t.id) AS transaction_count,
+       MIN(t.timestamp) AS date_from,
+       MAX(t.timestamp) AS date_to,
+       COUNT(CASE WHEN t.operation_type = 'BUY' THEN 1 END) AS buy_count,
+       COUNT(CASE WHEN t.operation_type = 'SELL' THEN 1 END) AS sell_count,
+       COUNT(CASE WHEN t.operation_type = 'WITHDRAW' THEN 1 END) AS withdraw_count,
+       COUNT(CASE WHEN t.operation_type = 'DEPOSIT_FIAT' THEN 1 END) AS deposit_count
+     FROM csv_imports ci
+     LEFT JOIN transactions t ON t.import_id = ci.id
+     GROUP BY ci.id
+     ORDER BY ci.imported_at DESC`
   );
   res.json(result.rows);
 });
