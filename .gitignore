@@ -1,0 +1,83 @@
+# Entorno
+.env
+.env.local
+
+# Node
+node_modules/
+dist/
+build/
+
+# Docker
+postgres_data/
+
+# Uploads CSV (datos sensibles)
+backend/uploads/
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+# ── Entorno y secretos ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+secrets/
+
+# ── CSVs y datos sensibles ─────────────────────────────────────────────────
+*.csv
+uploads/
+backend/uploads/
+*.xlsx
+*.xls
+
+# ── Node ───────────────────────────────────────────────────────────────────
+node_modules/
+dist/
+build/
+.npm/
+npm-debug.log*
+yarn-error.log
+*.tsbuildinfo
+
+# ── Docker / DB ────────────────────────────────────────────────────────────
+postgres_data/
+*.sql.bak
+
+# ── OS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ────────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*.swn
+
+# ── Logs ───────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Temporal ───────────────────────────────────────────────────────────────
+tmp/
+temp/
+.cache/

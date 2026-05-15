@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background-primary text-white antialiased;
+  }
+  ::-webkit-scrollbar {
+    @apply w-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-background-secondary;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+}
+
+@layer utilities {
+  .text-positive { @apply text-accent-green; }
+  .text-negative { @apply text-accent-red; }
+  .card { @apply bg-background-card border border-border rounded-xl p-5; }
+  .mono { @apply font-mono; }
+}
