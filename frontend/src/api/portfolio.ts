@@ -46,19 +46,59 @@ export interface AssetMetadata {
   last_price_check: string | null
 }
 
+export interface ManualTxPreview {
+  warnings: string[]
+  priceEur: number | null
+  estimatedGainLoss: number | null
+  affectedLots: {
+    lotId: string
+    openedAt: string
+    consumed: number
+    costConsumed: number
+    pricePerUnit: number
+  }[]
+}
+
+export interface Transaction {
+  id: string
+  operation_type: string
+  timestamp: string
+  asset: string
+  amount: string
+  amount_net: string
+  cost_asset: string | null
+  cost_amount: string | null
+  price_per_unit: string | null
+  fee_asset: string | null
+  fee_amount: string | null
+  wallet: string
+  notes: string | null
+  manually_added: boolean
+  created_at: string
+}
+
 export const portfolioApi = {
   getLots: () => api.get<FifoLot[]>('/fifo/lots'),
   getFiscalSummary: () => api.get<FiscalYear[]>('/fifo/summary'),
   runFifo: () => api.post<{ success: boolean; lotsCreated: number; lotsConsumed: number; totalGainEur: number; totalLossEur: number }>('/fifo/run'),
   getLivePrices: () => api.get<Record<string, number>>('/prices/live'),
+  getHistoricalPrice: (asset: string, date: string) =>
+    api.get<{ asset: string; date: string; price_eur: number }>(`/prices/historical?asset=${asset}&date=${date}`),
   getImports: () => api.get<ImportRecord[]>('/imports'),
   uploadCsv: (file: File) => api.uploadCsv(file),
   deleteImport: (id: string) => api.delete<{ success: boolean }>(`/imports/${id}`),
-
-  // Settings — Assets
   getAssets: () => api.get<AssetMetadata[]>('/settings/assets'),
   createAsset: (data: Partial<AssetMetadata>) => api.post<{ success: boolean; symbol: string }>('/settings/assets', data),
   updateAsset: (symbol: string, data: Partial<AssetMetadata>) => api.post<{ success: boolean }>(`/settings/assets/${symbol}`, data),
   detectPairs: (symbol: string) => api.post<AssetMetadata>(`/settings/assets/${symbol}/detect`, {}),
   testPair: (pair: string) => api.post<{ exists: boolean; price?: number }>('/settings/pairs/test', { pair }),
+  previewManualTx: (data: Record<string, unknown>) =>
+    api.post<ManualTxPreview>('/transactions/manual/preview', data),
+  createManualTx: (data: Record<string, unknown>) =>
+    api.post<{ success: boolean }>('/transactions/manual', data),
+  deleteManualTx: (id: string) => api.delete<{ success: boolean }>(`/transactions/${id}`),
+  getTransactions: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : ''
+    return api.get<{ transactions: Transaction[]; total: number }>(`/transactions${qs}`)
+  },
 }

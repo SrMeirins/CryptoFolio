@@ -81,6 +81,55 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
     }
   }
 
+  // Detectar gaps y solapamientos con imports existentes
+  if (validation.dateRange) {
+    const newFrom = new Date(validation.dateRange.from);
+    const newTo = new Date(validation.dateRange.to);
+
+    const existingRanges = await db.query(
+      `SELECT
+         ci.filename,
+         MIN(t.timestamp)::date AS date_from,
+         MAX(t.timestamp)::date AS date_to
+       FROM csv_imports ci
+       JOIN transactions t ON t.import_id = ci.id
+       GROUP BY ci.id, ci.filename
+       ORDER BY MIN(t.timestamp)`
+    );
+
+    for (const range of existingRanges.rows) {
+      const existFrom = new Date(range.date_from);
+      const existTo = new Date(range.date_to);
+
+      // Gap: nuevo CSV empieza después del fin del existente con hueco
+      const daysBetween = Math.floor(
+        (newFrom.getTime() - existTo.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      if (daysBetween > 1) {
+        validation.warnings.push(
+          `Gap de ${daysBetween} dias sin datos: "${range.filename}" cubre hasta ${range.date_to} ` +
+          `y este CSV empieza el ${validation.dateRange.from}. ` +
+          `Considera exportar ese periodo desde Binance.`
+        );
+      }
+
+      // Gap inverso: CSV existente empieza después del fin del nuevo
+      const daysBetweenInverse = Math.floor(
+        (existFrom.getTime() - newTo.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      if (daysBetweenInverse > 1) {
+        validation.warnings.push(
+          `Gap de ${daysBetweenInverse} dias sin datos: este CSV cubre hasta ${validation.dateRange.to} ` +
+          `y "${range.filename}" empieza el ${range.date_from}. ` +
+          `Considera exportar ese periodo desde Binance.`
+        );
+      }
+    }
+  }
+
+  // Contar duplicados
   let duplicateCount = 0;
   let newCount = 0;
 

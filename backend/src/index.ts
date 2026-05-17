@@ -11,7 +11,7 @@ import pricesRouter, { setupPricesWebSocket } from './routes/prices';
 import { startLivePrices } from './modules/prices/binance';
 import catalogRouter from './routes/catalog';
 import settingsRouter from './routes/settings';
-
+import transactionsRouter from './routes/transactions';
 
 const app = express();
 const server = createServer(app);
@@ -45,7 +45,7 @@ app.use('/api/fifo', fifoRouter);
 app.use('/api/prices', pricesRouter);
 app.use('/api/catalog', catalogRouter);
 app.use('/api/settings', settingsRouter);
-
+app.use('/api/transactions', transactionsRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('[ERROR]', err.message);

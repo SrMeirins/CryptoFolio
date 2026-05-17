@@ -4,12 +4,12 @@ import { portfolioApi, ImportRecord } from '../api/portfolio'
 import {
   Upload, FileText, Trash2, RefreshCw, CheckCircle,
   AlertCircle, ChevronDown, ChevronUp, Eye, Play,
-  AlertTriangle, Info, ArrowRight
+  AlertTriangle, Info, ArrowRight, Plus
 } from 'lucide-react'
 import { OperationWizard, WizardResult } from '../components/OperationWizard'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ManualTxModal } from '../components/ManualTxModal'
 import { useNavigate } from 'react-router-dom'
-
 
 interface ValidationResult {
   valid: boolean
@@ -100,6 +100,7 @@ export function ImportPage() {
   const [progressLog, setProgressLog] = useState<ProgressEvent[]>([])
   const [showTxTable, setShowTxTable] = useState(false)
   const [txPage, setTxPage] = useState(0)
+  const [showManualTx, setShowManualTx] = useState(false)
   const TX_PAGE_SIZE = 20
 
   const { data: imports = [] } = useQuery({
@@ -206,16 +207,26 @@ export function ImportPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Importar CSV</h1>
-        {stage !== 'upload' && (
+        <div className="flex items-center gap-3">
           <button
-            onClick={handleReset}
-            className="text-xs text-gray-500 hover:text-white transition-colors"
+            onClick={() => setShowManualTx(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-background-tertiary hover:bg-border border border-border rounded-lg text-sm font-medium transition-colors"
           >
-            Volver al inicio
+            <Plus size={14} />
+            Nueva transaccion
           </button>
-        )}
+          {stage !== 'upload' && (
+            <button
+              onClick={handleReset}
+              className="text-xs text-gray-500 hover:text-white transition-colors"
+            >
+              Volver al inicio
+            </button>
+          )}
+        </div>
       </div>
 
       {stage === 'upload' && (
@@ -277,6 +288,20 @@ export function ImportPage() {
       )}
 
       {stage === 'upload' && <AdvancedSection />}
+
+      {/* Modal transaccion manual */}
+      {showManualTx && (
+        <ManualTxModal
+          onClose={() => setShowManualTx(false)}
+          onSuccess={() => {
+            setShowManualTx(false)
+            setTimeout(() => {
+              queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
+              queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
+            }, 3000)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -661,86 +686,122 @@ function ImportsList({ imports, onDelete }: {
   onDelete: (id: string) => void
 }) {
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<'date' | 'transactions'>('date')
   const confirmTarget = imports.find(i => i.id === confirmId)
+
+  const filtered = imports
+    .filter(imp => imp.filename.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      if (sortBy === 'transactions') {
+        return parseInt(b.transaction_count) - parseInt(a.transaction_count)
+      }
+      return new Date(b.imported_at).getTime() - new Date(a.imported_at).getTime()
+    })
 
   return (
     <>
       <div className="card p-0">
-        <div className="px-5 py-4 border-b border-border">
-          <h3 className="font-medium text-sm">CSVs importados</h3>
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
+          <h3 className="font-medium text-sm shrink-0">CSVs importados</h3>
+          <div className="flex items-center gap-2 flex-1 justify-end">
+            <input
+              type="text"
+              placeholder="Buscar..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs placeholder-gray-600 focus:outline-none focus:border-accent-blue w-40"
+            />
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as 'date' | 'transactions')}
+              className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-gray-400 focus:outline-none focus:border-accent-blue"
+            >
+              <option value="date">Mas reciente</option>
+              <option value="transactions">Mas transacciones</option>
+            </select>
+          </div>
         </div>
-        <div className="divide-y divide-border">
-          {imports.map(imp => {
-            const txCount = parseInt(imp.transaction_count)
-            const isActive = txCount > 0
-            const dateFrom = imp.date_from ? new Date(imp.date_from).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }) : null
-            const dateTo = imp.date_to ? new Date(imp.date_to).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }) : null
-            const buyCount = parseInt(imp.buy_count)
-            const withdrawCount = parseInt(imp.withdraw_count)
-            const depositCount = parseInt(imp.deposit_count)
 
-            return (
-              <div key={imp.id} className="px-5 py-4 space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <FileText size={15} className="text-gray-500 shrink-0 mt-0.5" />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">{imp.filename}</p>
-                        {isActive && (
-                          <span className="flex items-center gap-1 text-xs text-accent-green shrink-0">
-                            <span className="w-1.5 h-1.5 rounded-full bg-accent-green inline-block" />
-                            Activo
-                          </span>
-                        )}
+        {filtered.length === 0 ? (
+          <div className="px-5 py-6 text-center text-xs text-gray-600">
+            {search ? 'No hay resultados para esta busqueda' : 'No hay imports'}
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {filtered.map(imp => {
+              const txCount = parseInt(imp.transaction_count)
+              const isActive = txCount > 0
+              const dateFrom = imp.date_from
+                ? new Date(imp.date_from).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+                : null
+              const dateTo = imp.date_to
+                ? new Date(imp.date_to).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+                : null
+              const buyCount = parseInt(imp.buy_count)
+              const withdrawCount = parseInt(imp.withdraw_count)
+              const depositCount = parseInt(imp.deposit_count)
+
+              return (
+                <div key={imp.id} className="px-5 py-4 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileText size={15} className="text-gray-500 shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{imp.filename}</p>
+                          {isActive && (
+                            <span className="flex items-center gap-1 text-xs text-accent-green shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-accent-green inline-block" />
+                              Activo
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {`Importado ${new Date(imp.imported_at).toLocaleString('es-ES')}`}
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {`Importado ${new Date(imp.imported_at).toLocaleString('es-ES')}`}
-                      </p>
                     </div>
+                    <button
+                      onClick={() => setConfirmId(imp.id)}
+                      className="text-gray-600 hover:text-accent-red transition-colors p-1 shrink-0"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setConfirmId(imp.id)}
-                    className="text-gray-600 hover:text-accent-red transition-colors p-1 shrink-0"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
 
-                {/* Stats row */}
-                <div className="flex items-center gap-3 ml-6 flex-wrap">
-                  {dateFrom && dateTo && (
-                    <span className="text-xs text-gray-400 mono">
-                      {dateFrom} — {dateTo}
-                    </span>
-                  )}
-                  <span className="text-gray-700">·</span>
-                  <span className="text-xs text-gray-500">
-                    {txCount} transacciones
-                  </span>
-                  {buyCount > 0 && (
-                    <>
-                      <span className="text-gray-700">·</span>
-                      <span className="text-xs text-accent-green">{buyCount} compras</span>
-                    </>
-                  )}
-                  {withdrawCount > 0 && (
-                    <>
-                      <span className="text-gray-700">·</span>
-                      <span className="text-xs text-accent-amber">{withdrawCount} retiradas</span>
-                    </>
-                  )}
-                  {depositCount > 0 && (
-                    <>
-                      <span className="text-gray-700">·</span>
-                      <span className="text-xs text-accent-blue">{depositCount} depositos</span>
-                    </>
-                  )}
+                  <div className="flex items-center gap-3 ml-6 flex-wrap">
+                    {dateFrom && dateTo && (
+                      <span className="text-xs text-gray-400 mono">
+                        {dateFrom} — {dateTo}
+                      </span>
+                    )}
+                    <span className="text-gray-700">·</span>
+                    <span className="text-xs text-gray-500">{txCount} transacciones</span>
+                    {buyCount > 0 && (
+                      <>
+                        <span className="text-gray-700">·</span>
+                        <span className="text-xs text-accent-green">{buyCount} compras</span>
+                      </>
+                    )}
+                    {withdrawCount > 0 && (
+                      <>
+                        <span className="text-gray-700">·</span>
+                        <span className="text-xs text-accent-amber">{withdrawCount} retiradas</span>
+                      </>
+                    )}
+                    {depositCount > 0 && (
+                      <>
+                        <span className="text-gray-700">·</span>
+                        <span className="text-xs text-accent-blue">{depositCount} depositos</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {confirmTarget && (
