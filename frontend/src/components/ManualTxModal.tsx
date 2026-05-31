@@ -63,7 +63,7 @@ export function ManualTxModal({ onClose, onSuccess }: ManualTxModalProps) {
       pricePerUnit: result.fields.price_eur ?? null,
       feeAsset: result.fields.fee_asset ?? null,
       feeAmount: result.fields.fee_amount ?? null,
-      wallet: result.fields.from_wallet ?? result.fields.to_wallet ?? 'BINANCE',
+      wallet_id: result.fields.from_wallet ?? result.fields.to_wallet ?? null,
       timestamp: result.fields.timestamp,
       notes: result.fields.notes ?? null,
     }

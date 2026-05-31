@@ -193,6 +193,12 @@ export async function importCsvFile(
   }
 
   return await db.transaction(async (client) => {
+    const binanceRes = await client.query(
+      `SELECT id FROM wallets WHERE is_system = TRUE AND type = 'exchange' LIMIT 1`
+    );
+    if (binanceRes.rows.length === 0) throw new Error('No hay wallet de exchange configurada');
+    const binanceWalletId: string = binanceRes.rows[0].id;
+
     const importRes = await client.query(
       `INSERT INTO csv_imports (filename, file_hash, row_count, skipped_count)
        VALUES ($1, $2, $3, $4)
@@ -205,7 +211,7 @@ export async function importCsvFile(
     let duplicateRows = 0;
 
     for (const tx of parseResult.transactions) {
-      const txId = await insertTransaction(client, tx, importId);
+      const txId = await insertTransaction(client, tx, importId, binanceWalletId);
       if (txId) {
         newTransactions++;
       } else {
@@ -238,7 +244,8 @@ export async function importCsvFile(
 async function insertTransaction(
   client: PoolClient,
   tx: ParsedTransaction,
-  importId: string
+  importId: string,
+  walletId: string
 ): Promise<string | null> {
   for (const hash of tx.rawRowHashes) {
     const dup = await client.query(
@@ -254,15 +261,17 @@ async function insertTransaction(
       asset, amount, amount_net,
       cost_asset, cost_amount, price_per_unit,
       fee_asset, fee_amount,
-      wallet, account,
-      sub_trade_count, notes, manually_added
+      wallet_id, account,
+      notes, manually_added,
+      destination_pending
     ) VALUES (
       $1, $2::operation_type, $3,
       $4, $5, $6,
       $7, $8, $9,
       $10, $11,
-      $12::wallet_type, $13,
-      $14, $15, false
+      $12, $13,
+      $14, false,
+      $15
     ) RETURNING id`,
     [
       importId,
@@ -276,10 +285,10 @@ async function insertTransaction(
       tx.pricePerUnit ?? null,
       tx.feeAsset ?? null,
       tx.feeAmount ?? null,
-      tx.wallet,
+      walletId,
       tx.account,
-      tx.subTradeCount,
       tx.notes ?? null,
+      tx.operationType === 'WITHDRAW',
     ]
   );
   const txId: string = txRes.rows[0].id;

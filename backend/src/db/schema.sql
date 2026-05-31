@@ -1,9 +1,8 @@
 -- ============================================================
--- CryptoTracker — Schema PostgreSQL
--- Versión: 1.0
+-- CryptoFolio — Schema PostgreSQL
+-- Version: 3.0 — Wallets unificadas (FK, sin enum wallet_type)
 -- ============================================================
 
--- Extensiones
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
@@ -12,252 +11,308 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- ============================================================
 
 CREATE TYPE operation_type AS ENUM (
-  -- Operativas propias del usuario
-  'BUY',              -- Compra de cripto (con EUR o USDC)
-  'SELL',             -- Venta de cripto a EUR o USDC
-  'CONVERT_IN',       -- Recepción de una conversión (EUR→USDC, USDC→BNB)
-  'CONVERT_OUT',      -- Gasto en una conversión
-  'DEPOSIT_FIAT',     -- Ingreso de EUR en Binance
-  'WITHDRAW',         -- Retirada a wallet externa (Tangem)
-  'FEE',              -- Fee de red o de operación
-  -- Internas Binance (sin efecto fiscal)
-  'INTERNAL_TRANSFER',-- Transfer Main↔Funding wallet
-  -- Ignoradas
-  'IGNORED'           -- Asset Recovery NFT, etc.
-);
-
-CREATE TYPE wallet_type AS ENUM (
-  'BINANCE',
-  'TANGEM',
-  'MANUAL'
+  'BUY', 'SELL',
+  'BUY_FIAT', 'BUY_CRYPTO',
+  'SELL_FIAT', 'SELL_CRYPTO',
+  'CONVERT_IN', 'CONVERT_OUT',
+  'DEPOSIT_FIAT',
+  'WITHDRAW',
+  'FEE', 'FEE_NETWORK', 'FEE_EXCHANGE',
+  'INTERNAL_TRANSFER',
+  'TRANSFER_INTERNAL',
+  'STAKING_REWARD', 'MINING_REWARD',
+  'LENDING_INTEREST', 'CASHBACK',
+  'AIRDROP', 'FORK',
+  'GIFT_SENT', 'LOST',
+  'IGNORED'
 );
 
 CREATE TYPE fiscal_event_type AS ENUM (
-  'GAIN',   -- Ganancia patrimonial
-  'LOSS',   -- Pérdida patrimonial
-  'NONE'    -- Sin evento fiscal (depósito, transferencia interna)
+  'GAIN',
+  'LOSS',
+  'NONE'
+);
+
+CREATE TYPE wallet_kind AS ENUM (
+  'exchange',
+  'hardware',
+  'software',
+  'bank'
 );
 
 -- ============================================================
+-- TABLA: networks
+-- ============================================================
+CREATE TABLE networks (
+  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name             TEXT NOT NULL UNIQUE,
+  native_asset     TEXT NOT NULL,
+  explorer_url     TEXT,
+  explorer_tx_url  TEXT,
+  is_predefined    BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO networks (name, native_asset, explorer_url, explorer_tx_url, is_predefined) VALUES
+  ('XRP Ledger', 'XRP',  'https://livenet.xrpl.org/accounts/{address}',              'https://livenet.xrpl.org/transactions/{tx_hash}',        TRUE),
+  ('Ethereum',   'ETH',  'https://etherscan.io/address/{address}',                   'https://etherscan.io/tx/{tx_hash}',                       TRUE),
+  ('Solana',     'SOL',  'https://explorer.solana.com/address/{address}',             'https://explorer.solana.com/tx/{tx_hash}',                TRUE),
+  ('BNB Chain',  'BNB',  'https://bscscan.com/address/{address}',                    'https://bscscan.com/tx/{tx_hash}',                        TRUE),
+  ('Cardano',    'ADA',  'https://cardanoscan.io/address/{address}',                 'https://cardanoscan.io/tx/{tx_hash}',                     TRUE),
+  ('HBAR',       'HBAR', 'https://hashscan.io/mainnet/account/{address}',            'https://hashscan.io/mainnet/transaction/{tx_hash}',       TRUE),
+  ('Stellar',    'XLM',  'https://stellar.expert/explorer/public/account/{address}', 'https://stellar.expert/explorer/public/tx/{tx_hash}',    TRUE),
+  ('Polkadot Asset Hub', 'DOT',  'https://assethub-polkadot.subscan.io/account/{address}',           'https://assethub-polkadot.subscan.io/extrinsic/{tx_hash}',       TRUE),
+  ('Bitcoin',            'BTC',  'https://blockstream.info/address/{address}',                        'https://blockstream.info/tx/{tx_hash}',                          TRUE),
+  ('Avalanche',          'AVAX', 'https://snowtrace.io/address/{address}',                            'https://snowtrace.io/tx/{tx_hash}',                              TRUE),
+  ('Tron',               'TRX',  'https://tronscan.org/#/address/{address}',                          'https://tronscan.org/#/transaction/{tx_hash}',                   TRUE);
+
+-- ============================================================
+-- TABLA: network_assets
+-- ============================================================
+CREATE TABLE network_assets (
+  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  network_id       UUID NOT NULL REFERENCES networks(id) ON DELETE CASCADE,
+  asset            TEXT NOT NULL,
+  contract_address TEXT,
+  is_predefined    BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(network_id, asset)
+);
+
+INSERT INTO network_assets (network_id, asset, contract_address, is_predefined)
+SELECT id, 'LINK', '0x514910771AF9Ca656af840dff83E8264EcF986CA', TRUE FROM networks WHERE name = 'Ethereum';
+INSERT INTO network_assets (network_id, asset, contract_address, is_predefined)
+SELECT id, 'USDC', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', TRUE FROM networks WHERE name = 'Ethereum';
+INSERT INTO network_assets (network_id, asset, contract_address, is_predefined)
+SELECT id, 'ONDO', '0xfAbA6f8e4a5E8Ab82F62fe7C39859FA577269BE3', TRUE FROM networks WHERE name = 'Ethereum';
+INSERT INTO network_assets (network_id, asset, contract_address, is_predefined)
+SELECT id, 'WIF',  NULL, TRUE FROM networks WHERE name = 'Solana';
+INSERT INTO network_assets (network_id, asset, contract_address, is_predefined)
+SELECT id, 'PYTH', NULL, TRUE FROM networks WHERE name = 'Solana';
+
+-- ============================================================
+-- TABLA: wallets
+-- ============================================================
+CREATE TABLE wallets (
+  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name         TEXT NOT NULL,
+  type         wallet_kind NOT NULL,
+  is_system    BOOLEAN NOT NULL DEFAULT FALSE,
+  is_default   BOOLEAN NOT NULL DEFAULT FALSE,
+  color        TEXT NOT NULL DEFAULT '#6366f1',
+  notes        TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO wallets (name, type, is_system, is_default, color)
+VALUES ('Binance', 'exchange', TRUE, TRUE, '#F0B90B');
+
+-- ============================================================
+-- TABLA: wallet_addresses
+-- ============================================================
+CREATE TABLE wallet_addresses (
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  wallet_id           UUID NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  network_id          UUID REFERENCES networks(id),
+  custom_network      TEXT,
+  custom_explorer_url TEXT,
+  address             TEXT,
+  last_sync_at        TIMESTAMPTZ,
+  last_known_balance  NUMERIC(30, 10),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_wallet_addresses_wallet  ON wallet_addresses(wallet_id);
+CREATE INDEX idx_wallet_addresses_network ON wallet_addresses(network_id);
+
+-- ============================================================
 -- TABLA: csv_imports
--- Registro de cada CSV importado para evitar duplicados
 -- ============================================================
 CREATE TABLE csv_imports (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   filename      TEXT NOT NULL,
-  file_hash     TEXT NOT NULL UNIQUE, -- SHA-256 del contenido del archivo
+  file_hash     TEXT NOT NULL UNIQUE,
   imported_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   row_count     INTEGER NOT NULL DEFAULT 0,
-  skipped_count INTEGER NOT NULL DEFAULT 0, -- Filas ignoradas (duplicadas, internas)
+  skipped_count INTEGER NOT NULL DEFAULT 0,
   notes         TEXT
 );
 
 -- ============================================================
 -- TABLA: raw_transactions
--- Cada fila del CSV de Binance, tal cual, antes de interpretar
 -- ============================================================
 CREATE TABLE raw_transactions (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  import_id     UUID NOT NULL REFERENCES csv_imports(id) ON DELETE CASCADE,
-  -- Columnas exactas del CSV de Binance
-  user_id       TEXT NOT NULL,
-  time          TIMESTAMPTZ NOT NULL,
-  account       TEXT NOT NULL,         -- 'Spot' | 'Funding'
-  operation     TEXT NOT NULL,         -- Valor exacto del CSV
-  coin          TEXT NOT NULL,
-  change        NUMERIC(30, 10) NOT NULL,
-  remark        TEXT,
-  -- Control de duplicados: hash de (user_id+time+account+operation+coin+change+remark)
-  row_hash      TEXT NOT NULL,
-  -- Referencia a la transacción interpretada (se llena después del parseo)
+  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  import_id      UUID NOT NULL REFERENCES csv_imports(id) ON DELETE CASCADE,
+  user_id        TEXT NOT NULL,
+  time           TIMESTAMPTZ NOT NULL,
+  account        TEXT NOT NULL,
+  operation      TEXT NOT NULL,
+  coin           TEXT NOT NULL,
+  change         NUMERIC(30, 10) NOT NULL,
+  remark         TEXT,
+  row_hash       TEXT NOT NULL,
   transaction_id UUID,
   UNIQUE(row_hash)
 );
 
-CREATE INDEX idx_raw_transactions_time ON raw_transactions(time);
+CREATE INDEX idx_raw_transactions_time   ON raw_transactions(time);
 CREATE INDEX idx_raw_transactions_import ON raw_transactions(import_id);
 
 -- ============================================================
 -- TABLA: transactions
--- Operaciones interpretadas y normalizadas
--- Una transacción puede agrupar N filas raw del mismo timestamp
+-- wallet_id referencia la tabla wallets (sin enum hardcodeado)
+-- destination_wallet_id: wallet destino para WITHDRAW/TRANSFER
+-- destination_pending: true cuando el destino aún no se ha asignado
 -- ============================================================
 CREATE TABLE transactions (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  import_id       UUID REFERENCES csv_imports(id) ON DELETE SET NULL,
-  -- Identificación
-  operation_type  operation_type NOT NULL,
-  timestamp       TIMESTAMPTZ NOT NULL,
-  -- Activo principal
-  asset           TEXT NOT NULL,           -- 'XRP', 'USDC', 'EUR', etc.
-  amount          NUMERIC(30, 10) NOT NULL, -- Cantidad bruta (sin fees)
-  amount_net      NUMERIC(30, 10) NOT NULL, -- Cantidad neta (después de fees en mismo activo)
-  -- Coste / contrapartida
-  cost_asset      TEXT,                    -- Activo con el que se pagó ('EUR', 'USDC')
-  cost_amount     NUMERIC(30, 10),         -- Cantidad pagada en cost_asset
-  -- Precio unitario calculado
-  price_per_unit  NUMERIC(30, 10),         -- cost_amount / amount en cost_asset
-  price_eur       NUMERIC(30, 10),         -- Precio unitario en EUR (puede requerir conversión USDC→EUR)
-  -- Fees
-  fee_asset       TEXT,                    -- 'BNB', 'XRP', etc.
-  fee_amount      NUMERIC(30, 10),         -- Cantidad de fee
-  fee_eur         NUMERIC(30, 10),         -- Equivalente en EUR de la fee (para deducción fiscal)
-  -- Wallet
-  wallet          wallet_type NOT NULL DEFAULT 'BINANCE',
-  account         TEXT,                    -- 'Spot' | 'Funding'
-  -- Agrupación de órdenes parciales (mismo timestamp, mismo par)
-  group_key       TEXT,                    -- timestamp::asset::cost_asset para agrupar sub-trades
-  sub_trade_count INTEGER NOT NULL DEFAULT 1, -- Nº de sub-trades que componen esta transacción
-  -- Metadatos
-  notes           TEXT,
-  manually_added  BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  import_id             UUID REFERENCES csv_imports(id) ON DELETE SET NULL,
+  operation_type        operation_type NOT NULL,
+  timestamp             TIMESTAMPTZ NOT NULL,
+  asset                 TEXT NOT NULL,
+  amount                NUMERIC(30, 10) NOT NULL,
+  amount_net            NUMERIC(30, 10) NOT NULL,
+  cost_asset            TEXT,
+  cost_amount           NUMERIC(30, 10),
+  price_per_unit        NUMERIC(30, 10),
+  price_eur             NUMERIC(30, 10),
+  fee_asset             TEXT,
+  fee_amount            NUMERIC(30, 10),
+  fee_eur               NUMERIC(30, 10),
+  wallet_id             UUID NOT NULL REFERENCES wallets(id),
+  account               TEXT,
+  notes                 TEXT,
+  manually_added        BOOLEAN NOT NULL DEFAULT FALSE,
+  destination_wallet_id UUID REFERENCES wallets(id),
+  destination_pending   BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_transactions_timestamp ON transactions(timestamp);
-CREATE INDEX idx_transactions_asset ON transactions(asset);
-CREATE INDEX idx_transactions_type ON transactions(operation_type);
-CREATE INDEX idx_transactions_wallet ON transactions(wallet);
+CREATE INDEX idx_transactions_asset     ON transactions(asset);
+CREATE INDEX idx_transactions_type      ON transactions(operation_type);
+CREATE INDEX idx_transactions_wallet    ON transactions(wallet_id);
+CREATE INDEX idx_transactions_dest      ON transactions(destination_wallet_id);
 
 -- ============================================================
 -- TABLA: fifo_lots
--- Lotes FIFO abiertos por cada activo
--- Se abre un lote con cada compra, se cierra (parcial o total) con cada venta/gasto
+-- wallet_id referencia la tabla wallets
 -- ============================================================
 CREATE TABLE fifo_lots (
-  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  -- Lote
-  asset             TEXT NOT NULL,
-  -- Cantidad original del lote
-  quantity_original NUMERIC(30, 10) NOT NULL,
-  -- Cantidad restante sin consumir
-  quantity_remaining NUMERIC(30, 10) NOT NULL,
-  -- Coste base del lote en EUR (precio de adquisición total)
-  cost_basis_eur    NUMERIC(30, 10) NOT NULL,
-  -- Precio unitario en EUR en el momento de la compra
-  price_per_unit_eur NUMERIC(30, 10) NOT NULL,
-  -- Fees incluidas en el coste base
-  fee_eur           NUMERIC(30, 10) NOT NULL DEFAULT 0,
-  -- Referencia a la transacción que abrió el lote
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  asset               TEXT NOT NULL,
+  quantity_original   NUMERIC(30, 10) NOT NULL,
+  quantity_remaining  NUMERIC(30, 10) NOT NULL,
+  cost_basis_eur      NUMERIC(30, 10) NOT NULL,
+  price_per_unit_eur  NUMERIC(30, 10) NOT NULL,
+  fee_eur             NUMERIC(30, 10) NOT NULL DEFAULT 0,
   open_transaction_id UUID NOT NULL REFERENCES transactions(id),
-  opened_at         TIMESTAMPTZ NOT NULL,
-  -- Si el lote está completamente consumido
-  closed_at         TIMESTAMPTZ,
-  is_closed         BOOLEAN NOT NULL DEFAULT FALSE,
-  -- Wallet donde está este lote
-  wallet            wallet_type NOT NULL DEFAULT 'BINANCE',
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  opened_at           TIMESTAMPTZ NOT NULL,
+  closed_at           TIMESTAMPTZ,
+  is_closed           BOOLEAN NOT NULL DEFAULT FALSE,
+  wallet_id           UUID NOT NULL REFERENCES wallets(id),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_fifo_lots_asset ON fifo_lots(asset);
+CREATE INDEX idx_fifo_lots_asset      ON fifo_lots(asset);
 CREATE INDEX idx_fifo_lots_asset_open ON fifo_lots(asset, is_closed, opened_at);
-CREATE INDEX idx_fifo_lots_wallet ON fifo_lots(wallet);
+CREATE INDEX idx_fifo_lots_wallet     ON fifo_lots(wallet_id);
 
 -- ============================================================
 -- TABLA: fifo_lot_consumptions
--- Registro de cada vez que se consume (parcialmente) un lote FIFO
 -- ============================================================
 CREATE TABLE fifo_lot_consumptions (
-  id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  lot_id                UUID NOT NULL REFERENCES fifo_lots(id),
-  -- Transacción que consume el lote (venta, fee, conversión)
+  id                       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  lot_id                   UUID NOT NULL REFERENCES fifo_lots(id),
   consuming_transaction_id UUID NOT NULL REFERENCES transactions(id),
-  quantity_consumed     NUMERIC(30, 10) NOT NULL,
-  -- Coste base proporcional consumido (para calcular G/P)
-  cost_basis_consumed_eur NUMERIC(30, 10) NOT NULL,
-  -- Valor de venta proporcional en EUR
-  proceeds_eur          NUMERIC(30, 10) NOT NULL,
-  -- Ganancia/pérdida de este consumo parcial
-  gain_loss_eur         NUMERIC(30, 10) NOT NULL, -- proceeds - cost_basis
-  fiscal_event_type     fiscal_event_type NOT NULL,
-  consumed_at           TIMESTAMPTZ NOT NULL,
-  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  quantity_consumed        NUMERIC(30, 10) NOT NULL,
+  cost_basis_consumed_eur  NUMERIC(30, 10) NOT NULL,
+  proceeds_eur             NUMERIC(30, 10) NOT NULL,
+  gain_loss_eur            NUMERIC(30, 10) NOT NULL,
+  fiscal_event_type        fiscal_event_type NOT NULL,
+  consumed_at              TIMESTAMPTZ NOT NULL,
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_consumptions_lot ON fifo_lot_consumptions(lot_id);
+CREATE INDEX idx_consumptions_lot         ON fifo_lot_consumptions(lot_id);
 CREATE INDEX idx_consumptions_transaction ON fifo_lot_consumptions(consuming_transaction_id);
-CREATE INDEX idx_consumptions_date ON fifo_lot_consumptions(consumed_at);
+CREATE INDEX idx_consumptions_date        ON fifo_lot_consumptions(consumed_at);
 
 -- ============================================================
 -- TABLA: price_cache
--- Caché de precios históricos y actuales en EUR
--- Se usa para: calcular G/P cuando se paga en USDC, valorar fees BNB
 -- ============================================================
 CREATE TABLE price_cache (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  asset       TEXT NOT NULL,
-  price_eur   NUMERIC(30, 10) NOT NULL,
-  source      TEXT NOT NULL DEFAULT 'coingecko', -- 'coingecko' | 'manual' | 'binance_ws'
-  -- Para precios históricos: fecha exacta
-  price_date  DATE,
-  -- Para precios en tiempo real: timestamp
-  fetched_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(asset, price_date)           -- Un precio histórico por activo por día
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  asset      TEXT NOT NULL,
+  price_eur  NUMERIC(30, 10) NOT NULL,
+  source     TEXT NOT NULL DEFAULT 'binance',
+  price_date DATE,
+  fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(asset, price_date)
 );
 
 CREATE INDEX idx_price_cache_asset ON price_cache(asset, price_date DESC);
 
 -- ============================================================
--- TABLA: portfolio_snapshots
--- Snapshots del portfolio a 31/12 de cada año (para Modelo 721)
--- Se generan automáticamente al calcular el informe fiscal
+-- TABLA: asset_metadata
 -- ============================================================
-CREATE TABLE portfolio_snapshots (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  snapshot_date   DATE NOT NULL,
-  asset           TEXT NOT NULL,
-  quantity        NUMERIC(30, 10) NOT NULL,
-  price_eur       NUMERIC(30, 10) NOT NULL,
-  value_eur       NUMERIC(30, 10) NOT NULL,
-  wallet          wallet_type NOT NULL,
-  -- Para el 721: si supera 50.000€ el conjunto total
-  modelo721_required BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(snapshot_date, asset, wallet)
+CREATE TABLE asset_metadata (
+  symbol             TEXT PRIMARY KEY,
+  name               TEXT NOT NULL,
+  coingecko_id       TEXT,
+  is_stablecoin      BOOLEAN NOT NULL DEFAULT FALSE,
+  decimals           INTEGER NOT NULL DEFAULT 8,
+  binance_eur_pair   TEXT,
+  binance_usdt_pair  TEXT,
+  binance_btc_pair   TEXT,
+  price_source       TEXT DEFAULT 'unknown',
+  auto_detected      BOOLEAN DEFAULT FALSE,
+  last_price_check   TIMESTAMPTZ
 );
 
--- ============================================================
--- TABLA: manual_transactions
--- Transferencias añadidas manualmente desde la UI
--- (ej: movimientos Tangem que no aparecen en Binance)
--- ============================================================
-CREATE TABLE manual_transactions (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  operation_type  operation_type NOT NULL,
-  timestamp       TIMESTAMPTZ NOT NULL,
-  asset           TEXT NOT NULL,
-  amount          NUMERIC(30, 10) NOT NULL,
-  from_wallet     wallet_type,
-  to_wallet       wallet_type,
-  price_eur       NUMERIC(30, 10),   -- Precio unitario en EUR en ese momento
-  notes           TEXT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  -- Se enlaza con transactions cuando se procesa
-  transaction_id  UUID REFERENCES transactions(id)
-);
+INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_eur_pair, price_source) VALUES
+  ('BTC',  'Bitcoin',      'bitcoin',          FALSE, 'BTCEUR',  'eur_direct'),
+  ('ETH',  'Ethereum',     'ethereum',         FALSE, 'ETHEUR',  'eur_direct'),
+  ('XRP',  'XRP',          'ripple',           FALSE, 'XRPEUR',  'eur_direct'),
+  ('ADA',  'Cardano',      'cardano',          FALSE, 'ADAEUR',  'eur_direct'),
+  ('DOT',  'Polkadot',     'polkadot',         FALSE, 'DOTEUR',  'eur_direct'),
+  ('LINK', 'Chainlink',    'chainlink',        FALSE, 'LINKEUR', 'eur_direct'),
+  ('XLM',  'Stellar',      'stellar',          FALSE, 'XLMEUR',  'eur_direct'),
+  ('BNB',  'BNB',          'binancecoin',      FALSE, 'BNBEUR',  'eur_direct'),
+  ('SOL',  'Solana',       'solana',           FALSE, 'SOLEUR',  'eur_direct');
+
+INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_usdt_pair, price_source) VALUES
+  ('HBAR', 'Hedera',       'hedera-hashgraph', FALSE, 'HBARUSDT', 'usdt_proxy'),
+  ('WIF',  'dogwifhat',    'dogwifcoin',       FALSE, 'WIFUSDT',  'usdt_proxy'),
+  ('PYTH', 'Pyth Network', 'pyth-network',     FALSE, 'PYTHUSDT', 'usdt_proxy'),
+  ('ONDO', 'Ondo Finance', 'ondo-finance',     FALSE, 'ONDOUSDT', 'usdt_proxy'),
+  ('USDC', 'USD Coin',     'usd-coin',         TRUE,  'USDCUSDT', 'usdt_proxy');
+
+INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, price_source) VALUES
+  ('EUR',  'Euro',   NULL, TRUE, 'fiat'),
+  ('USDT', 'Tether', NULL, TRUE, 'fiat');
 
 -- ============================================================
--- VISTA: v_portfolio_current
--- Balance actual por activo y wallet (calculado desde FIFO lots)
+-- VISTAS
 -- ============================================================
 CREATE OR REPLACE VIEW v_portfolio_current AS
 SELECT
-  asset,
-  wallet,
-  SUM(quantity_remaining) AS quantity,
-  SUM(cost_basis_eur * (quantity_remaining / quantity_original)) AS cost_basis_eur,
-  AVG(price_per_unit_eur) AS avg_buy_price_eur
-FROM fifo_lots
-WHERE is_closed = FALSE
-  AND quantity_remaining > 0
-GROUP BY asset, wallet
-ORDER BY asset, wallet;
+  fl.asset,
+  fl.wallet_id,
+  w.name  AS wallet_name,
+  w.color AS wallet_color,
+  w.type  AS wallet_kind,
+  SUM(fl.quantity_remaining) AS quantity,
+  SUM(fl.cost_basis_eur * (fl.quantity_remaining / NULLIF(fl.quantity_original, 0))) AS cost_basis_eur,
+  AVG(fl.price_per_unit_eur) AS avg_buy_price_eur
+FROM fifo_lots fl
+JOIN wallets w ON w.id = fl.wallet_id
+WHERE fl.is_closed = FALSE AND fl.quantity_remaining > 0
+GROUP BY fl.asset, fl.wallet_id, w.name, w.color, w.kind
+ORDER BY fl.asset, w.name;
 
--- ============================================================
--- VISTA: v_fiscal_year
--- Resumen de G/P por año fiscal (para IRPF)
--- ============================================================
 CREATE OR REPLACE VIEW v_fiscal_year AS
 SELECT
   EXTRACT(YEAR FROM consumed_at)::INTEGER AS fiscal_year,
@@ -266,12 +321,27 @@ SELECT
   SUM(CASE WHEN gain_loss_eur < 0 THEN gain_loss_eur ELSE 0 END) AS total_losses_eur,
   COUNT(*) AS num_operations
 FROM fifo_lot_consumptions
+WHERE fiscal_event_type != 'NONE'
 GROUP BY fiscal_year
 ORDER BY fiscal_year;
 
 -- ============================================================
--- FUNCIÓN: update_updated_at
--- Trigger para actualizar updated_at automáticamente
+-- TABLA: app_config
+-- Configuración global de la aplicación (clave-valor)
+-- ============================================================
+CREATE TABLE app_config (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO app_config (key, value) VALUES
+  ('fiscal_method',        'fifo'),
+  ('modelo721_threshold',  '50000'),
+  ('fiscal_country',       'ES');
+
+-- ============================================================
+-- TRIGGERS
 -- ============================================================
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
@@ -284,34 +354,3 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_transactions_updated_at
   BEFORE UPDATE ON transactions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
--- ============================================================
--- DATOS INICIALES
--- ============================================================
-
--- CoinGecko IDs para los activos que aparecen en el CSV
--- (necesarios para consultar precios históricos)
-CREATE TABLE asset_metadata (
-  symbol          TEXT PRIMARY KEY,
-  name            TEXT NOT NULL,
-  coingecko_id    TEXT,              -- ID exacto en CoinGecko
-  is_stablecoin   BOOLEAN NOT NULL DEFAULT FALSE,
-  decimals        INTEGER NOT NULL DEFAULT 8
-);
-
-INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin) VALUES
-  ('BTC',  'Bitcoin',         'bitcoin',            FALSE),
-  ('ETH',  'Ethereum',        'ethereum',           FALSE),
-  ('XRP',  'XRP',             'ripple',             FALSE),
-  ('ADA',  'Cardano',         'cardano',            FALSE),
-  ('DOT',  'Polkadot',        'polkadot',           FALSE),
-  ('LINK', 'Chainlink',       'chainlink',          FALSE),
-  ('HBAR', 'Hedera',          'hedera-hashgraph',   FALSE),
-  ('XLM',  'Stellar',         'stellar',            FALSE),
-  ('WIF',  'dogwifhat',       'dogwifcoin',         FALSE),
-  ('PYTH', 'Pyth Network',    'pyth-network',       FALSE),
-  ('ONDO', 'Ondo Finance',    'ondo-finance',       FALSE),
-  ('BNB',  'BNB',             'binancecoin',        FALSE),
-  ('USDC', 'USD Coin',        'usd-coin',           TRUE),
-  ('USDT', 'Tether',          'tether',             TRUE),
-  ('EUR',  'Euro',            NULL,                 TRUE);

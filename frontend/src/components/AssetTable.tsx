@@ -10,7 +10,7 @@ interface AssetTableProps {
 
 interface AssetRow {
   asset: string
-  wallets: { wallet: string; quantity: number; costBasis: number }[]
+  wallets: { wallet_id: string; wallet_name: string; wallet_color: string; wallet_kind: string; quantity: number; costBasis: number }[]
   totalQuantity: number
   totalCostBasis: number
   avgPrice: number
@@ -36,7 +36,7 @@ function groupByAsset(lots: FifoLot[]): AssetRow[] {
     const row = map.get(lot.asset)!
     row.totalQuantity += qty
     row.totalCostBasis += cost
-    row.wallets.push({ wallet: lot.wallet, quantity: qty, costBasis: cost })
+    row.wallets.push({ wallet_id: lot.wallet_id, wallet_name: lot.wallet_name, wallet_color: lot.wallet_color, wallet_kind: lot.wallet_kind, quantity: qty, costBasis: cost })
   }
 
   return [...map.values()].sort((a, b) => b.totalCostBasis - a.totalCostBasis)
@@ -47,7 +47,10 @@ function AssetRow({ row, prices }: { row: AssetRow; prices: Record<string, numbe
   const value = row.totalQuantity * price
   const pnl = value - row.totalCostBasis
   const pnlPct = row.totalCostBasis > 0 ? (pnl / row.totalCostBasis) * 100 : 0
-  const walletLabels = [...new Set(row.wallets.map((w) => w.wallet))]
+  const walletEntries = row.wallets.reduce((acc, w) => {
+    if (!acc.find(x => x.wallet_id === w.wallet_id)) acc.push(w)
+    return acc
+  }, [] as typeof row.wallets)
   const hasPrice = price > 0
 
   return (
@@ -81,17 +84,14 @@ function AssetRow({ row, prices }: { row: AssetRow; prices: Record<string, numbe
         {hasPrice ? (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%' : '—'}
       </td>
       <td className="px-4 py-3 text-center">
-        <div className="flex gap-1 justify-center">
-          {walletLabels.map((w) => (
+        <div className="flex gap-1 justify-center flex-wrap">
+          {walletEntries.map((w) => (
             <span
-              key={w}
-              className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                w === 'BINANCE'
-                  ? 'bg-accent-amber/10 text-accent-amber'
-                  : 'bg-accent-purple/10 text-accent-purple'
-              }`}
+              key={w.wallet_id}
+              className="text-xs px-2 py-0.5 rounded-full font-medium"
+              style={{ backgroundColor: `${w.wallet_color}20`, color: w.wallet_color }}
             >
-              {w === 'BINANCE' ? 'BNB' : 'TGM'}
+              {w.wallet_name.slice(0, 3).toUpperCase()}
             </span>
           ))}
         </div>

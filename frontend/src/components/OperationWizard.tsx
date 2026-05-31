@@ -1,8 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   TrendingUp, TrendingDown, ArrowLeftRight, Coins, Receipt, Settings,
   ChevronRight, ChevronLeft, Info, AlertCircle, CheckCircle, X, Zap
 } from 'lucide-react'
+
+interface WalletOption { id: string; name: string; type: string }
+
+function useWallets() {
+  const [wallets, setWallets] = useState<WalletOption[]>([])
+  const fetched = useRef(false)
+  useEffect(() => {
+    if (fetched.current) return
+    fetched.current = true
+    fetch('/api/wallets').then(r => r.json()).then(setWallets).catch(() => {})
+  }, [])
+  return wallets
+}
 
 interface FieldDefinition {
   name: string
@@ -491,6 +504,7 @@ function DynamicField({
   onChange: (val: unknown) => void
 }) {
   const baseInput = 'w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-accent-blue transition-colors'
+  const wallets = useWallets()
 
   return (
     <div className="space-y-1">
@@ -554,9 +568,9 @@ function DynamicField({
           className={baseInput}
         >
           <option value="">Seleccionar wallet...</option>
-          <option value="BINANCE">Binance</option>
-          <option value="TANGEM">Tangem</option>
-          <option value="MANUAL">Otra (manual)</option>
+          {wallets.map(w => (
+            <option key={w.id} value={w.id}>{w.name}</option>
+          ))}
         </select>
       )}
 

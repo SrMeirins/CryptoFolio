@@ -11,8 +11,8 @@ export function Portfolio() {
     queryFn: portfolioApi.getLots,
   })
 
-  const binance = lots.filter((l) => l.wallet === 'BINANCE')
-  const tangem = lots.filter((l) => l.wallet === 'TANGEM')
+  const binance = lots.filter((l) => l.wallet_kind === 'exchange')
+  const tangem = lots.filter((l) => l.wallet_kind !== 'exchange')
 
   if (isLoading) return <div className="p-6 text-gray-500">Cargando...</div>
 

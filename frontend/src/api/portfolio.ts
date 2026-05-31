@@ -2,12 +2,13 @@ import { api } from './client'
 
 export interface FifoLot {
   asset: string
-  wallet: string
+  wallet_id: string
+  wallet_name: string
+  wallet_color: string
+  wallet_kind: string
   quantity: string
   cost_basis_eur: string
   avg_price_eur: string
-  oldest_lot: string
-  lot_count: string
 }
 
 export interface FiscalYear {
@@ -89,8 +90,10 @@ export const portfolioApi = {
   deleteImport: (id: string) => api.delete<{ success: boolean }>(`/imports/${id}`),
   getAssets: () => api.get<AssetMetadata[]>('/settings/assets'),
   createAsset: (data: Partial<AssetMetadata>) => api.post<{ success: boolean; symbol: string }>('/settings/assets', data),
-  updateAsset: (symbol: string, data: Partial<AssetMetadata>) => api.post<{ success: boolean }>(`/settings/assets/${symbol}`, data),
+  updateAsset: (symbol: string, data: Partial<AssetMetadata>) => api.put<{ success: boolean }>(`/settings/assets/${symbol}`, data),
+  deleteAsset: (symbol: string) => api.delete<{ success: boolean }>(`/settings/assets/${symbol}`),
   detectPairs: (symbol: string) => api.post<AssetMetadata>(`/settings/assets/${symbol}/detect`, {}),
+  detectAllPairs: () => api.post<{ detected: number; failed: number; total: number }>('/settings/assets/detect-all', {}),
   testPair: (pair: string) => api.post<{ exists: boolean; price?: number }>('/settings/pairs/test', { pair }),
   previewManualTx: (data: Record<string, unknown>) =>
     api.post<ManualTxPreview>('/transactions/manual/preview', data),
@@ -101,4 +104,12 @@ export const portfolioApi = {
     const qs = params ? '?' + new URLSearchParams(params).toString() : ''
     return api.get<{ transactions: Transaction[]; total: number }>(`/transactions${qs}`)
   },
+  getConfig: () => api.get<Record<string, string>>('/settings/config'),
+  setConfig: (key: string, value: string) => api.put<{ success: boolean }>('/settings/config', { key, value }),
+  getStats: () => api.get<{
+    transactions: number; fifoLots: number; imports: number
+    priceCache: number; wallets: number; assets: number
+  }>('/settings/stats'),
+  clearPriceCache: () => api.delete<{ deleted: number }>('/settings/price-cache'),
+  resetAllData: () => api.delete<{ success: boolean }>('/settings/data/transactions'),
 }

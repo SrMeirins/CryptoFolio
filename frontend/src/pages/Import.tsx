@@ -4,12 +4,14 @@ import { portfolioApi, ImportRecord } from '../api/portfolio'
 import {
   Upload, FileText, Trash2, RefreshCw, CheckCircle,
   AlertCircle, ChevronDown, ChevronUp, Eye, Play,
-  AlertTriangle, Info, ArrowRight, Plus
+  AlertTriangle, Info, ArrowRight, Plus, HardDrive, X
 } from 'lucide-react'
 import { OperationWizard, WizardResult } from '../components/OperationWizard'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ManualTxModal } from '../components/ManualTxModal'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
+
+const SETUP_KEY = 'cflio_setup_seen'
 
 interface ValidationResult {
   valid: boolean
@@ -90,6 +92,7 @@ export function ImportPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const fileBufferRef = useRef<File | null>(null)
 
+  const [setupSeen, setSetupSeen] = useState(() => localStorage.getItem(SETUP_KEY) === 'true')
   const [stage, setStage] = useState<'upload' | 'preview' | 'catalog' | 'progress' | 'done'>('upload')
   const [dragOver, setDragOver] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -207,6 +210,33 @@ export function ImportPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
+      {/* Aviso configuracion wallets */}
+      {!setupSeen && (
+        <div className="flex items-center justify-between gap-4 px-4 py-3 bg-accent-amber/10 border border-accent-amber/30 rounded-lg text-sm">
+          <div className="flex items-center gap-3">
+            <HardDrive size={15} className="text-accent-amber shrink-0" />
+            <span className="text-gray-300">
+              ¿Tienes wallets frías? Configúralas antes de importar para que los retiros se asignen correctamente.
+            </span>
+            <Link
+              to="/settings"
+              className="flex items-center gap-1 text-accent-amber hover:text-accent-amber/80 font-medium whitespace-nowrap transition-colors"
+            >
+              Ir a configuración <ArrowRight size={13} />
+            </Link>
+          </div>
+          <button
+            onClick={() => {
+              localStorage.setItem(SETUP_KEY, 'true')
+              setSetupSeen(true)
+            }}
+            className="text-gray-600 hover:text-white transition-colors shrink-0"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Importar CSV</h1>

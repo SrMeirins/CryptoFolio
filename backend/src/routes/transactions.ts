@@ -7,7 +7,7 @@ const router = Router();
 
 // POST /api/transactions/manual/preview
 router.post('/manual/preview', async (req: Request, res: Response) => {
-  const { operationType, asset, amount, costAsset, costAmount, timestamp, wallet, feeAsset, feeAmount } = req.body;
+  const { operationType, asset, amount, costAsset, costAmount, timestamp, wallet_id } = req.body;
 
   if (!operationType || !asset || !timestamp) {
     res.status(400).json({ error: 'operationType, asset y timestamp son requeridos' });
@@ -17,7 +17,6 @@ router.post('/manual/preview', async (req: Request, res: Response) => {
   const date = new Date(timestamp);
   const warnings: string[] = [];
 
-  // 1. Detectar solapamiento con imports existentes
   const importRanges = await db.query(
     `SELECT ci.filename, MIN(t.timestamp) as date_from, MAX(t.timestamp) as date_to
      FROM csv_imports ci JOIN transactions t ON t.import_id = ci.id
@@ -32,32 +31,29 @@ router.post('/manual/preview', async (req: Request, res: Response) => {
     }
   }
 
-  // 2. Detectar si afecta al FIFO historico
   const lastTx = await db.query(`SELECT MAX(timestamp) as last_ts FROM transactions`);
   if (lastTx.rows[0].last_ts && date < new Date(lastTx.rows[0].last_ts)) {
     warnings.push(`Esta fecha es anterior a la ultima transaccion registrada. El recalculo FIFO afectara a todas las operaciones posteriores.`);
   }
 
-  // 3. Obtener precio historico automaticamente
   let priceEur: number | null = null;
   try {
     priceEur = await getHistoricalPriceEur(asset, date);
   } catch { /* ignorar */ }
 
-  // 4. Calcular impacto fiscal estimado
   let estimatedGainLoss: number | null = null;
   let affectedLots: unknown[] = [];
 
   const isSale = ['SELL', 'SELL_FIAT', 'SELL_CRYPTO', 'GIFT_SENT', 'LOST'].includes(operationType);
 
-  if (isSale && amount) {
+  if (isSale && amount && wallet_id) {
     const lots = await db.query(
       `SELECT id, quantity_remaining, cost_basis_eur, price_per_unit_eur, opened_at
        FROM fifo_lots
-       WHERE asset = $1 AND wallet = $2::wallet_type
+       WHERE asset = $1 AND wallet_id = $2
          AND is_closed = FALSE AND quantity_remaining > 0
        ORDER BY opened_at ASC`,
-      [asset, wallet ?? 'BINANCE']
+      [asset, wallet_id]
     );
 
     let proceedsEur = 0;
@@ -99,15 +95,20 @@ router.post('/manual', async (req: Request, res: Response) => {
     operationType, asset, amount, amountNet,
     costAsset, costAmount, pricePerUnit,
     feeAsset, feeAmount,
-    wallet, timestamp, notes,
+    wallet_id, timestamp, notes,
   } = req.body;
 
-  if (!operationType || !asset || !amount || !timestamp || !wallet) {
-    res.status(400).json({ error: 'operationType, asset, amount, timestamp y wallet son requeridos' });
+  if (!operationType || !asset || !amount || !timestamp || !wallet_id) {
+    res.status(400).json({ error: 'operationType, asset, amount, timestamp y wallet_id son requeridos' });
     return;
   }
 
-  // Obtener precio historico si no se proporciono
+  const walletCheck = await db.query('SELECT id FROM wallets WHERE id = $1', [wallet_id]);
+  if (walletCheck.rows.length === 0) {
+    res.status(400).json({ error: 'wallet_id no existe' });
+    return;
+  }
+
   let finalPricePerUnit = pricePerUnit ? parseFloat(pricePerUnit) : null;
   if (!finalPricePerUnit) {
     try {
@@ -115,7 +116,6 @@ router.post('/manual', async (req: Request, res: Response) => {
     } catch { /* dejar null */ }
   }
 
-  // Calcular cost_amount si no se proporciono
   let finalCostAmount = costAmount ? parseFloat(costAmount) : null;
   if (!finalCostAmount && finalPricePerUnit && amount) {
     finalCostAmount = parseFloat(amount) * finalPricePerUnit;
@@ -128,12 +128,12 @@ router.post('/manual', async (req: Request, res: Response) => {
       operation_type, timestamp, asset, amount, amount_net,
       cost_asset, cost_amount, price_per_unit,
       fee_asset, fee_amount,
-      wallet, account, sub_trade_count, notes, manually_added
+      wallet_id, account, notes, manually_added
     ) VALUES (
       $1::operation_type, $2, $3, $4, $5,
       $6, $7, $8,
       $9, $10,
-      $11::wallet_type, 'Manual', 1, $12, true
+      $11, 'Manual', $12, true
     )`,
     [
       dbOperationType,
@@ -146,7 +146,7 @@ router.post('/manual', async (req: Request, res: Response) => {
       finalPricePerUnit,
       feeAsset ?? null,
       feeAmount ? parseFloat(feeAmount) : null,
-      wallet,
+      wallet_id,
       notes ?? null,
     ]
   );
@@ -160,32 +160,40 @@ router.post('/manual', async (req: Request, res: Response) => {
 
 // GET /api/transactions
 router.get('/', async (req: Request, res: Response) => {
-  const { asset, type, wallet, manually_added, limit = '50', offset = '0' } = req.query;
+  const { asset, type, wallet_id, manually_added, limit = '50', offset = '0' } = req.query;
 
   let where = 'WHERE 1=1';
   const params: unknown[] = [];
   let paramIdx = 1;
 
-  if (asset) { where += ` AND asset = $${paramIdx++}`; params.push((asset as string).toUpperCase()); }
-  if (type) { where += ` AND operation_type = $${paramIdx++}`; params.push(type); }
-  if (wallet) { where += ` AND wallet = $${paramIdx++}::wallet_type`; params.push(wallet); }
-  if (manually_added !== undefined) { where += ` AND manually_added = $${paramIdx++}`; params.push(manually_added === 'true'); }
+  if (asset) { where += ` AND t.asset = $${paramIdx++}`; params.push((asset as string).toUpperCase()); }
+  if (type) { where += ` AND t.operation_type = $${paramIdx++}`; params.push(type); }
+  if (wallet_id) { where += ` AND t.wallet_id = $${paramIdx++}`; params.push(wallet_id); }
+  if (manually_added !== undefined) { where += ` AND t.manually_added = $${paramIdx++}`; params.push(manually_added === 'true'); }
 
   params.push(parseInt(limit as string));
   params.push(parseInt(offset as string));
 
   const result = await db.query(
-    `SELECT id, operation_type, timestamp, asset, amount, amount_net,
-            cost_asset, cost_amount, price_per_unit,
-            fee_asset, fee_amount, wallet, notes, manually_added, created_at
-     FROM transactions
+    `SELECT
+       t.id, t.operation_type, t.timestamp, t.asset, t.amount, t.amount_net,
+       t.cost_asset, t.cost_amount, t.price_per_unit,
+       t.fee_asset, t.fee_amount,
+       t.wallet_id, w.name AS wallet_name, w.color AS wallet_color, w.type AS wallet_kind,
+       t.destination_wallet_id, t.destination_pending,
+       t.notes, t.manually_added, t.created_at
+     FROM transactions t
+     JOIN wallets w ON w.id = t.wallet_id
      ${where}
-     ORDER BY timestamp DESC
+     ORDER BY t.timestamp DESC
      LIMIT $${paramIdx++} OFFSET $${paramIdx}`,
     params
   );
 
-  const total = await db.query(`SELECT COUNT(*) FROM transactions ${where}`, params.slice(0, -2));
+  const total = await db.query(
+    `SELECT COUNT(*) FROM transactions t JOIN wallets w ON w.id = t.wallet_id ${where}`,
+    params.slice(0, -2)
+  );
 
   res.json({
     transactions: result.rows,

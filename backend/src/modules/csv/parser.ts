@@ -205,7 +205,7 @@ function interpretGroup(
       asset: row.coin,
       amount: abs(row.change),
       amountNet: abs(row.change),
-      wallet: 'BINANCE',
+
       account,
       subTradeCount: 1,
       rawRowHashes: hashes,
@@ -219,7 +219,7 @@ function interpretGroup(
       asset: row.coin,
       amount: abs(row.change),
       amountNet: abs(row.change),
-      wallet: 'BINANCE' as const,
+
       account,
       notes: 'Withdraw fee is included — destino: Tangem',
       subTradeCount: 1,
@@ -279,7 +279,7 @@ function interpretConvert(
     costAsset: outRow.coin,
     costAmount: amountOut,
     pricePerUnit: amountOut / amountIn,
-    wallet: 'BINANCE',
+
     account,
     notes: `Binance Convert: ${outRow.coin}→${inRow.coin}`,
     subTradeCount: 1,
@@ -312,7 +312,7 @@ function interpretSoldRevenue(
     pricePerUnit: amountOut / amountIn,
     feeAsset:  feeRow?.coin,
     feeAmount: feeRow ? abs(feeRow.change) : undefined,
-    wallet: 'BINANCE',
+
     account,
     notes: `Transaction Sold/Revenue: ${soldRow.coin}→${revenueRow.coin}`,
     subTradeCount: 1,
@@ -339,7 +339,7 @@ function interpretBuyCryptoWithFiat(
     costAsset: 'EUR',
     costAmount: abs(eurRow.change),
     pricePerUnit: abs(eurRow.change) / abs(cryptoRow.change),
-    wallet: 'BINANCE',
+
     account,
     notes: `Buy Crypto With Fiat vía ${eurRow.remark}`,
     subTradeCount: 1,
@@ -366,7 +366,7 @@ function interpretSmallAssetsExchange(
     costAsset: outRow.coin,
     costAmount: abs(outRow.change),
     pricePerUnit: abs(outRow.change) / abs(inRow.change),
-    wallet: 'BINANCE',
+
     account,
     notes: `Small Assets Exchange: ${outRow.coin}→${inRow.coin} (dust)`,
     subTradeCount: 1,
@@ -415,7 +415,7 @@ function interpretTransactionBuy(
     pricePerUnit,
     feeAsset:  feeInAssetTotal > 0 ? asset : feeOtherAsset,
     feeAmount: feeInAssetTotal > 0 ? feeInAssetTotal : (feeInOtherTotal > 0 ? feeInOtherTotal : undefined),
-    wallet: 'BINANCE',
+
     account,
     subTradeCount: buyRows.length,
     rawRowHashes: hashes,
@@ -461,7 +461,7 @@ function interpretMultiAssetBuy(
       pricePerUnit: proportionalSpend / assetTotal,
       feeAsset:  feeInAssetTotal > 0 ? asset : feeOtherAsset,
       feeAmount: feeInAssetTotal > 0 ? feeInAssetTotal : (feeOtherTotal > 0 ? feeOtherTotal : undefined),
-      wallet: 'BINANCE' as const,
+
       account,
       subTradeCount: rows.length,
       rawRowHashes: rows.map((r) => r.rowHash),
@@ -490,7 +490,7 @@ function interpretTransactionSell(
     costAmount: receiveRow ? abs(receiveRow.change) : undefined,
     feeAsset:  feeRow?.coin,
     feeAmount: feeRow ? abs(feeRow.change) : undefined,
-    wallet: 'BINANCE',
+
     account,
     subTradeCount: 1,
     rawRowHashes: hashes,

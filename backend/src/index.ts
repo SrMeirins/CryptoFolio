@@ -12,6 +12,9 @@ import { startLivePrices } from './modules/prices/binance';
 import catalogRouter from './routes/catalog';
 import settingsRouter from './routes/settings';
 import transactionsRouter from './routes/transactions';
+import fiscalRouter from './routes/fiscal';
+import walletsRouter from './routes/wallets';
+
 
 const app = express();
 const server = createServer(app);
@@ -46,6 +49,8 @@ app.use('/api/prices', pricesRouter);
 app.use('/api/catalog', catalogRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/transactions', transactionsRouter);
+app.use('/api/fiscal', fiscalRouter);
+app.use('/api/wallets', walletsRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('[ERROR]', err.message);

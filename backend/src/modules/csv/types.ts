@@ -38,7 +38,6 @@ export interface ParsedTransaction {
   feeAsset?: string;
   feeAmount?: number;    // Siempre positivo
   // Meta
-  wallet: 'BINANCE' | 'TANGEM' | 'MANUAL';
   account: string;
   notes?: string;
   subTradeCount: number;

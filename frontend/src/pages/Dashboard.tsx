@@ -116,8 +116,8 @@ export function Dashboard() {
   const totalPnl = totalValue - totalCost
   const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0
 
-  const binanceLots = lots.filter((l) => l.wallet === 'BINANCE')
-  const tangemLots = lots.filter((l) => l.wallet === 'TANGEM')
+  const binanceLots = lots.filter((l) => l.wallet_kind === 'exchange')
+  const tangemLots = lots.filter((l) => l.wallet_kind !== 'exchange')
   const binanceValue = binanceLots.reduce((s, l) => s + parseFloat(l.quantity) * (prices[l.asset] ?? 0), 0)
   const tangemValue = tangemLots.reduce((s, l) => s + parseFloat(l.quantity) * (prices[l.asset] ?? 0), 0)
 
