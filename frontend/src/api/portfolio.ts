@@ -72,14 +72,28 @@ export interface Transaction {
   price_per_unit: string | null
   fee_asset: string | null
   fee_amount: string | null
-  wallet: string
+  wallet_id: string
+  wallet_name: string
+  wallet_color: string
+  wallet_kind: string
+  account: string | null
   notes: string | null
   manually_added: boolean
   created_at: string
 }
 
+export interface FiatBalance {
+  wallet_id: string
+  wallet_name: string
+  wallet_color: string
+  wallet_kind: string
+  asset: string
+  balance: string
+}
+
 export const portfolioApi = {
   getLots: () => api.get<FifoLot[]>('/fifo/lots'),
+  getFiatBalances: () => api.get<FiatBalance[]>('/fifo/fiat-balances'),
   getFiscalSummary: () => api.get<FiscalYear[]>('/fifo/summary'),
   runFifo: () => api.post<{ success: boolean; lotsCreated: number; lotsConsumed: number; totalGainEur: number; totalLossEur: number }>('/fifo/run'),
   getLivePrices: () => api.get<Record<string, number>>('/prices/live'),
@@ -100,9 +114,12 @@ export const portfolioApi = {
   createManualTx: (data: Record<string, unknown>) =>
     api.post<{ success: boolean }>('/transactions/manual', data),
   deleteManualTx: (id: string) => api.delete<{ success: boolean }>(`/transactions/${id}`),
-  getTransactions: (params?: Record<string, string>) => {
-    const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-    return api.get<{ transactions: Transaction[]; total: number }>(`/transactions${qs}`)
+  getTransactions: (params?: Record<string, string | undefined>) => {
+    const filtered = params
+      ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][])
+      : {}
+    const qs = Object.keys(filtered).length ? '?' + new URLSearchParams(filtered).toString() : ''
+    return api.get<{ transactions: Transaction[]; total: number; limit: number; offset: number }>(`/transactions${qs}`)
   },
   getConfig: () => api.get<Record<string, string>>('/settings/config'),
   setConfig: (key: string, value: string) => api.put<{ success: boolean }>('/settings/config', { key, value }),
@@ -112,4 +129,7 @@ export const portfolioApi = {
   }>('/settings/stats'),
   clearPriceCache: () => api.delete<{ deleted: number }>('/settings/price-cache'),
   resetAllData: () => api.delete<{ success: boolean }>('/settings/data/transactions'),
+  getNotifications: () => api.get<Array<{
+    id: string; type: 'error' | 'warning' | 'info'; category: string; message: string; count?: number;
+  }>>('/settings/notifications'),
 }

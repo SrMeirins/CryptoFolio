@@ -216,6 +216,84 @@ router.delete('/price-cache', async (_req: Request, res: Response) => {
   res.json({ deleted: result.rows.length });
 });
 
+// ── GET /api/settings/notifications ───────────────────────────────────────
+// Recopila avisos del sistema clasificados por severidad
+router.get('/notifications', async (_req: Request, res: Response) => {
+  const notifications: Array<{
+    id: string; type: 'error' | 'warning' | 'info'; category: string; message: string; count?: number;
+  }> = [];
+
+  // 1. Activos sin precio configurado (no stablecoin)
+  const noPriceRes = await db.query(
+    `SELECT symbol FROM asset_metadata WHERE price_source = 'unknown' AND is_stablecoin = FALSE ORDER BY symbol`
+  );
+  if (noPriceRes.rows.length > 0) {
+    notifications.push({
+      id: 'no-price',
+      type: 'warning',
+      category: 'Precios',
+      message: `${noPriceRes.rows.length} activo${noPriceRes.rows.length > 1 ? 's' : ''} sin precio configurado: ${noPriceRes.rows.map((r: {symbol: string}) => r.symbol).join(', ')}`,
+      count: noPriceRes.rows.length,
+    });
+  }
+
+  // 2. Retiros sin wallet destino asignada
+  const pendingRes = await db.query(
+    `SELECT asset, COUNT(*) as cnt FROM transactions WHERE destination_pending = TRUE GROUP BY asset ORDER BY asset`
+  );
+  if (pendingRes.rows.length > 0) {
+    const total = pendingRes.rows.reduce((s: number, r: {cnt: string}) => s + parseInt(r.cnt), 0);
+    const assets = pendingRes.rows.map((r: {asset: string}) => r.asset).join(', ');
+    notifications.push({
+      id: 'pending-withdrawals',
+      type: 'warning',
+      category: 'Retiros',
+      message: `${total} retiro${total > 1 ? 's' : ''} sin wallet destino asignada (${assets}). Ve a Historial para asignarlos.`,
+      count: total,
+    });
+  }
+
+  // 3. Depósitos de cripto externo que requieren revisión
+  const cryptoDepositRes = await db.query(
+    `SELECT COUNT(*) AS cnt FROM transactions
+     WHERE operation_type = 'AIRDROP'
+       AND notes LIKE '%Depósito de cripto externo%'`
+  );
+  const cryptoDepositCount = parseInt(cryptoDepositRes.rows[0].cnt);
+  if (cryptoDepositCount > 0) {
+    notifications.push({
+      id: 'crypto-deposits',
+      type: 'info',
+      category: 'Depósitos',
+      message: `${cryptoDepositCount} depósito${cryptoDepositCount > 1 ? 's' : ''} de cripto externo con coste de adquisición desconocido. Revisa y ajusta si es necesario.`,
+      count: cryptoDepositCount,
+    });
+  }
+
+  // 4. Lotes FIFO con activo sin precio (no se puede valorar el portfolio)
+  const noLotPriceRes = await db.query(
+    `SELECT DISTINCT fl.asset
+     FROM fifo_lots fl
+     LEFT JOIN asset_metadata am ON am.symbol = fl.asset
+     WHERE fl.is_closed = FALSE
+       AND fl.quantity_remaining > 0
+       AND (am.price_source = 'unknown' OR am.symbol IS NULL)
+     ORDER BY fl.asset`
+  );
+  if (noLotPriceRes.rows.length > 0) {
+    const assets = noLotPriceRes.rows.map((r: {asset: string}) => r.asset).join(', ');
+    notifications.push({
+      id: 'lots-no-price',
+      type: 'error',
+      category: 'Portfolio',
+      message: `Activos en cartera sin precio de mercado: ${assets}. El valor del portfolio puede estar incompleto.`,
+      count: noLotPriceRes.rows.length,
+    });
+  }
+
+  res.json(notifications);
+});
+
 // ── DELETE /api/settings/data/transactions ────────────────────────────────
 // Elimina todas las transacciones, lotes FIFO e importaciones.
 // La configuración (wallets, activos, app_config) se conserva.

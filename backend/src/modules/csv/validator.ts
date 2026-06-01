@@ -5,21 +5,7 @@ import {
   languageLabel,
   SupportedLanguage,
 } from './languages';
-
-const KNOWN_OPERATIONS = new Set([
-  'Deposit',
-  'Withdraw',
-  'Binance Convert',
-  'Transaction Buy',
-  'Transaction Spend',
-  'Transaction Fee',
-  'Transaction Sold',
-  'Transaction Revenue',
-  'Buy Crypto With Fiat',
-  'Small Assets Exchange BNB',
-  'Transfer Between Main and Funding Wallet',
-  'Asset Recovery',
-]);
+import { ALL_KNOWN_OPERATIONS } from './binanceAccounts';
 
 export interface ValidationResult {
   valid: boolean;
@@ -125,7 +111,7 @@ export function validateCsvStructure(fileBuffer: Buffer): ValidationResult {
     const timeStr   = cells[colIndex.time]?.trim();
     const changeStr = cells[colIndex.change]?.trim();
 
-    if (operation && !KNOWN_OPERATIONS.has(operation)) {
+    if (operation && !ALL_KNOWN_OPERATIONS.has(operation)) {
       unknownOps.add(operation);
     }
 

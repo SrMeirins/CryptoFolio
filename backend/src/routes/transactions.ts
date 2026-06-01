@@ -160,15 +160,16 @@ router.post('/manual', async (req: Request, res: Response) => {
 
 // GET /api/transactions
 router.get('/', async (req: Request, res: Response) => {
-  const { asset, type, wallet_id, manually_added, limit = '50', offset = '0' } = req.query;
+  const { asset, type, wallet_id, account, manually_added, limit = '50', offset = '0' } = req.query;
 
   let where = 'WHERE 1=1';
   const params: unknown[] = [];
   let paramIdx = 1;
 
-  if (asset) { where += ` AND t.asset = $${paramIdx++}`; params.push((asset as string).toUpperCase()); }
-  if (type) { where += ` AND t.operation_type = $${paramIdx++}`; params.push(type); }
-  if (wallet_id) { where += ` AND t.wallet_id = $${paramIdx++}`; params.push(wallet_id); }
+  if (asset)            { where += ` AND t.asset = $${paramIdx++}`;           params.push((asset as string).toUpperCase()); }
+  if (type)             { where += ` AND t.operation_type = $${paramIdx++}`;   params.push(type); }
+  if (wallet_id)        { where += ` AND t.wallet_id = $${paramIdx++}`;        params.push(wallet_id); }
+  if (account)          { where += ` AND t.account = $${paramIdx++}`;          params.push(account); }
   if (manually_added !== undefined) { where += ` AND t.manually_added = $${paramIdx++}`; params.push(manually_added === 'true'); }
 
   params.push(parseInt(limit as string));
@@ -180,7 +181,7 @@ router.get('/', async (req: Request, res: Response) => {
        t.cost_asset, t.cost_amount, t.price_per_unit,
        t.fee_asset, t.fee_amount,
        t.wallet_id, w.name AS wallet_name, w.color AS wallet_color, w.type AS wallet_kind,
-       t.destination_wallet_id, t.destination_pending,
+       t.account, t.destination_wallet_id, t.destination_pending,
        t.notes, t.manually_added, t.created_at
      FROM transactions t
      JOIN wallets w ON w.id = t.wallet_id

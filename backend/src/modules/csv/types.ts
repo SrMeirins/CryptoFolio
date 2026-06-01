@@ -17,9 +17,20 @@ export type OperationType =
   | 'CONVERT_IN'
   | 'CONVERT_OUT'
   | 'DEPOSIT_FIAT'
+  | 'WITHDRAW_FIAT'
   | 'WITHDRAW'
+  | 'FEE_EXCHANGE'
   | 'FEE'
   | 'INTERNAL_TRANSFER'
+  | 'TRANSFER_INTERNAL'
+  | 'STAKING_REWARD'
+  | 'MINING_REWARD'
+  | 'LENDING_INTEREST'
+  | 'CASHBACK'
+  | 'AIRDROP'
+  | 'FORK'
+  | 'GIFT_SENT'
+  | 'LOST'
   | 'IGNORED';
 
 export interface ParsedTransaction {

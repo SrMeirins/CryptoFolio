@@ -60,7 +60,30 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
             fee_asset, fee_amount,
             wallet_id, destination_wallet_id, destination_pending
      FROM transactions
-     ORDER BY timestamp ASC, created_at ASC`
+     ORDER BY timestamp ASC, created_at ASC,
+       -- Dentro del mismo segundo, abrir lotes antes de consumirlos.
+       -- BUY/INCOME primero → luego SELL/FEE_EXCHANGE que necesitan esos lotes.
+       CASE operation_type
+         WHEN 'BUY'              THEN 1
+         WHEN 'BUY_FIAT'        THEN 1
+         WHEN 'BUY_CRYPTO'      THEN 1
+         WHEN 'AIRDROP'         THEN 1
+         WHEN 'STAKING_REWARD'  THEN 1
+         WHEN 'LENDING_INTEREST'THEN 1
+         WHEN 'CASHBACK'        THEN 1
+         WHEN 'FORK'            THEN 1
+         WHEN 'SELL'            THEN 2
+         WHEN 'SELL_FIAT'       THEN 2
+         WHEN 'SELL_CRYPTO'     THEN 2
+         WHEN 'GIFT_SENT'       THEN 2
+         WHEN 'LOST'            THEN 2
+         WHEN 'WITHDRAW'        THEN 3
+         WHEN 'TRANSFER_INTERNAL' THEN 3
+         WHEN 'FEE_EXCHANGE'    THEN 4
+         WHEN 'FEE'             THEN 4
+         WHEN 'FEE_NETWORK'     THEN 4
+         ELSE 5
+       END`
   );
 
   const transactions: Transaction[] = txRes.rows.map((r: Record<string, unknown>) => ({
@@ -131,6 +154,7 @@ async function processTransaction(tx: Transaction, result: FifoRunResult): Promi
       await processFee(tx, result);
       break;
     case 'DEPOSIT_FIAT':
+    case 'WITHDRAW_FIAT':   // Retiro a banco — no hay lote que mover
     case 'INTERNAL_TRANSFER':
     case 'IGNORED':
     case 'CONVERT_IN':
@@ -167,14 +191,27 @@ async function processBuy(tx: Transaction, result: FifoRunResult): Promise<void>
       const unitPriceEur = tx.amount_net > 0 ? costBasisEur / tx.amount_net : 0;
       feeEur = tx.fee_amount * unitPriceEur;
     } else {
+      // Fee en activo distinto al comprado (ej: BNB). El valor EUR se añade al
+      // cost basis de la compra, y además se consumen los lotes del activo de la fee
+      // (es una disposición patrimonial imponible, igual que vender BNB).
       const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
       feeEur = tx.fee_amount * feePrice;
+      await consumeLots(tx.id, tx.fee_asset, tx.wallet_id, tx.fee_amount, feeEur, tx.timestamp, result);
     }
     costBasisEur += feeEur;
   }
 
   const quantity = tx.amount_net;
-  if (quantity <= 0 || tx.asset === 'EUR') return;
+
+  // Si se recibe EUR (fiat), no abrimos lote — pero SÍ ejecutamos la permuta
+  // para consumir los lotes del activo pagado (ej: XRP→EUR convierte XRP)
+  if (quantity <= 0 || tx.asset === 'EUR') {
+    // Permuta cripto→EUR: consumir lotes del activo pagado aunque no abramos lote de EUR
+    if (tx.asset === 'EUR' && tx.cost_asset && tx.cost_asset !== 'EUR' && tx.cost_amount) {
+      await consumeLots(tx.id, tx.cost_asset, tx.wallet_id, tx.cost_amount, costBasisEur, tx.timestamp, result);
+    }
+    return;
+  }
 
   const pricePerUnitEur = quantity > 0 ? costBasisEur / quantity : 0;
   await openLot(tx.asset, quantity, costBasisEur, pricePerUnitEur, feeEur, tx.id, tx.timestamp, tx.wallet_id);
@@ -247,10 +284,16 @@ async function processLost(tx: Transaction, result: FifoRunResult): Promise<void
   await consumeLots(tx.id, tx.asset, tx.wallet_id, tx.amount, 0, tx.timestamp, result);
 }
 
+// Activos fiat: nunca tienen lotes FIFO, las transferencias internas son no-ops silenciosas
+const FIAT_NO_LOT = new Set(['EUR', 'USD', 'GBP', 'CHF', 'BRL', 'ARS']);
+
 // ── TRANSFER / WITHDRAW ───────────────────────────────────────────────────
 // Si destination_pending=true o no hay destination_wallet_id, los lotes se
 // quedan en el wallet origen hasta que el usuario asigne el destino.
 async function processTransfer(tx: Transaction, result: FifoRunResult): Promise<void> {
+  // Transferencia interna de fiat entre sub-cuentas: sin lotes que mover, sin ruido
+  if (FIAT_NO_LOT.has(tx.asset)) return;
+
   if (tx.destination_pending || !tx.destination_wallet_id) {
     result.pendingWithdrawals++;
     console.warn(`[FIFO] ${tx.operation_type} sin destino para ${tx.asset} tx=${tx.id} — lotes permanecen en wallet origen`);
@@ -395,7 +438,7 @@ async function getOpenLots(asset: string, walletId: string): Promise<FifoLot[]> 
      WHERE asset = $1
        AND wallet_id = $2
        AND is_closed = FALSE
-       AND quantity_remaining > 0.000001
+       AND quantity_remaining > 0.0000000001
      ORDER BY opened_at ASC`,
     [asset, walletId]
   );

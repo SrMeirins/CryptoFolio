@@ -49,7 +49,10 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
   try {
     // FASE 1: Importar transacciones
     send('importing', 'Importando transacciones...');
-    const importResult = await importCsvFile(req.file.buffer, req.file.originalname);
+    const withdrawalDestinations: Record<string, string> = req.body.withdrawalDestinations
+      ? JSON.parse(req.body.withdrawalDestinations as string)
+      : {};
+    const importResult = await importCsvFile(req.file.buffer, req.file.originalname, withdrawalDestinations);
     send('importing', `✓ ${importResult.newTransactions} transacciones nuevas importadas (${importResult.duplicateRows} duplicadas ignoradas)`);
 
     // FASE 2: Precios históricos
@@ -73,35 +76,40 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
       date: new Date(r.date),
     }));
 
-    // Filtrar los que ya están en caché
-    let toFetch = 0;
+    // Deduplicar pares symbol|date y filtrar los ya cacheados — 1 sola query batch
+    const uniquePairs = new Map<string, Date>();
     for (const { symbol, date } of required) {
-      const cached = await db.query(
-        'SELECT id FROM price_cache WHERE asset = $1 AND price_date = $2',
-        [symbol, date.toISOString().slice(0, 10)]
-      );
-      if (cached.rows.length === 0) toFetch++;
+      const key = `${symbol}|${date.toISOString().slice(0, 10)}`;
+      if (!uniquePairs.has(key)) uniquePairs.set(key, date);
     }
+
+    const pairList = [...uniquePairs.entries()].map(([key, date]) => ({
+      symbol:  key.split('|')[0],
+      dateStr: key.split('|')[1],
+      date,
+    }));
+
+    let toFetchList: Array<{ symbol: string; date: Date }> = [];
+
+    if (pairList.length > 0) {
+      const symbols  = [...new Set(pairList.map(p => p.symbol))];
+      const dateStrs = [...new Set(pairList.map(p => p.dateStr))];
+      const cachedRes = await db.query(
+        `SELECT asset, price_date::text AS price_date
+         FROM price_cache
+         WHERE asset = ANY($1) AND price_date::text = ANY($2)`,
+        [symbols, dateStrs]
+      );
+      const cachedSet = new Set(
+        cachedRes.rows.map((r: { asset: string; price_date: string }) => `${r.asset}|${r.price_date}`)
+      );
+      toFetchList = pairList.filter(p => !cachedSet.has(`${p.symbol}|${p.dateStr}`));
+    }
+
+    const toFetch = toFetchList.length;
 
     if (toFetch > 0) {
       send('prices', `Cargando ${toFetch} precios históricos en paralelo...`, 0, toFetch);
-
-      // Precarga con progreso
-      const unique = new Map<string, Date>();
-      for (const { symbol, date } of required) {
-        const key = `${symbol}|${date.toISOString().slice(0, 10)}`;
-        if (!unique.has(key)) unique.set(key, date);
-      }
-
-      const toFetchList: Array<{ symbol: string; date: Date }> = [];
-      for (const [key, date] of unique) {
-        const symbol = key.split('|')[0];
-        const cached = await db.query(
-          'SELECT id FROM price_cache WHERE asset = $1 AND price_date = $2',
-          [symbol, date.toISOString().slice(0, 10)]
-        );
-        if (cached.rows.length === 0) toFetchList.push({ symbol, date });
-      }
 
       const CONCURRENCY = 10;
       let done = 0;
@@ -209,16 +217,15 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await client.query('DELETE FROM csv_imports WHERE id = $1', [id]);
   });
 
-  // Recalcular FIFO automáticamente tras borrar
-  // Solo si quedan imports (si no hay datos, no hay nada que calcular)
+  // Recalcular FIFO y esperar resultado antes de responder
   const remaining = await db.query('SELECT COUNT(*) FROM csv_imports');
   if (parseInt(remaining.rows[0].count) > 0) {
-    runFifoEngine().catch(err =>
+    await runFifoEngine().catch(err =>
       console.error('[DELETE IMPORT] Error recalculando FIFO:', err.message)
     );
   }
 
-  res.json({ success: true, fifoRecalculating: parseInt(remaining.rows[0].count) > 0 });
+  res.json({ success: true });
 });
 
 export default router;

@@ -16,6 +16,7 @@ CREATE TYPE operation_type AS ENUM (
   'SELL_FIAT', 'SELL_CRYPTO',
   'CONVERT_IN', 'CONVERT_OUT',
   'DEPOSIT_FIAT',
+  'WITHDRAW_FIAT',
   'WITHDRAW',
   'FEE', 'FEE_NETWORK', 'FEE_EXCHANGE',
   'INTERNAL_TRANSFER',
@@ -104,8 +105,17 @@ CREATE TABLE wallets (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO wallets (name, type, is_system, is_default, color)
-VALUES ('Binance', 'exchange', TRUE, TRUE, '#F0B90B');
+-- Wallet de sistema para activos retirados a wallets externas no rastreadas
+INSERT INTO wallets (name, type, is_system, is_default, color, notes)
+VALUES ('Wallets externas', 'software', TRUE, FALSE, '#6b7280',
+  'Activos retirados a wallets no registradas en esta app (MetaMask, otros exchanges, etc.)');
+
+-- Sub-cuentas de Binance (no borrables). Una por cada tipo de cuenta del CSV exportado.
+INSERT INTO wallets (name, type, is_system, is_default, color) VALUES
+  ('Binance Spot',             'exchange', TRUE, TRUE,  '#F0B90B'),
+  ('Binance Funding',          'exchange', TRUE, FALSE, '#F0B90B'),
+  ('Binance Cross Margin',     'exchange', TRUE, FALSE, '#E8892B'),
+  ('Binance Isolated Margin',  'exchange', TRUE, FALSE, '#C8812B');
 
 -- ============================================================
 -- TABLA: wallet_addresses

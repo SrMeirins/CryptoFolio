@@ -5,6 +5,7 @@ import { db } from '../../db/client';
 import { parseBinanceCsv } from './parser';
 import { validateCsvStructure, ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
+import { ACCOUNT_TO_WALLET, TRANSFER_DESTINATIONS } from './binanceAccounts';
 
 export interface ImportResult {
   importId: string;
@@ -129,27 +130,18 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
     }
   }
 
-  // Contar duplicados
+  // Contar duplicados — una sola query batch en lugar de N+1
+  const allHashes = parseResult.transactions.flatMap(tx => tx.rawRowHashes);
+  const existingRes = allHashes.length > 0
+    ? await db.query('SELECT row_hash FROM raw_transactions WHERE row_hash = ANY($1)', [allHashes])
+    : { rows: [] as { row_hash: string }[] };
+  const existingHashes = new Set(existingRes.rows.map((r: { row_hash: string }) => r.row_hash));
+
   let duplicateCount = 0;
   let newCount = 0;
-
   for (const tx of parseResult.transactions) {
-    let isDuplicate = false;
-    for (const hash of tx.rawRowHashes) {
-      const dup = await db.query(
-        'SELECT id FROM raw_transactions WHERE row_hash = $1',
-        [hash]
-      );
-      if (dup.rows.length > 0) {
-        isDuplicate = true;
-        break;
-      }
-    }
-    if (isDuplicate) {
-      duplicateCount++;
-    } else {
-      newCount++;
-    }
+    if (tx.rawRowHashes.some(h => existingHashes.has(h))) duplicateCount++;
+    else newCount++;
   }
 
   return {
@@ -164,7 +156,8 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
 
 export async function importCsvFile(
   fileBuffer: Buffer,
-  filename: string
+  filename: string,
+  withdrawalDestinations: Record<string, string> = {}
 ): Promise<ImportResult> {
   const validation = validateCsvStructure(fileBuffer);
   if (!validation.valid) {
@@ -193,11 +186,31 @@ export async function importCsvFile(
   }
 
   return await db.transaction(async (client) => {
-    const binanceRes = await client.query(
-      `SELECT id FROM wallets WHERE is_system = TRUE AND type = 'exchange' LIMIT 1`
+    // Cargar todas las wallets de sistema para asignar wallet_id correctamente
+    const walletsRes = await client.query(
+      `SELECT id, name, type FROM wallets WHERE is_system = TRUE`
     );
-    if (binanceRes.rows.length === 0) throw new Error('No hay wallet de exchange configurada');
-    const binanceWalletId: string = binanceRes.rows[0].id;
+    if (walletsRes.rows.length === 0) throw new Error('No hay wallets configuradas en el sistema');
+
+    const walletIdByName: Record<string, string> = {};
+    for (const row of walletsRes.rows as { id: string; name: string }[]) {
+      walletIdByName[row.name] = row.id;
+    }
+    const fallbackWalletId = walletsRes.rows[0].id;
+
+    // Resuelve el wallet_id para una cuenta CSV ('Spot', 'Funding', etc.)
+    function getWalletId(account: string): string {
+      const name = ACCOUNT_TO_WALLET[account];
+      return (name && walletIdByName[name]) ? walletIdByName[name] : fallbackWalletId;
+    }
+
+    // Resuelve el wallet_id destino para una transferencia interna
+    function getDestinationWalletId(notes: string | undefined, account: string): string | null {
+      if (!notes) return null;
+      const destName = TRANSFER_DESTINATIONS[notes]?.[account];
+      if (!destName) return null;
+      return walletIdByName[destName] ?? null;
+    }
 
     const importRes = await client.query(
       `INSERT INTO csv_imports (filename, file_hash, row_count, skipped_count)
@@ -207,16 +220,56 @@ export async function importCsvFile(
     );
     const importId: string = importRes.rows[0].id;
 
+    // Batch check duplicados dentro de la transacción
+    const allTxHashes = parseResult.transactions.flatMap(tx => tx.rawRowHashes);
+    const existingInDb = allTxHashes.length > 0
+      ? await client.query('SELECT row_hash FROM raw_transactions WHERE row_hash = ANY($1)', [allTxHashes])
+      : { rows: [] as { row_hash: string }[] };
+    const existingHashSet = new Set(existingInDb.rows.map((r: { row_hash: string }) => r.row_hash));
+
     let newTransactions = 0;
     let duplicateRows = 0;
 
     for (const tx of parseResult.transactions) {
-      const txId = await insertTransaction(client, tx, importId, binanceWalletId);
-      if (txId) {
-        newTransactions++;
-      } else {
+      if (tx.rawRowHashes.some(h => existingHashSet.has(h))) {
         duplicateRows++;
+        continue;
       }
+      const walletId = getWalletId(tx.account);
+      let destinationWalletId: string | null = null;
+      let effectiveOpType = tx.operationType;
+
+      if (tx.operationType === 'TRANSFER_INTERNAL') {
+        destinationWalletId = getDestinationWalletId(tx.notes, tx.account);
+      } else if (tx.operationType === 'WITHDRAW') {
+        const dest = withdrawalDestinations[tx.asset];
+
+        if (dest === '__lost__') {
+          // Pérdida de acceso → LOST
+          // FIFO consume el lote a 0 proceeds → pérdida patrimonial
+          effectiveOpType = 'LOST';
+          destinationWalletId = null;
+        } else if (dest === '__gift__') {
+          // Regalo, donación o pago a tercero → GIFT_SENT
+          // FIFO procesa como venta al precio de mercado → transmisión patrimonial
+          // G/P = precio de mercado en fecha de envío − coste de adquisición
+          effectiveOpType = 'GIFT_SENT';
+          destinationWalletId = null;
+        } else if (dest === '__external__') {
+          // Retirado a wallet externa no rastreada (MetaMask, otro exchange…)
+          // El lote se mueve a la wallet "Wallets externas" del sistema
+          const extWallet = walletsRes.rows.find(
+            (r: { name: string }) => r.name === 'Wallets externas'
+          );
+          destinationWalletId = extWallet?.id ?? null;
+        } else {
+          // Wallet fría del usuario
+          destinationWalletId = dest ?? null;
+        }
+      }
+
+      await insertTransaction(client, tx, importId, walletId, destinationWalletId, effectiveOpType);
+      newTransactions++;
     }
 
     await client.query(
@@ -245,15 +298,15 @@ async function insertTransaction(
   client: PoolClient,
   tx: ParsedTransaction,
   importId: string,
-  walletId: string
-): Promise<string | null> {
-  for (const hash of tx.rawRowHashes) {
-    const dup = await client.query(
-      'SELECT id FROM raw_transactions WHERE row_hash = $1',
-      [hash]
-    );
-    if (dup.rows.length > 0) return null;
-  }
+  walletId: string,
+  destinationWalletId: string | null = null,
+  operationTypeOverride?: string,
+): Promise<void> {
+  const opType = operationTypeOverride ?? tx.operationType;
+  // WITHDRAW sin destino asignado → pending (usuario lo asignará después)
+  const isWithdraw  = opType === 'WITHDRAW';
+  const destPending = isWithdraw && !destinationWalletId;
+  const destId      = destinationWalletId;
 
   const txRes = await client.query(
     `INSERT INTO transactions (
@@ -263,7 +316,7 @@ async function insertTransaction(
       fee_asset, fee_amount,
       wallet_id, account,
       notes, manually_added,
-      destination_pending
+      destination_wallet_id, destination_pending
     ) VALUES (
       $1, $2::operation_type, $3,
       $4, $5, $6,
@@ -271,11 +324,11 @@ async function insertTransaction(
       $10, $11,
       $12, $13,
       $14, false,
-      $15
+      $15, $16
     ) RETURNING id`,
     [
       importId,
-      tx.operationType,
+      opType,  // puede ser override (WITHDRAW→LOST para pérdidas)
       tx.timestamp,
       tx.asset,
       tx.amount,
@@ -288,20 +341,30 @@ async function insertTransaction(
       walletId,
       tx.account,
       tx.notes ?? null,
-      tx.operationType === 'WITHDRAW',
+      destId,
+      destPending,
     ]
   );
   const txId: string = txRes.rows[0].id;
 
+  // Guardar datos reales del CSV en raw_transactions (no strings vacíos)
   for (const hash of tx.rawRowHashes) {
     await client.query(
       `INSERT INTO raw_transactions
        (import_id, user_id, time, account, operation, coin, change, remark, row_hash, transaction_id)
-       VALUES ($1, '', $2, '', '', '', 0, '', $3, $4)
+       VALUES ($1, '', $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (row_hash) DO NOTHING`,
-      [importId, tx.timestamp, hash, txId]
+      [
+        importId,
+        tx.timestamp,
+        tx.account,
+        tx.operationType,
+        tx.asset,
+        tx.amount,
+        tx.notes ?? '',
+        hash,
+        txId,
+      ]
     );
   }
-
-  return txId;
 }

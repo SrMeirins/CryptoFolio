@@ -27,6 +27,11 @@ router.get('/', async (_req: Request, res: Response) => {
     FROM wallets w
     LEFT JOIN wallet_addresses wa ON wa.wallet_id = w.id
     LEFT JOIN networks n ON n.id = wa.network_id
+    WHERE
+      -- Exchanges (sub-cuentas de Binance) siempre visibles
+      w.type = 'exchange'
+      -- Wallets propias del usuario (no son del sistema)
+      OR w.is_system = FALSE
     GROUP BY w.id
     ORDER BY w.is_system DESC, w.created_at ASC
   `);

@@ -244,8 +244,9 @@ router.get('/:year/events', async (req: Request, res: Response) => {
       t.asset        AS activo,
       t.amount_net   AS cantidad,
       t.amount_net * COALESCE(t.price_per_unit, 0) AS valor_eur,
-      t.wallet
+      w.name         AS wallet
     FROM transactions t
+    JOIN wallets w ON w.id = t.wallet_id
     WHERE EXTRACT(YEAR FROM t.timestamp) = $1
       AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP')
     ORDER BY t.timestamp ASC
@@ -284,7 +285,10 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
 
       return {
         asset:        row.asset as string,
-        wallet:       row.wallet as string,
+        wallet_id:    row.wallet_id as string,
+        wallet_name:  row.wallet_name as string,
+        wallet_kind:  row.wallet_kind as string,
+        wallet_color: row.wallet_color as string,
         quantity,
         costBasisEur: parseFloat(row.cost_basis as string),
         precioEur:    precio,

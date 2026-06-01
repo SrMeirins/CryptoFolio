@@ -1,0 +1,165 @@
+/**
+ * Taxonomía oficial de cuentas y operaciones de Binance CSV.
+ * Esta es la fuente de verdad única del módulo de importación.
+ *
+ * status:
+ *   'supported' → parseada y procesada en FIFO
+ *   'ignored'   → reconocida pero sin impacto fiscal (transferencias internas)
+ *   'pending'   → reconocida pero no implementada todavía
+ */
+
+export type BinanceAccount = 'Spot' | 'Funding' | 'Cross Margin' | 'Isolated Margin' | 'Futures';
+
+export type OpStatus = 'supported' | 'ignored' | 'pending';
+
+export interface BinanceOperation {
+  csvLabel:     string;
+  internalType: string;  // operation_type de la DB, o 'IGNORED'
+  status:       OpStatus;
+  notes?:       string;
+}
+
+// ── Spot ───────────────────────────────────────────────────────────────────
+export const SPOT_OPERATIONS: BinanceOperation[] = [
+  { csvLabel: 'Deposit',                                                    internalType: 'DEPOSIT_FIAT',     status: 'supported' },
+  { csvLabel: 'Withdraw',                                                   internalType: 'WITHDRAW',         status: 'supported' },
+  { csvLabel: 'Buy Crypto With Fiat',                                       internalType: 'BUY',              status: 'supported' },
+  { csvLabel: 'Transaction Buy',                                            internalType: 'BUY',              status: 'supported' },
+  { csvLabel: 'Transaction Spend',                                          internalType: 'BUY',              status: 'supported',  notes: 'Fila de coste en Transaction Buy' },
+  { csvLabel: 'Transaction Fee',                                            internalType: 'BUY',              status: 'supported',  notes: 'Fila de comisión en Transaction Buy/Sold' },
+  { csvLabel: 'Transaction Sold',                                           internalType: 'SELL',             status: 'supported' },
+  { csvLabel: 'Transaction Revenue',                                        internalType: 'SELL',             status: 'supported',  notes: 'Fila de ingreso en Transaction Sold' },
+  { csvLabel: 'Binance Convert',                                            internalType: 'BUY',              status: 'supported',  notes: 'Swap EUR→cripto o cripto→cripto' },
+  { csvLabel: 'Small Assets Exchange BNB',                                  internalType: 'BUY',              status: 'supported',  notes: 'Conversión de dust a BNB' },
+  { csvLabel: 'Transfer Between Main and Funding Wallet',                   internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Movimiento Spot↔Funding — mueve lotes entre sub-cuentas' },
+  { csvLabel: 'Transfer Between Main Account/Futures and Margin Account',   internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Movimiento Spot↔Margin — mueve lotes entre sub-cuentas' },
+  // Retiro de fiat al banco (no hay lote FIFO que mover, solo tracking contable)
+  { csvLabel: 'Fiat Withdraw',                                              internalType: 'WITHDRAW_FIAT',     status: 'supported' },
+  // Compra con tarjeta/banco — mismo patrón que Buy Crypto With Fiat
+  { csvLabel: 'Buy Crypto With Card',                                       internalType: 'BUY',               status: 'supported' },
+  // Sistema OCBS de Binance — variante de compra con EUR
+  { csvLabel: 'Convert Fiat to Crypto OCBS',                                internalType: 'BUY',               status: 'supported', notes: 'Variante OCBS de compra EUR→cripto' },
+  // Asientos contables internos del sistema OCBS (ignorados, la compra ya se registra en la op. principal)
+  { csvLabel: 'Fiat OCBS - Add Fiat and Fees',                              internalType: 'IGNORED',           status: 'ignored',   notes: 'Asiento contable OCBS, redundante con Buy Crypto With Card' },
+  { csvLabel: 'Deposit Fiat OCBS',                                          internalType: 'IGNORED',           status: 'ignored',   notes: 'Asiento contable OCBS, redundante con Convert Fiat to Crypto OCBS' },
+  // Airdrops y distribuciones
+  { csvLabel: 'Distribution',                                               internalType: 'AIRDROP',           status: 'supported', notes: 'Airdrop/distribución de tokens' },
+  // Fee standalone pagada en BNB
+  { csvLabel: 'BNB Fee Deduction',                                          internalType: 'FEE_EXCHANGE',      status: 'supported', notes: 'Fee de exchange pagada en BNB — evento imponible' },
+];
+
+// ── Funding ────────────────────────────────────────────────────────────────
+export const FUNDING_OPERATIONS: BinanceOperation[] = [
+  { csvLabel: 'Binance Convert',                                            internalType: 'BUY',              status: 'supported' },
+  { csvLabel: 'Crypto Box',                                                 internalType: 'CASHBACK',         status: 'supported' },
+  { csvLabel: 'Asset Recovery',                                             internalType: 'AIRDROP',          status: 'supported' },
+  { csvLabel: 'Transfer Between Main and Funding Wallet',                   internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Movimiento Funding↔Spot — mueve lotes entre sub-cuentas' },
+  // Staking / rendimientos
+  { csvLabel: 'Staking Rewards',                                            internalType: 'STAKING_REWARD',   status: 'supported' },
+  { csvLabel: 'ETH 2.0 Staking Rewards',                                   internalType: 'STAKING_REWARD',   status: 'supported' },
+  { csvLabel: 'Simple Earn Flexible Interest',                              internalType: 'LENDING_INTEREST', status: 'supported' },
+  { csvLabel: 'Simple Earn Locked Rewards',                                 internalType: 'STAKING_REWARD',   status: 'supported' },
+  { csvLabel: 'Savings Interest',                                           internalType: 'LENDING_INTEREST', status: 'supported' },
+  { csvLabel: 'POS savings interest',                                       internalType: 'LENDING_INTEREST', status: 'supported' },
+  { csvLabel: 'Launchpool Interest',                                        internalType: 'STAKING_REWARD',   status: 'supported' },
+  { csvLabel: 'BNB Vault Rewards',                                          internalType: 'STAKING_REWARD',   status: 'supported' },
+  // Airdrops / cashback
+  { csvLabel: 'Airdrop Assets',                                             internalType: 'AIRDROP',          status: 'supported' },
+  { csvLabel: 'Cash Voucher Distribution',                                  internalType: 'CASHBACK',         status: 'supported' },
+  { csvLabel: 'Commission Rebate',                                          internalType: 'CASHBACK',         status: 'supported' },
+  { csvLabel: 'Referral Kickback',                                          internalType: 'CASHBACK',         status: 'supported' },
+  { csvLabel: 'Mission Reward Distribution',                                internalType: 'CASHBACK',         status: 'supported' },
+  // Movimientos internos (sin impacto fiscal)
+  { csvLabel: 'Simple Earn Flexible Subscription',                          internalType: 'IGNORED',          status: 'ignored' },
+  { csvLabel: 'Simple Earn Flexible Redemption',                            internalType: 'IGNORED',          status: 'ignored' },
+  { csvLabel: 'Simple Earn Locked Subscription',                            internalType: 'IGNORED',          status: 'ignored' },
+  { csvLabel: 'Simple Earn Locked Redemption',                              internalType: 'IGNORED',          status: 'ignored' },
+  { csvLabel: 'Token Swap - Redenomination/Rebranding',                     internalType: 'IGNORED',          status: 'ignored' },
+  { csvLabel: 'Dual Investment - Subscribe',                                internalType: 'IGNORED',          status: 'ignored' },
+  { csvLabel: 'Dual Investment - Settlement',                               internalType: 'IGNORED',          status: 'ignored' },
+];
+
+// ── Isolated Margin ────────────────────────────────────────────────────────
+export const ISOLATED_MARGIN_OPERATIONS: BinanceOperation[] = [
+  { csvLabel: 'Transaction Buy',                                            internalType: 'BUY',               status: 'supported' },
+  { csvLabel: 'Transaction Spend',                                          internalType: 'BUY',               status: 'supported' },
+  { csvLabel: 'Transaction Fee',                                            internalType: 'BUY',               status: 'supported' },
+  { csvLabel: 'Transaction Sold',                                           internalType: 'SELL',              status: 'supported' },
+  { csvLabel: 'Transaction Revenue',                                        internalType: 'SELL',              status: 'supported' },
+  { csvLabel: 'Transfer Between Main Account/Futures and Margin Account',   internalType: 'TRANSFER_INTERNAL', status: 'supported' },
+  { csvLabel: 'Isolated Margin Loan',       internalType: 'IGNORED',      status: 'supported', notes: 'Préstamo recibido — no hecho imponible' },
+  { csvLabel: 'Isolated Margin Repayment',  internalType: 'FEE_EXCHANGE', status: 'supported', notes: 'Devolución préstamo — disposición patrimonial si hay lote FIFO' },
+  { csvLabel: 'Isolated Margin Liquidation - Fee', internalType: 'FEE_EXCHANGE', status: 'supported', notes: 'Fee de liquidación — evento imponible' },
+  { csvLabel: 'BNB Fee Deduction',          internalType: 'FEE_EXCHANGE', status: 'supported', notes: 'Positivo = devolución de fee original (CASHBACK); negativo = fee en BNB' },
+];
+
+// ── Cross Margin ───────────────────────────────────────────────────────────
+export const CROSS_MARGIN_OPERATIONS: BinanceOperation[] = [
+  { csvLabel: 'Transaction Buy',                                            internalType: 'BUY',              status: 'supported',  notes: 'Multifill pendiente' },
+  { csvLabel: 'Transaction Spend',                                          internalType: 'BUY',              status: 'supported' },
+  { csvLabel: 'Transaction Fee',                                            internalType: 'BUY',              status: 'supported' },
+  { csvLabel: 'Transaction Sold',                                           internalType: 'SELL',             status: 'supported',  notes: 'Multifill pendiente' },
+  { csvLabel: 'Transaction Revenue',                                        internalType: 'SELL',             status: 'supported' },
+  { csvLabel: 'Transfer Between Main Account/Futures and Margin Account',   internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Movimiento Spot↔Margin' },
+  { csvLabel: 'Margin Fee',                                                 internalType: 'FEE_EXCHANGE',      status: 'supported', notes: 'Interés de margen pagado en cripto — evento imponible en España' },
+  { csvLabel: 'Margin Loan',       internalType: 'IGNORED',      status: 'supported', notes: 'Préstamo recibido — no hecho imponible. Guardado en historial para tracking.' },
+  { csvLabel: 'Margin Repayment', internalType: 'FEE_EXCHANGE', status: 'supported', notes: 'Devolución préstamo — disposición patrimonial al precio de mercado si hay lote FIFO' },
+  { csvLabel: 'Cross Margin Liquidation - Repayment',   internalType: 'FEE_EXCHANGE', status: 'supported', notes: 'Repago de deuda — disposición patrimonial al precio de mercado' },
+  { csvLabel: 'Cross Margin Liquidation - Small Assets Takeover', internalType: 'SELL', status: 'supported', notes: 'Venta forzosa de colateral — transmisión patrimonial imponible' },
+];
+
+// ── Mapeo cuenta CSV → nombre de wallet en la DB ──────────────────────────
+// Permite al importer asignar el wallet_id correcto a cada transacción.
+export const ACCOUNT_TO_WALLET: Record<string, string> = {
+  'Spot':             'Binance Spot',
+  'Funding':          'Binance Funding',
+  'Cross Margin':     'Binance Cross Margin',
+  'Isolated Margin':  'Binance Isolated Margin',
+};
+
+// ── Destino de cada tipo de transferencia interna ──────────────────────────
+// Para TRANSFER_INTERNAL: dado cuenta origen → nombre de wallet destino.
+export const TRANSFER_DESTINATIONS: Record<string, Record<string, string>> = {
+  'Transfer Between Main and Funding Wallet': {
+    'Spot':    'Binance Funding',
+    'Funding': 'Binance Spot',
+  },
+  'Transfer Between Main Account/Futures and Margin Account': {
+    'Spot':             'Binance Cross Margin',
+    'Cross Margin':     'Binance Spot',
+    'Funding':          'Binance Cross Margin',
+    'Isolated Margin':  'Binance Spot',
+  },
+};
+
+// ── Índice global ──────────────────────────────────────────────────────────
+export const ACCOUNT_OPERATIONS: Record<string, BinanceOperation[]> = {
+  'Spot':             SPOT_OPERATIONS,
+  'Funding':          FUNDING_OPERATIONS,
+  'Cross Margin':     CROSS_MARGIN_OPERATIONS,
+  'Isolated Margin':  ISOLATED_MARGIN_OPERATIONS,
+};
+
+// Set de todas las operaciones conocidas (para el validador)
+// 'Margin Short Sale' es una etiqueta interna generada por el parser, no aparece en CSV
+export const ALL_KNOWN_OPERATIONS = new Set([
+  ...Object.values(ACCOUNT_OPERATIONS).flat().map(op => op.csvLabel),
+  'Margin Short Sale',
+]);
+
+// Set de operaciones que se ignoran en FIFO (para el parser)
+export const ALL_IGNORED_OPERATIONS = new Set(
+  Object.values(ACCOUNT_OPERATIONS)
+    .flat()
+    .filter(op => op.status === 'ignored')
+    .map(op => op.csvLabel)
+);
+
+// Colores por cuenta (para la UI)
+export const ACCOUNT_COLORS: Record<string, string> = {
+  'Spot':           '#6366f1',
+  'Funding':        '#8b5cf6',
+  'Cross Margin':   '#f59e0b',
+  'Isolated Margin':'#e74c3c',
+  'Futures':        '#e74c3c',
+};

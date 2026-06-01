@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, TrendingUp, FileText, Upload,
-  ChevronLeft, ChevronRight, Wallet, Activity, Settings
+  ChevronLeft, ChevronRight, Wallet, Activity, Settings,
 } from 'lucide-react'
 import { usePricesStore } from '../store/pricesStore'
 
@@ -48,7 +48,7 @@ export function Sidebar() {
             end={to === '/'}
             className={({ isActive }) => `
               flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
-              transition-colors duration-150 group
+              transition-colors duration-150
               ${isActive
                 ? 'bg-accent-blue/10 text-accent-blue'
                 : 'text-gray-400 hover:text-white hover:bg-background-tertiary'
@@ -61,10 +61,10 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Status WS + collapse */}
+      {/* WS status + collapse */}
       <div className="px-3 py-4 border-t border-border space-y-3">
         {!collapsed && (
-          <div className="flex items-center gap-2 px-2">
+          <div className="flex items-center gap-2 px-1">
             <div className={`w-2 h-2 rounded-full ${connected ? 'bg-accent-green animate-pulse' : 'bg-gray-500'}`} />
             <span className="text-xs text-gray-500">
               {connected ? 'Precios live' : 'Reconectando...'}
