@@ -447,10 +447,11 @@ export const OPERATION_CATALOG: OperationType[] = [
     badgeColor: 'gray',
     example: 'Transfer Between Main and Funding Wallet de Binance',
     fields: [
-      { name: 'timestamp', label: 'Fecha y hora',           required: true,  type: 'datetime' },
-      { name: 'asset',     label: 'Activo (referencia)',     required: false, type: 'asset' },
-      { name: 'amount',    label: 'Cantidad (referencia)',   required: false, type: 'number' },
-      { name: 'notes',     label: 'Motivo por el que se ignora', required: false, type: 'text' },
+      { name: 'timestamp',   label: 'Fecha y hora',                required: true,  type: 'datetime' },
+      { name: 'asset',       label: 'Activo (referencia)',          required: false, type: 'asset' },
+      { name: 'amount',      label: 'Cantidad (referencia)',        required: false, type: 'number' },
+      { name: 'from_wallet', label: 'Wallet (referencia)',          required: false, type: 'wallet' },
+      { name: 'notes',       label: 'Motivo por el que se ignora',  required: false, type: 'text' },
     ],
   },
 ];

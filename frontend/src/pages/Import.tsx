@@ -4,11 +4,12 @@ import { portfolioApi, ImportRecord } from '../api/portfolio'
 import {
   Upload, FileText, Trash2, RefreshCw, CheckCircle,
   AlertCircle, ChevronDown, ChevronUp, Eye, Play,
-  AlertTriangle, Info, ArrowRight, Plus, HardDrive, X, Check
+  AlertTriangle, Info, ArrowRight, Plus, HardDrive, X, Check, ChevronRight, Zap
 } from 'lucide-react'
 import { OperationWizard, WizardResult } from '../components/OperationWizard'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ManualTxModal } from '../components/ManualTxModal'
+import { useToast } from '../components/Toast'
 import { useNavigate, Link } from 'react-router-dom'
 
 const SETUP_KEY = 'cflio_setup_seen'
@@ -57,6 +58,7 @@ interface PreviewTransaction {
   account: string
   notes?: string
   subTradeCount: number
+  rawRowHashes?: string[]  // primer hash = txKey único para retiros
 }
 
 interface UnknownOperationSample {
@@ -66,6 +68,15 @@ interface UnknownOperationSample {
   originalLabel: string
 }
 
+interface DepositReview {
+  txKey: string
+  timestamp: string
+  asset: string
+  amount: number
+  historicalPrice: number | null
+  existingInDb?: boolean  // ya importado en DB sin coste
+}
+
 interface PreviewResult {
   validation: ValidationResult
   transactions: PreviewTransaction[]
@@ -73,6 +84,7 @@ interface PreviewResult {
   newCount: number
   errors: string[]
   unknownOperationSamples: Record<string, UnknownOperationSample>
+  depositReviews: DepositReview[]
 }
 
 interface ProgressEvent {
@@ -120,18 +132,39 @@ export function ImportPage() {
   const [preview, setPreview] = useState<PreviewResult | null>(null)
   const [catalogingOp, setCatalogingOp] = useState<string | null>(null)
   const [resolvedOps, setResolvedOps] = useState<Record<string, WizardResult>>({})
-  // asset -> walletId: destinos asignados por el usuario para cada retiro
-  const [withdrawalDestinations, setWithdrawalDestinations] = useState<Record<string, string>>({})
+  // txKey -> walletId: destinos asignados por transacción de retiro (clave = rawRowHashes[0])
+  const [withdrawalDestinations, setWithdrawalDestinations] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(sessionStorage.getItem('import_withdrawal_dest') ?? '{}') } catch { return {} }
+  })
+  // txKey → pricePerUnit (null = usuario marcó como "desconocido")
+  const [depositCosts, setDepositCosts] = useState<Record<string, number | null>>(() => {
+    try { return JSON.parse(sessionStorage.getItem('import_deposit_costs') ?? '{}') } catch { return {} }
+  })
   const [progressLog, setProgressLog] = useState<ProgressEvent[]>([])
   const [showTxTable, setShowTxTable] = useState(false)
   const [txPage, setTxPage] = useState(0)
   const [showManualTx, setShowManualTx] = useState(false)
   const TX_PAGE_SIZE = 20
 
+  // Persistir estado de revisión en sessionStorage para sobrevivir recargas accidentales
+  useEffect(() => {
+    try { sessionStorage.setItem('import_withdrawal_dest', JSON.stringify(withdrawalDestinations)) } catch { /* ignorar */ }
+  }, [withdrawalDestinations])
+
+  useEffect(() => {
+    try { sessionStorage.setItem('import_deposit_costs', JSON.stringify(depositCosts)) } catch { /* ignorar */ }
+  }, [depositCosts])
+
   const { data: imports = [] } = useQuery({
     queryKey: ['imports'],
     queryFn: portfolioApi.getImports,
   })
+
+  const { data: pendingDeposits = [] } = useQuery({
+    queryKey: ['pending-deposits'],
+    queryFn: portfolioApi.getPendingDeposits,
+  })
+  const hasPendingDeposits = pendingDeposits.length > 0
 
   async function handleFile(file: File) {
     setError(null)
@@ -162,6 +195,19 @@ export function ImportPage() {
   async function handleConfirm() {
     if (!fileBufferRef.current) return
 
+    // Guard: depósitos sin revisar → volver al preview
+    const csvDeposits = (preview?.transactions ?? [])
+      .filter(tx => (tx.notes ?? '').includes('cripto externo'))
+    const unreviewedDeposits = csvDeposits.some(tx => {
+      const key = tx.rawRowHashes?.[0] ?? `${tx.timestamp}|${tx.asset}|${tx.amount}`
+      return !(key in depositCosts)
+    })
+    if (unreviewedDeposits) {
+      setStage('preview')
+      setError('Asigna el coste de adquisición de todos los depósitos externos en el panel de revisión.')
+      return
+    }
+
     setStage('progress')
     setProgressLog([])
 
@@ -173,6 +219,11 @@ export function ImportPage() {
     }
     if (Object.keys(withdrawalDestinations).length > 0) {
       form.append('withdrawalDestinations', JSON.stringify(withdrawalDestinations))
+    }
+    // Enviar TODOS los costes revisados incluyendo null ("No sé")
+    // El servidor los usa para verificar que el usuario revisó cada depósito
+    if (Object.keys(depositCosts).length > 0) {
+      form.append('depositCosts', JSON.stringify(depositCosts))
     }
 
     try {
@@ -205,6 +256,10 @@ export function ImportPage() {
               queryClient.invalidateQueries({ queryKey: ['imports'] })
               queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
               queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
+              try {
+                sessionStorage.removeItem('import_withdrawal_dest')
+                sessionStorage.removeItem('import_deposit_costs')
+              } catch { /* ignorar */ }
             }
           } catch { /* ignorar */ }
         }
@@ -221,8 +276,13 @@ export function ImportPage() {
     setProgressLog([])
     setResolvedOps({})
     setWithdrawalDestinations({})
+    setDepositCosts({})
     fileBufferRef.current = null
     if (fileRef.current) fileRef.current.value = ''
+    try {
+      sessionStorage.removeItem('import_withdrawal_dest')
+      sessionStorage.removeItem('import_deposit_costs')
+    } catch { /* ignorar */ }
   }
 
   async function handleDelete(id: string) {
@@ -305,8 +365,15 @@ export function ImportPage() {
           txPageSize={TX_PAGE_SIZE}
           resolvedOps={resolvedOps}
           withdrawalDestinations={withdrawalDestinations}
+          depositCosts={depositCosts}
           onWithdrawalDestination={(asset, walletId) =>
             setWithdrawalDestinations(prev => ({ ...prev, [asset]: walletId }))
+          }
+          onDepositCost={(txKey, price) =>
+            setDepositCosts(prev => ({ ...prev, [txKey]: price }))
+          }
+          onIgnoreOp={(op) =>
+            setResolvedOps(prev => ({ ...prev, [op]: { operationTypeId: 'IGNORED', fields: {} } }))
           }
           onCatalog={(op) => { setCatalogingOp(op); setStage('catalog') }}
           onConfirm={handleConfirm}
@@ -594,13 +661,408 @@ function WithdrawalSelector({ value, coldWallets, onChange }: {
   )
 }
 
+// Clave única por transacción de retiro
+function txKey(tx: PreviewTransaction): string {
+  return tx.rawRowHashes?.[0] ?? `${tx.timestamp}|${tx.asset}|${tx.amountNet}`
+}
+
+// ── DepositReviewStage ── Stage dedicada (como catalog), imposible saltarse ─
+function DepositReviewStage({ transactions, depositCosts, onSetCost, onConfirm, onBack }: {
+  transactions: PreviewTransaction[]
+  depositCosts: Record<string, number | null>
+  onSetCost: (txKey: string, price: number | null) => void
+  onConfirm: () => void
+  onBack: () => void
+}) {
+  const deposits: DepositReview[] = transactions
+    .filter(tx => (tx.notes ?? '').includes('cripto externo'))
+    .map(tx => ({
+      txKey:          tx.rawRowHashes?.[0] ?? `${tx.timestamp}|${tx.asset}|${tx.amount}`,
+      timestamp:      tx.timestamp,
+      asset:          tx.asset,
+      amount:         tx.amount,
+      historicalPrice: null,
+    }))
+
+  const reviewed     = deposits.filter(d => d.txKey in depositCosts).length
+  const allReviewed  = reviewed === deposits.length
+
+  return (
+    <div className="card space-y-5">
+      {/* Header */}
+      <div className="flex items-start gap-3 pb-4 border-b border-border">
+        <div className="w-9 h-9 rounded-xl bg-accent-amber/15 flex items-center justify-center shrink-0">
+          <AlertTriangle size={18} className="text-accent-amber" />
+        </div>
+        <div className="flex-1">
+          <h2 className="font-semibold text-base text-white">Revisión de depósitos externos</h2>
+          <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+            {deposits.length} depósito{deposits.length > 1 ? 's' : ''} recibido{deposits.length > 1 ? 's' : ''} desde fuera de Binance.
+            Indica el precio al que los compraste para que el cálculo FIFO y tu declaración fiscal sean correctos.
+          </p>
+        </div>
+        {/* Progreso */}
+        <div className="shrink-0 text-right">
+          <span className={`text-sm font-bold mono ${allReviewed ? 'text-accent-green' : 'text-accent-amber'}`}>
+            {reviewed}/{deposits.length}
+          </span>
+          <p className="text-[10px] text-gray-600 mt-0.5">revisados</p>
+        </div>
+      </div>
+
+      {/* Lista de depósitos */}
+      <div className="space-y-3">
+        {deposits.map(dep => (
+          <DepositCostRow
+            key={dep.txKey}
+            dep={dep}
+            cost={depositCosts[dep.txKey]}
+            reviewed={dep.txKey in depositCosts}
+            onSetCost={onSetCost}
+          />
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-4 border-t border-border">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
+        >
+          <ChevronRight size={14} className="rotate-180" />
+          Volver al preview
+        </button>
+        <button
+          onClick={onConfirm}
+          disabled={!allReviewed}
+          className="flex items-center gap-2 px-6 py-2.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+        >
+          <Play size={14} />
+          {allReviewed ? 'Confirmar e importar' : `Faltan ${deposits.length - reviewed} por revisar`}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── DepositCostReview ──────────────────────────────────────────────────────
+function DepositCostReview({ deposits, costs, onSetCost }: {
+  deposits: DepositReview[]
+  costs: Record<string, number | null>
+  onSetCost: (txKey: string, pricePerUnit: number | null) => void
+}) {
+  const reviewed  = deposits.filter(d => d.txKey in costs).length
+  const total     = deposits.length
+  const allDone   = reviewed === total
+
+  return (
+    <div className={`card border-2 ${allDone ? 'border-accent-green/30' : 'border-accent-amber/40'} space-y-4`}>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle size={16} className={`shrink-0 mt-0.5 ${allDone ? 'text-accent-green' : 'text-accent-amber'}`} />
+          <div>
+            <h3 className={`font-semibold text-sm ${allDone ? 'text-accent-green' : 'text-accent-amber'}`}>
+              {allDone ? '✓ Depósitos revisados' : 'Asigna el coste de adquisición de cada depósito'}
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Estos activos llegaron desde fuera de Binance. Obligatorio antes de importar.
+            </p>
+          </div>
+        </div>
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
+          allDone ? 'bg-accent-green/20 text-accent-green' : 'bg-accent-amber/20 text-accent-amber'
+        }`}>
+          {reviewed}/{total}
+        </span>
+      </div>
+
+      {/* Lista */}
+      <div className="space-y-2">
+        {deposits.map(dep => (
+          <DepositCostRow
+            key={dep.txKey}
+            dep={dep}
+            cost={costs[dep.txKey]}
+            reviewed={dep.txKey in costs}
+            onSetCost={onSetCost}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── DepositSection ── depósitos agrupados por activo (sin dropdowns, inline) ─
+function DepositSection({ deposits, depositCosts, onSetCost, allReviewed, reviewedCount }: {
+  deposits: DepositReview[]
+  depositCosts: Record<string, number | null>
+  onSetCost: (txKey: string, price: number | null) => void
+  allReviewed: boolean
+  reviewedCount: number
+}) {
+  const byAsset: Record<string, DepositReview[]> = {}
+  for (const dep of deposits) {
+    if (!byAsset[dep.asset]) byAsset[dep.asset] = []
+    byAsset[dep.asset].push(dep)
+  }
+
+  return (
+    <div className="border-t border-border pt-4 space-y-2">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-semibold ${allReviewed ? 'text-accent-green' : 'text-accent-amber'}`}>
+            {allReviewed ? '✓ Depósitos revisados' : 'Depósitos externos — coste de adquisición'}
+          </span>
+          <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+            allReviewed ? 'bg-accent-green/20 text-accent-green' : 'bg-accent-amber/20 text-accent-amber'
+          }`}>
+            {reviewedCount}/{deposits.length}
+          </span>
+        </div>
+        <p className="text-[11px] text-gray-600">Activos recibidos desde fuera de Binance</p>
+      </div>
+
+      {Object.entries(byAsset).map(([asset, deps]) => (
+        <DepositAssetGroup
+          key={asset}
+          asset={asset}
+          deposits={deps}
+          depositCosts={depositCosts}
+          onSetCost={onSetCost}
+        />
+      ))}
+    </div>
+  )
+}
+
+function DepositAssetGroup({ asset, deposits, depositCosts, onSetCost }: {
+  asset: string
+  deposits: DepositReview[]
+  depositCosts: Record<string, number | null>
+  onSetCost: (txKey: string, price: number | null) => void
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const reviewedCount = deposits.filter(d => d.txKey in depositCosts).length
+  const allReviewed   = reviewedCount === deposits.length
+  const totalAmt      = deposits.reduce((s, d) => s + d.amount, 0)
+  const hasMany       = deposits.length > 1
+
+  function applyAll(price: number | null) {
+    deposits.forEach(d => onSetCost(d.txKey, price))
+  }
+
+  return (
+    <div className={`rounded-xl border ${allReviewed ? 'border-accent-green/30' : 'border-border'}`}>
+      {/* Cabecera grupo */}
+      <div className={`flex items-center gap-3 px-4 py-3 rounded-t-xl ${allReviewed ? 'bg-accent-green/5' : 'bg-background-tertiary/60'}`}>
+        <div className={`w-2 h-2 rounded-full shrink-0 ${
+          allReviewed ? 'bg-accent-green' : reviewedCount > 0 ? 'bg-accent-amber' : 'bg-gray-600'
+        }`} />
+        <span className="font-bold mono text-sm">{asset}</span>
+        <span className="text-xs text-gray-500">
+          {hasMany
+            ? `${deposits.length} entradas · ${totalAmt.toLocaleString('es-ES', { maximumFractionDigits: 6 })}`
+            : `${totalAmt.toLocaleString('es-ES', { maximumFractionDigits: 6 })} · ${
+                new Date(deposits[0].timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+              }`
+          }
+        </span>
+        <div className="flex-1" />
+
+        {/* Acciones masivas del grupo */}
+        {hasMany && (
+          <div className="flex items-center gap-1.5">
+            <HistoricalPriceButton asset={asset} timestamp={deposits[0].timestamp} onPrice={applyAll} label="Hist. a todos" />
+            <button onClick={() => applyAll(0)}
+              className="text-[10px] px-2 py-1 rounded-md border border-border text-gray-500 hover:text-white hover:border-gray-500 bg-background-card transition-colors">
+              Gratis a todos
+            </button>
+            <button onClick={() => applyAll(null)}
+              className="text-[10px] px-2 py-1 rounded-md border border-border text-gray-500 hover:text-white hover:border-gray-500 bg-background-card transition-colors">
+              No sé a todos
+            </button>
+          </div>
+        )}
+
+        {hasMany && (
+          <button onClick={() => setExpanded(e => !e)} className="text-gray-500 hover:text-gray-300 transition-colors ml-1">
+            <ChevronDown size={13} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+
+        {allReviewed && (
+          <span className="text-[10px] text-accent-green flex items-center gap-0.5">
+            <Check size={9} /> listo
+          </span>
+        )}
+      </div>
+
+      {/* Filas individuales */}
+      {expanded && (
+        <div className="divide-y divide-border/50">
+          {deposits.map(dep => (
+            <DepositRow
+              key={dep.txKey}
+              dep={dep}
+              cost={depositCosts[dep.txKey]}
+              reviewed={dep.txKey in depositCosts}
+              onSetCost={onSetCost}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Botón auto-fetch precio histórico con estado de error
+function HistoricalPriceButton({ asset, timestamp, onPrice, label = 'Precio histórico' }: {
+  asset: string
+  timestamp: string
+  onPrice: (p: number) => void
+  label?: string
+}) {
+  const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle')
+
+  async function fetch_() {
+    setState('loading')
+    try {
+      const dateStr = new Date(timestamp).toISOString().slice(0, 10)
+      const res = await fetch(`/api/prices/historical?asset=${asset}&date=${dateStr}`)
+      if (res.ok) {
+        const d = await res.json()
+        if (d.price_eur > 0) { onPrice(d.price_eur); setState('idle') }
+        else setState('error')
+      } else { setState('error') }
+    } catch { setState('error') }
+  }
+
+  if (state === 'error') {
+    return (
+      <button onClick={() => setState('idle')}
+        className="text-[10px] px-2 py-1 rounded-md border border-accent-red/40 text-accent-red bg-accent-red/5 transition-colors">
+        Sin precio en Binance ✕
+      </button>
+    )
+  }
+
+  return (
+    <button onClick={fetch_} disabled={state === 'loading'}
+      className="text-[10px] px-2 py-1 rounded-md border border-accent-blue/30 text-accent-blue bg-accent-blue/5 hover:bg-accent-blue/15 transition-colors disabled:opacity-50 flex items-center gap-1">
+      {state === 'loading' ? <RefreshCw size={9} className="animate-spin" /> : <Zap size={9} />}
+      {label}
+    </button>
+  )
+}
+
+// Fila de depósito individual — botones inline, sin dropdowns
+function DepositRow({ dep, cost, reviewed, onSetCost }: {
+  dep: DepositReview
+  cost: number | null | undefined
+  reviewed: boolean
+  onSetCost: (txKey: string, v: number | null) => void
+}) {
+  const [inputVal, setInputVal] = useState(cost != null ? String(cost) : '')
+  const date = new Date(dep.timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+
+  function handleInput(val: string) {
+    setInputVal(val)
+    const n = parseFloat(val.replace(',', '.'))
+    if (!isNaN(n) && n >= 0) onSetCost(dep.txKey, n)
+    else if (val === '') onSetCost(dep.txKey, undefined as unknown as null)
+  }
+
+  const isReviewed  = reviewed
+  const statusLabel = !isReviewed   ? null
+    : cost != null                  ? `${cost.toLocaleString('es-ES', { maximumFractionDigits: 6 })} €/ud.`
+    : 'desconocido'
+
+  return (
+    <div className="px-4 py-3">
+      {/* Fila superior: fecha + cantidad */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xs text-gray-400 mono">{date}</span>
+        <span className="text-xs text-gray-600">·</span>
+        <span className="text-xs text-gray-300 mono">
+          {dep.amount.toLocaleString('es-ES', { maximumFractionDigits: 6 })} {dep.asset}
+        </span>
+        {statusLabel && (
+          <span className={`ml-auto text-[10px] font-medium ${cost != null ? 'text-accent-green' : 'text-gray-500'}`}>
+            {cost != null ? `✓ ${statusLabel}` : `○ ${statusLabel}`}
+          </span>
+        )}
+        {!isReviewed && (
+          <span className="ml-auto text-[10px] text-accent-amber">● pendiente</span>
+        )}
+      </div>
+
+      {/* Fila inferior: acciones */}
+      <div className="flex items-center gap-2">
+        {/* Input precio sin flechas */}
+        <div className="relative flex items-center flex-1 max-w-48">
+          <input
+            type="text"
+            inputMode="decimal"
+            placeholder="0,000000"
+            value={inputVal}
+            onChange={e => handleInput(e.target.value)}
+            className={`w-full bg-background-primary border rounded-lg pl-3 pr-12 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-none mono transition-colors ${
+              isReviewed && cost != null ? 'border-accent-green/40 focus:border-accent-green' : 'border-border focus:border-accent-blue'
+            }`}
+          />
+          <span className="absolute right-3 text-[10px] text-gray-600 pointer-events-none">€/ud.</span>
+        </div>
+
+        {/* Precio histórico */}
+        <HistoricalPriceButton
+          asset={dep.asset}
+          timestamp={dep.timestamp}
+          onPrice={p => { setInputVal(String(p)); onSetCost(dep.txKey, p) }}
+        />
+
+        {/* Gratis */}
+        <button
+          onClick={() => { setInputVal('0'); onSetCost(dep.txKey, 0) }}
+          className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+            cost === 0 && isReviewed
+              ? 'border-accent-green/40 bg-accent-green/10 text-accent-green'
+              : 'border-border text-gray-500 hover:text-white hover:border-gray-500 bg-background-card'
+          }`}
+          title="Coste 0€ — airdrop, regalo, minería, etc."
+        >
+          Gratis (0€)
+        </button>
+
+        {/* No sé */}
+        <button
+          onClick={() => { setInputVal(''); onSetCost(dep.txKey, null) }}
+          className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+            cost == null && isReviewed
+              ? 'border-gray-600 bg-gray-800 text-gray-300'
+              : 'border-border text-gray-500 hover:text-white hover:border-gray-500 bg-background-card'
+          }`}
+          title="Coste desconocido — se usará el precio de mercado en la fecha"
+        >
+          No sé
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── WithdrawalDestinations ─────────────────────────────────────────────────
-function WithdrawalDestinations({ withdrawals, destinations, onAssign }: {
+function WithdrawalDestinations({ withdrawals, destinations, onAssign, deposits, depositCosts, onSetDepositCost }: {
   withdrawals: PreviewTransaction[]
   destinations: Record<string, string>
-  onAssign: (asset: string, walletId: string) => void
+  onAssign: (txKey: string, walletId: string) => void
+  deposits: DepositReview[]
+  depositCosts: Record<string, number | null>
+  onSetDepositCost: (txKey: string, price: number | null) => void
 }) {
-  const [applyAllWallet, setApplyAllWallet] = useState('')
+  const [bulkDest,  setBulkDest]  = useState('')
+  const [selected,  setSelected]  = useState<Set<string>>(new Set())  // Set<txKey>
+  const [expanded,  setExpanded]  = useState<Set<string>>(new Set())  // Set<asset> expandidos
 
   const { data: wallets = [] } = useQuery({
     queryKey: ['wallets'],
@@ -610,7 +1072,6 @@ function WithdrawalDestinations({ withdrawals, destinations, onAssign }: {
     .filter(w => w.type !== 'exchange')
   const coldWallets = allNonExchangeWallets.filter(w => w.name !== 'Wallets externas')
 
-  // Ordenar por fecha, agrupar por activo
   const sortedWithdrawals = [...withdrawals].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   )
@@ -619,198 +1080,370 @@ function WithdrawalDestinations({ withdrawals, destinations, onAssign }: {
     acc[tx.asset].push(tx)
     return acc
   }, {})
-  // Ordenar grupos por fecha del primer retiro de cada activo
   const uniqueAssets = Object.entries(byAsset)
     .sort((a, b) => new Date(a[1][0].timestamp).getTime() - new Date(b[1][0].timestamp).getTime())
     .map(([asset]) => asset)
 
-  const assignedCount = uniqueAssets.filter(a => destinations[a]).length
-  const totalAssets   = uniqueAssets.length
-  const allAssigned   = assignedCount === totalAssets
-  const progress      = totalAssets > 0 ? (assignedCount / totalAssets) * 100 : 0
+  // Progreso retiros
+  const allTxKeys     = withdrawals.map(txKey)
+  const assignedCount = allTxKeys.filter(k => destinations[k]).length
+  const totalTxs      = allTxKeys.length
+  const allAssigned   = assignedCount === totalTxs
 
-  function applyToAll() {
-    if (!applyAllWallet) return
-    uniqueAssets.forEach(a => onAssign(a, applyAllWallet))
+  // Progreso depósitos
+  const depositsReviewedCount = deposits.filter(d => d.txKey in depositCosts).length
+  const allDepositsReviewed   = deposits.length === 0 || depositsReviewedCount === deposits.length
+
+  // Progreso global (retiros + depósitos)
+  const totalItems    = totalTxs + deposits.length
+  const doneItems     = assignedCount + depositsReviewedCount
+  const allDone       = allAssigned && allDepositsReviewed
+  const progress      = totalItems > 0 ? (doneItems / totalItems) * 100 : 0
+  const selectedCount = selected.size
+  const unassignedKeys = allTxKeys.filter(k => !destinations[k])
+
+  const allChecked  = selectedCount === totalTxs
+  const someChecked = selectedCount > 0 && !allChecked
+
+  function toggleTx(key: string) {
+    setSelected(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
+  }
+  function toggleGroup(txs: PreviewTransaction[]) {
+    const keys = txs.map(txKey)
+    const allIn = keys.every(k => selected.has(k))
+    setSelected(prev => {
+      const s = new Set(prev)
+      keys.forEach(k => allIn ? s.delete(k) : s.add(k))
+      return s
+    })
+  }
+  function selectAll()        { setSelected(new Set(allTxKeys)) }
+  function selectUnassigned() { setSelected(new Set(unassignedKeys)) }
+  function selectNone()       { setSelected(new Set()) }
+  function toggleAll()        { allChecked ? selectNone() : selectAll() }
+  function toggleExpand(asset: string) {
+    setExpanded(prev => { const s = new Set(prev); s.has(asset) ? s.delete(asset) : s.add(asset); return s })
   }
 
-  const fmtDate = (ts: string) => new Date(ts).toLocaleString('es-ES', {
-    day: '2-digit', month: 'short', year: '2-digit',
-    hour: '2-digit', minute: '2-digit',
-  })
+  function applyBulk() {
+    if (!bulkDest) return
+    const targets = selectedCount > 0 ? [...selected] : allTxKeys
+    targets.forEach(k => onAssign(k, bulkDest))
+    setSelected(new Set())
+  }
+  function applyToGroup(txs: PreviewTransaction[]) {
+    if (!bulkDest) return
+    txs.forEach(tx => onAssign(txKey(tx), bulkDest))
+  }
+  function applyToUnassigned() {
+    if (!bulkDest) return
+    unassignedKeys.forEach(k => onAssign(k, bulkDest))
+  }
+
+  // Estado de un grupo
+  function groupStatus(txs: PreviewTransaction[]) {
+    const dests = txs.map(tx => destinations[txKey(tx)]).filter(Boolean)
+    if (dests.length === 0) return { label: null, color: 'text-gray-600' }
+    const unique = [...new Set(dests)]
+    if (unique.length === 1) return { label: unique[0], color: 'text-accent-green' }
+    return { label: 'múltiples', color: 'text-accent-amber' }
+  }
+
   const fmtAmt = (n: number) => {
     if (Math.abs(n) >= 1000) return n.toLocaleString('es-ES', { maximumFractionDigits: 4 })
     if (Math.abs(n) >= 1)    return n.toFixed(6)
     return n.toFixed(8)
   }
 
+  function destLabel(dest: string) {
+    if (dest === '__lost__')     return { text: '💀 Pérdida',    cls: 'text-accent-red' }
+    if (dest === '__gift__')     return { text: '🎁 Regalo',     cls: 'text-accent-blue' }
+    if (dest === '__external__') return { text: '📱 Externa',    cls: 'text-gray-400' }
+    const w = coldWallets.find(w => w.id === dest)
+    return w ? { text: w.name, cls: 'text-accent-green' } : { text: 'pendiente', cls: 'text-gray-600 italic' }
+  }
+
   return (
-    <div className={`rounded-2xl border-2 overflow-hidden transition-all duration-300 ${
-      allAssigned ? 'border-accent-green/40' : 'border-accent-amber/40'
+    <div className={`rounded-2xl border-2 transition-all duration-300 ${
+      allDone ? 'border-accent-green/40' : 'border-accent-amber/40'
     }`}>
       {/* Header con progreso */}
-      <div className={`px-5 py-4 ${allAssigned ? 'bg-accent-green/8' : 'bg-accent-amber/8'}`}>
+      <div className={`px-5 py-4 ${allDone ? 'bg-accent-green/8' : 'bg-accent-amber/8'}`}>
         <div className="flex items-start justify-between gap-4 mb-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className={`text-sm font-semibold ${allAssigned ? 'text-accent-green' : 'text-accent-amber'}`}>
-                {allAssigned ? '✓ Destinos de retiros completados' : 'Asigna el destino de cada retiro'}
+              <span className={`text-sm font-semibold ${allDone ? 'text-accent-green' : 'text-accent-amber'}`}>
+                {allDone ? '✓ Revisión completada' : 'Revisión obligatoria antes de importar'}
               </span>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                allAssigned ? 'bg-accent-green/20 text-accent-green' : 'bg-accent-amber/20 text-accent-amber'
+                allDone ? 'bg-accent-green/20 text-accent-green' : 'bg-accent-amber/20 text-accent-amber'
               }`}>
-                {assignedCount}/{totalAssets}
+                {doneItems}/{totalItems}
               </span>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              El FIFO no puede mover los lotes sin saber a qué wallet van. Obligatorio antes de importar.
+              Asigna el destino de cada retiro y el coste de cada depósito externo.
             </p>
           </div>
-          <span className="text-xs text-gray-600 shrink-0 pt-0.5">
-            {withdrawals.length} retiro{withdrawals.length !== 1 ? 's' : ''}
-          </span>
+          <div className="text-right shrink-0">
+            <span className="text-xs text-gray-600">{withdrawals.length} retiro{withdrawals.length !== 1 ? 's' : ''}</span>
+            {deposits.length > 0 && <span className="text-xs text-gray-600 ml-2">{deposits.length} depósito{deposits.length !== 1 ? 's' : ''}</span>}
+          </div>
         </div>
-
-        {/* Barra de progreso */}
         <div className="h-1.5 bg-background-tertiary rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-500 ${allAssigned ? 'bg-accent-green' : 'bg-accent-amber'}`}
+            className={`h-full rounded-full transition-all duration-500 ${allDone ? 'bg-accent-green' : 'bg-accent-amber'}`}
             style={{ width: `${progress}%` }}
           />
         </div>
       </div>
 
-      <div className="p-5 space-y-5 bg-background-card">
+      <div className="p-5 space-y-4 bg-background-card max-h-[70vh] overflow-y-auto">
         {coldWallets.length === 0 ? (
           <div className="flex items-center gap-2 text-xs text-accent-amber bg-accent-amber/10 rounded-xl px-4 py-3 border border-accent-amber/20">
             <AlertTriangle size={13} className="shrink-0" />
-            No tienes wallets frías configuradas. Ve a Configuración → Wallets y añade tu Tangem/Ledger antes de importar.
+            No tienes wallets frías configuradas. Ve a Configuración → Wallets antes de importar.
           </div>
         ) : (
-          /* Aplicar a todos */
-          <div className="flex items-center gap-3 p-3 bg-background-tertiary rounded-xl border border-border">
-            <span className="text-xs font-medium text-gray-400 shrink-0">Aplicar a todos:</span>
-            <div className="flex-1">
-              <WithdrawalSelector value={applyAllWallet} coldWallets={coldWallets} onChange={setApplyAllWallet} />
+          <div className="rounded-xl border border-border bg-background-tertiary">
+            {/* Selector + acciones */}
+            <div className="flex items-center gap-3 px-4 py-3">
+              {/* Checkbox master tri-state */}
+              <button
+                onClick={toggleAll}
+                className={`w-4.5 h-4.5 shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
+                  allChecked  ? 'bg-accent-blue border-accent-blue' :
+                  someChecked ? 'bg-accent-blue/30 border-accent-blue' :
+                                'border-gray-600 hover:border-gray-400'
+                }`}
+                title={allChecked ? 'Deseleccionar todo' : 'Seleccionar todo'}
+              >
+                {allChecked  && <span className="text-white text-[10px] font-bold leading-none">✓</span>}
+                {someChecked && <span className="text-accent-blue text-[10px] font-bold leading-none">−</span>}
+              </button>
+
+              {/* Selector de destino */}
+              <div className="flex-1 min-w-0">
+                <WithdrawalSelector value={bulkDest} coldWallets={coldWallets} onChange={setBulkDest} />
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex items-center gap-2 shrink-0">
+                {selectedCount > 0 ? (
+                  /* Aplicar a seleccionados */
+                  <button
+                    onClick={applyBulk}
+                    disabled={!bulkDest}
+                    className="px-3 py-1.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5"
+                  >
+                    <span className="bg-white/20 rounded px-1 py-0.5 text-[10px] font-bold">{selectedCount}</span>
+                    Aplicar
+                  </button>
+                ) : (
+                  <>
+                    {unassignedKeys.length > 0 && unassignedKeys.length < totalTxs && (
+                      <button
+                        onClick={applyToUnassigned}
+                        disabled={!bulkDest}
+                        className="px-3 py-1.5 border border-border hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs font-medium text-gray-300 transition-colors whitespace-nowrap"
+                        title="Aplicar solo a los que aún no tienen destino"
+                      >
+                        No asignados
+                      </button>
+                    )}
+                    <button
+                      onClick={applyBulk}
+                      disabled={!bulkDest}
+                      className="px-3 py-1.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
+                    >
+                      Todos
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-            <button
-              onClick={applyToAll}
-              disabled={!applyAllWallet}
-              className="shrink-0 px-4 py-1.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
-            >
-              Aplicar
-            </button>
+
+            {/* Barra de selección rápida — visible solo cuando hay selección */}
+            {selectedCount > 0 && (
+              <div className="border-t border-border px-4 py-2 flex items-center gap-3">
+                <span className="text-xs text-accent-blue font-medium">
+                  {selectedCount} seleccionado{selectedCount !== 1 ? 's' : ''}
+                </span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <button onClick={selectUnassigned} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">no asignados</button>
+                  <span className="text-gray-700">·</span>
+                  <button onClick={selectAll}  className="text-xs text-gray-500 hover:text-gray-300 transition-colors">todos</button>
+                  <span className="text-gray-700">·</span>
+                  <button onClick={selectNone} className="text-xs text-gray-500 hover:text-accent-red transition-colors">ninguno</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Grupos por activo ordenados por fecha */}
-        <div className="space-y-5">
+        {/* Grupos por activo */}
+        <div className="space-y-3">
           {uniqueAssets.map(asset => {
-            const txs        = byAsset[asset]
-            const assigned   = destinations[asset]
-            const destWallet = coldWallets.find(w => w.id === assigned)
-            const totalAmt   = txs.reduce((s, t) => s + t.amountNet, 0)
-            const firstDate  = new Date(txs[0].timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })
+            const txs      = byAsset[asset]
+            const keys     = txs.map(txKey)
+            const totalAmt = txs.reduce((s, t) => s + t.amountNet, 0)
+            const firstDate = new Date(txs[0].timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })
+            const groupAllSelected = keys.every(k => selected.has(k))
+            const groupSomeSelected = keys.some(k => selected.has(k)) && !groupAllSelected
+            const status   = groupStatus(txs)
+            const assetAssignedCount = keys.filter(k => destinations[k]).length
+            const isOpen   = expanded.has(asset) || txs.length === 1
 
             return (
-              <div key={asset}>
-                {/* Cabecera del grupo */}
-                <div className="flex items-center justify-between gap-3 mb-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${assigned ? 'bg-accent-green' : 'bg-accent-amber'}`} />
-                    <span className="font-bold mono text-base">{asset}</span>
-                    <div className="text-xs text-gray-500 hidden sm:flex items-center gap-1">
-                      <span>{txs.length} retiro{txs.length !== 1 ? 's' : ''}</span>
-                      <span className="text-gray-700">·</span>
-                      <span className="mono">{fmtAmt(totalAmt)}</span>
-                      <span className="text-gray-700">·</span>
-                      <span>desde {firstDate}</span>
-                    </div>
-                  </div>
-                  <WithdrawalSelector
-                    value={assigned ?? ''}
-                    coldWallets={coldWallets}
-                    onChange={v => onAssign(asset, v)}
-                  />
-                </div>
+              <div key={asset} className="rounded-xl border border-border">
+                {/* Cabecera del grupo ─────────────────────────────────── */}
+                <div className="flex items-center gap-3 px-4 py-3 bg-background-tertiary/60">
+                  {/* Checkbox grupo */}
+                  <button
+                    onClick={() => toggleGroup(txs)}
+                    className={`w-4 h-4 shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
+                      groupAllSelected  ? 'bg-accent-blue border-accent-blue' :
+                      groupSomeSelected ? 'bg-accent-blue/30 border-accent-blue' :
+                                          'border-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    {groupAllSelected  && <span className="text-white text-[9px] font-bold leading-none">✓</span>}
+                    {groupSomeSelected && <span className="text-accent-blue text-[9px] font-bold leading-none">−</span>}
+                  </button>
 
-                {/* Tarjetas de transacciones */}
-                <div className="space-y-1.5">
-                  {txs.map((tx, i) => {
-                    const acColor = BINANCE_ACCOUNT_COLORS[tx.account] ?? '#6b7280'
-                    return (
-                      <div
-                        key={i}
-                        className={`rounded-xl border px-4 py-3 flex items-center gap-4 transition-all ${
-                          assigned
-                            ? 'border-accent-green/20 bg-accent-green/4'
-                            : 'border-border bg-background-tertiary/50'
-                        }`}
+                  {/* Info del grupo */}
+                  <button
+                    onClick={() => txs.length > 1 && toggleExpand(asset)}
+                    className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
+                  >
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${
+                      assetAssignedCount === txs.length ? 'bg-accent-green' :
+                      assetAssignedCount > 0           ? 'bg-accent-amber' : 'bg-gray-600'
+                    }`} />
+                    <span className="font-bold mono">{asset}</span>
+                    <span className="text-xs text-gray-500">
+                      {txs.length} retiro{txs.length !== 1 ? 's' : ''} · {fmtAmt(totalAmt)} · desde {firstDate}
+                    </span>
+                    {/* Estado del grupo */}
+                    {status.label && (
+                      <span className={`text-xs font-medium ${status.color} ml-1`}>
+                        → {status.label === 'múltiples' ? 'múltiples destinos' :
+                           destLabel(status.label).text}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Acciones de grupo: aplicar a todos + expand */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Aplicar a todo el grupo */}
+                    {bulkDest && (
+                      <button
+                        onClick={() => applyToGroup(txs)}
+                        className="text-xs text-accent-blue hover:text-accent-blue/80 font-medium transition-colors whitespace-nowrap"
+                        title={`Aplicar destino seleccionado a todos los retiros de ${asset}`}
                       >
-                        {/* Fecha */}
-                        <div className="shrink-0 w-32">
-                          <p className="text-xs mono text-gray-300 font-medium">
-                            {new Date(tx.timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })}
-                          </p>
-                          <p className="text-xs mono text-gray-600">
-                            {new Date(tx.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-
-                        {/* Cuenta */}
-                        <span
-                          className="shrink-0 text-xs px-2 py-0.5 rounded-lg font-medium"
-                          style={{ backgroundColor: `${acColor}18`, color: acColor }}
-                        >
-                          {tx.account}
-                        </span>
-
-                        {/* Importe */}
-                        <div className="flex-1 flex items-center gap-1.5">
-                          <span className="font-bold mono text-accent-red text-sm">
-                            −{fmtAmt(tx.amountNet)}
-                          </span>
-                          <span className="text-gray-500 mono text-xs">{tx.asset}</span>
-                        </div>
-
-                        {/* Notas */}
-                        {tx.notes && (
-                          <span className="hidden lg:block text-xs text-gray-700 truncate max-w-40">
-                            {tx.notes}
-                          </span>
-                        )}
-
-                        {/* Destino */}
-                        <div className="shrink-0 flex items-center gap-1.5">
-                          {assigned === '__lost__' ? (
-                            <span className="text-xs font-medium text-accent-red">💀 Pérdida patrimonial</span>
-                          ) : assigned === '__gift__' ? (
-                            <span className="text-xs font-medium text-accent-blue">🎁 Regalo/Pago — venta a mercado</span>
-                          ) : assigned === '__external__' ? (
-                            <span className="text-xs font-medium text-gray-400">📱 Mi wallet externa</span>
-                          ) : destWallet ? (
-                            <>
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: destWallet.color }} />
-                              <span className="text-xs font-medium text-accent-green">{destWallet.name}</span>
-                            </>
-                          ) : (
-                            <span className="text-xs text-gray-600 italic">pendiente</span>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
+                        Aplicar al grupo
+                      </button>
+                    )}
+                    {/* Expand/collapse — solo si hay más de 1 tx */}
+                    {txs.length > 1 && (
+                      <button
+                        onClick={() => toggleExpand(asset)}
+                        className="text-gray-500 hover:text-gray-300 transition-colors"
+                      >
+                        {isOpen
+                          ? <ChevronDown size={14} />
+                          : <ChevronRight size={14} />}
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {/* Filas por transacción ───────────────────────────────── */}
+                {isOpen && (
+                  <div className="divide-y divide-border">
+                    {txs.map((tx, i) => {
+                      const key       = txKey(tx)
+                      const dest      = destinations[key]
+                      const dl        = destLabel(dest ?? '')
+                      const isTxSel   = selected.has(key)
+                      const acColor   = BINANCE_ACCOUNT_COLORS[tx.account] ?? '#6b7280'
+
+                      return (
+                        <div
+                          key={i}
+                          className={`flex items-center gap-3 px-4 py-3 transition-all ${
+                            isTxSel ? 'bg-accent-blue/5' :
+                            dest    ? 'bg-accent-green/3' : ''
+                          }`}
+                        >
+                          {/* Checkbox individual */}
+                          <button
+                            onClick={() => toggleTx(key)}
+                            className={`w-3.5 h-3.5 shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
+                              isTxSel ? 'bg-accent-blue border-accent-blue' : 'border-gray-700 hover:border-gray-500'
+                            }`}
+                          >
+                            {isTxSel && <span className="text-white text-[8px] font-bold leading-none">✓</span>}
+                          </button>
+
+                          {/* Fecha */}
+                          <div className="shrink-0 w-28">
+                            <p className="text-xs mono text-gray-300">
+                              {new Date(tx.timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })}
+                            </p>
+                            <p className="text-xs mono text-gray-600">
+                              {new Date(tx.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+
+                          {/* Cuenta */}
+                          <span className="shrink-0 text-xs px-2 py-0.5 rounded-lg font-medium"
+                            style={{ backgroundColor: `${acColor}18`, color: acColor }}>
+                            {tx.account}
+                          </span>
+
+                          {/* Importe */}
+                          <span className="font-bold mono text-accent-red text-sm shrink-0">
+                            −{fmtAmt(tx.amountNet)} <span className="text-gray-500 font-normal text-xs">{tx.asset}</span>
+                          </span>
+
+                          {/* Spacer */}
+                          <div className="flex-1" />
+
+                          {/* Selector individual */}
+                          <WithdrawalSelector
+                            value={dest ?? ''}
+                            coldWallets={coldWallets}
+                            onChange={v => onAssign(key, v)}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
+
+        {/* Depósitos externos agrupados por activo */}
+        {deposits.length > 0 && (
+          <DepositSection
+            deposits={deposits}
+            depositCosts={depositCosts}
+            onSetCost={onSetDepositCost}
+            allReviewed={allDepositsReviewed}
+            reviewedCount={depositsReviewedCount}
+          />
+        )}
+
       </div>
     </div>
   )
 }
 
-function PreviewStage({ preview, showTxTable, setShowTxTable, txPage, setTxPage, txPageSize, resolvedOps, withdrawalDestinations, onWithdrawalDestination, onCatalog, onConfirm }: {
+function PreviewStage({ preview, showTxTable, setShowTxTable, txPage, setTxPage, txPageSize, resolvedOps, withdrawalDestinations, depositCosts, onWithdrawalDestination, onDepositCost, onIgnoreOp, onCatalog, onConfirm }: {
   preview: PreviewResult
   showTxTable: boolean
   setShowTxTable: (v: boolean) => void
@@ -819,25 +1452,47 @@ function PreviewStage({ preview, showTxTable, setShowTxTable, txPage, setTxPage,
   txPageSize: number
   resolvedOps: Record<string, WizardResult>
   withdrawalDestinations: Record<string, string>
+  depositCosts: Record<string, number | null>
   onWithdrawalDestination: (asset: string, walletId: string) => void
+  onDepositCost: (txKey: string, price: number | null) => void
+  onIgnoreOp: (op: string) => void
   onCatalog: (op: string) => void
   onConfirm: () => void
 }) {
   const hasUnresolved = preview.validation.unknownOperations.some(op => !resolvedOps[op] || resolvedOps[op].operationTypeId === '')
 
-  // Retiros detectados en el preview (transacciones completas, ordenados por fecha)
+  // Retiros detectados en el preview
   const withdrawals = [...preview.transactions.filter(tx => tx.operationType === 'WITHDRAW')]
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  // withdrawalDestinations está keyed por txKey (rawRowHashes[0]), NO por asset
+  const withdrawalTxKeys = withdrawals.map(tx =>
+    tx.rawRowHashes?.[0] ?? `${tx.timestamp}|${tx.asset}|${tx.amount}`
+  )
+  const hasUnassignedWithdrawals = withdrawalTxKeys.some(k => !withdrawalDestinations[k])
 
-  const withdrawalAssets = [...new Set(withdrawals.map(tx => tx.asset))]
-  const hasUnassignedWithdrawals = withdrawalAssets.length > 0 &&
-    withdrawalAssets.some(a => !withdrawalDestinations[a])
+  // Depósitos externos del CSV que necesitan coste
+  const depositsForPanel: DepositReview[] = preview.transactions
+    .filter(tx => (tx.notes ?? '').includes('cripto externo'))
+    .map(tx => ({
+      txKey:          tx.rawRowHashes?.[0] ?? `${tx.timestamp}|${tx.asset}|${tx.amount}`,
+      timestamp:      tx.timestamp,
+      asset:          tx.asset,
+      amount:         tx.amount,
+      historicalPrice: null,
+    }))
+  const allDepositsReviewedInPanel = depositsForPanel.length === 0 ||
+    depositsForPanel.every(d => d.txKey in depositCosts)
+
+  // Bloqueado solo si hay cosas sin resolver — nunca por "nada nuevo que importar" si hay depósitos que actualizar
+  const hasAnythingToDo = preview.newCount > 0 || depositsForPanel.length > 0
+  const isBlocked = hasUnresolved || hasUnassignedWithdrawals || !allDepositsReviewedInPanel || !hasAnythingToDo
   const newTxs = preview.transactions.slice(0, preview.newCount)
   const paginated = newTxs.slice(txPage * txPageSize, (txPage + 1) * txPageSize)
   const totalPages = Math.ceil(newTxs.length / txPageSize)
 
   return (
     <div className="space-y-4">
+
       <div className="card space-y-4">
         <h2 className="font-medium text-sm">Resumen del archivo</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -917,10 +1572,7 @@ function PreviewStage({ preview, showTxTable, setShowTxTable, txPage, setTxPage,
                   <div className="flex items-center gap-2 shrink-0">
                     {/* Ignorar — excluye del import */}
                     <button
-                      onClick={() => setResolvedOps(prev => ({
-                        ...prev,
-                        [op]: { operationTypeId: 'IGNORED', fields: {} }
-                      }))}
+                      onClick={() => onIgnoreOp(op)}
                       className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
                         isIgnored
                           ? 'bg-background-card border border-border text-gray-400'
@@ -1024,12 +1676,15 @@ function PreviewStage({ preview, showTxTable, setShowTxTable, txPage, setTxPage,
         </div>
       )}
 
-      {/* Sección de asignación de destino para retiros */}
-      {withdrawals.length > 0 && (
+      {/* Panel unificado: retiros + depósitos externos */}
+      {(withdrawals.length > 0 || depositsForPanel.length > 0) && (
         <WithdrawalDestinations
           withdrawals={withdrawals}
           destinations={withdrawalDestinations}
           onAssign={onWithdrawalDestination}
+          deposits={depositsForPanel}
+          depositCosts={depositCosts}
+          onSetDepositCost={onDepositCost}
         />
       )}
 
@@ -1039,18 +1694,22 @@ function PreviewStage({ preview, showTxTable, setShowTxTable, txPage, setTxPage,
             ? '⚠ Resuelve todas las operaciones desconocidas antes de confirmar'
             : hasUnassignedWithdrawals
             ? '⚠ Asigna el destino de todos los retiros antes de confirmar'
+            : !allDepositsReviewedInPanel
+            ? '⚠ Asigna el coste de adquisición de todos los depósitos externos'
+            : !hasAnythingToDo
+            ? 'No hay transacciones nuevas ni depósitos que actualizar'
             : preview.newCount === 0
-            ? 'No hay transacciones nuevas que importar'
+            ? 'Se actualizarán los costes de los depósitos y se recalculará el FIFO'
             : `Se importarán ${preview.newCount} transacciones y se recalculará el FIFO automáticamente`
           }
         </div>
         <button
           onClick={onConfirm}
-          disabled={hasUnresolved || hasUnassignedWithdrawals || preview.newCount === 0}
+          disabled={isBlocked}
           className="flex items-center gap-2 px-6 py-2.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
         >
           <Play size={14} />
-          Confirmar e importar
+          {preview.newCount === 0 && depositsForPanel.length > 0 ? 'Guardar costes y recalcular FIFO' : 'Confirmar e importar'}
         </button>
       </div>
     </div>
@@ -1062,89 +1721,194 @@ function ProgressStage({ log, done, onGoToDashboard }: {
   done: boolean
   onGoToDashboard: () => void
 }) {
-  const phases = ['importing', 'prices', 'fifo', 'done']
-  const currentPhase = log.length > 0 ? log[log.length - 1].phase : 'importing'
-  const currentPhaseIdx = phases.indexOf(currentPhase)
+  const [showLog, setShowLog] = useState(false)
 
-  const phaseLabels: Record<string, string> = {
-    importing: 'Importando',
-    prices: 'Precios',
-    fifo: 'FIFO',
-    done: 'Completado',
-    error: 'Error',
-  }
+  const PHASES = [
+    { key: 'importing', label: 'Importando',    icon: FileText   },
+    { key: 'prices',   label: 'Precios hist.',  icon: RefreshCw  },
+    { key: 'fifo',     label: 'Cálculo FIFO',   icon: HardDrive  },
+    { key: 'done',     label: 'Completado',     icon: CheckCircle },
+  ] as const
+
+  const isError = log.some(e => e.phase === 'error')
+  const currentPhase = log.length > 0 ? log[log.length - 1].phase : 'importing'
+  const phaseOrder = PHASES.map(p => p.key)
+  const currentIdx = phaseOrder.indexOf(currentPhase as typeof phaseOrder[number])
+
+  // Extraer métricas del log para la pantalla de éxito
+  const importLine = log.find(e => e.message.includes('transacciones nuevas'))
+  const fifoLine   = log.find(e => e.message.includes('lotes') && e.message.includes('consumos'))
+  const gpLine     = log.find(e => e.message.includes('G/P neto'))
 
   return (
-    <div className="card space-y-5">
-      <div className="flex items-center gap-0">
-        {['importing', 'prices', 'fifo', 'done'].map((phase, i) => {
-          const isDone = phases.indexOf(phase) < currentPhaseIdx || (done && phase !== 'error')
-          const isCurrent = phase === currentPhase && !done
-          const isError = currentPhase === 'error'
+    <div className="card space-y-6">
+      {/* Fases visuales */}
+      <div className="grid grid-cols-4 gap-2">
+        {PHASES.map((phase, i) => {
+          const idx        = phaseOrder.indexOf(phase.key)
+          const isDone     = done ? true : idx < currentIdx
+          const isCurrent  = !done && phase.key === currentPhase
+          const Icon       = phase.icon
+
           return (
-            <div key={phase} className="flex-1 flex items-center">
-              <div className={`flex-1 h-1 ${i === 0 ? 'rounded-l' : ''} ${i === 3 ? 'rounded-r' : ''} ${
-                isDone ? 'bg-accent-green' :
-                isCurrent ? 'bg-accent-blue' :
-                isError ? 'bg-accent-red' :
+            <div
+              key={phase.key}
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
+                isError && isCurrent ? 'border-accent-red/40 bg-accent-red/5' :
+                isDone  ? 'border-accent-green/30 bg-accent-green/5' :
+                isCurrent ? 'border-accent-blue/40 bg-accent-blue/5' :
+                'border-border bg-background-tertiary/30'
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                isError && isCurrent ? 'bg-accent-red/15' :
+                isDone  ? 'bg-accent-green/15' :
+                isCurrent ? 'bg-accent-blue/15' :
                 'bg-background-tertiary'
-              }`} />
+              }`}>
+                {isCurrent && !isError
+                  ? <RefreshCw size={15} className="text-accent-blue animate-spin" />
+                  : <Icon size={15} className={
+                      isError && isCurrent ? 'text-accent-red' :
+                      isDone ? 'text-accent-green' :
+                      isCurrent ? 'text-accent-blue' : 'text-gray-600'
+                    } />
+                }
+              </div>
+              <span className={`text-xs font-medium text-center leading-tight ${
+                isError && isCurrent ? 'text-accent-red' :
+                isDone ? 'text-accent-green' :
+                isCurrent ? 'text-accent-blue' : 'text-gray-600'
+              }`}>
+                {phase.label}
+              </span>
+              {/* Barra bajo el icono */}
+              <div className="w-full h-0.5 rounded-full overflow-hidden bg-background-tertiary">
+                <div className={`h-full rounded-full transition-all duration-500 ${
+                  isError && isCurrent ? 'bg-accent-red w-full' :
+                  isDone ? 'bg-accent-green w-full' :
+                  isCurrent ? 'bg-accent-blue w-1/2 animate-pulse' : 'w-0'
+                }`} />
+              </div>
             </div>
           )
         })}
       </div>
 
-      <div className="grid grid-cols-4 text-center">
-        {['importing', 'prices', 'fifo', 'done'].map(phase => {
-          const isDone = phases.indexOf(phase) < currentPhaseIdx || done
-          const isCurrent = phase === currentPhase && !done
-          return (
-            <div key={phase} className={`text-xs ${
-              isCurrent ? 'text-accent-blue font-medium' :
-              isDone ? 'text-accent-green' :
-              'text-gray-600'
-            }`}>
-              {phaseLabels[phase]}
-            </div>
-          )
-        })}
-      </div>
-
-      <div className="bg-black/50 rounded-lg p-4 font-mono text-xs space-y-1 max-h-64 overflow-y-auto">
-        {log.length === 0 && <div className="text-gray-600">Iniciando proceso...</div>}
-        {log.map((event, i) => (
-          <div key={i} className={
-            event.phase === 'error' ? 'text-accent-red' :
-            event.phase === 'done' ? 'text-accent-green' :
-            'text-gray-400'
-          }>
-            <span className="text-gray-600 mr-2">
-              {new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+      {/* Estado actual — solo cuando no ha terminado */}
+      {!done && !isError && (
+        <div className="flex items-center gap-3 p-3 bg-background-tertiary rounded-xl">
+          <RefreshCw size={14} className="text-accent-blue animate-spin shrink-0" />
+          <span className="text-sm text-gray-300">
+            {log.length > 0 ? log[log.length - 1].message : 'Iniciando...'}
+          </span>
+          {log[log.length - 1]?.progress !== undefined && (
+            <span className="ml-auto text-xs text-gray-500 mono">
+              {log[log.length - 1].progress}/{log[log.length - 1].total}
             </span>
-            {event.progress !== undefined && event.total !== undefined
-              ? `[${event.progress}/${event.total}] ${event.message}`
-              : event.message
-            }
-          </div>
-        ))}
-        {!done && currentPhase !== 'error' && (
-          <div className="text-accent-blue animate-pulse">|</div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
-      {done && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-accent-green text-sm font-medium">
-            <CheckCircle size={16} />
-            Importacion y calculo FIFO completados.
+      {/* Error */}
+      {isError && (
+        <div className="flex items-start gap-3 p-4 bg-accent-red/5 border border-accent-red/30 rounded-xl">
+          <AlertTriangle size={16} className="text-accent-red shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-accent-red mb-1">Error durante la importación</p>
+            <p className="text-xs text-gray-400">
+              {log.find(e => e.phase === 'error')?.message ?? 'Error desconocido'}
+            </p>
           </div>
-          <button
-            onClick={onGoToDashboard}
-            className="flex items-center gap-2 px-4 py-2 bg-accent-blue hover:bg-accent-blue/80 rounded-lg text-sm font-medium transition-colors"
-          >
-            Ver Dashboard
-            <ArrowRight size={14} />
-          </button>
+        </div>
+      )}
+
+      {/* Resumen de éxito */}
+      {done && !isError && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <CheckCircle size={18} className="text-accent-green" />
+            <span className="font-semibold text-accent-green">Importación completada</span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            {importLine && (
+              <div className="bg-background-tertiary rounded-xl p-3 text-center">
+                <p className="text-xl font-bold mono text-white">
+                  {importLine.message.match(/(\d+) transacciones/)?.[1] ?? '—'}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-0.5">Transacciones nuevas</p>
+              </div>
+            )}
+            {fifoLine && (
+              <>
+                <div className="bg-background-tertiary rounded-xl p-3 text-center">
+                  <p className="text-xl font-bold mono text-white">
+                    {fifoLine.message.match(/(\d+) lotes/)?.[1] ?? '—'}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Lotes FIFO</p>
+                </div>
+                <div className="bg-background-tertiary rounded-xl p-3 text-center">
+                  <p className="text-xl font-bold mono text-white">
+                    {fifoLine.message.match(/(\d+) consumos/)?.[1] ?? '—'}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Consumos</p>
+                </div>
+              </>
+            )}
+          </div>
+
+          {gpLine && (
+            <div className={`flex items-center justify-between p-3 rounded-xl border ${
+              (gpLine.message.includes('+') && !gpLine.message.startsWith('G/P neto: -'))
+                ? 'bg-accent-green/5 border-accent-green/20'
+                : 'bg-accent-red/5 border-accent-red/20'
+            }`}>
+              <span className="text-sm text-gray-400">G/P neto acumulado</span>
+              <span className={`font-bold mono ${
+                gpLine.message.includes('+') ? 'text-accent-green' : 'text-accent-red'
+              }`}>
+                {gpLine.message.replace('G/P neto: ', '')}
+              </span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-2">
+            <button
+              onClick={() => setShowLog(v => !v)}
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1.5"
+            >
+              <ChevronDown size={12} className={`transition-transform ${showLog ? 'rotate-180' : ''}`} />
+              {showLog ? 'Ocultar' : 'Ver'} log técnico
+            </button>
+            <button
+              onClick={onGoToDashboard}
+              className="flex items-center gap-2 px-5 py-2 bg-accent-blue hover:bg-accent-blue/80 rounded-lg text-sm font-medium transition-colors"
+            >
+              Ver Dashboard
+              <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Log técnico colapsable */}
+      {(showLog || (!done && log.length > 3)) && (
+        <div className="bg-black/50 rounded-lg p-4 font-mono text-xs space-y-1 max-h-48 overflow-y-auto">
+          {log.map((event, i) => (
+            <div key={i} className={
+              event.phase === 'error' ? 'text-accent-red' :
+              event.phase === 'done'  ? 'text-accent-green' :
+              event.phase === 'fifo'  ? 'text-accent-blue' :
+              'text-gray-500'
+            }>
+              {event.progress !== undefined && event.total !== undefined
+                ? `[${event.progress}/${event.total}] ${event.message}`
+                : event.message
+              }
+            </div>
+          ))}
+          {!done && <div className="text-accent-blue animate-pulse">▍</div>}
         </div>
       )}
     </div>
@@ -1271,6 +2035,190 @@ function ImportsList({ imports, onDelete }: {
         />
       )}
     </>
+  )
+}
+
+// ── PendingDepositsPanel ───────────────────────────────────────────────────
+type PendingDeposit = { id: string; timestamp: string; asset: string; amount: string; wallet_name: string; historicalPrice: number | null }
+
+function PendingDepositsPanel({ deposits }: { deposits: PendingDeposit[] }) {
+  const queryClient = useQueryClient()
+  const toast = useToast()
+  const [localCosts, setLocalCosts] = useState<Record<string, number | null>>({})
+  const [saving, setSaving] = useState(false)
+
+  // Cuántos tienen precio asignado (manual o null=desconocido marcado)
+  const reviewed = deposits.filter(d => d.id in localCosts)
+  const allReviewed = reviewed.length === deposits.length
+  const hasValues = deposits.some(d => localCosts[d.id] != null)
+
+  async function handleSave() {
+    const updates = deposits
+      .filter(d => localCosts[d.id] != null)
+      .map(d => ({ id: d.id, pricePerUnit: localCosts[d.id] as number }))
+
+    setSaving(true)
+    try {
+      if (updates.length > 0) {
+        await portfolioApi.bulkSetCosts(updates)
+      }
+      queryClient.invalidateQueries({ queryKey: ['pending-deposits'] })
+      queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
+      queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      const skipped = deposits.length - updates.length
+      toast.success(
+        'Revisión completada',
+        `${updates.length > 0 ? `${updates.length} coste${updates.length > 1 ? 's' : ''} guardado${updates.length > 1 ? 's' : ''}` : ''}${skipped > 0 ? ` · ${skipped} marcado${skipped > 1 ? 's' : ''} como desconocido` : ''}`
+      )
+      setLocalCosts({})
+    } catch (e) {
+      toast.error('Error al guardar', (e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="card border-accent-amber/40 bg-amber-950/20">
+      {/* Header */}
+      <div className="flex items-start gap-3 mb-5">
+        <div className="w-8 h-8 rounded-xl bg-accent-amber/15 flex items-center justify-center shrink-0">
+          <AlertTriangle size={16} className="text-accent-amber" />
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-sm text-white">
+            Revisión obligatoria — depósitos sin coste de adquisición
+          </h3>
+          <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+            {deposits.length} depósito{deposits.length > 1 ? 's' : ''} recibido{deposits.length > 1 ? 's' : ''} desde fuera de Binance
+            {deposits.length > 1 ? ' no tienen' : ' no tiene'} precio de adquisición registrado.
+            Esto afecta al cálculo FIFO y a tu declaración fiscal.
+            <strong className="text-accent-amber"> Debes revisar todos para poder importar nuevos datos.</strong>
+          </p>
+          {/* Progreso */}
+          <div className="flex items-center gap-2 mt-2">
+            <div className="flex-1 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-accent-amber transition-all duration-300 rounded-full"
+                style={{ width: `${(reviewed.length / deposits.length) * 100}%` }}
+              />
+            </div>
+            <span className="text-xs text-gray-500 shrink-0">{reviewed.length}/{deposits.length} revisados</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Lista de depósitos */}
+      <div className="space-y-2 mb-4">
+        {deposits.map(dep => {
+          const cost = localCosts[dep.id]
+          const isReviewed = dep.id in localCosts
+          const date = new Date(dep.timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+          const amount = parseFloat(dep.amount)
+
+          return (
+            <div
+              key={dep.id}
+              className={`p-3 rounded-xl border transition-colors ${
+                isReviewed
+                  ? cost != null
+                    ? 'border-accent-green/30 bg-accent-green/5'
+                    : 'border-gray-600 bg-background-tertiary'
+                  : 'border-accent-amber/20 bg-background-card'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-bold mono text-sm text-white">{dep.asset}</span>
+                    <span className="text-xs text-gray-400 mono">{amount.toLocaleString('es-ES', { maximumFractionDigits: 6 })}</span>
+                    <span className="text-gray-600">·</span>
+                    <span className="text-xs text-gray-500">{date}</span>
+                    {!isReviewed && (
+                      <span className="ml-auto text-[10px] px-1.5 py-0.5 bg-accent-amber/15 text-accent-amber rounded-full font-medium">
+                        Pendiente
+                      </span>
+                    )}
+                    {isReviewed && cost != null && (
+                      <span className="ml-auto text-[10px] px-1.5 py-0.5 bg-accent-green/15 text-accent-green rounded-full font-medium flex items-center gap-0.5">
+                        <Check size={9} /> {cost.toLocaleString('es-ES', { maximumFractionDigits: 4 })} €/ud.
+                      </span>
+                    )}
+                    {isReviewed && cost == null && (
+                      <span className="ml-auto text-[10px] px-1.5 py-0.5 bg-gray-700 text-gray-400 rounded-full font-medium">
+                        Desconocido
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      placeholder="Precio EUR/unidad al adquirir..."
+                      value={cost != null ? cost : ''}
+                      onChange={e => setLocalCosts(prev => ({
+                        ...prev,
+                        [dep.id]: e.target.value ? parseFloat(e.target.value) : null
+                      }))}
+                      className="flex-1 bg-background-primary border border-border rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-accent-blue transition-colors mono"
+                    />
+                    {dep.historicalPrice != null && (
+                      <button
+                        onClick={() => setLocalCosts(prev => ({ ...prev, [dep.id]: dep.historicalPrice! }))}
+                        className="text-xs px-3 py-1.5 bg-accent-blue/10 hover:bg-accent-blue/20 border border-accent-blue/30 text-accent-blue rounded-lg transition-colors whitespace-nowrap"
+                      >
+                        {dep.historicalPrice.toLocaleString('es-ES', { maximumFractionDigits: 4 })} € (histórico)
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setLocalCosts(prev => {
+                        if (prev[dep.id] === null) {
+                          // toggle: desmarcar si ya era "desconocido"
+                          const next = { ...prev }
+                          delete next[dep.id]
+                          return next
+                        }
+                        return { ...prev, [dep.id]: null }
+                      })}
+                      className={`text-xs px-3 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+                        isReviewed && cost == null
+                          ? 'bg-gray-700 border-gray-600 text-gray-300'
+                          : 'bg-background-primary border-border text-gray-500 hover:border-gray-500 hover:text-gray-300'
+                      }`}
+                    >
+                      No sé
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-500">
+          {!allReviewed
+            ? `Faltan ${deposits.length - reviewed.length} por revisar`
+            : hasValues
+            ? 'Todo revisado — guarda para continuar'
+            : 'Todos marcados como desconocidos — guarda para continuar'
+          }
+        </p>
+        <button
+          onClick={handleSave}
+          disabled={!allReviewed || saving}
+          className="flex items-center gap-2 px-5 py-2 bg-accent-amber hover:bg-accent-amber/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium text-black transition-colors"
+        >
+          {saving ? <RefreshCw size={13} className="animate-spin" /> : <Check size={13} />}
+          {saving ? 'Guardando...' : 'Guardar y desbloquear importación'}
+        </button>
+      </div>
+    </div>
   )
 }
 

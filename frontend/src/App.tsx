@@ -11,6 +11,7 @@ import { Settings } from './pages/Settings'
 import { useLivePrices } from './hooks/useLivePrices'
 import { portfolioApi } from './api/portfolio'
 import { Bell, X, AlertTriangle, AlertCircle, Info } from 'lucide-react'
+import { ToastProvider } from './components/Toast'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 interface Notification {
@@ -127,7 +128,8 @@ export default function App() {
   useLivePrices()
 
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <ToastProvider>
       <div className="flex h-screen overflow-hidden">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden bg-background-primary">
@@ -144,6 +146,7 @@ export default function App() {
           </main>
         </div>
       </div>
+      </ToastProvider>
     </BrowserRouter>
   )
 }

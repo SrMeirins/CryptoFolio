@@ -329,6 +329,7 @@ function interpretGroup(
       notes: isFiat ? undefined : 'Depósito de cripto externo — coste de adquisición original desconocido. Verificar y ajustar si es necesario.',
       subTradeCount: 1,
       rawRowHashes: hashes,
+      needsCostReview: !isFiat,
     };
   }
 

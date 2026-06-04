@@ -53,6 +53,7 @@ export interface ParsedTransaction {
   notes?: string;
   subTradeCount: number;
   rawRowHashes: string[];
+  needsCostReview?: boolean;  // depósito externo: coste de adquisición desconocido
 }
 
 // Lo que devuelve el parser completo

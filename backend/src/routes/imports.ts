@@ -47,12 +47,82 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
   }
 
   try {
-    // FASE 1: Importar transacciones
-    send('importing', 'Importando transacciones...');
     const withdrawalDestinations: Record<string, string> = req.body.withdrawalDestinations
       ? JSON.parse(req.body.withdrawalDestinations as string)
       : {};
-    const importResult = await importCsvFile(req.file.buffer, req.file.originalname, withdrawalDestinations);
+    // null = usuario marcó "desconocido" — cuenta como revisado (no bloquea el import)
+    const depositCostsRaw: Record<string, number | null> = req.body.depositCosts
+      ? JSON.parse(req.body.depositCosts as string)
+      : {};
+
+    // ── GATE 0: comprobar depósitos externos ANTES de importar nada ──────────
+    // 1. Depósitos en el CSV con needsCostReview
+    const { parseBinanceCsv } = await import('../modules/csv/parser');
+    const preparse = parseBinanceCsv(req.file.buffer);
+    const csvExternalDeposits = preparse.transactions.filter(tx => tx.needsCostReview);
+
+    // ¿Cuáles de ellos son YA duplicados (ya en DB)?
+    const csvDepHashes = csvExternalDeposits.map(tx => tx.rawRowHashes[0]).filter(Boolean);
+    const alreadyInDbRes = csvDepHashes.length > 0
+      ? await db.query('SELECT row_hash FROM raw_transactions WHERE row_hash = ANY($1)', [csvDepHashes])
+      : { rows: [] };
+    const alreadyInDbHashes = new Set(alreadyInDbRes.rows.map((r: { row_hash: string }) => r.row_hash));
+
+    // Depósitos NUEVOS (no están aún en DB) sin coste asignado en este envío
+    const missingNewDeposits = csvExternalDeposits.filter(tx => {
+      const key = tx.rawRowHashes[0];
+      return key && !alreadyInDbHashes.has(key) && !(key in depositCostsRaw);
+    });
+
+    // 2. Depósitos ya en DB sin coste (independientemente del CSV actual)
+    const dbPendingRes = await db.query(
+      `SELECT id::text FROM transactions
+       WHERE notes LIKE '%Depósito de cripto externo%' AND price_per_unit IS NULL`
+    );
+    const dbPendingIds: string[] = dbPendingRes.rows.map((r: { id: string }) => r.id);
+    const missingDbDeposits = dbPendingIds.filter(id => !(id in depositCostsRaw));
+
+    const totalMissing = missingNewDeposits.length + missingDbDeposits.length;
+    if (totalMissing > 0) {
+      send('error',
+        `⛔ Revisión requerida: hay ${totalMissing} depósito${totalMissing > 1 ? 's' : ''} ` +
+        `externo${totalMissing > 1 ? 's' : ''} sin coste de adquisición. ` +
+        `Vuelve al preview y asigna el coste en el panel de "Revisión obligatoria".`
+      );
+      res.end();
+      return;
+    }
+
+    // ── FASE 1: Importar transacciones ────────────────────────────────────────
+    send('importing', 'Importando transacciones...');
+
+    // Separar costes: UUIDs (ya en DB) vs hashes (nuevos en CSV)
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    // Solo actualizar los que tienen precio real (null = desconocido, no actualizar)
+    const existingDepositUpdates = Object.entries(depositCostsRaw)
+      .filter(([key, val]) => UUID_REGEX.test(key) && val !== null)
+      .map(([id, pricePerUnit]) => ({ id, pricePerUnit: pricePerUnit as number }));
+    // Solo nuevos depósitos con precio real (null = desconocido)
+    const newDepositCosts: Record<string, number> = Object.fromEntries(
+      Object.entries(depositCostsRaw)
+        .filter(([key, val]) => !UUID_REGEX.test(key) && val !== null)
+        .map(([k, v]) => [k, v as number])
+    );
+
+    if (existingDepositUpdates.length > 0) {
+      for (const { id, pricePerUnit } of existingDepositUpdates) {
+        const amtRes = await db.query('SELECT amount FROM transactions WHERE id = $1', [id]);
+        if (amtRes.rows[0]) {
+          const costAmount = parseFloat(amtRes.rows[0].amount) * pricePerUnit;
+          await db.query(
+            'UPDATE transactions SET price_per_unit = $1, cost_amount = $2, updated_at = NOW() WHERE id = $3',
+            [pricePerUnit, costAmount, id]
+          );
+        }
+      }
+    }
+
+    const importResult = await importCsvFile(req.file.buffer, req.file.originalname, withdrawalDestinations, newDepositCosts);
     send('importing', `✓ ${importResult.newTransactions} transacciones nuevas importadas (${importResult.duplicateRows} duplicadas ignoradas)`);
 
     // FASE 2: Precios históricos
@@ -126,6 +196,22 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
       }
     } else {
       send('prices', '✓ Todos los precios históricos en caché');
+    }
+
+    // GATE: verificar que no haya depósitos externos sin coste antes de correr FIFO
+    const pendingDepRes = await db.query(
+      `SELECT COUNT(*) AS cnt FROM transactions
+       WHERE notes LIKE '%Depósito de cripto externo%' AND price_per_unit IS NULL`
+    );
+    const pendingDepCount = parseInt(pendingDepRes.rows[0].cnt);
+    if (pendingDepCount > 0) {
+      send('error',
+        `⛔ FIFO bloqueado: hay ${pendingDepCount} depósito${pendingDepCount > 1 ? 's' : ''} ` +
+        `externo${pendingDepCount > 1 ? 's' : ''} sin coste de adquisición. ` +
+        `Revísalos en la sección de Importación antes de continuar.`
+      );
+      res.end();
+      return;
     }
 
     // FASE 3: Motor FIFO

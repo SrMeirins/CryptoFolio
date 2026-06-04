@@ -5,72 +5,100 @@ import { getHistoricalPriceEur } from '../modules/prices/binance';
 
 const router = Router();
 
-// POST /api/transactions/manual/preview
-router.post('/manual/preview', async (req: Request, res: Response) => {
-  const { operationType, asset, amount, costAsset, costAmount, timestamp, wallet_id } = req.body;
+// Ops que no generan precio histórico (coste 0 por ley)
+const ZERO_COST_OPS = new Set(['FORK']);
+// Ops que consumen lotes (para preview)
+const CONSUME_OPS = new Set(['SELL', 'SELL_FIAT', 'SELL_CRYPTO', 'GIFT_SENT', 'LOST', 'FEE_NETWORK', 'FEE_EXCHANGE']);
+// Ops que crean lotes
+const OPEN_LOT_OPS = new Set(['BUY', 'BUY_FIAT', 'BUY_CRYPTO', 'AIRDROP', 'FORK', 'STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'CASHBACK']);
 
-  if (!operationType || !asset || !timestamp) {
-    res.status(400).json({ error: 'operationType, asset y timestamp son requeridos' });
+// ── POST /api/transactions/manual/preview ──────────────────────────────────
+router.post('/manual/preview', async (req: Request, res: Response) => {
+  const {
+    operationType, asset, amount, costAsset, costAmount,
+    timestamp, wallet_id, destinationWalletId, feeAsset, feeAmount,
+  } = req.body;
+
+  const isFeeOp = operationType === 'FEE_NETWORK' || operationType === 'FEE_EXCHANGE';
+  const resolvedAsset  = isFeeOp ? (feeAsset  ?? asset)  : asset;
+  const resolvedAmount = isFeeOp ? (feeAmount ?? amount) : amount;
+
+  if (!operationType || !timestamp) {
+    res.status(400).json({ error: 'operationType y timestamp son requeridos' });
     return;
   }
 
   const date = new Date(timestamp);
   const warnings: string[] = [];
 
+  // Advertencia: fecha en el futuro
+  if (date > new Date()) {
+    warnings.push('La fecha introducida es futura. Verifica que sea correcta.');
+  }
+
+  // Advertencia: solapamiento con imports
   const importRanges = await db.query(
     `SELECT ci.filename, MIN(t.timestamp) as date_from, MAX(t.timestamp) as date_to
      FROM csv_imports ci JOIN transactions t ON t.import_id = ci.id
      GROUP BY ci.id, ci.filename`
   );
-
   for (const range of importRanges.rows) {
     const from = new Date(range.date_from);
-    const to = new Date(range.date_to);
+    const to   = new Date(range.date_to);
     if (date >= from && date <= to) {
-      warnings.push(`La fecha esta dentro del rango importado de "${range.filename}" (${from.toISOString().slice(0, 10)} - ${to.toISOString().slice(0, 10)})`);
+      warnings.push(
+        `La fecha está dentro del rango importado de "${range.filename}" ` +
+        `(${from.toISOString().slice(0, 10)} – ${to.toISOString().slice(0, 10)}). ` +
+        `Asegúrate de no duplicar la operación.`
+      );
     }
   }
 
-  const lastTx = await db.query(`SELECT MAX(timestamp) as last_ts FROM transactions`);
+  // Advertencia: fecha anterior al último registro → recálculo FIFO completo
+  const lastTx = await db.query('SELECT MAX(timestamp) as last_ts FROM transactions');
   if (lastTx.rows[0].last_ts && date < new Date(lastTx.rows[0].last_ts)) {
-    warnings.push(`Esta fecha es anterior a la ultima transaccion registrada. El recalculo FIFO afectara a todas las operaciones posteriores.`);
+    warnings.push(
+      'Esta fecha es anterior a la última transacción registrada. ' +
+      'Se recalcularán todos los lotes FIFO posteriores.'
+    );
   }
 
+  // Precio histórico (FORK siempre 0)
   let priceEur: number | null = null;
-  try {
-    priceEur = await getHistoricalPriceEur(asset, date);
-  } catch { /* ignorar */ }
+  if (resolvedAsset && !ZERO_COST_OPS.has(operationType)) {
+    try { priceEur = await getHistoricalPriceEur(resolvedAsset, date); } catch { /* ignorar */ }
+  }
 
   let estimatedGainLoss: number | null = null;
   let affectedLots: unknown[] = [];
+  let newLot: unknown = null;
+  let transferLots: unknown[] = [];
 
-  const isSale = ['SELL', 'SELL_FIAT', 'SELL_CRYPTO', 'GIFT_SENT', 'LOST'].includes(operationType);
-
-  if (isSale && amount && wallet_id) {
+  // Preview de venta / consumo de lotes
+  if (CONSUME_OPS.has(operationType) && resolvedAmount && wallet_id) {
     const lots = await db.query(
       `SELECT id, quantity_remaining, cost_basis_eur, price_per_unit_eur, opened_at
        FROM fifo_lots
-       WHERE asset = $1 AND wallet_id = $2
-         AND is_closed = FALSE AND quantity_remaining > 0
+       WHERE asset = $1 AND wallet_id = $2 AND is_closed = FALSE AND quantity_remaining > 0
        ORDER BY opened_at ASC`,
-      [asset, wallet_id]
+      [resolvedAsset, wallet_id]
     );
 
     let proceedsEur = 0;
     if (costAsset === 'EUR' && costAmount) {
       proceedsEur = parseFloat(costAmount);
     } else if (priceEur) {
-      proceedsEur = parseFloat(amount) * priceEur;
+      proceedsEur = parseFloat(resolvedAmount) * priceEur;
     }
 
-    let remaining = parseFloat(amount);
+    let remaining = parseFloat(resolvedAmount);
     let totalCost = 0;
-    const proceedsPerUnit = proceedsEur / parseFloat(amount);
+    const proceedsPerUnit = remaining > 0 ? proceedsEur / remaining : 0;
 
     for (const lot of lots.rows) {
       if (remaining <= 0) break;
-      const consumed = Math.min(parseFloat(lot.quantity_remaining), remaining);
-      const proportion = consumed / parseFloat(lot.quantity_remaining);
+      const consumed     = Math.min(parseFloat(lot.quantity_remaining), remaining);
+      const proportion   = consumed / parseFloat(lot.quantity_remaining);
       const costConsumed = parseFloat(lot.cost_basis_eur) * proportion;
       totalCost += costConsumed;
       remaining -= consumed;
@@ -79,86 +107,261 @@ router.post('/manual/preview', async (req: Request, res: Response) => {
         openedAt: lot.opened_at,
         consumed,
         costConsumed,
+        proceedsEur: consumed * proceedsPerUnit,
         pricePerUnit: lot.price_per_unit_eur,
       });
+    }
+
+    if (remaining > 0.0001) {
+      warnings.push(`Lotes insuficientes: faltan ${remaining.toFixed(6)} ${resolvedAsset ?? ''} en esta wallet.`);
     }
 
     estimatedGainLoss = proceedsEur - totalCost;
   }
 
-  res.json({ warnings, priceEur, estimatedGainLoss, affectedLots });
+  // Preview de apertura de lote (BUY / income)
+  if (OPEN_LOT_OPS.has(operationType) && resolvedAmount) {
+    const qty    = parseFloat(resolvedAmount);
+    const price  = ZERO_COST_OPS.has(operationType) ? 0 : (priceEur ?? 0);
+    const cost   = costAsset === 'EUR' && costAmount ? parseFloat(costAmount) : qty * price;
+    newLot = { asset: resolvedAsset, quantity: qty, costBasisEur: cost, pricePerUnit: price };
+  }
+
+  // Preview de transferencia: lotes que se moverán
+  if (operationType === 'TRANSFER_INTERNAL' && resolvedAmount && wallet_id && destinationWalletId) {
+    if (wallet_id === destinationWalletId) {
+      warnings.push('El wallet origen y destino son el mismo.');
+    } else {
+      const lots = await db.query(
+        `SELECT quantity_remaining, cost_basis_eur, price_per_unit_eur, opened_at
+         FROM fifo_lots
+         WHERE asset = $1 AND wallet_id = $2 AND is_closed = FALSE AND quantity_remaining > 0
+         ORDER BY opened_at ASC`,
+        [resolvedAsset, wallet_id]
+      );
+      let remaining = parseFloat(resolvedAmount);
+      for (const lot of lots.rows) {
+        if (remaining <= 0) break;
+        const moved = Math.min(parseFloat(lot.quantity_remaining), remaining);
+        transferLots.push({ openedAt: lot.opened_at, moved, pricePerUnit: lot.price_per_unit_eur });
+        remaining -= moved;
+      }
+      if (remaining > 0.0001) {
+        warnings.push(`Lotes insuficientes para transferir: faltan ${remaining.toFixed(6)} ${resolvedAsset ?? ''}.`);
+      }
+    }
+  }
+
+  res.json({ warnings, priceEur, estimatedGainLoss, affectedLots, newLot, transferLots });
 });
 
-// POST /api/transactions/manual
+// ── POST /api/transactions/manual ─────────────────────────────────────────
 router.post('/manual', async (req: Request, res: Response) => {
   const {
     operationType, asset, amount, amountNet,
     costAsset, costAmount, pricePerUnit,
     feeAsset, feeAmount,
-    wallet_id, timestamp, notes,
+    wallet_id, destinationWalletId, timestamp, notes,
   } = req.body;
 
-  if (!operationType || !asset || !amount || !timestamp || !wallet_id) {
-    res.status(400).json({ error: 'operationType, asset, amount, timestamp y wallet_id son requeridos' });
+  const isFeeOp   = operationType === 'FEE_NETWORK' || operationType === 'FEE_EXCHANGE';
+  const isIgnored = operationType === 'IGNORED';
+  const isFork    = operationType === 'FORK';
+
+  // FEE ops usan fee_asset/fee_amount como campo principal
+  const finalAsset  = isFeeOp ? (feeAsset  ?? asset)  : asset;
+  const finalAmount = isFeeOp ? (feeAmount ?? amount) : amount;
+
+  if (!operationType || !timestamp) {
+    res.status(400).json({ error: 'operationType y timestamp son requeridos' });
+    return;
+  }
+  if (!isIgnored && !isFeeOp && (!finalAsset || !finalAmount)) {
+    res.status(400).json({ error: 'asset y amount son requeridos para este tipo de operación' });
+    return;
+  }
+  if (isFeeOp && !finalAsset) {
+    res.status(400).json({ error: 'fee_asset es requerido para operaciones de fee' });
     return;
   }
 
-  const walletCheck = await db.query('SELECT id FROM wallets WHERE id = $1', [wallet_id]);
-  if (walletCheck.rows.length === 0) {
-    res.status(400).json({ error: 'wallet_id no existe' });
-    return;
+  // Resolver wallet_id
+  let resolvedWalletId = wallet_id;
+  if (!resolvedWalletId) {
+    if (isIgnored) {
+      const fallback = await db.query('SELECT id FROM wallets WHERE is_system = TRUE LIMIT 1');
+      resolvedWalletId = fallback.rows[0]?.id;
+    }
+    if (!resolvedWalletId) {
+      res.status(400).json({ error: 'wallet_id es requerido' });
+      return;
+    }
+  } else {
+    const walletCheck = await db.query('SELECT id FROM wallets WHERE id = $1', [resolvedWalletId]);
+    if (walletCheck.rows.length === 0) {
+      res.status(400).json({ error: 'wallet_id no existe' });
+      return;
+    }
   }
 
-  let finalPricePerUnit = pricePerUnit ? parseFloat(pricePerUnit) : null;
-  if (!finalPricePerUnit) {
-    try {
-      finalPricePerUnit = await getHistoricalPriceEur(asset, new Date(timestamp));
-    } catch { /* dejar null */ }
+  // Validar TRANSFER_INTERNAL
+  if (operationType === 'TRANSFER_INTERNAL') {
+    if (!destinationWalletId) {
+      res.status(400).json({ error: 'destinationWalletId es requerido para transferencias internas' });
+      return;
+    }
+    if (destinationWalletId === resolvedWalletId) {
+      res.status(400).json({ error: 'El wallet origen y destino no pueden ser el mismo' });
+      return;
+    }
+    const destCheck = await db.query('SELECT id FROM wallets WHERE id = $1', [destinationWalletId]);
+    if (destCheck.rows.length === 0) {
+      res.status(400).json({ error: 'destinationWalletId no existe' });
+      return;
+    }
   }
 
-  let finalCostAmount = costAmount ? parseFloat(costAmount) : null;
-  if (!finalCostAmount && finalPricePerUnit && amount) {
-    finalCostAmount = parseFloat(amount) * finalPricePerUnit;
+  // Precio histórico (FORK = 0 por ley AEAT)
+  let finalPricePerUnit: number | null = isFork ? 0 : (pricePerUnit ? parseFloat(pricePerUnit) : null);
+  if (!isFork && !finalPricePerUnit && finalAsset) {
+    try { finalPricePerUnit = await getHistoricalPriceEur(finalAsset, new Date(timestamp)); } catch { /* dejar null */ }
+  }
+
+  // costAsset: solo EUR por defecto en operaciones fiat. Crypto ops tienen su propio asset.
+  const resolvedCostAsset = costAsset ?? (
+    ['BUY_FIAT', 'SELL_FIAT', 'DEPOSIT_FIAT', 'WITHDRAW_FIAT'].includes(operationType) ? 'EUR' : null
+  );
+
+  // costAmount: FORK = 0, resto normal
+  let finalCostAmount: number | null = isFork ? 0 : (costAmount ? parseFloat(costAmount) : null);
+  if (!isFork && !finalCostAmount && finalPricePerUnit && finalAmount) {
+    finalCostAmount = parseFloat(finalAmount) * finalPricePerUnit;
   }
 
   const dbOperationType = mapCatalogTypeToDb(operationType);
+  const dbAsset  = (finalAsset ?? 'OTHER').toString().toUpperCase();
+  const dbAmount = parseFloat(finalAmount ?? '0') || 0;
 
   await db.query(
     `INSERT INTO transactions (
-      operation_type, timestamp, asset, amount, amount_net,
-      cost_asset, cost_amount, price_per_unit,
-      fee_asset, fee_amount,
-      wallet_id, account, notes, manually_added
-    ) VALUES (
-      $1::operation_type, $2, $3, $4, $5,
-      $6, $7, $8,
-      $9, $10,
-      $11, 'Manual', $12, true
-    )`,
+       operation_type, timestamp, asset, amount, amount_net,
+       cost_asset, cost_amount, price_per_unit,
+       fee_asset, fee_amount,
+       wallet_id, destination_wallet_id, account, notes, manually_added
+     ) VALUES (
+       $1::operation_type, $2, $3, $4, $5,
+       $6, $7, $8,
+       $9, $10,
+       $11, $12, 'Manual', $13, true
+     )`,
     [
-      dbOperationType,
-      new Date(timestamp),
-      asset.toUpperCase(),
-      parseFloat(amount),
-      parseFloat(amountNet ?? amount),
-      costAsset ?? 'EUR',
+      dbOperationType, new Date(timestamp),
+      dbAsset, dbAmount,
+      parseFloat(amountNet ?? finalAmount ?? '0') || 0,
+      resolvedCostAsset,
       finalCostAmount,
       finalPricePerUnit,
-      feeAsset ?? null,
+      feeAsset  ?? null,
       feeAmount ? parseFloat(feeAmount) : null,
-      wallet_id,
+      resolvedWalletId,
+      destinationWalletId ?? null,
       notes ?? null,
     ]
   );
 
-  runFifoEngine().catch(err =>
-    console.error('[MANUAL TX] Error recalculando FIFO:', err.message)
-  );
-
-  res.json({ success: true });
+  // Recalcular FIFO de forma síncrona → devolvemos resultado al cliente
+  try {
+    const fifoResult = await runFifoEngine();
+    res.json({ success: true, fifo: fifoResult });
+  } catch (err) {
+    res.json({ success: true, fifo: null, fifoError: (err as Error).message });
+  }
 });
 
-// GET /api/transactions
+// ── PUT /api/transactions/:id (editar transacción manual) ─────────────────
+router.put('/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const {
+    operationType, asset, amount, amountNet,
+    costAsset, costAmount, pricePerUnit,
+    feeAsset, feeAmount,
+    wallet_id, destinationWalletId, timestamp, notes,
+  } = req.body;
+
+  const tx = await db.query('SELECT manually_added FROM transactions WHERE id = $1', [id]);
+  if (tx.rows.length === 0) {
+    res.status(404).json({ error: 'Transacción no encontrada' });
+    return;
+  }
+  if (!tx.rows[0].manually_added) {
+    res.status(403).json({ error: 'Solo se pueden editar transacciones manuales' });
+    return;
+  }
+
+  const isFeeOp = operationType === 'FEE_NETWORK' || operationType === 'FEE_EXCHANGE';
+  const isFork  = operationType === 'FORK';
+
+  const finalAsset  = isFeeOp ? (feeAsset  ?? asset)  : asset;
+  const finalAmount = isFeeOp ? (feeAmount ?? amount) : amount;
+
+  if (!finalAsset || !finalAmount || !timestamp || !wallet_id) {
+    res.status(400).json({ error: 'Faltan campos requeridos' });
+    return;
+  }
+
+  let finalPricePerUnit: number | null = isFork ? 0 : (pricePerUnit ? parseFloat(pricePerUnit) : null);
+  if (!isFork && !finalPricePerUnit) {
+    try { finalPricePerUnit = await getHistoricalPriceEur(finalAsset, new Date(timestamp)); } catch { /* ignorar */ }
+  }
+
+  const resolvedCostAsset = costAsset ?? (
+    ['BUY_FIAT', 'SELL_FIAT', 'DEPOSIT_FIAT'].includes(operationType) ? 'EUR' : null
+  );
+  let finalCostAmount: number | null = isFork ? 0 : (costAmount ? parseFloat(costAmount) : null);
+  if (!isFork && !finalCostAmount && finalPricePerUnit) {
+    finalCostAmount = parseFloat(finalAmount) * finalPricePerUnit;
+  }
+
+  await db.query(
+    `UPDATE transactions SET
+       operation_type = $1::operation_type,
+       timestamp      = $2,
+       asset          = $3,
+       amount         = $4,
+       amount_net     = $5,
+       cost_asset     = $6,
+       cost_amount    = $7,
+       price_per_unit = $8,
+       fee_asset      = $9,
+       fee_amount     = $10,
+       wallet_id      = $11,
+       destination_wallet_id = $12,
+       notes          = $13,
+       updated_at     = NOW()
+     WHERE id = $14`,
+    [
+      mapCatalogTypeToDb(operationType), new Date(timestamp),
+      finalAsset.toUpperCase(), parseFloat(finalAmount),
+      parseFloat(amountNet ?? finalAmount),
+      resolvedCostAsset, finalCostAmount, finalPricePerUnit,
+      feeAsset  ?? null,
+      feeAmount ? parseFloat(feeAmount) : null,
+      wallet_id,
+      destinationWalletId ?? null,
+      notes ?? null,
+      id,
+    ]
+  );
+
+  try {
+    const fifoResult = await runFifoEngine();
+    res.json({ success: true, fifo: fifoResult });
+  } catch (err) {
+    res.json({ success: true, fifo: null, fifoError: (err as Error).message });
+  }
+});
+
+// ── GET /api/transactions ──────────────────────────────────────────────────
 router.get('/', async (req: Request, res: Response) => {
   const { asset, type, wallet_id, account, manually_added, limit = '50', offset = '0' } = req.query;
 
@@ -166,11 +369,14 @@ router.get('/', async (req: Request, res: Response) => {
   const params: unknown[] = [];
   let paramIdx = 1;
 
-  if (asset)            { where += ` AND t.asset = $${paramIdx++}`;           params.push((asset as string).toUpperCase()); }
-  if (type)             { where += ` AND t.operation_type = $${paramIdx++}`;   params.push(type); }
-  if (wallet_id)        { where += ` AND t.wallet_id = $${paramIdx++}`;        params.push(wallet_id); }
-  if (account)          { where += ` AND t.account = $${paramIdx++}`;          params.push(account); }
-  if (manually_added !== undefined) { where += ` AND t.manually_added = $${paramIdx++}`; params.push(manually_added === 'true'); }
+  if (asset)          { where += ` AND t.asset = $${paramIdx++}`;          params.push((asset as string).toUpperCase()); }
+  if (type)           { where += ` AND t.operation_type = $${paramIdx++}`; params.push(type); }
+  if (wallet_id)      { where += ` AND t.wallet_id = $${paramIdx++}`;      params.push(wallet_id); }
+  if (account)        { where += ` AND t.account = $${paramIdx++}`;        params.push(account); }
+  if (manually_added !== undefined) {
+    where += ` AND t.manually_added = $${paramIdx++}`;
+    params.push(manually_added === 'true');
+  }
 
   params.push(parseInt(limit as string));
   params.push(parseInt(offset as string));
@@ -181,10 +387,12 @@ router.get('/', async (req: Request, res: Response) => {
        t.cost_asset, t.cost_amount, t.price_per_unit,
        t.fee_asset, t.fee_amount,
        t.wallet_id, w.name AS wallet_name, w.color AS wallet_color, w.type AS wallet_kind,
-       t.account, t.destination_wallet_id, t.destination_pending,
-       t.notes, t.manually_added, t.created_at
+       t.account, t.destination_wallet_id,
+       dw.name AS destination_wallet_name, dw.color AS destination_wallet_color,
+       t.destination_pending, t.notes, t.manually_added, t.created_at
      FROM transactions t
      JOIN wallets w ON w.id = t.wallet_id
+     LEFT JOIN wallets dw ON dw.id = t.destination_wallet_id
      ${where}
      ORDER BY t.timestamp DESC
      LIMIT $${paramIdx++} OFFSET $${paramIdx}`,
@@ -204,19 +412,17 @@ router.get('/', async (req: Request, res: Response) => {
   });
 });
 
-// DELETE /api/transactions/:id
+// ── DELETE /api/transactions/:id ──────────────────────────────────────────
 router.delete('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
 
   const tx = await db.query('SELECT manually_added FROM transactions WHERE id = $1', [id]);
-
   if (tx.rows.length === 0) {
-    res.status(404).json({ error: 'Transaccion no encontrada' });
+    res.status(404).json({ error: 'Transacción no encontrada' });
     return;
   }
-
   if (!tx.rows[0].manually_added) {
-    res.status(403).json({ error: 'Solo se pueden borrar transacciones manuales desde aqui.' });
+    res.status(403).json({ error: 'Solo se pueden borrar transacciones manuales desde aquí.' });
     return;
   }
 
@@ -231,34 +437,35 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await client.query('DELETE FROM transactions WHERE id = $1', [id]);
   });
 
-  runFifoEngine().catch(err =>
-    console.error('[DELETE MANUAL TX] Error recalculando FIFO:', err.message)
-  );
-
-  res.json({ success: true });
+  try {
+    const fifoResult = await runFifoEngine();
+    res.json({ success: true, fifo: fifoResult });
+  } catch (err) {
+    res.json({ success: true, fifo: null, fifoError: (err as Error).message });
+  }
 });
 
 function mapCatalogTypeToDb(catalogType: string): string {
   const map: Record<string, string> = {
-    'BUY_FIAT':         'BUY_FIAT',
-    'BUY_CRYPTO':       'BUY_CRYPTO',
-    'SELL_FIAT':        'SELL_FIAT',
-    'SELL_CRYPTO':      'SELL_CRYPTO',
-    'STAKING_REWARD':   'STAKING_REWARD',
-    'MINING_REWARD':    'MINING_REWARD',
-    'LENDING_INTEREST': 'LENDING_INTEREST',
-    'CASHBACK':         'CASHBACK',
-    'AIRDROP':          'AIRDROP',
-    'FORK':             'FORK',
-    'GIFT_SENT':        'GIFT_SENT',
-    'LOST':             'LOST',
-    'TRANSFER_INTERNAL':'TRANSFER_INTERNAL',
-    'FEE_NETWORK':      'FEE_NETWORK',
-    'FEE_EXCHANGE':     'FEE_EXCHANGE',
-    'IGNORED':          'IGNORED',
-    'BUY':              'BUY',
-    'SELL':             'SELL',
-    'WITHDRAW':         'WITHDRAW',
+    'BUY_FIAT':          'BUY_FIAT',
+    'BUY_CRYPTO':        'BUY_CRYPTO',
+    'SELL_FIAT':         'SELL_FIAT',
+    'SELL_CRYPTO':       'SELL_CRYPTO',
+    'STAKING_REWARD':    'STAKING_REWARD',
+    'MINING_REWARD':     'MINING_REWARD',
+    'LENDING_INTEREST':  'LENDING_INTEREST',
+    'CASHBACK':          'CASHBACK',
+    'AIRDROP':           'AIRDROP',
+    'FORK':              'FORK',
+    'GIFT_SENT':         'GIFT_SENT',
+    'LOST':              'LOST',
+    'TRANSFER_INTERNAL': 'TRANSFER_INTERNAL',
+    'FEE_NETWORK':       'FEE_NETWORK',
+    'FEE_EXCHANGE':      'FEE_EXCHANGE',
+    'IGNORED':           'IGNORED',
+    'BUY':               'BUY',
+    'SELL':              'SELL',
+    'WITHDRAW':          'WITHDRAW',
   };
   return map[catalogType] ?? catalogType;
 }

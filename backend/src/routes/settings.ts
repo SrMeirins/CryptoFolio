@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/client';
 import { autoDetectPair, testPair } from '../modules/prices/pairDetector';
+import { runFifoEngine } from '../modules/fifo/engine';
+import { getHistoricalPriceEur } from '../modules/prices/binance';
 
 const router = Router();
 
@@ -223,9 +225,19 @@ router.get('/notifications', async (_req: Request, res: Response) => {
     id: string; type: 'error' | 'warning' | 'info'; category: string; message: string; count?: number;
   }> = [];
 
-  // 1. Activos sin precio configurado (no stablecoin)
+  // 1. Activos sin precio configurado (no stablecoin) Y con saldo > 0
+  // Excluimos activos con saldo 0 (cerrados, recuperados, etc.) porque no necesitan precio actual
   const noPriceRes = await db.query(
-    `SELECT symbol FROM asset_metadata WHERE price_source = 'unknown' AND is_stablecoin = FALSE ORDER BY symbol`
+    `SELECT am.symbol
+     FROM asset_metadata am
+     WHERE am.price_source = 'unknown' AND am.is_stablecoin = FALSE
+       AND EXISTS (
+         SELECT 1 FROM fifo_lots fl
+         WHERE fl.asset = am.symbol
+           AND fl.is_closed = FALSE
+           AND fl.quantity_remaining > 0.000001
+       )
+     ORDER BY am.symbol`
   );
   if (noPriceRes.rows.length > 0) {
     notifications.push({
@@ -253,19 +265,19 @@ router.get('/notifications', async (_req: Request, res: Response) => {
     });
   }
 
-  // 3. Depósitos de cripto externo que requieren revisión
+  // 3. Depósitos de cripto externo sin coste de adquisición — bloquean el FIFO
   const cryptoDepositRes = await db.query(
     `SELECT COUNT(*) AS cnt FROM transactions
-     WHERE operation_type = 'AIRDROP'
-       AND notes LIKE '%Depósito de cripto externo%'`
+     WHERE notes LIKE '%Depósito de cripto externo%'
+       AND price_per_unit IS NULL`
   );
   const cryptoDepositCount = parseInt(cryptoDepositRes.rows[0].cnt);
   if (cryptoDepositCount > 0) {
     notifications.push({
       id: 'crypto-deposits',
-      type: 'info',
+      type: 'warning',
       category: 'Depósitos',
-      message: `${cryptoDepositCount} depósito${cryptoDepositCount > 1 ? 's' : ''} de cripto externo con coste de adquisición desconocido. Revisa y ajusta si es necesario.`,
+      message: `${cryptoDepositCount} depósito${cryptoDepositCount > 1 ? 's' : ''} de cripto externo sin coste de adquisición. Revísalos en Importación antes de importar nuevos datos.`,
       count: cryptoDepositCount,
     });
   }
@@ -292,6 +304,54 @@ router.get('/notifications', async (_req: Request, res: Response) => {
   }
 
   res.json(notifications);
+});
+
+// ── GET /api/settings/pending-deposits ───────────────────────────────────
+// Transacciones de depósito externo ya importadas sin coste de adquisición
+router.get('/pending-deposits', async (_req: Request, res: Response) => {
+  const result = await db.query(
+    `SELECT t.id, t.timestamp, t.asset, t.amount, t.price_per_unit, t.cost_amount, w.name AS wallet_name
+     FROM transactions t
+     JOIN wallets w ON w.id = t.wallet_id
+     WHERE t.notes LIKE '%Depósito de cripto externo%'
+       AND t.price_per_unit IS NULL
+     ORDER BY t.timestamp`
+  );
+  // Auto-detectar precio histórico para cada depósito
+  const rows = await Promise.all(result.rows.map(async (row: {
+    id: string; timestamp: string; asset: string; amount: string;
+    price_per_unit: null; cost_amount: null; wallet_name: string;
+  }) => {
+    let historicalPrice: number | null = null;
+    try {
+      historicalPrice = await getHistoricalPriceEur(row.asset, new Date(row.timestamp));
+    } catch { /* sin precio */ }
+    return { ...row, historicalPrice };
+  }));
+  res.json(rows);
+});
+
+// ── POST /api/settings/bulk-set-costs ────────────────────────────────────
+// Asigna precio de adquisición a depósitos externos ya importados
+router.post('/bulk-set-costs', async (req: Request, res: Response) => {
+  const updates: { id: string; pricePerUnit: number }[] = req.body.updates;
+  if (!updates?.length) {
+    res.status(400).json({ error: 'updates es requerido' });
+    return;
+  }
+  await db.transaction(async (client) => {
+    for (const { id, pricePerUnit } of updates) {
+      const amount = await client.query('SELECT amount FROM transactions WHERE id = $1', [id]);
+      if (!amount.rows[0]) continue;
+      const costAmount = parseFloat(amount.rows[0].amount) * pricePerUnit;
+      await client.query(
+        `UPDATE transactions SET price_per_unit = $1, cost_amount = $2, updated_at = NOW() WHERE id = $3`,
+        [pricePerUnit, costAmount, id]
+      );
+    }
+  });
+  const fifo = await runFifoEngine();
+  res.json({ success: true, updated: updates.length, fifo });
 });
 
 // ── DELETE /api/settings/data/transactions ────────────────────────────────

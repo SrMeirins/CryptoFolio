@@ -56,6 +56,18 @@ export interface ManualTxPreview {
     openedAt: string
     consumed: number
     costConsumed: number
+    proceedsEur?: number
+    pricePerUnit: number
+  }[]
+  newLot?: {
+    asset: string
+    quantity: number
+    costBasisEur: number
+    pricePerUnit: number
+  }
+  transferLots?: {
+    openedAt: string
+    moved: number
     pricePerUnit: number
   }[]
 }
@@ -112,8 +124,11 @@ export const portfolioApi = {
   previewManualTx: (data: Record<string, unknown>) =>
     api.post<ManualTxPreview>('/transactions/manual/preview', data),
   createManualTx: (data: Record<string, unknown>) =>
-    api.post<{ success: boolean }>('/transactions/manual', data),
-  deleteManualTx: (id: string) => api.delete<{ success: boolean }>(`/transactions/${id}`),
+    api.post<{ success: boolean; fifo?: { lotsCreated: number; lotsConsumed: number; totalGainEur: number; totalLossEur: number } }>('/transactions/manual', data),
+  updateManualTx: (id: string, data: Record<string, unknown>) =>
+    api.put<{ success: boolean; fifo?: { lotsCreated: number; lotsConsumed: number; totalGainEur: number; totalLossEur: number } }>(`/transactions/${id}`, data),
+  deleteManualTx: (id: string) =>
+    api.delete<{ success: boolean; fifo?: { lotsCreated: number; lotsConsumed: number } }>(`/transactions/${id}`),
   getTransactions: (params?: Record<string, string | undefined>) => {
     const filtered = params
       ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][])
@@ -129,7 +144,36 @@ export const portfolioApi = {
   }>('/settings/stats'),
   clearPriceCache: () => api.delete<{ deleted: number }>('/settings/price-cache'),
   resetAllData: () => api.delete<{ success: boolean }>('/settings/data/transactions'),
+  getRealizedPnl: () => api.get<{
+    totalGains:  number
+    totalLosses: number
+    netPnl:      number
+    byAsset: {
+      asset:          string
+      operations:     number
+      realized_gains: string
+      realized_losses:string
+      net_pnl:        string
+      total_sold:     string
+      first_sale:     string
+      last_sale:      string
+    }[]
+  }>('/fifo/realized-pnl'),
+  getEurFlow: () => api.get<{
+    deposited: number
+    withdrawn: number
+    netFromBank: number
+    eurSpentBuying: number
+    eurReceivedSelling: number
+    netInvested: number
+  }>('/fifo/eur-flow'),
   getNotifications: () => api.get<Array<{
     id: string; type: 'error' | 'warning' | 'info'; category: string; message: string; count?: number;
   }>>('/settings/notifications'),
+  getPendingDeposits: () => api.get<Array<{
+    id: string; timestamp: string; asset: string; amount: string;
+    wallet_name: string; historicalPrice: number | null;
+  }>>('/settings/pending-deposits'),
+  bulkSetCosts: (updates: { id: string; pricePerUnit: number }[]) =>
+    api.post<{ success: boolean; updated: number; fifo: unknown }>('/settings/bulk-set-costs', { updates }),
 }

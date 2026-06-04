@@ -6,6 +6,7 @@ import { parseBinanceCsv } from './parser';
 import { validateCsvStructure, ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
 import { ACCOUNT_TO_WALLET, TRANSFER_DESTINATIONS } from './binanceAccounts';
+import { getHistoricalPriceEur } from '../prices/binance';
 
 export interface ImportResult {
   importId: string;
@@ -25,6 +26,15 @@ export interface UnknownOperationSample {
   originalLabel: string;
 }
 
+export interface DepositReview {
+  txKey: string;           // rawRowHashes[0] para nuevos, o UUID para ya importados
+  timestamp: string;
+  asset: string;
+  amount: number;
+  historicalPrice: number | null;
+  existingInDb?: boolean;  // true si ya está importado (necesita bulk-set-costs en lugar de depositCosts)
+}
+
 export interface PreviewResult {
   validation: ValidationResult;
   transactions: ParsedTransaction[];
@@ -32,6 +42,7 @@ export interface PreviewResult {
   newCount: number;
   errors: string[];
   unknownOperationSamples: Record<string, UnknownOperationSample>;
+  depositReviews: DepositReview[];  // depósitos externos que necesitan coste
 }
 
 export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult> {
@@ -45,6 +56,7 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
       newCount: 0,
       errors: validation.errors,
       unknownOperationSamples: {},
+      depositReviews: [],
     };
   }
 
@@ -144,6 +156,43 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
     else newCount++;
   }
 
+  // Detectar depósitos externos que necesitan revisión de coste:
+  // 1. Nuevos en este CSV
+  // 2. Ya importados en DB pero sin price_per_unit
+  const depositReviews: DepositReview[] = [];
+
+  // Caso 1: nuevos depósitos en este CSV
+  for (const tx of parseResult.transactions) {
+    if (!tx.needsCostReview) continue;
+    if (tx.rawRowHashes.some(h => existingHashes.has(h))) continue; // ya importado (ver caso 2)
+    const txKey = tx.rawRowHashes[0];
+    let historicalPrice: number | null = null;
+    try { historicalPrice = await getHistoricalPriceEur(tx.asset, tx.timestamp); } catch { /* ignorar */ }
+    depositReviews.push({ txKey, timestamp: tx.timestamp.toISOString(), asset: tx.asset, amount: tx.amount, historicalPrice });
+  }
+
+  // Caso 2: depósitos ya importados en DB pero sin coste — bloquean igual
+  const existingPendingRes = await db.query(
+    `SELECT id::text AS txkey, timestamp, asset, amount
+     FROM transactions
+     WHERE notes LIKE '%Depósito de cripto externo%' AND price_per_unit IS NULL
+     ORDER BY timestamp`
+  );
+  for (const row of existingPendingRes.rows) {
+    // No duplicar si ya está en depositReviews (txKey del CSV coincide)
+    if (depositReviews.some(d => d.txKey === row.txkey)) continue;
+    let historicalPrice: number | null = null;
+    try { historicalPrice = await getHistoricalPriceEur(row.asset, new Date(row.timestamp)); } catch { /* ignorar */ }
+    depositReviews.push({
+      txKey: row.txkey,           // id UUID de la transacción — se usa en depositCosts
+      timestamp: new Date(row.timestamp).toISOString(),
+      asset: row.asset,
+      amount: parseFloat(row.amount),
+      historicalPrice,
+      existingInDb: true,         // flag extra para distinguir en UI si hace falta
+    });
+  }
+
   return {
     validation,
     transactions: parseResult.transactions,
@@ -151,13 +200,15 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
     newCount,
     errors: parseResult.errors.map((e) => e.message),
     unknownOperationSamples,
+    depositReviews,
   };
 }
 
 export async function importCsvFile(
   fileBuffer: Buffer,
   filename: string,
-  withdrawalDestinations: Record<string, string> = {}
+  withdrawalDestinations: Record<string, string> = {},
+  depositCosts: Record<string, number> = {}   // txKey → pricePerUnit (EUR)
 ): Promise<ImportResult> {
   const validation = validateCsvStructure(fileBuffer);
   if (!validation.valid) {
@@ -242,7 +293,10 @@ export async function importCsvFile(
       if (tx.operationType === 'TRANSFER_INTERNAL') {
         destinationWalletId = getDestinationWalletId(tx.notes, tx.account);
       } else if (tx.operationType === 'WITHDRAW') {
-        const dest = withdrawalDestinations[tx.asset];
+        // Buscar destino por txKey (rawRowHashes[0]) → más granular que por activo.
+        // Fallback al activo para compatibilidad con importaciones anteriores.
+        const txKey = tx.rawRowHashes[0] ?? tx.asset;
+        const dest  = withdrawalDestinations[txKey] ?? withdrawalDestinations[tx.asset];
 
         if (dest === '__lost__') {
           // Pérdida de acceso → LOST
@@ -268,7 +322,12 @@ export async function importCsvFile(
         }
       }
 
-      await insertTransaction(client, tx, importId, walletId, destinationWalletId, effectiveOpType);
+      // Coste de adquisición para depósitos externos
+      const depositPriceOverride = tx.needsCostReview
+        ? (depositCosts[tx.rawRowHashes[0]] ?? null)
+        : null;
+
+      await insertTransaction(client, tx, importId, walletId, destinationWalletId, effectiveOpType, depositPriceOverride);
       newTransactions++;
     }
 
@@ -301,12 +360,19 @@ async function insertTransaction(
   walletId: string,
   destinationWalletId: string | null = null,
   operationTypeOverride?: string,
+  depositPriceOverride: number | null = null,
 ): Promise<void> {
   const opType = operationTypeOverride ?? tx.operationType;
   // WITHDRAW sin destino asignado → pending (usuario lo asignará después)
   const isWithdraw  = opType === 'WITHDRAW';
   const destPending = isWithdraw && !destinationWalletId;
   const destId      = destinationWalletId;
+
+  // Para depósitos externos: usar precio override si fue provisto
+  const finalPricePerUnit = depositPriceOverride ?? tx.pricePerUnit ?? null;
+  const finalCostAmount   = depositPriceOverride
+    ? tx.amount * depositPriceOverride
+    : (tx.costAmount ?? null);
 
   const txRes = await client.query(
     `INSERT INTO transactions (
@@ -328,14 +394,14 @@ async function insertTransaction(
     ) RETURNING id`,
     [
       importId,
-      opType,  // puede ser override (WITHDRAW→LOST para pérdidas)
+      opType,
       tx.timestamp,
       tx.asset,
       tx.amount,
       tx.amountNet,
       tx.costAsset ?? null,
-      tx.costAmount ?? null,
-      tx.pricePerUnit ?? null,
+      finalCostAmount,
+      finalPricePerUnit,
       tx.feeAsset ?? null,
       tx.feeAmount ?? null,
       walletId,
