@@ -118,6 +118,58 @@ router.get('/fiat-balances', async (_req, res) => {
   res.json(result.rows);
 });
 
+// GET /api/fifo/eur-flow — Euros depositados, retirados y neto invertido en cripto
+router.get('/eur-flow', async (_req, res) => {
+  const result = await db.query(`
+    SELECT
+      COALESCE(SUM(CASE WHEN operation_type = 'DEPOSIT_FIAT'  AND asset = 'EUR' THEN amount     ELSE 0 END), 0) AS deposited,
+      COALESCE(SUM(CASE WHEN operation_type = 'WITHDRAW_FIAT' AND asset = 'EUR' THEN amount     ELSE 0 END), 0) AS withdrawn,
+      COALESCE(SUM(CASE WHEN operation_type IN ('BUY','BUY_FIAT') AND cost_asset = 'EUR'        THEN cost_amount ELSE 0 END), 0) AS eur_spent_buying,
+      COALESCE(SUM(CASE WHEN operation_type IN ('SELL','SELL_FIAT') AND cost_asset = 'EUR'      THEN cost_amount ELSE 0 END), 0) AS eur_received_selling
+    FROM transactions
+  `);
+  const row = result.rows[0];
+  const deposited          = parseFloat(row.deposited);
+  const withdrawn          = parseFloat(row.withdrawn);
+  const eurSpentBuying     = parseFloat(row.eur_spent_buying);
+  const eurReceivedSelling = parseFloat(row.eur_received_selling);
+  res.json({
+    deposited,
+    withdrawn,
+    netFromBank: deposited - withdrawn,         // EUR neto desde el banco
+    eurSpentBuying,
+    eurReceivedSelling,
+    netInvested: eurSpentBuying - eurReceivedSelling,  // EUR neto gastado en cripto
+  });
+});
+
+// GET /api/fifo/realized-pnl — P&L realizado histórico por activo
+router.get('/realized-pnl', async (_req, res) => {
+  const result = await db.query(`
+    SELECT
+      fl.asset,
+      COUNT(flc.id)::int                                                              AS operations,
+      ROUND(SUM(CASE WHEN flc.gain_loss_eur > 0 THEN flc.gain_loss_eur ELSE 0 END)::numeric, 2) AS realized_gains,
+      ROUND(SUM(CASE WHEN flc.gain_loss_eur < 0 THEN flc.gain_loss_eur ELSE 0 END)::numeric, 2) AS realized_losses,
+      ROUND(SUM(flc.gain_loss_eur)::numeric, 2)                                       AS net_pnl,
+      ROUND(SUM(flc.quantity_consumed)::numeric, 8)                                   AS total_sold,
+      MIN(flc.consumed_at)::date                                                       AS first_sale,
+      MAX(flc.consumed_at)::date                                                       AS last_sale
+    FROM fifo_lot_consumptions flc
+    JOIN fifo_lots fl ON fl.id = flc.lot_id
+    WHERE flc.fiscal_event_type != 'NONE'
+    GROUP BY fl.asset
+    ORDER BY net_pnl ASC
+  `);
+
+  const rows = result.rows;
+  const totalGains  = rows.reduce((s: number, r: { realized_gains: string }) => s + parseFloat(r.realized_gains), 0);
+  const totalLosses = rows.reduce((s: number, r: { realized_losses: string }) => s + parseFloat(r.realized_losses), 0);
+  const netPnl      = totalGains + totalLosses;
+
+  res.json({ totalGains, totalLosses, netPnl, byAsset: rows });
+});
+
 // GET /api/fifo/lots — Lotes FIFO abiertos actualmente
 router.get('/lots', async (_req, res) => {
   const result = await db.query(
@@ -129,7 +181,9 @@ router.get('/lots', async (_req, res) => {
        w.type  AS wallet_kind,
        SUM(fl.quantity_remaining)  AS quantity,
        SUM(fl.cost_basis_eur)      AS cost_basis_eur,
-       AVG(fl.price_per_unit_eur)  AS avg_price_eur
+       -- Media ponderada por cantidad (no media simple)
+       SUM(fl.quantity_remaining * fl.price_per_unit_eur)
+         / NULLIF(SUM(fl.quantity_remaining), 0) AS avg_price_eur
      FROM fifo_lots fl
      JOIN wallets w ON w.id = fl.wallet_id
      WHERE fl.is_closed = FALSE AND fl.quantity_remaining > 0
