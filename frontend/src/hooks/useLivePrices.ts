@@ -27,7 +27,6 @@ export function useLivePrices() {
 
       ws.onopen = () => {
         setConnected(true)
-        console.log('[WS] Conectado a precios live')
       }
 
       ws.onmessage = (event) => {

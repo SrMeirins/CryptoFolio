@@ -4,57 +4,10 @@ import { portfolioApi, FiatBalance, FifoLot } from '../api/portfolio'
 import { AssetTable } from '../components/AssetTable'
 import { usePricesStore } from '../store/pricesStore'
 import { formatEur } from '../utils/format'
+import { InfoTooltip } from '../components/InfoTooltip'
+import { MetricCard } from '../components/MetricCard'
 import { RefreshCw, Wallet, Search, X, ChevronDown } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-
-// ── InfoTooltip ── hover moderno ────────────────────────────────────────────
-function InfoTooltip({ label, children }: { label: string; children: React.ReactNode }) {
-  const [visible, setVisible] = useState(false)
-
-  return (
-    <div
-      className="relative inline-flex items-center"
-      onMouseEnter={() => setVisible(true)}
-      onMouseLeave={() => setVisible(false)}
-    >
-      {/* Trigger */}
-      <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-semibold cursor-default select-none transition-all duration-150 ${
-        visible
-          ? 'bg-accent-blue/20 text-accent-blue border border-accent-blue/50'
-          : 'bg-white/5 text-gray-600 border border-white/10 hover:border-white/20 hover:text-gray-400'
-      }`}>
-        ?
-      </span>
-
-      {/* Panel flotante */}
-      {visible && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 z-[100] w-64 pointer-events-none">
-          {/* Glassmorphism card */}
-          <div className="relative rounded-xl border border-white/10 bg-gray-950/90 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] p-4 animate-slide-in">
-
-            {/* Acento superior */}
-            <div className="absolute inset-x-0 top-0 h-px rounded-t-xl bg-gradient-to-r from-transparent via-accent-blue/40 to-transparent" />
-
-            {/* Label */}
-            <p className="text-[10px] font-semibold tracking-widest text-accent-blue/80 uppercase mb-2">
-              {label}
-            </p>
-
-            {/* Contenido */}
-            <div className="text-[11px] text-gray-300 leading-relaxed space-y-2">
-              {children}
-            </div>
-          </div>
-
-          {/* Flecha */}
-          <div className="flex justify-center -mt-px">
-            <div className="w-2.5 h-2.5 rotate-45 border-r border-b border-white/10 bg-gray-950/90 backdrop-blur-xl" />
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ── Cálculo de totales globales ────────────────────────────────────────────
 function usePortfolioTotals(lots: FifoLot[], fiatBalances: FiatBalance[]) {
@@ -91,35 +44,6 @@ function usePortfolioTotals(lots: FifoLot[], fiatBalances: FiatBalance[]) {
   const pnlPct = totalCost > 0 ? (pnl / totalCost) * 100 : 0
 
   return { totalValue, totalCost, pnl, pnlPct, assetsTotal, pricesMissing }
-}
-
-// ── MetricCard ─────────────────────────────────────────────────────────────
-function MetricCard({
-  label, value, positive, loading, tooltip,
-}: {
-  label: string
-  value: string
-  positive?: boolean
-  loading?: boolean
-  tooltip?: React.ReactNode
-}) {
-  return (
-    <div className="bg-background-card border border-border rounded-2xl px-5 py-5 flex flex-col gap-2">
-      <div className="flex items-center gap-1.5">
-        <p className="text-[11px] text-gray-600 font-medium uppercase tracking-widest leading-none">{label}</p>
-        {tooltip && <InfoTooltip label={label}>{tooltip}</InfoTooltip>}
-      </div>
-      {loading
-        ? <div className="h-8 w-32 bg-background-tertiary rounded-lg animate-pulse" />
-        : <p className={`text-[1.6rem] font-semibold tracking-tight leading-none font-['JetBrains_Mono',monospace] ${
-            positive === undefined ? 'text-white' :
-            positive ? 'text-accent-green' : 'text-accent-red'
-          }`}>
-            {value}
-          </p>
-      }
-    </div>
-  )
 }
 
 

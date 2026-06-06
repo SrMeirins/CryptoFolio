@@ -72,7 +72,9 @@ async function fetchWithRetry(url: string, retries = 3): Promise<unknown> {
       const res = await fetch(url, { headers });
 
       if (res.status === 429) {
-        const waitMs = attempt * 15000; // 15s, 30s, 45s
+        // Respetar Retry-After si CoinGecko lo envía, si no usar backoff progresivo
+        const retryAfter = parseInt(res.headers.get('retry-after') ?? '0', 10);
+        const waitMs = retryAfter > 0 ? retryAfter * 1000 : attempt * 15000;
         console.warn(`[PRICES] Rate limit (429), esperando ${waitMs / 1000}s...`);
         await sleep(waitMs);
         continue;
@@ -163,7 +165,8 @@ export async function getCurrentPricesEur(symbols: string[]): Promise<Map<string
   const url = `${BASE_URL}/simple/price?ids=${ids}&vs_currencies=eur`;
 
   try {
-    const data = await fetchWithRetry(url) as Record<string, { eur: number }>;
+    // Encolado para no solaparse con otros fetches (respeta el mismo rate limit)
+    const data = await queue.enqueue(() => fetchWithRetry(url)) as Record<string, { eur: number }>;
 
     for (const symbol of toFetch) {
       const geckoId = coinGeckoIds.get(symbol)!;
@@ -225,6 +228,126 @@ export async function prefetchHistoricalPrices(
   }
 
   console.log('[PRICES] Precarga de precios históricos completada ✓');
+}
+
+// ── Auto-detección de coingecko_id ────────────────────────────────────────
+// Activos cuya búsqueda ya falló — evita reintentos infinitos en la misma sesión
+const failedSearches = new Set<string>();
+
+export async function searchAndSaveCoinGeckoId(symbol: string): Promise<string | null> {
+  if (failedSearches.has(symbol)) return null;
+  if (coinGeckoIds.has(symbol)) return coinGeckoIds.get(symbol)!;
+
+  const url = `${BASE_URL}/search?query=${encodeURIComponent(symbol)}`;
+
+  try {
+    const data = await queue.enqueue(async () => {
+      console.log(`[PRICES] Buscando coingecko_id para ${symbol}...`);
+      return await fetchWithRetry(url) as {
+        coins: { id: string; name: string; symbol: string; market_cap_rank: number | null }[]
+      };
+    });
+
+    // Coincidencia exacta de símbolo (case-insensitive)
+    const matches = data.coins.filter(c => c.symbol.toUpperCase() === symbol.toUpperCase());
+    if (matches.length === 0) {
+      console.warn(`[PRICES] Sin coincidencia en CoinGecko para ${symbol}`);
+      failedSearches.add(symbol);
+      return null;
+    }
+
+    // El de menor market_cap_rank es el más establecido (null = sin ranking, al final)
+    matches.sort((a, b) => {
+      if (a.market_cap_rank === null) return 1;
+      if (b.market_cap_rank === null) return -1;
+      return a.market_cap_rank - b.market_cap_rank;
+    });
+
+    const geckoId = matches[0].id;
+    console.log(`[PRICES] Auto-detectado: ${symbol} → ${geckoId} (${matches[0].name})`);
+
+    await db.query(
+      'UPDATE asset_metadata SET coingecko_id = $1 WHERE symbol = $2',
+      [geckoId, symbol]
+    );
+    coinGeckoIds.set(symbol, geckoId);
+
+    return geckoId;
+  } catch (e) {
+    console.error(`[PRICES] Error buscando coingecko_id para ${symbol}:`, (e as Error).message);
+    failedSearches.add(symbol);
+    return null;
+  }
+}
+
+// ── Market chart bulk fetch ────────────────────────────────────────────────
+// Descarga todos los precios diarios de un activo para N días en UNA request.
+// CoinGecko devuelve datos diarios hasta 90 días, semanales para >90 días.
+// Almacena cada punto en price_cache para que quede disponible sin re-fetch.
+export async function fetchMarketChart(
+  symbol: string,
+  days: number
+): Promise<Map<string, number>> {
+  let geckoId = coinGeckoIds.get(symbol);
+
+  // Si no tenemos coingecko_id, intentar auto-detectarlo vía CoinGecko Search
+  if (!geckoId) {
+    const found = await searchAndSaveCoinGeckoId(symbol);
+    if (!found) return new Map();
+    geckoId = found;
+  }
+
+  const result = new Map<string, number>();
+
+  // Comprobar cuántas fechas del rango ya están en caché
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  const startStr = toDateStr(startDate);
+
+  const cached = await db.query(
+    `SELECT price_date::text AS d, price_eur
+     FROM price_cache
+     WHERE asset = $1 AND price_date >= $2
+     ORDER BY price_date`,
+    [symbol, startStr]
+  );
+  for (const row of cached.rows) {
+    result.set(row.d, parseFloat(row.price_eur));
+  }
+
+  // Si ya tenemos datos suficientes, no re-fetch (>= 80% de los días esperados)
+  const expectedDays = Math.min(days, 365);
+  if (result.size >= expectedDays * 0.8) {
+    return result;
+  }
+
+  // Fetch bulk desde CoinGecko (sin interval=daily — parámetro de plan Pro)
+  // CoinGecko auto-selecciona granularidad: hourly ≤90d, daily >90d
+  const data = await queue.enqueue(async () => {
+    const url = `${BASE_URL}/coins/${geckoId}/market_chart?vs_currency=eur&days=${days}`;
+    console.log(`[PRICES] Market chart ${symbol} (${days}d) → ${geckoId}`);
+    return await fetchWithRetry(url) as { prices: [number, number][] };
+  }).catch(e => {
+    console.warn(`[PRICES] Market chart ${symbol} falló: ${e.message}`);
+    return null;
+  });
+
+  if (!data?.prices) return result; // falló o sin datos — devolvemos lo que había en caché
+
+  // Guardar cada punto en caché
+  for (const [ts, price] of data.prices) {
+    const date = new Date(ts);
+    const dateStr = toDateStr(date);
+    result.set(dateStr, price);
+    await db.query(
+      `INSERT INTO price_cache (asset, price_eur, price_date, source)
+       VALUES ($1, $2, $3, 'coingecko_chart')
+       ON CONFLICT (asset, price_date) DO UPDATE SET price_eur = EXCLUDED.price_eur`,
+      [symbol, price, dateStr]
+    );
+  }
+
+  return result;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

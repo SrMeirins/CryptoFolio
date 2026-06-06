@@ -1,8 +1,9 @@
 import { db } from '../../db/client';
+import { searchAndSaveCoinGeckoId } from './coingecko';
 
 const REST_BASE = 'https://api.binance.com/api/v3';
 
-export type PriceSource = 'eur_direct' | 'usdt_proxy' | 'btc_proxy' | 'fiat' | 'unknown';
+export type PriceSource = 'eur_direct' | 'usdt_proxy' | 'btc_proxy' | 'fiat' | 'coingecko' | 'unknown';
 
 export interface AssetPairInfo {
   symbol: string;
@@ -88,6 +89,20 @@ export async function autoDetectPair(symbol: string): Promise<AssetPairInfo> {
   }
 
   console.log(`[PAIRS] ${symbol}: source=${info.priceSource} EUR=${hasEur} USDT=${hasUsdt} BTC=${hasBtc}`);
+
+  // Fallback a CoinGecko si no hay ningún par en Binance
+  if (info.priceSource === 'unknown') {
+    // Primero mirar si ya tenemos coingecko_id en DB
+    const geckoInDb = await db.query(
+      'SELECT coingecko_id FROM asset_metadata WHERE symbol = $1 AND coingecko_id IS NOT NULL',
+      [symbol]
+    );
+    const geckoId = geckoInDb.rows[0]?.coingecko_id ?? await searchAndSaveCoinGeckoId(symbol);
+    if (geckoId) {
+      info.priceSource = 'coingecko';
+      console.log(`[PAIRS] ${symbol}: sin par Binance → CoinGecko (${geckoId})`);
+    }
+  }
 
   // Guardar en DB y cache
   await upsertAssetMetadata(info);

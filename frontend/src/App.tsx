@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Sidebar } from './components/Sidebar'
 import { Dashboard } from './pages/Dashboard'
@@ -28,10 +28,18 @@ const TYPE_META = {
   info:    { Icon: Info,          color: '#6366f1', label: 'Info'  },
 }
 
+const NOTIFICATION_ROUTES: Record<string, string> = {
+  'no-price':             '/settings?tab=assets',
+  'lots-no-price':        '/settings?tab=assets',
+  'pending-withdrawals':  '/history',
+  'crypto-deposits':      '/import',
+}
+
 // ── NotificationsButton ────────────────────────────────────────────────────
 function NotificationsButton() {
   const [open, setOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
 
   const { data: notifications = [] } = useQuery<Notification[]>({
     queryKey: ['notifications'],
@@ -90,15 +98,22 @@ function NotificationsButton() {
               <div className="divide-y divide-border/50">
                 {notifications.map(n => {
                   const { Icon, color, label } = TYPE_META[n.type]
+                  const dest = NOTIFICATION_ROUTES[n.id]
                   return (
-                    <div key={n.id} className="flex gap-3 px-4 py-3.5" style={{ backgroundColor: `${color}08` }}>
+                    <div key={n.id}
+                      onClick={dest ? () => { navigate(dest); setOpen(false) } : undefined}
+                      className={`flex gap-3 px-4 py-3.5 transition-colors ${dest ? 'cursor-pointer hover:brightness-110' : ''}`}
+                      style={{ backgroundColor: `${color}08` }}>
                       <Icon size={15} className="shrink-0 mt-0.5" style={{ color }} />
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs font-semibold" style={{ color }}>{n.category}</span>
                           <span className="text-xs px-1.5 py-0.5 rounded-md" style={{ backgroundColor: `${color}20`, color }}>
                             {label}
                           </span>
+                          {dest && (
+                            <span className="ml-auto text-xs text-gray-600 group-hover:text-gray-400">Ir →</span>
+                          )}
                         </div>
                         <p className="text-xs text-gray-300 leading-relaxed">{n.message}</p>
                       </div>

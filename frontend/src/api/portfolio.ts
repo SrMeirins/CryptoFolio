@@ -92,6 +92,9 @@ export interface Transaction {
   notes: string | null
   manually_added: boolean
   created_at: string
+  destination_wallet_id: string | null
+  destination_wallet_name: string | null
+  destination_wallet_color: string | null
 }
 
 export interface FiatBalance {
@@ -112,7 +115,6 @@ export const portfolioApi = {
   getHistoricalPrice: (asset: string, date: string) =>
     api.get<{ asset: string; date: string; price_eur: number }>(`/prices/historical?asset=${asset}&date=${date}`),
   getImports: () => api.get<ImportRecord[]>('/imports'),
-  uploadCsv: (file: File) => api.uploadCsv(file),
   deleteImport: (id: string) => api.delete<{ success: boolean }>(`/imports/${id}`),
   getAssets: () => api.get<AssetMetadata[]>('/settings/assets'),
   createAsset: (data: Partial<AssetMetadata>) => api.post<{ success: boolean; symbol: string }>('/settings/assets', data),
@@ -134,8 +136,26 @@ export const portfolioApi = {
       ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][])
       : {}
     const qs = Object.keys(filtered).length ? '?' + new URLSearchParams(filtered).toString() : ''
-    return api.get<{ transactions: Transaction[]; total: number; limit: number; offset: number }>(`/transactions${qs}`)
+    return api.get<{ transactions: Transaction[]; total: number; total_eur: number; limit: number; offset: number }>(`/transactions${qs}`)
   },
+  getTransactionStats: () => api.get<{
+    totals: {
+      total_ops: number; unique_assets: number; total_invested: number
+      total_fee_ops: number; total_fees_eur: number; total_buys: number; total_sells: number; total_manual: number
+    }
+    monthly: { mes: string; total_ops: number; compras: number; ventas: number; ingresos: number; transferencias: number; eur_invertido: number }[]
+    topAssets: { asset: string; ops: number; eur_volume: number }[]
+    fees: { asset: string; ops: number; total_amount: number; total_eur: number }[]
+  }>('/transactions/stats'),
+  getWallets: () => api.get<unknown[]>('/wallets'),
+  getNetworks: () => api.get<unknown[]>('/wallets/networks'),
+  createWallet: (data: Record<string, unknown>) => api.post<{ id: string }>('/wallets', data),
+  updateWallet: (id: string, data: Record<string, unknown>) => api.put<{ success: boolean }>(`/wallets/${id}`, data),
+  deleteWallet: (id: string) => api.delete<{ success: boolean }>(`/wallets/${id}`),
+  createAddress: (walletId: string, data: Record<string, unknown>) => api.post<{ id: string }>(`/wallets/${walletId}/addresses`, data),
+  updateAddress: (walletId: string, addressId: string, data: Record<string, unknown>) => api.put<{ success: boolean }>(`/wallets/${walletId}/addresses/${addressId}`, data),
+  deleteAddress: (walletId: string, addressId: string) => api.delete<{ success: boolean }>(`/wallets/${walletId}/addresses/${addressId}`),
+  exportBackup: () => api.get<Record<string, unknown>>('/settings/backup'),
   getConfig: () => api.get<Record<string, string>>('/settings/config'),
   setConfig: (key: string, value: string) => api.put<{ success: boolean }>('/settings/config', { key, value }),
   getStats: () => api.get<{
@@ -170,6 +190,12 @@ export const portfolioApi = {
   getNotifications: () => api.get<Array<{
     id: string; type: 'error' | 'warning' | 'info'; category: string; message: string; count?: number;
   }>>('/settings/notifications'),
+  getYesterdayPrices: () => api.get<{ prices: Record<string, number> }>('/fifo/yesterday-prices'),
+  getPortfolioHistory: (period: string) => api.get<{
+    points: { date: string; value: number }[]
+    period: string
+    refreshing: boolean
+  }>(`/fifo/portfolio-history?period=${period}`),
   getPendingDeposits: () => api.get<Array<{
     id: string; timestamp: string; asset: string; amount: string;
     wallet_name: string; historicalPrice: number | null;

@@ -20,15 +20,5 @@ export const api = {
     request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 
-  uploadCsv: async (file: File) => {
-    const form = new FormData()
-    form.append('file', file)
-    const res = await fetch(`${BASE}/imports`, { method: 'POST', body: form })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }))
-      throw new Error(err.error || res.statusText)
-    }
-    return res.json()
-  },
 }
 

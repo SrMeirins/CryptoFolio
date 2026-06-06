@@ -301,8 +301,9 @@ INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_u
   ('USDC', 'USD Coin',     'usd-coin',         TRUE,  'USDCUSDT', 'usdt_proxy');
 
 INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, price_source) VALUES
-  ('EUR',  'Euro',   NULL, TRUE, 'fiat'),
-  ('USDT', 'Tether', NULL, TRUE, 'fiat');
+  ('EUR',  'Euro',   NULL,          TRUE,  'fiat'),
+  ('USDT', 'Tether', NULL,          TRUE,  'fiat'),
+  ('LUNC', 'Terra Classic', 'terra-luna', FALSE, 'coingecko');
 
 -- ============================================================
 -- VISTAS

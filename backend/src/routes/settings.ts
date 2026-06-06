@@ -225,18 +225,11 @@ router.get('/notifications', async (_req: Request, res: Response) => {
     id: string; type: 'error' | 'warning' | 'info'; category: string; message: string; count?: number;
   }> = [];
 
-  // 1. Activos sin precio configurado (no stablecoin) Y con saldo > 0
-  // Excluimos activos con saldo 0 (cerrados, recuperados, etc.) porque no necesitan precio actual
+  // 1. Activos sin precio configurado — excluye stablecoins y activos con fuente CoinGecko
   const noPriceRes = await db.query(
     `SELECT am.symbol
      FROM asset_metadata am
      WHERE am.price_source = 'unknown' AND am.is_stablecoin = FALSE
-       AND EXISTS (
-         SELECT 1 FROM fifo_lots fl
-         WHERE fl.asset = am.symbol
-           AND fl.is_closed = FALSE
-           AND fl.quantity_remaining > 0.000001
-       )
      ORDER BY am.symbol`
   );
   if (noPriceRes.rows.length > 0) {
@@ -290,6 +283,7 @@ router.get('/notifications', async (_req: Request, res: Response) => {
      WHERE fl.is_closed = FALSE
        AND fl.quantity_remaining > 0
        AND (am.price_source = 'unknown' OR am.symbol IS NULL)
+       AND (am.is_stablecoin = FALSE OR am.symbol IS NULL)
      ORDER BY fl.asset`
   );
   if (noLotPriceRes.rows.length > 0) {
@@ -357,6 +351,38 @@ router.post('/bulk-set-costs', async (req: Request, res: Response) => {
 // ── DELETE /api/settings/data/transactions ────────────────────────────────
 // Elimina todas las transacciones, lotes FIFO e importaciones.
 // La configuración (wallets, activos, app_config) se conserva.
+// ── GET /api/settings/backup ──────────────────────────────────────────────
+router.get('/backup', async (_req: Request, res: Response) => {
+  const [txs, walletsRes, assets, config, imports] = await Promise.all([
+    db.query('SELECT * FROM transactions ORDER BY timestamp ASC'),
+    db.query(`
+      SELECT w.*, COALESCE(json_agg(
+        json_build_object(
+          'id', a.id, 'network_name', n.name, 'network_native_asset', n.native_asset,
+          'custom_network', a.custom_network, 'address', a.address, 'explorer_url',
+          COALESCE(a.custom_explorer_url, n.explorer_url)
+        )
+      ) FILTER (WHERE a.id IS NOT NULL), '[]') AS addresses
+      FROM wallets w
+      LEFT JOIN wallet_addresses a ON a.wallet_id = w.id
+      LEFT JOIN networks n ON n.id = a.network_id
+      GROUP BY w.id ORDER BY w.created_at
+    `),
+    db.query('SELECT * FROM asset_metadata ORDER BY symbol'),
+    db.query('SELECT * FROM app_config'),
+    db.query('SELECT id, filename, imported_at, row_count, skipped_count FROM csv_imports ORDER BY imported_at'),
+  ]);
+  res.json({
+    version:      '1.0',
+    exported_at:  new Date().toISOString(),
+    transactions: txs.rows,
+    wallets:      walletsRes.rows,
+    assets:       assets.rows,
+    config:       config.rows,
+    imports:      imports.rows,
+  });
+});
+
 router.delete('/data/transactions', async (_req: Request, res: Response) => {
   await db.transaction(async (client) => {
     await client.query('DELETE FROM fifo_lot_consumptions');

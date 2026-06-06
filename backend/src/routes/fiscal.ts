@@ -6,69 +6,33 @@ import ExcelJS from 'exceljs';
 
 const router = Router();
 
-// Umbral Modelo 721 configurable desde app_config
+// ── Helpers ────────────────────────────────────────────────────────────────
 async function getUmbral721(): Promise<number> {
   const res = await db.query("SELECT value FROM app_config WHERE key = 'modelo721_threshold'");
   return res.rows.length > 0 ? (parseInt(res.rows[0].value) || 50000) : 50000;
 }
 
-// ── Tipos ──────────────────────────────────────────────────────────────────
-interface FiscalEvent {
-  fecha: string;
-  tipo: string;
-  activoTransmitido: string;
-  cantidadTransmitida: number;
-  contrapartidaClave: string;
-  contrapartidaDescripcion: string;
-  valorTransmisionEur: number;
-  gastosTransmisionEur: number;
-  valorAdquisicionEur: number;
-  gastosAdquisicionEur: number;
-  gananciaPeridaEur: number;
-  wallet: string;
-  txId: string;
-}
-
-interface RendimientoEvent {
-  fecha: string;
-  tipo: string;
-  activo: string;
-  cantidad: number;
-  valorEur: number;
-  wallet: string;
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-function getContrapartidaClave(costAsset: string | null): { clave: string; descripcion: string } {
-  if (!costAsset || costAsset === 'EUR') {
-    return { clave: 'F', descripcion: 'Moneda de curso legal (EUR)' };
-  }
-  return { clave: 'N', descripcion: `Otra moneda virtual (${costAsset})` };
+// activoRecibido = activo que se recibió a cambio (null para fees/pérdidas sin contrapartida)
+function getContrapartidaClave(activoRecibido: string | null): { clave: string; descripcion: string } {
+  if (!activoRecibido) return { clave: 'F', descripcion: 'Sin contrapartida directa (comisión/pérdida)' };
+  if (activoRecibido === 'EUR') return { clave: 'F', descripcion: 'Moneda de curso legal (EUR)' };
+  return { clave: 'N', descripcion: `Otra moneda virtual (${activoRecibido})` };
 }
 
 function getTipoRendimiento(operationType: string): string {
   const map: Record<string, string> = {
     'STAKING_REWARD':   'Staking',
-    'MINING_REWARD':    'Mineria',
-    'LENDING_INTEREST': 'Lending / Interes',
+    'MINING_REWARD':    'Minería',
+    'LENDING_INTEREST': 'Lending / Interés',
     'CASHBACK':         'Cashback / Bonus',
     'AIRDROP':          'Airdrop',
   };
   return map[operationType] ?? operationType;
 }
 
-// Calcula lotes abiertos a una fecha dada reconstruyendo el estado historico.
-// Los lotes destino de transferencias se excluyen si la transferencia ocurrió
-// después de la fecha consultada (condición sobre t_open.timestamp).
-// Los consumos de tipo NONE (transferencias internas) restan correctamente
-// del lote origen sin aparecer como eventos fiscales.
 // Reconstruye el estado histórico de lotes a una fecha dada.
-// soloExchange=true filtra por wallets de tipo 'exchange' (Modelo 721).
-// Los lotes destino de transferencias solo aparecen si la transferencia
-// ocurrió antes de la fecha consultada (JOIN con t_open.timestamp).
 // Los consumos NONE (transferencias internas) restan correctamente del lote origen.
-async function getLotesAFecha(fecha: Date, soloExchange = false) {
-  const walletFilter = soloExchange ? `AND w.type = 'exchange'` : '';
+async function getLotesAFecha(fecha: Date) {
   const res = await db.query(`
     SELECT
       fl.asset,
@@ -94,7 +58,6 @@ async function getLotesAFecha(fecha: Date, soloExchange = false) {
         t_open.operation_type NOT IN ('TRANSFER_INTERNAL', 'WITHDRAW')
         OR t_open.timestamp <= $1
       )
-      ${walletFilter}
     GROUP BY fl.asset, fl.wallet_id, w.name, w.color, w.type
     HAVING SUM(
       fl.quantity_original - COALESCE(
@@ -108,6 +71,117 @@ async function getLotesAFecha(fecha: Date, soloExchange = false) {
     ORDER BY fl.asset, w.name
   `, [fecha]);
   return res.rows;
+}
+
+// Carga y formatea los eventos fiscales y rendimientos de un año dado.
+// Función compartida entre /events y /export para no duplicar lógica.
+async function getEventosAnio(year: number) {
+  const gpRows = await db.query(`
+    SELECT
+      flc.consumed_at             AS fecha,
+      t.operation_type,
+      fl.asset                    AS activo_transmitido,
+      t.asset                     AS tx_asset,
+      flc.quantity_consumed       AS cantidad,
+      t.cost_asset,
+      flc.proceeds_eur            AS valor_transmision,
+      fl.fee_eur                  AS gastos_adquisicion,
+      flc.cost_basis_consumed_eur AS valor_adquisicion,
+      flc.gain_loss_eur,
+      w.name                      AS wallet,
+      t.id                        AS tx_id,
+      t.fee_asset,
+      t.fee_amount
+    FROM fifo_lot_consumptions flc
+    JOIN fifo_lots    fl ON fl.id = flc.lot_id
+    JOIN transactions t  ON t.id  = flc.consuming_transaction_id
+    JOIN wallets      w  ON w.id  = t.wallet_id
+    WHERE EXTRACT(YEAR FROM flc.consumed_at) = $1
+      AND flc.fiscal_event_type != 'NONE'
+    ORDER BY flc.consumed_at ASC
+  `, [year]);
+
+  const FEE_OR_LOSS_OPS = new Set(['FEE_EXCHANGE', 'FEE_NETWORK', 'FEE', 'LOST', 'GIFT_SENT']);
+
+  const fiscalEvents = await Promise.all(
+    gpRows.rows.map(async (row: Record<string, unknown>) => {
+      const opType    = row.operation_type as string;
+      const asset     = row.activo_transmitido as string;
+      const txAsset   = row.tx_asset as string | null;
+      const costAsset = row.cost_asset as string | null;
+
+      // Determinar qué se recibió a cambio:
+      // - BUY permuta (comprar B con A): tx_asset = B (distinto de fl.asset = A)
+      // - SELL (vender A por B): cost_asset = B, tx_asset = fl.asset
+      // - FEE/LOST: sin contrapartida directa
+      let activoRecibido: string | null;
+      if (FEE_OR_LOSS_OPS.has(opType)) {
+        activoRecibido = null;
+      } else if (txAsset && txAsset !== asset) {
+        activoRecibido = txAsset;      // permuta: compraron txAsset vendiendo asset
+      } else {
+        activoRecibido = costAsset || null;  // SELL: recibieron costAsset
+      }
+
+      const contrapartida = getContrapartidaClave(activoRecibido);
+
+      let gastosTransmision = 0;
+      if (row.fee_asset && row.fee_amount) {
+        try {
+          const feePrice = await getHistoricalPriceEur(
+            row.fee_asset as string,
+            new Date(row.fecha as string)
+          );
+          gastosTransmision = parseFloat(row.fee_amount as string) * feePrice;
+        } catch (e) {
+          console.warn(`[FISCAL] No se pudo obtener precio de fee ${row.fee_asset}: ${(e as Error).message}`);
+        }
+      }
+
+      return {
+        fecha:                    new Date(row.fecha as string).toISOString().slice(0, 10),
+        tipo:                     opType,
+        activoTransmitido:        asset,
+        activoRecibido:           activoRecibido,
+        cantidadTransmitida:      parseFloat(row.cantidad as string),
+        contrapartidaClave:       contrapartida.clave,
+        contrapartidaDescripcion: contrapartida.descripcion,
+        valorTransmisionEur:      parseFloat(row.valor_transmision as string),
+        gastosTransmisionEur:     gastosTransmision,
+        valorAdquisicionEur:      parseFloat(row.valor_adquisicion as string),
+        gastosAdquisicionEur:     parseFloat(row.gastos_adquisicion as string) || 0,
+        gananciaPerdidaEur:       parseFloat(row.gain_loss_eur as string),
+        wallet:                   row.wallet as string,
+        txId:                     row.tx_id as string,
+      };
+    })
+  );
+
+  const rendRows = await db.query(`
+    SELECT
+      t.timestamp    AS fecha,
+      t.operation_type,
+      t.asset        AS activo,
+      t.amount_net   AS cantidad,
+      t.amount_net * COALESCE(t.price_per_unit, 0) AS valor_eur,
+      w.name         AS wallet
+    FROM transactions t
+    JOIN wallets w ON w.id = t.wallet_id
+    WHERE EXTRACT(YEAR FROM t.timestamp) = $1
+      AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP')
+    ORDER BY t.timestamp ASC
+  `, [year]);
+
+  const rendimientos = rendRows.rows.map((row: Record<string, unknown>) => ({
+    fecha:    new Date(row.fecha as string).toISOString().slice(0, 10),
+    tipo:     getTipoRendimiento(row.operation_type as string),
+    activo:   row.activo as string,
+    cantidad: parseFloat(row.cantidad as string),
+    valorEur: parseFloat(row.valor_eur as string),
+    wallet:   row.wallet as string,
+  }));
+
+  return { fiscalEvents, rendimientos };
 }
 
 // ── GET /api/fiscal/years ──────────────────────────────────────────────────
@@ -124,9 +198,234 @@ router.get('/years', async (_req: Request, res: Response) => {
   res.json(result.rows.map((r: { year: number }) => r.year));
 });
 
+// ── GET /api/fiscal/overview ───────────────────────────────────────────────
+// Devuelve resumen de todos los años disponibles en una sola llamada.
+// Usado para la comparativa interanual y el carryforward de pérdidas.
+router.get('/overview', async (_req: Request, res: Response) => {
+  const yearsRes = await db.query(`
+    SELECT DISTINCT EXTRACT(YEAR FROM consumed_at)::int AS year
+    FROM fifo_lot_consumptions
+    UNION
+    SELECT DISTINCT EXTRACT(YEAR FROM timestamp)::int AS year
+    FROM transactions
+    WHERE operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP')
+    ORDER BY year ASC
+  `);
+
+  const years: number[] = yearsRes.rows.map((r: { year: number }) => r.year);
+
+  const data = await Promise.all(years.map(async (year) => {
+    const gpRes = await db.query(`
+      SELECT
+        COALESCE(SUM(CASE WHEN flc.gain_loss_eur > 0 THEN flc.gain_loss_eur ELSE 0 END), 0) AS total_ganancias,
+        COALESCE(SUM(CASE WHEN flc.gain_loss_eur < 0 THEN flc.gain_loss_eur ELSE 0 END), 0) AS total_perdidas,
+        COALESCE(SUM(flc.gain_loss_eur), 0) AS neto,
+        COUNT(*) AS num_operaciones
+      FROM fifo_lot_consumptions flc
+      WHERE EXTRACT(YEAR FROM flc.consumed_at) = $1
+        AND flc.fiscal_event_type != 'NONE'
+    `, [year]);
+
+    const rendRes = await db.query(`
+      SELECT COALESCE(SUM(t.amount_net * COALESCE(t.price_per_unit, 0)), 0) AS total_rendimientos
+      FROM transactions t
+      WHERE EXTRACT(YEAR FROM t.timestamp) = $1
+        AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP')
+    `, [year]);
+
+    return {
+      year,
+      esAnioEnCurso: year === new Date().getFullYear(),
+      totalGanancias:  parseFloat(gpRes.rows[0]?.total_ganancias ?? '0'),
+      totalPerdidas:   parseFloat(gpRes.rows[0]?.total_perdidas ?? '0'),
+      netoPatrimonial: parseFloat(gpRes.rows[0]?.neto ?? '0'),
+      numOperaciones:  parseInt(gpRes.rows[0]?.num_operaciones ?? '0'),
+      totalRendimientos: parseFloat(rendRes.rows[0]?.total_rendimientos ?? '0'),
+    };
+  }));
+
+  res.json(data);
+});
+
+// ── GET /api/fiscal/carryforward ───────────────────────────────────────────
+// Análisis de compensación de pérdidas (últimos 4 años + año actual).
+// Normativa española: pérdidas patrimoniales compensan contra ganancias
+// patrimoniales sin límite, y contra rendimientos del capital mobiliario
+// con límite del 25% de los rendimientos positivos del año.
+router.get('/carryforward', async (_req: Request, res: Response) => {
+  const currentYear = new Date().getFullYear();
+
+  // Obtenemos neto G/P y rendimientos de los últimos 5 años
+  const rows: { year: number; netoGP: number; rendimientos: number }[] = [];
+  for (let y = currentYear - 4; y <= currentYear; y++) {
+    const gpR = await db.query(`
+      SELECT COALESCE(SUM(flc.gain_loss_eur), 0) AS neto
+      FROM fifo_lot_consumptions flc
+      WHERE EXTRACT(YEAR FROM flc.consumed_at) = $1
+        AND flc.fiscal_event_type != 'NONE'
+    `, [y]);
+    const rendR = await db.query(`
+      SELECT COALESCE(SUM(t.amount_net * COALESCE(t.price_per_unit, 0)), 0) AS total
+      FROM transactions t
+      WHERE EXTRACT(YEAR FROM t.timestamp) = $1
+        AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP')
+    `, [y]);
+    rows.push({
+      year: y,
+      netoGP:        parseFloat(gpR.rows[0]?.neto ?? '0'),
+      rendimientos:  parseFloat(rendR.rows[0]?.total ?? '0'),
+    });
+  }
+
+  // Simulamos la compensación año a año manteniendo un pool de pérdidas pendientes
+  // con su año de origen (para respetar el límite de 4 años)
+  type PendienteItem = { year: number; importe: number };
+  let pendientes: PendienteItem[] = [];
+
+  const resultado = rows.map(({ year, netoGP, rendimientos }) => {
+    // Expirar pérdidas de hace más de 4 años
+    pendientes = pendientes.filter(p => year - p.year <= 4);
+
+    const perdidaEsteAnio  = netoGP < 0 ? Math.abs(netoGP) : 0;
+    const gananciasPatrim  = netoGP > 0 ? netoGP : 0;
+
+    // 1. Compensar pérdidas pendientes contra ganancias patrimoniales del año
+    let pendienteTotal = pendientes.reduce((s, p) => s + p.importe, 0);
+    const compensadoPatrim = Math.min(pendienteTotal, gananciasPatrim);
+    let restanteGanancias  = gananciasPatrim - compensadoPatrim;
+    pendienteTotal        -= compensadoPatrim;
+
+    // Aplicar consumo proporcional FIFO sobre los pendientes
+    let aConsumir = compensadoPatrim;
+    for (const p of pendientes) {
+      const consumido = Math.min(p.importe, aConsumir);
+      p.importe -= consumido;
+      aConsumir -= consumido;
+      if (aConsumir <= 0) break;
+    }
+    pendientes = pendientes.filter(p => p.importe > 0.01);
+
+    // 2. Compensar pérdidas pendientes restantes contra rendimientos (límite 25%)
+    const limiteRendimientos = rendimientos > 0 ? rendimientos * 0.25 : 0;
+    pendienteTotal = pendientes.reduce((s, p) => s + p.importe, 0);
+    const compensadoRend = Math.min(pendienteTotal, limiteRendimientos);
+    pendienteTotal -= compensadoRend;
+
+    aConsumir = compensadoRend;
+    for (const p of pendientes) {
+      const consumido = Math.min(p.importe, aConsumir);
+      p.importe -= consumido;
+      aConsumir -= consumido;
+      if (aConsumir <= 0) break;
+    }
+    pendientes = pendientes.filter(p => p.importe > 0.01);
+
+    // Acumular pérdida de este año
+    if (perdidaEsteAnio > 0.01) {
+      pendientes.push({ year, importe: perdidaEsteAnio });
+    }
+
+    return {
+      year,
+      netoAntes:          netoGP,
+      rendimientos,
+      perdida:            perdidaEsteAnio,
+      compensadoPatrim,
+      compensadoRend,
+      compensado:         compensadoPatrim + compensadoRend,
+      limiteRend25:       limiteRendimientos,
+      netoDespues:        restanteGanancias,
+    };
+  });
+
+  res.json({
+    pendienteTotal: pendientes.reduce((s, p) => s + p.importe, 0),
+    detalle: resultado,
+  });
+});
+
+// ── GET /api/fiscal/:year/breakdown ───────────────────────────────────────
+// G/P neto agrupado por activo transmitido para el año dado.
+router.get('/:year/breakdown', async (req: Request, res: Response) => {
+  const year = parseInt(req.params.year);
+  if (isNaN(year)) return res.status(400).json({ error: 'Año inválido' });
+
+  const result = await db.query(`
+    SELECT
+      fl.asset,
+      COALESCE(SUM(CASE WHEN flc.gain_loss_eur > 0 THEN flc.gain_loss_eur ELSE 0 END), 0) AS ganancias,
+      COALESCE(SUM(CASE WHEN flc.gain_loss_eur < 0 THEN flc.gain_loss_eur ELSE 0 END), 0) AS perdidas,
+      COALESCE(SUM(flc.gain_loss_eur), 0) AS neto,
+      COUNT(*) AS operaciones
+    FROM fifo_lot_consumptions flc
+    JOIN fifo_lots fl ON fl.id = flc.lot_id
+    WHERE EXTRACT(YEAR FROM flc.consumed_at) = $1
+      AND flc.fiscal_event_type != 'NONE'
+    GROUP BY fl.asset
+    ORDER BY ABS(SUM(flc.gain_loss_eur)) DESC
+  `, [year]);
+
+  res.json(result.rows.map((r: Record<string, unknown>) => ({
+    asset:       r.asset as string,
+    ganancias:   parseFloat(r.ganancias as string),
+    perdidas:    parseFloat(r.perdidas as string),
+    neto:        parseFloat(r.neto as string),
+    operaciones: parseInt(r.operaciones as string),
+  })));
+});
+
+// ── GET /api/fiscal/:year/monthly ──────────────────────────────────────────
+// G/P acumulado mes a mes para el año dado (para gráfico de evolución).
+router.get('/:year/monthly', async (req: Request, res: Response) => {
+  const year = parseInt(req.params.year);
+  if (isNaN(year)) return res.status(400).json({ error: 'Año inválido' });
+
+  const result = await db.query(`
+    SELECT
+      EXTRACT(MONTH FROM flc.consumed_at)::int AS mes,
+      COALESCE(SUM(flc.gain_loss_eur), 0)      AS neto_mes
+    FROM fifo_lot_consumptions flc
+    WHERE EXTRACT(YEAR FROM flc.consumed_at) = $1
+      AND flc.fiscal_event_type != 'NONE'
+    GROUP BY mes
+    ORDER BY mes
+  `, [year]);
+
+  const byMonth = new Map(result.rows.map((r: Record<string, unknown>) => [
+    parseInt(r.mes as string),
+    parseFloat(r.neto_mes as string),
+  ]));
+
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+  const maxMonth = year < currentYear ? 12 : currentMonth;
+
+  let acumulado = 0;
+  const meses = [];
+  for (let m = 1; m <= maxMonth; m++) {
+    acumulado += byMonth.get(m) ?? 0;
+    meses.push({
+      mes: m,
+      label: new Date(year, m - 1, 1).toLocaleDateString('es-ES', { month: 'short' }),
+      netoMes:    byMonth.get(m) ?? 0,
+      acumulado,
+    });
+  }
+
+  // Proyección lineal para año en curso
+  let proyeccionFinAnio: number | null = null;
+  if (year === currentYear && currentMonth > 0 && acumulado !== 0) {
+    proyeccionFinAnio = acumulado * (12 / currentMonth);
+  }
+
+  res.json({ meses, proyeccionFinAnio });
+});
+
 // ── GET /api/fiscal/:year/summary ──────────────────────────────────────────
 router.get('/:year/summary', async (req: Request, res: Response) => {
   const year = parseInt(req.params.year);
+  if (isNaN(year)) return res.status(400).json({ error: 'Año inválido' });
+
   const currentYear = new Date().getFullYear();
   const esAnioEnCurso = year === currentYear;
 
@@ -151,15 +450,19 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
   `, [year]);
 
   const dec31 = esAnioEnCurso ? new Date() : new Date(`${year}-12-31T23:59:59Z`);
-  const lotes = await getLotesAFecha(dec31, false);
+  const lotes = await getLotesAFecha(dec31);
 
   let valorTotal721 = 0;
   for (const lot of lotes) {
     try {
       const price = await getHistoricalPriceEur(lot.asset, dec31);
       valorTotal721 += parseFloat(lot.quantity) * price;
-    } catch { /* ignorar */ }
+    } catch (e) {
+      console.warn(`[FISCAL] Sin precio para ${lot.asset} en Modelo 721: ${(e as Error).message}`);
+    }
   }
+
+  const umbral = await getUmbral721();
 
   res.json({
     year,
@@ -171,107 +474,31 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
     totalRendimientos:           parseFloat(rendRes.rows[0].total_rendimientos),
     numRendimientos:             parseInt(rendRes.rows[0].num_rendimientos),
     valorTotal31Dic:             valorTotal721,
-    superaUmbral721:             valorTotal721 > await getUmbral721(),
-    umbral721:                   await getUmbral721(),
+    superaUmbral721:             valorTotal721 > umbral,
+    umbral721:                   umbral,
   });
 });
 
 // ── GET /api/fiscal/:year/events ───────────────────────────────────────────
 router.get('/:year/events', async (req: Request, res: Response) => {
   const year = parseInt(req.params.year);
+  if (isNaN(year)) return res.status(400).json({ error: 'Año inválido' });
 
-  const gpRows = await db.query(`
-    SELECT
-      flc.consumed_at             AS fecha,
-      t.operation_type,
-      fl.asset                    AS activo_transmitido,
-      flc.quantity_consumed       AS cantidad,
-      t.cost_asset,
-      flc.proceeds_eur            AS valor_transmision,
-      fl.fee_eur                  AS gastos_adquisicion,
-      flc.cost_basis_consumed_eur AS valor_adquisicion,
-      flc.gain_loss_eur,
-      w.name                      AS wallet,
-      t.id                        AS tx_id,
-      t.fee_asset,
-      t.fee_amount
-    FROM fifo_lot_consumptions flc
-    JOIN fifo_lots    fl ON fl.id = flc.lot_id
-    JOIN transactions t  ON t.id  = flc.consuming_transaction_id
-    JOIN wallets      w  ON w.id  = t.wallet_id
-    WHERE EXTRACT(YEAR FROM flc.consumed_at) = $1
-      AND flc.fiscal_event_type != 'NONE'
-    ORDER BY flc.consumed_at ASC
-  `, [year]);
-
-  const fiscalEvents: FiscalEvent[] = await Promise.all(
-    gpRows.rows.map(async (row: Record<string, unknown>) => {
-      const contrapartida = getContrapartidaClave(row.cost_asset as string | null);
-
-      let gastosTransmision = 0;
-      if (row.fee_asset && row.fee_amount) {
-        try {
-          const feePrice = await getHistoricalPriceEur(
-            row.fee_asset as string,
-            new Date(row.fecha as string)
-          );
-          gastosTransmision = parseFloat(row.fee_amount as string) * feePrice;
-        } catch { /* ignorar */ }
-      }
-
-      return {
-        fecha:                    new Date(row.fecha as string).toISOString().slice(0, 10),
-        tipo:                     row.operation_type as string,
-        activoTransmitido:        row.activo_transmitido as string,
-        cantidadTransmitida:      parseFloat(row.cantidad as string),
-        contrapartidaClave:       contrapartida.clave,
-        contrapartidaDescripcion: contrapartida.descripcion,
-        valorTransmisionEur:      parseFloat(row.valor_transmision as string),
-        gastosTransmisionEur:     gastosTransmision,
-        valorAdquisicionEur:      parseFloat(row.valor_adquisicion as string),
-        gastosAdquisicionEur:     parseFloat(row.gastos_adquisicion as string) || 0,
-        gananciaPeridaEur:        parseFloat(row.gain_loss_eur as string),
-        wallet:                   row.wallet as string,
-        txId:                     row.tx_id as string,
-      };
-    })
-  );
-
-  const rendRows = await db.query(`
-    SELECT
-      t.timestamp    AS fecha,
-      t.operation_type,
-      t.asset        AS activo,
-      t.amount_net   AS cantidad,
-      t.amount_net * COALESCE(t.price_per_unit, 0) AS valor_eur,
-      w.name         AS wallet
-    FROM transactions t
-    JOIN wallets w ON w.id = t.wallet_id
-    WHERE EXTRACT(YEAR FROM t.timestamp) = $1
-      AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP')
-    ORDER BY t.timestamp ASC
-  `, [year]);
-
-  const rendimientos: RendimientoEvent[] = rendRows.rows.map((row: Record<string, unknown>) => ({
-    fecha:    new Date(row.fecha as string).toISOString().slice(0, 10),
-    tipo:     getTipoRendimiento(row.operation_type as string),
-    activo:   row.activo as string,
-    cantidad: parseFloat(row.cantidad as string),
-    valorEur: parseFloat(row.valor_eur as string),
-    wallet:   row.wallet as string,
-  }));
-
-  res.json({ fiscalEvents, rendimientos });
+  const data = await getEventosAnio(year);
+  res.json(data);
 });
 
 // ── GET /api/fiscal/:year/modelo721 ───────────────────────────────────────
 router.get('/:year/modelo721', async (req: Request, res: Response) => {
   const year = parseInt(req.params.year);
+  if (isNaN(year)) return res.status(400).json({ error: 'Año inválido' });
+
   const currentYear = new Date().getFullYear();
   const esAnioEnCurso = year === currentYear;
   const dec31 = esAnioEnCurso ? new Date() : new Date(`${year}-12-31T23:59:59Z`);
 
-  const lotes = await getLotesAFecha(dec31, false);
+  const lotes = await getLotesAFecha(dec31);
+  const umbral = await getUmbral721();
 
   const activos = await Promise.all(
     lotes.map(async (row: Record<string, unknown>) => {
@@ -281,7 +508,9 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
       try {
         precio = await getHistoricalPriceEur(row.asset as string, dec31);
         valorEur = quantity * precio;
-      } catch { /* ignorar */ }
+      } catch (e) {
+        console.warn(`[FISCAL] Sin precio para ${row.asset} en Modelo 721: ${(e as Error).message}`);
+      }
 
       return {
         asset:        row.asset as string,
@@ -305,22 +534,19 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
     fecha:        dec31.toISOString().slice(0, 10),
     activos,
     totalValor,
-    superaUmbral: totalValor > await getUmbral721(),
-    umbral:       await getUmbral721(),
-    aviso:        'El Modelo 721 aplica a criptoactivos custodiados en exchanges extranjeros. Consulta con tu asesor fiscal sobre la aplicabilidad a wallets de autocustodia.',
+    superaUmbral: totalValor > umbral,
+    umbral,
+    aviso: 'El Modelo 721 aplica a criptoactivos custodiados en exchanges extranjeros. Consulta con tu asesor fiscal sobre la aplicabilidad a wallets de autocustodia.',
   });
 });
 
 // ── GET /api/fiscal/:year/export ───────────────────────────────────────────
 router.get('/:year/export', async (req: Request, res: Response) => {
   const year = parseInt(req.params.year);
-  const format = (req.query.format as string) ?? 'csv';
+  if (isNaN(year)) return res.status(400).json({ error: 'Año inválido' });
 
-  const eventsRes = await fetch(`http://localhost:3001/api/fiscal/${year}/events`);
-  const { fiscalEvents, rendimientos } = await eventsRes.json() as {
-    fiscalEvents: FiscalEvent[];
-    rendimientos: RendimientoEvent[];
-  };
+  const format = (req.query.format as string) ?? 'csv';
+  const { fiscalEvents, rendimientos } = await getEventosAnio(year);
 
   // ── CSV ───────────────────────────────────────────────────────────────────
   if (format === 'csv') {
@@ -341,7 +567,7 @@ router.get('/:year/export', async (req: Request, res: Response) => {
         e.gastosTransmisionEur.toFixed(2),
         e.valorAdquisicionEur.toFixed(2),
         e.gastosAdquisicionEur.toFixed(2),
-        e.gananciaPeridaEur.toFixed(2),
+        e.gananciaPerdidaEur.toFixed(2),
       ].join(';'));
     }
 
@@ -352,7 +578,7 @@ router.get('/:year/export', async (req: Request, res: Response) => {
       lines.push([r.fecha, r.tipo, r.activo, r.cantidad.toFixed(8), r.valorEur.toFixed(2)].join(';'));
     }
 
-    res.send('\uFEFF' + lines.join('\n'));
+    res.send('﻿' + lines.join('\n'));
 
   // ── RENTA WEB ─────────────────────────────────────────────────────────────
   } else if (format === 'rentaweb') {
@@ -360,21 +586,22 @@ router.get('/:year/export', async (req: Request, res: Response) => {
     res.setHeader('Content-Disposition', `attachment; filename="fiscal_${year}_rentaweb.csv"`);
 
     const lines: string[] = [];
-    lines.push('Denominacion moneda virtual transmitida;Clave tipo contraprestacion;Valor transmision EUR;Gastos transmision EUR;Valor adquisicion EUR;Gastos adquisicion EUR;Ganancia/Perdida EUR');
+    lines.push('Fecha;Denominacion moneda virtual transmitida;Clave tipo contraprestacion;Valor transmision EUR;Gastos transmision EUR;Valor adquisicion EUR;Gastos adquisicion EUR;Ganancia/Perdida EUR');
 
     for (const e of fiscalEvents) {
       lines.push([
+        e.fecha,
         e.activoTransmitido,
         e.contrapartidaClave,
         e.valorTransmisionEur.toFixed(2),
         e.gastosTransmisionEur.toFixed(2),
         e.valorAdquisicionEur.toFixed(2),
         e.gastosAdquisicionEur.toFixed(2),
-        e.gananciaPeridaEur.toFixed(2),
+        e.gananciaPerdidaEur.toFixed(2),
       ].join(';'));
     }
 
-    res.send('\uFEFF' + lines.join('\n'));
+    res.send('﻿' + lines.join('\n'));
 
   // ── EXCEL ─────────────────────────────────────────────────────────────────
   } else if (format === 'excel') {
@@ -398,6 +625,9 @@ router.get('/:year/export', async (req: Request, res: Response) => {
     sheet1.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
     sheet1.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1a1a2e' } };
 
+    const EUR_FMT = '#,##0.00 €';
+    const EUR_COLS_1 = ['valorTx', 'gastosTx', 'valorAdq', 'gastosAdq', 'gp'];
+
     for (const e of fiscalEvents) {
       const row = sheet1.addRow({
         fecha:     e.fecha,
@@ -409,10 +639,11 @@ router.get('/:year/export', async (req: Request, res: Response) => {
         gastosTx:  e.gastosTransmisionEur,
         valorAdq:  e.valorAdquisicionEur,
         gastosAdq: e.gastosAdquisicionEur,
-        gp:        e.gananciaPeridaEur,
+        gp:        e.gananciaPerdidaEur,
       });
+      EUR_COLS_1.forEach(col => { row.getCell(col).numFmt = EUR_FMT; });
       row.getCell('gp').font = {
-        color: { argb: e.gananciaPeridaEur >= 0 ? 'FF00c896' : 'FFe74c3c' },
+        color: { argb: e.gananciaPerdidaEur >= 0 ? 'FF00c896' : 'FFe74c3c' },
         bold: true,
       };
     }
@@ -423,8 +654,9 @@ router.get('/:year/export', async (req: Request, res: Response) => {
       gastosTx:  fiscalEvents.reduce((s, e) => s + e.gastosTransmisionEur, 0),
       valorAdq:  fiscalEvents.reduce((s, e) => s + e.valorAdquisicionEur, 0),
       gastosAdq: fiscalEvents.reduce((s, e) => s + e.gastosAdquisicionEur, 0),
-      gp:        fiscalEvents.reduce((s, e) => s + e.gananciaPeridaEur, 0),
+      gp:        fiscalEvents.reduce((s, e) => s + e.gananciaPerdidaEur, 0),
     });
+    EUR_COLS_1.forEach(col => { t1.getCell(col).numFmt = EUR_FMT; });
     t1.font = { bold: true };
 
     const sheet2 = workbook.addWorksheet('Rendimientos Capital Mob.');
@@ -439,13 +671,15 @@ router.get('/:year/export', async (req: Request, res: Response) => {
     sheet2.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1a1a2e' } };
 
     for (const r of rendimientos) {
-      sheet2.addRow({ fecha: r.fecha, tipo: r.tipo, activo: r.activo, cantidad: r.cantidad, valor: r.valorEur });
+      const row2 = sheet2.addRow({ fecha: r.fecha, tipo: r.tipo, activo: r.activo, cantidad: r.cantidad, valor: r.valorEur });
+      row2.getCell('valor').numFmt = EUR_FMT;
     }
 
     const t2 = sheet2.addRow({
       fecha: 'TOTAL',
       valor: rendimientos.reduce((s, r) => s + r.valorEur, 0),
     });
+    t2.getCell('valor').numFmt = EUR_FMT;
     t2.font = { bold: true };
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -467,9 +701,9 @@ router.get('/:year/export', async (req: Request, res: Response) => {
       .text(`Generado el ${new Date().toLocaleDateString('es-ES')} - CryptoFolio`, { align: 'center' });
     doc.moveDown(2);
 
-    const totalGP        = fiscalEvents.reduce((s, e) => s + e.gananciaPeridaEur, 0);
-    const totalGanancias = fiscalEvents.filter(e => e.gananciaPeridaEur > 0).reduce((s, e) => s + e.gananciaPeridaEur, 0);
-    const totalPerdidas  = fiscalEvents.filter(e => e.gananciaPeridaEur < 0).reduce((s, e) => s + e.gananciaPeridaEur, 0);
+    const totalGP        = fiscalEvents.reduce((s, e) => s + e.gananciaPerdidaEur, 0);
+    const totalGanancias = fiscalEvents.filter(e => e.gananciaPerdidaEur > 0).reduce((s, e) => s + e.gananciaPerdidaEur, 0);
+    const totalPerdidas  = fiscalEvents.filter(e => e.gananciaPerdidaEur < 0).reduce((s, e) => s + e.gananciaPerdidaEur, 0);
 
     doc.fontSize(14).font('Helvetica-Bold').fillColor('#000000')
       .text('Ganancias y Perdidas Patrimoniales');
@@ -510,9 +744,9 @@ router.get('/:year/export', async (req: Request, res: Response) => {
         e.contrapartidaClave,
         e.valorTransmisionEur.toFixed(2),
         e.valorAdquisicionEur.toFixed(2),
-        e.gananciaPeridaEur.toFixed(2),
+        e.gananciaPerdidaEur.toFixed(2),
       ].forEach((val, i) => {
-        if (i === 5) doc.fillColor(e.gananciaPeridaEur >= 0 ? '#00c896' : '#e74c3c');
+        if (i === 5) doc.fillColor(e.gananciaPerdidaEur >= 0 ? '#00c896' : '#e74c3c');
         doc.text(val, x, y, { width: colWidths[i] });
         doc.fillColor('#000000');
         x += colWidths[i];
@@ -529,7 +763,7 @@ router.get('/:year/export', async (req: Request, res: Response) => {
       doc.fontSize(10).font('Helvetica').text(`Total rendimientos: ${totalRend.toFixed(2)} EUR`);
       doc.moveDown(1);
 
-      const rendColW   = [80, 120, 60, 100, 80];
+      const rendColW    = [80, 120, 60, 100, 80];
       const rendHeaders = ['Fecha', 'Tipo', 'Activo', 'Cantidad', 'Valor EUR'];
       x = 50;
       doc.fontSize(8).font('Helvetica-Bold');
