@@ -1,14 +1,15 @@
 import { Scale, Info } from 'lucide-react'
 import { formatEur } from '../../utils/format'
-import { TRAMOS, calcularTramos, tramoActivo } from './helpers'
+import { useTramos, calcularTramos, tramoActivo } from './helpers'
 import type { Carryforward } from './types'
 
 export function TramosIRPF({ base, label }: { base: number; label: string }) {
-  const tramos = calcularTramos(base)
+  const tramosConfig = useTramos()
+  const tramos = calcularTramos(base, tramosConfig)
   if (tramos.length === 0) return null
   const cuotaTotal   = tramos.reduce((s, t) => s + t.cuota, 0)
   const tipoMedio    = base > 0 ? (cuotaTotal / base) * 100 : 0
-  const tipoMarginal = tramoActivo(base)
+  const tipoMarginal = tramoActivo(base, tramosConfig)
 
   return (
     <div className="bg-background-card border border-border rounded-2xl p-5">
@@ -24,7 +25,7 @@ export function TramosIRPF({ base, label }: { base: number; label: string }) {
       </div>
 
       <div className="space-y-2">
-        {TRAMOS.filter((_, i) => i < tramos.length || (i === 0 && base <= 0)).map((t, i) => {
+        {tramosConfig.filter((_, i) => i < tramos.length || (i === 0 && base <= 0)).map((t, i) => {
           const info  = tramos[i]
           const activo = info != null
           const pct   = activo ? Math.min((info.cuota / cuotaTotal) * 100, 100) : 0

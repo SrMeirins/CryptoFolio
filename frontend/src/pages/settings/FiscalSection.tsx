@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
-import { AlertCircle, Check } from 'lucide-react'
+import { AlertCircle, Check, RotateCcw } from 'lucide-react'
+import { TRAMOS_DEFAULT } from '../fiscal/helpers'
 
 export function FiscalSection() {
   const { data: config = {} } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
@@ -11,15 +12,48 @@ export function FiscalSection() {
   const [thresholdInput, setThresholdInput] = useState('')
   const [savingThreshold, setSavingThreshold] = useState(false)
 
-  useEffect(() => {
-    setThresholdInput(String(threshold))
-  }, [threshold])
+  useEffect(() => { setThresholdInput(String(threshold)) }, [threshold])
 
   async function saveThreshold() {
     setSavingThreshold(true)
     await portfolioApi.setConfig('modelo721_threshold', thresholdInput)
     queryClient.invalidateQueries({ queryKey: ['config'] })
     setSavingThreshold(false)
+  }
+
+  // ── Tramos IRPF ──────────────────────────────────────────────────────────
+  const storedTipos: number[] = (() => {
+    const raw = config['irpf_tramos_tipos']
+    if (!raw) return TRAMOS_DEFAULT.map(t => t.tipo)
+    try {
+      const arr = JSON.parse(raw)
+      if (Array.isArray(arr) && arr.length === TRAMOS_DEFAULT.length) return arr
+    } catch { /* noop */ }
+    return TRAMOS_DEFAULT.map(t => t.tipo)
+  })()
+
+  const [tramosInput, setTramosInput] = useState<string[]>([])
+  const [savingTramos, setSavingTramos] = useState(false)
+  const [savedTramos, setSavedTramos] = useState(false)
+
+  useEffect(() => { setTramosInput(storedTipos.map(String)) }, [config])
+
+  const tramosModified = tramosInput.some((v, i) => parseFloat(v) !== storedTipos[i])
+  const tramosValid    = tramosInput.every(v => { const n = parseFloat(v); return !isNaN(n) && n > 0 && n <= 100 })
+
+  async function saveTramos() {
+    if (!tramosValid) return
+    setSavingTramos(true)
+    const tipos = tramosInput.map(v => parseFloat(v))
+    await portfolioApi.setConfig('irpf_tramos_tipos', JSON.stringify(tipos))
+    queryClient.invalidateQueries({ queryKey: ['config'] })
+    setSavingTramos(false)
+    setSavedTramos(true)
+    setTimeout(() => setSavedTramos(false), 2000)
+  }
+
+  function resetTramos() {
+    setTramosInput(TRAMOS_DEFAULT.map(t => String(t.tipo)))
   }
 
   return (
@@ -90,6 +124,78 @@ export function FiscalSection() {
         <p className="text-xs text-gray-600 flex items-start gap-1.5">
           <AlertCircle size={11} className="shrink-0 mt-0.5" />
           El umbral legal vigente es €50.000. Modifícalo solo si la normativa cambia.
+        </p>
+      </div>
+
+      {/* Tramos IRPF */}
+      <div className="rounded-xl border border-border bg-background-card p-5 space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="font-semibold text-sm">Tramos IRPF — base del ahorro</h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Porcentajes aplicables a las ganancias patrimoniales. Los tramos en euros son fijos por ley.
+            </p>
+          </div>
+          <button
+            onClick={resetTramos}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white border border-border hover:border-gray-500 transition-all shrink-0"
+          >
+            <RotateCcw size={11} /> Restaurar
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {TRAMOS_DEFAULT.map((t, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <span className="text-xs text-gray-500 w-44 shrink-0">{t.label}</span>
+              <div className="flex items-center gap-1.5 bg-background-tertiary border border-border rounded-lg overflow-hidden focus-within:border-accent-blue transition-colors w-24">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={tramosInput[i] ?? t.tipo}
+                  onChange={e => {
+                    const next = [...tramosInput]
+                    next[i] = e.target.value
+                    setTramosInput(next)
+                  }}
+                  className="px-2 py-2 text-sm mono bg-transparent text-white w-14 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className="pr-2 text-sm text-gray-500">%</span>
+              </div>
+              {parseFloat(tramosInput[i]) !== TRAMOS_DEFAULT[i].tipo && (
+                <span className="text-[10px] text-accent-amber mono">
+                  por defecto: {TRAMOS_DEFAULT[i].tipo}%
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            onClick={saveTramos}
+            disabled={savingTramos || !tramosModified || !tramosValid}
+            className="px-4 py-2.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors"
+          >
+            {savingTramos ? 'Guardando...' : 'Guardar tramos'}
+          </button>
+          {savedTramos && (
+            <div className="flex items-center gap-1.5 text-xs text-accent-green">
+              <Check size={12} /> Guardado
+            </div>
+          )}
+          {!tramosValid && tramosModified && (
+            <p className="text-xs text-accent-red flex items-center gap-1">
+              <AlertCircle size={11} /> Valores entre 0 y 100
+            </p>
+          )}
+        </div>
+
+        <p className="text-xs text-gray-600 flex items-start gap-1.5">
+          <AlertCircle size={11} className="shrink-0 mt-0.5" />
+          Modifica solo si la normativa fiscal cambia. Afecta al simulador de venta y a la página Fiscal.
         </p>
       </div>
 

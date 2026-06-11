@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { X, TrendingDown, TrendingUp, Calculator, ChevronDown, AlertCircle } from 'lucide-react'
 import { formatEur, formatAmount, formatPrice, pnlColor } from '../utils/format'
+import { useTramos } from '../pages/fiscal/helpers'
 
 interface SimulatedLot {
   lotId:             string
@@ -73,33 +74,7 @@ function useHoldRepeat(callback: () => void) {
   return { onMouseDown: start, onMouseUp: stop, onMouseLeave: stop, onTouchStart: start, onTouchEnd: stop }
 }
 
-const TRAMOS = [
-  { desde: 0,      hasta: 6000,      tipo: 19 },
-  { desde: 6000,   hasta: 50000,     tipo: 21 },
-  { desde: 50000,  hasta: 200000,    tipo: 23 },
-  { desde: 200000, hasta: 300000,    tipo: 27 },
-  { desde: 300000, hasta: Infinity,  tipo: 28 },
-]
-
 interface TramoDesglose { tipo: number; base: number; cuota: number; label: string }
-
-function calcularTramos(ganancia: number): TramoDesglose[] {
-  if (ganancia <= 0) return []
-  const result: TramoDesglose[] = []
-  let restante = ganancia
-  for (const t of TRAMOS) {
-    if (restante <= 0) break
-    const ancho = t.hasta === Infinity ? restante : Math.min(restante, t.hasta - t.desde)
-    const base  = Math.min(restante, ancho)
-    if (base <= 0) continue
-    const label = t.hasta === Infinity
-      ? `> ${formatEur(t.desde)}`
-      : `${formatEur(t.desde)} – ${formatEur(t.hasta)}`
-    result.push({ tipo: t.tipo, base, cuota: base * t.tipo / 100, label })
-    restante -= base
-  }
-  return result
-}
 
 // Botón − / + con hold-to-repeat
 function StepButton({ label, onStep }: { label: string; onStep: () => void }) {
@@ -180,12 +155,31 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
     })
   }, [])
 
+  const tramosConfig = useTramos()
+
   const net      = result?.netGainLoss ?? 0
   const isGain   = net > 0.005
   const isLoss   = net < -0.005
-  const tramos   = isGain ? calcularTramos(net) : []
-  const efectivo = result && isGain && result.irpfEstimate > 0
-    ? (result.irpfEstimate / net * 100).toFixed(1)
+
+  // Calcular desglose de tramos desde la config (puede diferir del irpfEstimate del backend)
+  const tramosDesglose: TramoDesglose[] = isGain ? (() => {
+    const desglose: TramoDesglose[] = []
+    let restante = net, anterior = 0
+    for (const t of tramosConfig) {
+      if (restante <= 0) break
+      const ancho = t.hasta === Infinity ? restante : Math.min(restante, t.hasta - anterior)
+      const base  = Math.min(restante, ancho)
+      if (base <= 0) { anterior = t.hasta; continue }
+      desglose.push({ tipo: t.tipo, base, cuota: base * t.tipo / 100, label: t.label })
+      restante -= base
+      anterior = t.hasta === Infinity ? anterior : t.hasta
+    }
+    return desglose
+  })() : []
+
+  const irpfFrontend = tramosDesglose.reduce((s, t) => s + t.cuota, 0)
+  const efectivo = isGain && irpfFrontend > 0
+    ? (irpfFrontend / net * 100).toFixed(1)
     : null
 
   const inputCls = `
@@ -335,12 +329,12 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
               </div>
 
               {/* IRPF desglose */}
-              {isGain && tramos.length > 0 && (
+              {isGain && tramosDesglose.length > 0 && (
                 <div className="rounded-2xl border border-accent-amber/20 bg-accent-amber/5 overflow-hidden">
                   <div className="px-4 pt-4 pb-3 border-b border-accent-amber/10">
                     <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1">Retención IRPF estimada</p>
                     <div className="flex items-end gap-3">
-                      <span className="text-2xl font-bold mono text-accent-amber">{formatEur(result.irpfEstimate)}</span>
+                      <span className="text-2xl font-bold mono text-accent-amber">{formatEur(irpfFrontend)}</span>
                       {efectivo && (
                         <span className="text-xs text-gray-500 mb-0.5">
                           tipo efectivo <span className="text-accent-amber font-medium">{efectivo}%</span>
@@ -349,8 +343,8 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
                     </div>
                   </div>
                   <div className="px-4 py-3 space-y-1.5">
-                    <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-2">Desglose por tramos (IRPF 2024)</p>
-                    {tramos.map((t, i) => (
+                    <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-2">Desglose por tramos</p>
+                    {tramosDesglose.map((t, i) => (
                       <div key={i} className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="shrink-0 text-[10px] font-bold text-accent-amber bg-accent-amber/15 px-1.5 py-0.5 rounded-md mono">{t.tipo}%</span>
@@ -364,11 +358,11 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
                     ))}
                     <div className="flex items-center justify-between pt-2 mt-2 border-t border-accent-amber/15">
                       <span className="text-[10px] font-medium text-gray-400">Neto tras impuestos</span>
-                      <span className="text-[10px] font-semibold text-white mono">{formatEur(result.totalProceeds - result.irpfEstimate)}</span>
+                      <span className="text-[10px] font-semibold text-white mono">{formatEur(result.totalProceeds - irpfFrontend)}</span>
                     </div>
                   </div>
                   <div className="px-4 pb-3">
-                    <p className="text-[9px] text-gray-600 leading-relaxed">Estimación orientativa sobre la ganancia neta, sin considerar otras rentas del ejercicio ni deducciones aplicables.</p>
+                    <p className="text-[9px] text-gray-600 leading-relaxed">Estimación orientativa. Sin considerar otras rentas del ejercicio ni deducciones aplicables.</p>
                   </div>
                 </div>
               )}

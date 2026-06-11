@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { portfolioApi } from '../../api/portfolio'
 import { formatEur } from '../../utils/format'
 
 export const PNL_THRESHOLD = 0.005
@@ -9,7 +11,10 @@ export function pnlBg(val: number) {
   return 'bg-background-tertiary border-border'
 }
 
-export const TRAMOS = [
+export interface Tramo { hasta: number; tipo: number; label: string }
+
+// Tramos por defecto — IRPF 2024 (base del ahorro)
+export const TRAMOS_DEFAULT: Tramo[] = [
   { hasta: 6_000,    tipo: 19, label: '0 – 6.000 €' },
   { hasta: 50_000,   tipo: 21, label: '6.001 – 50.000 €' },
   { hasta: 200_000,  tipo: 23, label: '50.001 – 200.000 €' },
@@ -17,26 +22,46 @@ export const TRAMOS = [
   { hasta: Infinity, tipo: 28, label: '> 300.000 €' },
 ]
 
-export function calcularTramos(base: number): { tramo: string; tipo: number; cuota: number }[] {
+// Alias para compatibilidad con código existente
+export const TRAMOS = TRAMOS_DEFAULT
+
+function parseTipos(stored: string): number[] | null {
+  try {
+    const arr = JSON.parse(stored)
+    if (Array.isArray(arr) && arr.length === TRAMOS_DEFAULT.length && arr.every(n => typeof n === 'number' && n > 0 && n <= 100))
+      return arr
+  } catch { /* noop */ }
+  return null
+}
+
+// Hook — lee porcentajes desde config y aplica sobre los tramos por defecto
+export function useTramos(): Tramo[] {
+  const { data: config = {} } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
+  const tipos = config['irpf_tramos_tipos'] ? parseTipos(config['irpf_tramos_tipos']) : null
+  if (!tipos) return TRAMOS_DEFAULT
+  return TRAMOS_DEFAULT.map((t, i) => ({ ...t, tipo: tipos[i] ?? t.tipo }))
+}
+
+export function calcularTramos(base: number, tramos: Tramo[] = TRAMOS_DEFAULT): { tramo: string; tipo: number; cuota: number }[] {
   if (base <= 0) return []
   const result = []
   let restante = base
   let anterior = 0
-  for (const t of TRAMOS) {
+  for (const t of tramos) {
     if (restante <= 0) break
     const tramo = Math.min(restante, t.hasta - anterior)
     if (tramo > 0) result.push({ tramo: t.label, tipo: t.tipo, cuota: tramo * (t.tipo / 100) })
     restante -= tramo
-    anterior = t.hasta
+    anterior = t.hasta === Infinity ? restante : t.hasta
   }
   return result
 }
 
-export function tramoActivo(base: number): number {
-  for (const t of TRAMOS) {
+export function tramoActivo(base: number, tramos: Tramo[] = TRAMOS_DEFAULT): number {
+  for (const t of tramos) {
     if (base <= t.hasta) return t.tipo
   }
-  return 28
+  return tramos[tramos.length - 1]?.tipo ?? 28
 }
 
 export function AssetLogo({ symbol, size = 24 }: { symbol: string; size?: number }) {
