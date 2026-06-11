@@ -481,33 +481,6 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
   });
 });
 
-// ── GET /api/fiscal/:year/tax-loss-candidates ─────────────────────────────
-// Devuelve lotes abiertos agregados por activo (qty + coste). El frontend
-// cruza con precios en tiempo real para calcular la pérdida latente.
-router.get('/:year/tax-loss-candidates', async (req: Request, res: Response) => {
-  const year = parseInt(req.params.year);
-  if (isNaN(year)) { res.status(400).json({ error: 'Año inválido' }); return; }
-
-  // Activos con lotes abiertos — excluimos fiat/stablecoins
-  const FIAT_SKIP = ["EUR","USD","GBP","CHF","BRL","ARS","USDT","USDC","BUSD","DAI","TUSD","USDP","GUSD","FDUSD"];
-  const lotsRes = await db.query(`
-    SELECT
-      fl.asset,
-      SUM(fl.quantity_remaining)::float         AS qty,
-      SUM(fl.cost_basis_eur)::float             AS cost_basis,
-      (SUM(fl.cost_basis_eur)
-        / NULLIF(SUM(fl.quantity_remaining), 0))::float AS avg_cost_price
-    FROM fifo_lots fl
-    WHERE fl.is_closed = FALSE
-      AND fl.quantity_remaining > 0.0000001
-      AND fl.asset <> ALL($1::text[])
-    GROUP BY fl.asset
-    ORDER BY fl.asset
-  `, [FIAT_SKIP]);
-
-  res.json({ year, candidates: lotsRes.rows });
-});
-
 // ── GET /api/fiscal/:year/events ───────────────────────────────────────────
 router.get('/:year/events', async (req: Request, res: Response) => {
   const year = parseInt(req.params.year);
