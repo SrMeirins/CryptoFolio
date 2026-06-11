@@ -9,6 +9,7 @@ import { Modelo721Card } from './fiscal/Modelo721Card'
 import { TablaEventos } from './fiscal/TablaEventos'
 import { TablaRendimientos } from './fiscal/TablaRendimientos'
 import { ExportPanel } from './fiscal/ExportPanel'
+import { TaxLossHarvestingCard } from './fiscal/TaxLossHarvestingCard'
 import type {
   FiscalSummary, FiscalEvent, RendimientoEvent, Modelo721,
   YearOverview, Carryforward, BreakdownItem, MonthlyData,
@@ -194,6 +195,15 @@ export function Fiscal() {
           </div>
 
           {carryforward && <CompensacionPerdidas data={carryforward} />}
+
+          {summary.esAnioEnCurso && (
+            <TaxLossHarvestingCard
+              year={activeYear}
+              ganancias={summary.totalGanancias}
+              perdidas={summary.totalPerdidas}
+              neto={summary.netoPatrimonial}
+            />
+          )}
 
           {modelo721Loading ? (
             <div className="bg-background-card border border-border rounded-2xl p-5 animate-pulse">
