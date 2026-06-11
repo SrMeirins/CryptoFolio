@@ -11,7 +11,6 @@ export async function loadAssetMetadata(): Promise<void> {
     'SELECT symbol, coingecko_id FROM asset_metadata WHERE coingecko_id IS NOT NULL'
   );
   coinGeckoIds = new Map(res.rows.map((r: { symbol: string; coingecko_id: string }) => [r.symbol, r.coingecko_id]));
-  console.log(`[PRICES] ${coinGeckoIds.size} activos cargados desde asset_metadata`);
 }
 
 // ── Rate limiter simple ────────────────────────────────────────────────────
@@ -126,7 +125,6 @@ export async function getHistoricalPriceEur(
     const geckoDate = formatGeckoDate(date);
     const url = `${BASE_URL}/coins/${geckoId}/history?date=${geckoDate}&localization=false`;
 
-    console.log(`[PRICES] Fetching ${symbol} @ ${dateStr} (${geckoId})`);
     const data = await fetchWithRetry(url) as {
       market_data?: { current_price?: { eur?: number } }
     };
@@ -215,19 +213,11 @@ export async function prefetchHistoricalPrices(
     }
   }
 
-  if (toFetch.length === 0) {
-    console.log('[PRICES] Todos los precios históricos ya están en caché ✓');
-    return;
-  }
-
-  console.log(`[PRICES] Precargando ${toFetch.length} precios históricos...`);
-  console.log(`[PRICES] Tiempo estimado: ~${Math.ceil(toFetch.length * 6.5 / 60)} minutos`);
+  if (toFetch.length === 0) return;
 
   for (const { symbol, date } of toFetch) {
     await getHistoricalPriceEur(symbol, date);
   }
-
-  console.log('[PRICES] Precarga de precios históricos completada ✓');
 }
 
 // ── Auto-detección de coingecko_id ────────────────────────────────────────
@@ -242,7 +232,6 @@ export async function searchAndSaveCoinGeckoId(symbol: string): Promise<string |
 
   try {
     const data = await queue.enqueue(async () => {
-      console.log(`[PRICES] Buscando coingecko_id para ${symbol}...`);
       return await fetchWithRetry(url) as {
         coins: { id: string; name: string; symbol: string; market_cap_rank: number | null }[]
       };
@@ -264,7 +253,6 @@ export async function searchAndSaveCoinGeckoId(symbol: string): Promise<string |
     });
 
     const geckoId = matches[0].id;
-    console.log(`[PRICES] Auto-detectado: ${symbol} → ${geckoId} (${matches[0].name})`);
 
     await db.query(
       'UPDATE asset_metadata SET coingecko_id = $1 WHERE symbol = $2',
@@ -325,7 +313,6 @@ export async function fetchMarketChart(
   // CoinGecko auto-selecciona granularidad: hourly ≤90d, daily >90d
   const data = await queue.enqueue(async () => {
     const url = `${BASE_URL}/coins/${geckoId}/market_chart?vs_currency=eur&days=${days}`;
-    console.log(`[PRICES] Market chart ${symbol} (${days}d) → ${geckoId}`);
     return await fetchWithRetry(url) as { prices: [number, number][] };
   }).catch(e => {
     console.warn(`[PRICES] Market chart ${symbol} falló: ${e.message}`);

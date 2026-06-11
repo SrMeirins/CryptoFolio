@@ -69,27 +69,43 @@ async function loadInitialPrices(): Promise<void> {
     }
 
     liveCache.set('EUR', 1);
-    console.log(`[PRICES] Precios iniciales cargados: ${liveCache.size} activos ✓`);
   } catch (e) {
     console.error('[PRICES] Error cargando precios iniciales:', (e as Error).message);
   }
 }
 
-// ── REST: precio histórico ─────────────────────────────────────────────────
-async function fetchKlinePrice(pair: string, date: Date): Promise<number> {
+function sleep(ms: number): Promise<void> {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+// ── REST: precio histórico con retry ante rate-limit ─────────────────────
+async function fetchKlinePrice(pair: string, date: Date, retries = 3): Promise<number> {
   const d = new Date(date);
   d.setUTCHours(0, 0, 0, 0);
   const startTime = d.getTime();
   const endTime = startTime + 24 * 60 * 60 * 1000;
 
   const url = `${REST_BASE}/klines?symbol=${pair}&interval=1d&startTime=${startTime}&endTime=${endTime}&limit=1`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Binance klines HTTP ${res.status} para ${pair}`);
 
-  const data = await res.json() as unknown[][];
-  if (!data || data.length === 0) throw new Error(`Sin datos para ${pair} @ ${date.toISOString()}`);
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const res = await fetch(url);
 
-  return parseFloat(data[0][4] as string);
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get('retry-after') ?? '0', 10);
+      const waitMs = retryAfter > 0 ? retryAfter * 1000 : attempt * 10000;
+      await sleep(waitMs);
+      continue;
+    }
+
+    if (!res.ok) throw new Error(`Binance klines HTTP ${res.status} para ${pair}`);
+
+    const data = await res.json() as unknown[][];
+    if (!data || data.length === 0) throw new Error(`Sin datos para ${pair} @ ${date.toISOString()}`);
+
+    return parseFloat(data[0][4] as string);
+  }
+
+  throw new Error(`fetchKlinePrice agotó reintentos para ${pair}`);
 }
 
 export async function getHistoricalPriceEur(symbol: string, date: Date): Promise<number> {
@@ -188,25 +204,20 @@ export async function prefetchHistoricalPrices(
     if (cached.rows.length === 0) toFetch.push({ symbol, date });
   }
 
-  if (toFetch.length === 0) {
-    console.log('[PRICES] Todos los precios históricos en caché ✓');
-    return;
-  }
+  if (toFetch.length === 0) return;
 
-  console.log(`[PRICES] Precargando ${toFetch.length} precios en paralelo...`);
-  const CONCURRENCY = 10;
+  // Binance klines: peso 2, límite ~1200/min → máx ~600 llamadas/min (~10/seg).
+  // Batches de 5 con 600ms entre lotes = ~8 llamadas/seg, con margen de seguridad.
+  const CONCURRENCY = 5;
+  const BATCH_DELAY_MS = 600;
+
   for (let i = 0; i < toFetch.length; i += CONCURRENCY) {
     const batch = toFetch.slice(i, i + CONCURRENCY);
     await Promise.allSettled(
-      batch.map(({ symbol, date }) =>
-        getHistoricalPriceEur(symbol, date).catch(e =>
-          console.warn(`[PRICES] Error ${symbol} @ ${date.toISOString().slice(0, 10)}: ${e.message}`)
-        )
-      )
+      batch.map(({ symbol, date }) => getHistoricalPriceEur(symbol, date).catch(() => {}))
     );
-    console.log(`[PRICES] ${Math.min(i + CONCURRENCY, toFetch.length)}/${toFetch.length} completados`);
+    if (i + CONCURRENCY < toFetch.length) await sleep(BATCH_DELAY_MS);
   }
-  console.log('[PRICES] Precarga completada ✓');
 }
 
 // ── WebSocket: precios en tiempo real ─────────────────────────────────────
@@ -246,10 +257,7 @@ export function startLivePrices(): void {
 }
 
 function connectWebSocket(streamUrl: string): void {
-  console.log('[WS] Conectando a Binance WebSocket...');
   ws = new WebSocket(streamUrl);
-
-  ws.on('open', () => console.log('[WS] Binance WebSocket conectado ✓'));
 
   ws.on('message', async (data: Buffer) => {
     try {
@@ -321,5 +329,4 @@ export function getAllLivePrices(): Map<string, number> {
 
 export async function loadAssetMetadata(): Promise<void> {
   await loadPairCache();
-  console.log('[PRICES] Usando Binance API dinámica (sin hardcodeo) ✓');
 }

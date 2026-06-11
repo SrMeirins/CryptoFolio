@@ -133,8 +133,8 @@ async function getEventosAnio(year: number) {
             new Date(row.fecha as string)
           );
           gastosTransmision = parseFloat(row.fee_amount as string) * feePrice;
-        } catch (e) {
-          console.warn(`[FISCAL] No se pudo obtener precio de fee ${row.fee_asset}: ${(e as Error).message}`);
+        } catch {
+          // precio de fee no disponible — gastos de transmisión = 0
         }
       }
 
@@ -457,8 +457,8 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
     try {
       const price = await getHistoricalPriceEur(lot.asset, dec31);
       valorTotal721 += parseFloat(lot.quantity) * price;
-    } catch (e) {
-      console.warn(`[FISCAL] Sin precio para ${lot.asset} en Modelo 721: ${(e as Error).message}`);
+    } catch {
+      // precio no disponible — lote excluido del cálculo
     }
   }
 
@@ -508,8 +508,8 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
       try {
         precio = await getHistoricalPriceEur(row.asset as string, dec31);
         valorEur = quantity * precio;
-      } catch (e) {
-        console.warn(`[FISCAL] Sin precio para ${row.asset} en Modelo 721: ${(e as Error).message}`);
+      } catch {
+        // precio no disponible — activo con valorEur = 0
       }
 
       return {

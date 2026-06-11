@@ -32,8 +32,6 @@ router.post('/run', async (_req, res) => {
       date: new Date(r.date),
     }));
 
-    console.log(`[FIFO] Necesito ${required.length} precios históricos únicos`);
-
     // 3. Precargar precios (respeta rate limit automáticamente)
     await prefetchHistoricalPrices(required);
 
@@ -333,7 +331,7 @@ router.get('/portfolio-history', async (req, res) => {
       lastFetchAttempt.set(period, Date.now());
       loadCoinGeckoMetadata()
         .then(() => Promise.all(allAssets.map((asset: string) => fetchMarketChart(asset, days).catch(() => {}))))
-        .catch(console.error)
+        .catch(() => {})
         .finally(() => refreshingPeriods.delete(period));
     }
   } catch (e) {

@@ -306,9 +306,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
   // Recalcular FIFO y esperar resultado antes de responder
   const remaining = await db.query('SELECT COUNT(*) FROM csv_imports');
   if (parseInt(remaining.rows[0].count) > 0) {
-    await runFifoEngine().catch(err =>
-      console.error('[DELETE IMPORT] Error recalculando FIFO:', err.message)
-    );
+    await runFifoEngine().catch(() => {});
   }
 
   res.json({ success: true });

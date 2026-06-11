@@ -39,8 +39,8 @@ router.get('/live', async (_req: Request, res: Response) => {
       }
     }
     Object.assign(prices, cgLiveCache.prices);
-  } catch (e) {
-    console.warn('[PRICES] Error obteniendo precios CoinGecko live:', (e as Error).message);
+  } catch {
+    // CoinGecko no disponible — se usan solo precios WebSocket
   }
 
   res.json(prices);

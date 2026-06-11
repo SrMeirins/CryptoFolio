@@ -108,12 +108,9 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
       await processTransaction(tx, result);
     } catch (e) {
       const msg = `Error en tx ${tx.id} (${tx.operation_type} ${tx.asset} @ ${tx.timestamp.toISOString()}): ${(e as Error).message}`;
-      console.error('[FIFO]', msg);
       result.errors.push(msg);
     }
   }
-
-  console.log(`[FIFO] Completado: ${result.lotsCreated} lotes, ${result.lotsConsumed} consumos, ${result.pendingWithdrawals} retiros pendientes`);
 
   return result;
 }
@@ -161,7 +158,7 @@ async function processTransaction(tx: Transaction, result: FifoRunResult): Promi
     case 'CONVERT_OUT':
       break;
     default:
-      console.warn(`[FIFO] Tipo no manejado: ${tx.operation_type}`);
+      result.errors.push(`Tipo de operación no manejado: ${tx.operation_type} (tx ${tx.id})`);
   }
 }
 
@@ -296,7 +293,6 @@ async function processTransfer(tx: Transaction, result: FifoRunResult): Promise<
 
   if (tx.destination_pending || !tx.destination_wallet_id) {
     result.pendingWithdrawals++;
-    console.warn(`[FIFO] ${tx.operation_type} sin destino para ${tx.asset} tx=${tx.id} — lotes permanecen en wallet origen`);
     return;
   }
 
@@ -337,7 +333,7 @@ async function processTransfer(tx: Transaction, result: FifoRunResult): Promise<
     }
 
     if (quantityToMove > 0.0001) {
-      console.warn(`[FIFO] TRANSFER sin lotes suficientes para ${tx.asset} (faltan ${quantityToMove.toFixed(6)})`);
+      result.errors.push(`TRANSFER sin lotes suficientes para ${tx.asset} tx=${tx.id} (faltan ${quantityToMove.toFixed(6)})`);
     }
   });
 }
@@ -388,7 +384,7 @@ async function consumeLots(
   const lots = await getOpenLots(asset, walletId);
 
   if (lots.length === 0) {
-    console.warn(`[FIFO] Sin lotes abiertos para ${asset} en wallet ${walletId}`);
+    result.errors.push(`Sin lotes abiertos para ${asset} en wallet ${walletId} (tx ${txId})`);
     return;
   }
 
