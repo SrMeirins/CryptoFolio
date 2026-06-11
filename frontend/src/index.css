@@ -24,6 +24,37 @@
   .mono { @apply font-mono; }
 }
 
+/* ── Page transition ──────────────────────────────────────────────────────── */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-page-in { animation: pageIn 0.22s ease-out both; }
+
+/* ── Shimmer skeleton ─────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.03) 25%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.03) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* ── Value reveal (card load) ─────────────────────────────────────────────── */
+@keyframes valueReveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-value-reveal { animation: valueReveal 0.3s ease-out both; }
+
+/* ── Slide-in (legacy) ────────────────────────────────────────────────────── */
 @keyframes slide-in {
   from { opacity: 0; transform: translateX(1rem); }
   to   { opacity: 1; transform: translateX(0); }

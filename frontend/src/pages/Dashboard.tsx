@@ -20,40 +20,53 @@ const ALLOC_COLORS = [
 const FIAT_COLOR = '#10b981'
 
 // ── TopMovers ────────────────────────────────────────────────────────────────
-interface MoverItem { asset: string; pct: number; value: number }
+interface MoverItem { asset: string; pct: number; value: number; rank: number }
 
-function MoverRow({ asset, pct, value }: MoverItem) {
+function MoverRow({ asset, pct, value, rank }: MoverItem) {
   const [imgOk, setImgOk] = useState(true)
   const isUp  = pct >= 0
   const color = isUp ? '#00c896' : '#e74c3c'
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors">
+    <div
+      className="flex items-center gap-3 px-4 py-3 transition-colors hover:brightness-110"
+      style={{ background: `${color}06` }}
+    >
+      <span className="text-[10px] text-gray-700 w-4 text-center font-mono shrink-0">{rank}</span>
       {imgOk ? (
         <img
           src={`https://assets.coincap.io/assets/icons/${asset.toLowerCase()}@2x.png`}
           alt={asset}
-          className="w-7 h-7 rounded-full shrink-0 ring-1 ring-white/10"
+          className="w-8 h-8 rounded-full shrink-0"
+          style={{ boxShadow: `0 0 0 2px ${color}30` }}
           onError={() => setImgOk(false)}
         />
       ) : (
         <div
-          className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ring-1 ring-white/10"
-          style={{ background: `${color}18`, color }}
+          className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+          style={{ background: `${color}20`, color, boxShadow: `0 0 0 2px ${color}30` }}
         >
           {asset.slice(0, 2)}
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-semibold text-gray-200 leading-tight">{asset}</p>
-        <p className="text-[10px] text-gray-600 font-mono leading-tight">{formatEur(value)}</p>
+        <p className="text-[13px] font-bold leading-tight" style={{ color }}>{asset}</p>
+        <p className="text-[10px] text-gray-600 font-mono leading-tight mt-0.5">{formatEur(value)}</p>
       </div>
-      <span
-        className="text-[13px] font-bold font-mono px-2.5 py-1 rounded-lg shrink-0"
-        style={{ background: `${color}15`, color }}
-      >
-        {isUp ? '+' : ''}{pct.toFixed(2)}%
-      </span>
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <span
+          className="text-[13px] font-bold font-mono px-2 py-0.5 rounded-lg"
+          style={{ background: `${color}18`, color }}
+        >
+          {isUp ? '+' : ''}{pct.toFixed(2)}%
+        </span>
+        <div className="w-16 h-1 rounded-full overflow-hidden bg-white/5">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${Math.min(Math.abs(pct) * 2, 100)}%`, background: color, opacity: 0.7 }}
+          />
+        </div>
+      </div>
     </div>
   )
 }
@@ -71,7 +84,7 @@ function TopMovers({ lots }: { lots: FifoLot[] }) {
       })
     }
 
-    const items: MoverItem[] = []
+    const items: Omit<MoverItem, 'rank'>[] = []
     for (const [asset, { qty, cost }] of byAsset) {
       const price = prices[asset]
       if (!price || qty < 0.000001 || cost <= 0) continue
@@ -81,8 +94,8 @@ function TopMovers({ lots }: { lots: FifoLot[] }) {
 
     const sorted = [...items].sort((a, b) => b.pct - a.pct)
     return {
-      top:    sorted.slice(0, 3),
-      bottom: sorted.length >= 2 ? sorted.slice(-3).reverse() : [],
+      top:    sorted.slice(0, 3).map((item, i) => ({ ...item, rank: i + 1 })),
+      bottom: sorted.length >= 2 ? sorted.slice(-3).reverse().map((item, i) => ({ ...item, rank: i + 1 })) : [],
     }
   }, [lots, prices])
 
@@ -93,19 +106,19 @@ function TopMovers({ lots }: { lots: FifoLot[] }) {
       <div className="grid grid-cols-2 divide-x divide-border">
         <div>
           <div className="px-4 py-3 border-b border-border flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-green shrink-0" />
-            <span className="text-[11px] text-gray-500 font-medium uppercase tracking-widest">Mejores</span>
+            <span className="w-2 h-2 rounded-full bg-accent-green shrink-0" style={{ boxShadow: '0 0 6px #00c896' }} />
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-accent-green/80">Mejores</span>
           </div>
-          <div className="divide-y divide-border/40">
+          <div className="divide-y divide-border/30">
             {top.map(item => <MoverRow key={item.asset} {...item} />)}
           </div>
         </div>
         <div>
           <div className="px-4 py-3 border-b border-border flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-red shrink-0" />
-            <span className="text-[11px] text-gray-500 font-medium uppercase tracking-widest">Peores</span>
+            <span className="w-2 h-2 rounded-full bg-accent-red shrink-0" style={{ boxShadow: '0 0 6px #e74c3c' }} />
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-accent-red/80">Peores</span>
           </div>
-          <div className="divide-y divide-border/40">
+          <div className="divide-y divide-border/30">
             {bottom.map(item => <MoverRow key={item.asset} {...item} />)}
           </div>
         </div>
@@ -147,7 +160,7 @@ function RecentActivity() {
   return (
     <div className="bg-background-card border border-border rounded-2xl overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-        <h3 className="text-sm font-medium">Actividad reciente</h3>
+        <h3 className="text-sm font-semibold">Actividad reciente</h3>
         <Link to="/history" className="text-xs text-accent-blue hover:underline">Ver todo →</Link>
       </div>
 
@@ -155,9 +168,9 @@ function RecentActivity() {
         <div className="divide-y divide-border/40">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3 px-5 py-3.5">
-              <div className="w-16 h-5 bg-background-tertiary rounded-md animate-pulse" />
-              <div className="flex-1 h-4 bg-background-tertiary rounded animate-pulse" />
-              <div className="w-20 h-4 bg-background-tertiary rounded animate-pulse" />
+              <div className="w-16 h-6 skeleton rounded-lg" />
+              <div className="flex-1 h-4 skeleton rounded" />
+              <div className="w-16 h-4 skeleton rounded" />
             </div>
           ))}
         </div>
@@ -166,30 +179,52 @@ function RecentActivity() {
           Sin transacciones aún
         </div>
       ) : (
-        <div className="divide-y divide-border/40">
+        <div className="divide-y divide-border/30">
           {txs.map(tx => {
-            const meta = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: '#6b7280' }
+            const meta = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: '#6b7280', rowBg: 'transparent' }
+            const isIncome = ['STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP','FORK'].includes(tx.operation_type)
+            const isSell   = ['SELL','SELL_FIAT','SELL_CRYPTO'].includes(tx.operation_type)
+            const isBuy    = ['BUY','BUY_FIAT','BUY_CRYPTO'].includes(tx.operation_type)
             return (
-              <div key={tx.id} className="flex items-center gap-3 px-5 py-3 hover:bg-white/[0.02] transition-colors">
+              <div
+                key={tx.id}
+                className="flex items-center gap-3 px-5 py-3 transition-all hover:brightness-105"
+                style={{ background: meta.rowBg }}
+              >
+                {/* Badge operación */}
                 <span
-                  className="text-[11px] font-medium px-2 py-0.5 rounded-md shrink-0 min-w-[80px] text-center"
-                  style={{ backgroundColor: `${meta.color}18`, color: meta.color }}
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 min-w-[76px] text-center border"
+                  style={{
+                    backgroundColor: `${meta.color}15`,
+                    color: meta.color,
+                    borderColor: `${meta.color}30`,
+                  }}
                 >
                   {meta.label}
                 </span>
-                <div className="flex-1 min-w-0 flex items-center gap-2">
-                  <span className="text-sm font-medium text-white">{tx.asset}</span>
-                  <span className="text-xs text-gray-500 font-mono truncate">{fmtAmount(tx.amount)}</span>
-                  {tx.wallet_name && (
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-                      style={{ backgroundColor: `${tx.wallet_color}20`, color: tx.wallet_color }}
-                    >
-                      {tx.wallet_name}
-                    </span>
-                  )}
+
+                {/* Activo + wallet */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-white">{tx.asset}</span>
+                    {tx.wallet_name && (
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded-md font-medium shrink-0"
+                        style={{ backgroundColor: `${tx.wallet_color}18`, color: tx.wallet_color }}
+                      >
+                        {tx.wallet_name}
+                      </span>
+                    )}
+                  </div>
+                  <p className={`text-xs font-mono mt-0.5 ${
+                    isBuy ? 'text-accent-green/80' : isSell ? 'text-accent-red/80' : isIncome ? 'text-violet-400/80' : 'text-gray-500'
+                  }`}>
+                    {isBuy ? '+' : isSell ? '−' : ''}{fmtAmount(tx.amount)}
+                  </p>
                 </div>
-                <span className="text-xs text-gray-600 shrink-0">{relativeDate(tx.timestamp)}</span>
+
+                {/* Fecha */}
+                <span className="text-[11px] text-gray-600 shrink-0 tabular-nums">{relativeDate(tx.timestamp)}</span>
               </div>
             )
           })}
@@ -499,41 +534,45 @@ function FiscalCard({ data }: { data: FiscalYear[] }) {
   const gains    = parseFloat(current.total_gains_eur)
   const losses   = parseFloat(current.total_losses_eur)
   const ops      = parseInt(current.num_operations as unknown as string, 10)
+  const isPos    = gainLoss >= 0
+  const accentColor = isPos ? '#10b981' : '#ef4444'
 
   return (
-    <div className="bg-background-card border border-border rounded-2xl flex flex-col overflow-hidden">
+    <div className="bg-background-card border border-border rounded-2xl overflow-hidden flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold tracking-widest text-gray-600 uppercase">Fiscal</span>
-          <span className="text-xs font-semibold text-white bg-white/5 border border-white/10 px-2 py-0.5 rounded-md">
+          <span className="text-[11px] font-bold text-white bg-white/6 border border-white/10 px-2 py-0.5 rounded-md">
             {current.fiscal_year}
           </span>
         </div>
-        <Link to="/fiscal" className="text-xs text-accent-blue hover:underline">Ver detalle →</Link>
+        <Link to="/fiscal" className="text-xs text-accent-blue hover:underline">Detalle →</Link>
       </div>
 
-      {/* G/P neto — métrica principal */}
-      <div className="px-5 pt-5 pb-4">
-        <p className="text-[11px] text-gray-600 font-medium uppercase tracking-widest mb-2">G/P neto realizado</p>
-        <p className={`font-['JetBrains_Mono',monospace] text-[1.6rem] font-semibold tracking-tight leading-none ${pnlColor(gainLoss)}`}>
-          {gainLoss >= 0 ? '+' : ''}{formatEur(gainLoss)}
+      {/* Métrica principal — centrada */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-5 gap-1">
+        <p className="text-[10px] text-gray-600 font-medium uppercase tracking-widest">G/P neto realizado</p>
+        <p className={`font-['JetBrains_Mono',monospace] text-[1.7rem] font-bold tracking-tight leading-none ${isPos ? 'text-accent-green' : 'text-accent-red'}`}>
+          {isPos ? '+' : ''}{formatEur(gainLoss)}
         </p>
+        <div
+          className="mt-1 px-2 py-0.5 rounded-md text-[10px] font-semibold"
+          style={{ background: `${accentColor}15`, color: accentColor }}
+        >
+          {ops} operacion{ops !== 1 ? 'es' : ''}
+        </div>
       </div>
 
       {/* Desglose */}
-      <div className="mx-4 mb-4 rounded-xl bg-white/[0.03] border border-white/5 divide-y divide-white/5">
-        <div className="flex items-center justify-between px-4 py-2.5">
-          <span className="text-xs text-gray-500">Ganancias</span>
-          <span className="font-['JetBrains_Mono',monospace] text-xs text-accent-green">+{formatEur(gains)}</span>
+      <div className="mx-3 mb-3 rounded-xl bg-white/[0.03] border border-white/5 divide-y divide-white/5">
+        <div className="flex items-center justify-between px-3 py-2">
+          <span className="text-[11px] text-gray-500">Ganancias</span>
+          <span className="font-['JetBrains_Mono',monospace] text-[11px] font-semibold text-accent-green">+{formatEur(gains)}</span>
         </div>
-        <div className="flex items-center justify-between px-4 py-2.5">
-          <span className="text-xs text-gray-500">Pérdidas</span>
-          <span className="font-['JetBrains_Mono',monospace] text-xs text-accent-red">{formatEur(losses)}</span>
-        </div>
-        <div className="flex items-center justify-between px-4 py-2.5">
-          <span className="text-xs text-gray-500">Operaciones</span>
-          <span className="font-['JetBrains_Mono',monospace] text-xs text-gray-300">{ops}</span>
+        <div className="flex items-center justify-between px-3 py-2">
+          <span className="text-[11px] text-gray-500">Pérdidas</span>
+          <span className="font-['JetBrains_Mono',monospace] text-[11px] font-semibold text-accent-red">{formatEur(losses)}</span>
         </div>
       </div>
     </div>
@@ -632,6 +671,8 @@ export function Dashboard() {
         <MetricCard
           label="Valor actual"
           value={hasPrices ? formatEur(totalValue) : '—'}
+          rawValue={hasPrices ? totalValue : undefined}
+          format={formatEur}
           loading={lotsLoading}
           change24h={hasPrices ? change24h : null}
           change24hLoading={ydayLoading}
@@ -655,6 +696,8 @@ export function Dashboard() {
         <MetricCard
           label="Coste de adquisición"
           value={formatEur(totalCost)}
+          rawValue={totalCost}
+          format={formatEur}
           loading={lotsLoading}
           tooltip={
             <>
@@ -667,6 +710,8 @@ export function Dashboard() {
         <MetricCard
           label="P&L no realizado"
           value={hasPrices ? (totalPnl >= 0 ? '+' : '') + formatEur(totalPnl) : '—'}
+          rawValue={hasPrices ? totalPnl : undefined}
+          format={v => (v >= 0 ? '+' : '') + formatEur(v)}
           positive={hasPrices ? totalPnl >= 0 : undefined}
           loading={lotsLoading}
           tooltip={
@@ -683,6 +728,8 @@ export function Dashboard() {
         <MetricCard
           label="Rentabilidad"
           value={hasPrices ? (totalPnlPct >= 0 ? '+' : '') + totalPnlPct.toFixed(2) + '%' : '—'}
+          rawValue={hasPrices ? totalPnlPct : undefined}
+          format={v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%'}
           positive={hasPrices ? totalPnlPct >= 0 : undefined}
           loading={lotsLoading}
           tooltip={
@@ -699,6 +746,8 @@ export function Dashboard() {
           <MetricCard
             label="EUR neto en cripto"
             value={formatEur(eurFlow.netFromBank)}
+            rawValue={eurFlow.netFromBank}
+            format={formatEur}
             loading={lotsLoading}
             tooltip={
               <>

@@ -183,15 +183,13 @@ export function Fiscal() {
             <EvolucionMensual data={monthly} esAnioEnCurso={summary.esAnioEnCurso} />
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {breakdown.length > 0 && <DesglosePorActivo data={breakdown} />}
-            {summary.netoPatrimonial > 0 && (
-              <TramosIRPF
-                base={summary.netoPatrimonial + summary.totalRendimientos}
-                label={`Tramos IRPF — estimación ${activeYear}`}
-              />
-            )}
-          </div>
+          {breakdown.length > 0 && <DesglosePorActivo data={breakdown} />}
+          {summary.netoPatrimonial > 0 && (
+            <TramosIRPF
+              base={summary.netoPatrimonial + summary.totalRendimientos}
+              label={`Tramos IRPF — estimación ${activeYear}`}
+            />
+          )}
 
           {carryforward && <CompensacionPerdidas data={carryforward} />}
 

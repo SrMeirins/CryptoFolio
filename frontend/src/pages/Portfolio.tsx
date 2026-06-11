@@ -56,12 +56,7 @@ const DONUT_COLORS = [
 ]
 
 function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatBalances: FiatBalance[] }) {
-  // Throttle: el donut solo recalcula cada 5 s, no en cada tick de precio
-  const [prices, setPrices] = useState(() => usePricesStore.getState().prices)
-  useEffect(() => {
-    const id = setInterval(() => setPrices({ ...usePricesStore.getState().prices }), 5000)
-    return () => clearInterval(id)
-  }, [])
+  const prices = usePricesStore(s => s.prices)
 
   const [hovered, setHovered] = useState<string | null>(null)
 

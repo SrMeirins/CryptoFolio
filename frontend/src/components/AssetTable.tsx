@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, Settings, ArrowUpDown, ArrowUp, ArrowDown, Calculator } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { FifoLot, FiatBalance } from '../api/portfolio'
+import { FifoLot, FiatBalance, portfolioApi } from '../api/portfolio'
 import { usePricesStore } from '../store/pricesStore'
 import { formatEur, formatPrice, formatAmount, pnlColor } from '../utils/format'
 
@@ -141,7 +142,6 @@ function buildRows(
 
 // ── Fila cripto (con expand) ───────────────────────────────────────────────
 
-const fmtBreakEven = formatPrice
 
 // Nombre corto para chip de wallet:
 // Exchange → solo la sub-cuenta ("Binance Spot" → "Spot", "Binance Funding" → "Funding")
@@ -154,9 +154,10 @@ function walletShortName(name: string, kind: string): string {
   return name
 }
 
-function CryptoRowComponent({ row, prices, totalPortfolioValue, compact = false, onSimulate }: {
+function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate }: {
   row: CryptoRow
   prices: Record<string, number>
+  yesterdayPrices: Record<string, number>
   totalPortfolioValue: number
   compact?: boolean
   onSimulate?: (asset: string, qty: number, price: number) => void
@@ -168,16 +169,18 @@ function CryptoRowComponent({ row, prices, totalPortfolioValue, compact = false,
   const hasPrice   = price > 0
   const canExpand  = row.wallets.length > 1
 
+  // 24h change
+  const ydayPrice   = yesterdayPrices[row.asset]
+  const change24h   = hasPrice && ydayPrice && ydayPrice > 0
+    ? ((price - ydayPrice) / ydayPrice) * 100
+    : null
+
   // Break-even: precio al que vendiendo todo recuperas exactamente lo invertido
-  const breakEven  = row.totalQuantity > 0 ? row.totalCostBasis / row.totalQuantity : 0
 
   // Peso sobre el portfolio total
   const portfolioWeight = hasPrice && totalPortfolioValue > 0
     ? (row.value / totalPortfolioValue) * 100
     : null
-  const isAboveBE  = hasPrice && price > breakEven   // en beneficio
-  const isBelowBE  = hasPrice && price < breakEven   // en pérdida
-  const distPct    = breakEven > 0 ? ((price - breakEven) / breakEven) * 100 : null
 
   return (
     <>
@@ -224,9 +227,22 @@ function CryptoRowComponent({ row, prices, totalPortfolioValue, compact = false,
         {/* Cantidad */}
         <td className={`px-4 ${compact ? 'py-2' : 'py-3'} text-right mono text-gray-300`}>{formatAmount(row.totalQuantity)}</td>
 
-        {/* Precio actual */}
+        {/* Precio actual + 24h */}
         <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono`}>
-          {hasPrice ? formatPrice(price) : (
+          {hasPrice ? (
+            <div className="flex flex-col items-end gap-0.5">
+              <span>{formatPrice(price)}</span>
+              {change24h !== null && (
+                <span className={`text-[10px] font-semibold px-1.5 py-px rounded-full ${
+                  change24h >= 0
+                    ? 'text-accent-green bg-accent-green/10'
+                    : 'text-accent-red bg-accent-red/10'
+                }`}>
+                  {change24h >= 0 ? '▲' : '▼'} {Math.abs(change24h).toFixed(2)}%
+                </span>
+              )}
+            </div>
+          ) : (
             <Link to="/settings?tab=assets"
               className="inline-flex items-center gap-1 text-[11px] text-accent-amber/80 hover:text-accent-amber bg-accent-amber/8 border border-accent-amber/20 px-2 py-0.5 rounded-md transition-colors"
               title="Configura el par de precio en Settings → Activos"
@@ -236,21 +252,6 @@ function CryptoRowComponent({ row, prices, totalPortfolioValue, compact = false,
           )}
         </td>
 
-        {/* Break-even — oculto en compacto */}
-        {!compact && (
-          <td className="px-4 py-3 text-right">
-            <div className="flex flex-col items-end gap-0.5">
-              <span className="mono text-gray-300 text-sm">{fmtBreakEven(breakEven)}</span>
-              {hasPrice && distPct !== null && (
-                <span className={`text-[10px] font-semibold mono px-1.5 py-0.5 rounded-full ${
-                  isAboveBE ? 'text-accent-green bg-accent-green/10' : 'text-accent-red bg-accent-red/10'
-                }`}>
-                  {isAboveBE ? '▲ ' : '▼ '}{Math.abs(distPct).toFixed(1)}%
-                </span>
-              )}
-            </div>
-          </td>
-        )}
 
         {/* Valor EUR */}
         <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono font-medium`}>
@@ -295,11 +296,9 @@ function CryptoRowComponent({ row, prices, totalPortfolioValue, compact = false,
 
       {/* Sub-filas por wallet */}
       {expanded && row.wallets.map(w => {
-        const wBreakEven = w.quantity > 0 ? w.costBasis / w.quantity : 0
         const wValue     = w.quantity * price
         const wPnl       = hasPrice ? wValue - w.costBasis : null
         const wPnlPct    = w.costBasis > 0 && wPnl !== null ? (wPnl / w.costBasis) * 100 : null
-        const wDistPct   = wBreakEven > 0 && hasPrice ? ((price - wBreakEven) / wBreakEven) * 100 : null
 
         return (
           <tr key={w.wallet_id} className="bg-background-tertiary/20 border-l-2"
@@ -312,21 +311,6 @@ function CryptoRowComponent({ row, prices, totalPortfolioValue, compact = false,
             </td>
             <td className="px-4 py-2 text-right mono text-xs text-gray-400">{formatAmount(w.quantity)}</td>
             <td className="px-4 py-2 text-right mono text-xs text-gray-600">—</td>
-            {/* Break-even por wallet — oculto en compacto */}
-            {!compact && (
-              <td className="px-4 py-2 text-right">
-                <div className="flex flex-col items-end gap-0.5">
-                  <span className="mono text-xs text-gray-400">{fmtBreakEven(wBreakEven)}</span>
-                  {wDistPct !== null && (
-                    <span className={`text-[9px] font-semibold mono px-1 rounded-full ${
-                      wDistPct >= 0 ? 'text-accent-green/80 bg-accent-green/8' : 'text-accent-red/80 bg-accent-red/8'
-                    }`}>
-                      {wDistPct >= 0 ? '▲' : '▼'} {Math.abs(wDistPct).toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-              </td>
-            )}
             <td className="px-4 py-2 text-right mono text-xs">
               {hasPrice ? <span className="text-gray-300">{formatEur(wValue)}</span> : <span className="text-gray-600">—</span>}
             </td>
@@ -410,7 +394,7 @@ function FiatRowComponent({ row, totalPortfolioValue, compact = false }: { row: 
 
 const DUST_THRESHOLD = 1
 
-type SortKey = 'asset' | 'quantity' | 'price' | 'breakeven' | 'value' | 'cost' | 'pnl' | 'pnlpct' | 'weight'
+type SortKey = 'asset' | 'quantity' | 'price' | 'value' | 'cost' | 'pnl' | 'pnlpct' | 'weight'
 type SortDir = 'asc' | 'desc'
 
 function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices: Record<string, number>, total: number): UnifiedRow[] {
@@ -426,9 +410,6 @@ function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices: Record
     } else if (key === 'price') {
       va = a.kind === 'crypto' ? (prices[a.asset] ?? 0) : 1
       vb = b.kind === 'crypto' ? (prices[b.asset] ?? 0) : 1
-    } else if (key === 'breakeven') {
-      va = a.kind === 'crypto' && a.totalQuantity > 0 ? a.totalCostBasis / a.totalQuantity : 0
-      vb = b.kind === 'crypto' && b.totalQuantity > 0 ? b.totalCostBasis / b.totalQuantity : 0
     } else if (key === 'value') {
       va = a.value; vb = b.value
     } else if (key === 'cost') {
@@ -454,6 +435,12 @@ function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices: Record
 
 export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTableProps) {
   const prices   = usePricesStore(s => s.prices)
+  const { data: ydayData } = useQuery({
+    queryKey: ['yesterday-prices'],
+    queryFn: portfolioApi.getYesterdayPrices,
+    staleTime: 10 * 60_000,
+  })
+  const yesterdayPrices = ydayData?.prices ?? {}
   const [dustOpen,  setDustOpen]  = useState(false)
   const [compact,   setCompact]   = useState(false)
   const [sortKey,   setSortKey]   = useState<SortKey>('value')
@@ -481,6 +468,7 @@ export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTablePr
 
   const totalValue = allRows.reduce((s, r) => s + r.value, 0)
   const dustValue  = dustRows.reduce((s, r) => s + r.value, 0)
+  const onlyDust   = mainRows.length === 0 && dustRows.length > 0
 
   const sortedMain = useMemo(
     () => sortRows(mainRows, sortKey, sortDir, prices, totalValue),
@@ -516,7 +504,6 @@ export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTablePr
         <SortTh label="Activo"     sk="asset"    right={false} />
         <SortTh label="Cantidad"   sk="quantity"  />
         <SortTh label="Precio"     sk="price"     />
-        {!compact && <SortTh label="Break-even" sk="breakeven" title="Precio de equilibrio" />}
         <SortTh label="Valor EUR"  sk="value"     />
         {!compact && <SortTh label="Coste base" sk="cost" />}
         {!compact && <SortTh label="P&L"        sk="pnl"  />}
@@ -529,7 +516,7 @@ export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTablePr
   const renderRow = (row: UnifiedRow) =>
     row.kind === 'fiat'
       ? <FiatRowComponent key={`fiat-${row.asset}`} row={row} totalPortfolioValue={totalValue} compact={compact} />
-      : <CryptoRowComponent key={row.asset} row={row} prices={prices} totalPortfolioValue={totalValue} compact={compact} onSimulate={onSimulate} />
+      : <CryptoRowComponent key={row.asset} row={row} prices={prices} yesterdayPrices={yesterdayPrices} totalPortfolioValue={totalValue} compact={compact} onSimulate={onSimulate} />
 
   // Activos sin precio configurado
   const noPriceAssets = mainRows
@@ -601,23 +588,34 @@ export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTablePr
       </div>
 
       {dustRows.length > 0 && (
-        <div className="card overflow-hidden p-0">
+        <div className={`card overflow-hidden p-0 ${onlyDust ? 'border-amber-500/20 bg-amber-500/[0.02]' : ''}`}>
           <button
             onClick={() => setDustOpen(!dustOpen)}
             className="w-full px-5 py-3 flex items-center justify-between hover:bg-background-tertiary/50 transition-colors"
           >
             <div className="flex items-center gap-2">
-              {dustOpen
-                ? <ChevronDown size={14} className="text-gray-500" />
+              {(dustOpen || onlyDust)
+                ? <ChevronDown size={14} className={onlyDust ? 'text-amber-500/70' : 'text-gray-500'} />
                 : <ChevronRight size={14} className="text-gray-500" />}
-              <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Polvo</span>
-              <span className="text-xs bg-background-tertiary text-gray-500 px-2 py-0.5 rounded-full">
-                {dustRows.length} activos
+              <span className={`text-xs font-semibold uppercase tracking-wider ${onlyDust ? 'text-amber-500/80' : 'text-gray-500'}`}>
+                Polvo
               </span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                onlyDust
+                  ? 'bg-amber-500/15 text-amber-500/80 border border-amber-500/20'
+                  : 'bg-background-tertiary text-gray-500'
+              }`}>
+                {dustRows.length} activos &lt; €1
+              </span>
+              {onlyDust && (
+                <span className="text-[10px] text-amber-500/60 italic">esta wallet solo tiene polvo</span>
+              )}
             </div>
-            <span className="text-xs text-gray-600 mono">{formatEur(dustValue)}</span>
+            <span className={`text-xs mono font-medium ${onlyDust ? 'text-amber-500/70' : 'text-gray-600'}`}>
+              {formatEur(dustValue)}
+            </span>
           </button>
-          {dustOpen && (
+          {(dustOpen || onlyDust) && (
             <div className="overflow-x-auto border-t border-border">
               <table className="w-full text-sm">
                 {tableHeader}

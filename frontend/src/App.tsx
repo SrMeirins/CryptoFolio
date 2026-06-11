@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Sidebar } from './components/Sidebar'
 import { Dashboard } from './pages/Dashboard'
@@ -203,6 +203,23 @@ function TopBar() {
   )
 }
 
+// ── RoutedContent ──────────────────────────────────────────────────────────
+function RoutedContent() {
+  const { pathname } = useLocation()
+  return (
+    <div key={pathname} className="animate-page-in min-h-full">
+      <Routes>
+        <Route path="/"         element={<Dashboard />} />
+        <Route path="/portfolio" element={<Portfolio />} />
+        <Route path="/fiscal"   element={<Fiscal />} />
+        <Route path="/import"   element={<ImportPage />} />
+        <Route path="/history"  element={<History />} />
+        <Route path="/settings" element={<Settings />} />
+      </Routes>
+    </div>
+  )
+}
+
 // ── App ────────────────────────────────────────────────────────────────────
 export default function App() {
   useLivePrices()
@@ -215,14 +232,7 @@ export default function App() {
         <div className="flex-1 flex flex-col overflow-hidden bg-background-primary">
           <TopBar />
           <main className="flex-1 overflow-y-auto">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/portfolio" element={<Portfolio />} />
-              <Route path="/fiscal" element={<Fiscal />} />
-              <Route path="/import" element={<ImportPage />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
+            <RoutedContent />
           </main>
         </div>
       </div>
