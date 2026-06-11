@@ -204,20 +204,20 @@ function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatBalances
 
 // ── WalletSections ── una sección por cada wallet real ─────────────────────
 function WalletSections({ lots, fiatBalances, onSimulate }: { lots: FifoLot[]; fiatBalances: FiatBalance[]; onSimulate: (asset: string, qty: number, price: number) => void }) {
-  // Coleccionar wallets únicas en orden: exchanges primero, luego frías
+  // Coleccionar wallets únicas en orden: frías primero, exchanges al final
   const walletOrder: string[] = []
   const seen = new Set<string>()
 
-  // 1. Exchanges: en orden de aparición en los lotes
+  // 1. Wallets frías
   for (const lot of lots) {
-    if (lot.wallet_kind === 'exchange' && !seen.has(lot.wallet_id)) {
+    if (lot.wallet_kind !== 'exchange' && !seen.has(lot.wallet_id)) {
       walletOrder.push(lot.wallet_id)
       seen.add(lot.wallet_id)
     }
   }
-  // 2. Wallets frías
+  // 2. Exchanges
   for (const lot of lots) {
-    if (lot.wallet_kind !== 'exchange' && !seen.has(lot.wallet_id)) {
+    if (lot.wallet_kind === 'exchange' && !seen.has(lot.wallet_id)) {
       walletOrder.push(lot.wallet_id)
       seen.add(lot.wallet_id)
     }
