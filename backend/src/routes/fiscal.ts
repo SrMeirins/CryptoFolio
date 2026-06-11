@@ -12,11 +12,13 @@ async function getUmbral721(): Promise<number> {
   return res.rows.length > 0 ? (parseInt(res.rows[0].value) || 50000) : 50000;
 }
 
-// activoRecibido = activo que se recibió a cambio (null para fees/pérdidas sin contrapartida)
+const FIAT_ASSETS = new Set(['EUR', 'USD', 'GBP', 'CHF', 'BRL', 'ARS', 'USDT', 'USDC', 'BUSD', 'DAI']);
+
+// Claves oficiales AEAT: D=Dinero, V=Valores/cripto, I=Inmueble, O=Otros/sin contrapartida
 function getContrapartidaClave(activoRecibido: string | null): { clave: string; descripcion: string } {
-  if (!activoRecibido) return { clave: 'F', descripcion: 'Sin contrapartida directa (comisión/pérdida)' };
-  if (activoRecibido === 'EUR') return { clave: 'F', descripcion: 'Moneda de curso legal (EUR)' };
-  return { clave: 'N', descripcion: `Otra moneda virtual (${activoRecibido})` };
+  if (!activoRecibido)                      return { clave: 'O', descripcion: 'Sin contrapartida directa (comision/perdida)' };
+  if (FIAT_ASSETS.has(activoRecibido))      return { clave: 'D', descripcion: `Moneda de curso legal (${activoRecibido})` };
+  return { clave: 'V', descripcion: `Otra moneda virtual (${activoRecibido})` };
 }
 
 function getTipoRendimiento(operationType: string): string {
@@ -581,27 +583,42 @@ router.get('/:year/export', async (req: Request, res: Response) => {
     res.send('﻿' + lines.join('\n'));
 
   // ── RENTA WEB ─────────────────────────────────────────────────────────────
+  // Formato compatible con la importación de la herramienta Renta Web (AEAT).
+  // Claves AEAT: D=Dinero, V=Valores/cripto, O=Otros/sin contrapartida.
+  // - valorTransmision = BRUTO (proceeds_neto + gastosTx) para que AEAT reste gastosTx correctamente.
+  // - gastosAdquisicion = 0 porque el cost_basis ya incluye las comisiones de compra.
+  // - Decimal: coma (,). Fecha: DD/MM/YYYY.
   } else if (format === 'rentaweb') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="fiscal_${year}_rentaweb.csv"`);
 
+    const eur = (n: number) => n.toFixed(2).replace('.', ',');
+    const fmtDate = (iso: string) => {
+      const [y, m, d] = iso.split('-');
+      return `${d}/${m}/${y}`;
+    };
+
     const lines: string[] = [];
-    lines.push('Fecha;Denominacion moneda virtual transmitida;Clave tipo contraprestacion;Valor transmision EUR;Gastos transmision EUR;Valor adquisicion EUR;Gastos adquisicion EUR;Ganancia/Perdida EUR');
+    lines.push('Fecha;Denominacion moneda virtual transmitida;Clave contraprestacion;Descripcion contraprestacion;Valor transmision EUR;Gastos transmision EUR;Valor adquisicion EUR;Gastos adquisicion EUR;Ganancia/Perdida EUR');
 
     for (const e of fiscalEvents) {
+      // Valor transmisión bruto = neto + gastos tx (para que AEAT reste gastosTx sin doble conteo)
+      const valorTxBruto = e.valorTransmisionEur + e.gastosTransmisionEur;
+      // Gastos adquisición = 0 porque cost_basis ya incluye las comisiones de compra
       lines.push([
-        e.fecha,
+        fmtDate(e.fecha),
         e.activoTransmitido,
         e.contrapartidaClave,
-        e.valorTransmisionEur.toFixed(2),
-        e.gastosTransmisionEur.toFixed(2),
-        e.valorAdquisicionEur.toFixed(2),
-        e.gastosAdquisicionEur.toFixed(2),
-        e.gananciaPerdidaEur.toFixed(2),
+        e.contrapartidaDescripcion,
+        eur(valorTxBruto),
+        eur(e.gastosTransmisionEur),
+        eur(e.valorAdquisicionEur),
+        '0,00',
+        eur(e.gananciaPerdidaEur),
       ].join(';'));
     }
 
-    res.send('﻿' + lines.join('\n'));
+    res.send('﻿' + lines.join('\r\n'));
 
   // ── EXCEL ─────────────────────────────────────────────────────────────────
   } else if (format === 'excel') {
