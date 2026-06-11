@@ -10,7 +10,8 @@ import { History } from './pages/History'
 import { Settings } from './pages/Settings'
 import { useLivePrices } from './hooks/useLivePrices'
 import { portfolioApi } from './api/portfolio'
-import { Bell, X, AlertTriangle, AlertCircle, Info } from 'lucide-react'
+import { Bell, X, AlertTriangle, AlertCircle, Info, RefreshCw } from 'lucide-react'
+import { usePricesStore } from './store/pricesStore'
 import { ToastProvider } from './components/Toast'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
@@ -33,6 +34,69 @@ const NOTIFICATION_ROUTES: Record<string, string> = {
   'lots-no-price':        '/settings?tab=assets',
   'pending-withdrawals':  '/history',
   'crypto-deposits':      '/import',
+}
+
+// ── PriceRefreshButton ─────────────────────────────────────────────────────
+function PriceRefreshButton() {
+  const { connected, lastUpdate, setPrices } = usePricesStore(s => ({
+    connected:  s.connected,
+    lastUpdate: s.lastUpdate,
+    setPrices:  s.setPrices,
+  }))
+  const [refreshing, setRefreshing] = useState(false)
+  const [done,       setDone]       = useState(false)
+
+  async function refresh() {
+    if (refreshing) return
+    setRefreshing(true)
+    setDone(false)
+    try {
+      const data: Record<string, number> = await fetch('/api/prices/live').then(r => r.json())
+      if (Object.keys(data).length > 0) setPrices(data)
+      setDone(true)
+      setTimeout(() => setDone(false), 1500)
+    } catch { /* silencioso */ } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const timeAgo = lastUpdate
+    ? (() => {
+        const secs = Math.floor((Date.now() - lastUpdate.getTime()) / 1000)
+        if (secs < 60)  return `${secs}s`
+        if (secs < 3600) return `${Math.floor(secs / 60)}m`
+        return `${Math.floor(secs / 3600)}h`
+      })()
+    : null
+
+  const title = connected
+    ? `Precios en vivo · actualizado hace ${timeAgo ?? '…'}`
+    : 'Sin conexión · haz clic para refrescar'
+
+  return (
+    <button
+      onClick={refresh}
+      title={title}
+      className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-xs ${
+        refreshing
+          ? 'text-accent-blue bg-accent-blue/10'
+          : done
+          ? 'text-accent-green bg-accent-green/10'
+          : 'text-gray-500 hover:text-white hover:bg-background-tertiary'
+      }`}
+    >
+      <RefreshCw
+        size={14}
+        className={refreshing ? 'animate-spin' : 'transition-transform hover:rotate-180 duration-300'}
+      />
+      {/* Indicador de estado WS */}
+      <span
+        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+          connected ? 'bg-accent-green animate-pulse' : 'bg-gray-600'
+        }`}
+      />
+    </button>
+  )
 }
 
 // ── NotificationsButton ────────────────────────────────────────────────────
@@ -132,7 +196,8 @@ function NotificationsButton() {
 // ── TopBar ─────────────────────────────────────────────────────────────────
 function TopBar() {
   return (
-    <div className="shrink-0 h-12 flex items-center justify-end px-4 border-b border-border bg-background-secondary">
+    <div className="shrink-0 h-12 flex items-center justify-end gap-1 px-4 border-b border-border bg-background-secondary">
+      <PriceRefreshButton />
       <NotificationsButton />
     </div>
   )
