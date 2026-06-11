@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { ManualTxModal } from '../components/ManualTxModal'
+import { DateRangePicker } from '../components/DateRangePicker'
 import { formatEur } from '../utils/format'
 import { OP_META } from '../constants/operations'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -773,43 +774,12 @@ export function History() {
             {KNOWN_ACCOUNTS.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
 
-          {/* Rango fechas + atajos */}
-          <div className="flex items-center gap-1">
-            <Calendar size={11} className="text-gray-600" />
-            <input type="date" value={filters.date_from}
-              onChange={e => setFilter('date_from', e.target.value)}
-              className="bg-background-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-gray-400 focus:outline-none focus:border-accent-blue" />
-            <span className="text-gray-700 text-[10px]">—</span>
-            <input type="date" value={filters.date_to}
-              onChange={e => setFilter('date_to', e.target.value)}
-              className="bg-background-tertiary border border-border rounded-lg px-2 py-1.5 text-xs text-gray-400 focus:outline-none focus:border-accent-blue" />
-          </div>
-
-          {/* Atajos de fecha */}
-          <div className="flex items-center gap-1">
-            {[
-              { label: 'Hoy',       mode: 'today' as const },
-              { label: 'Mes',       mode: 'month' as const },
-              { label: 'Año',       mode: 'year'  as const },
-            ].map(({ label, mode }) => {
-              const sc = dateShortcut(mode)
-              const active = filters.date_from === sc.date_from && filters.date_to === sc.date_to
-              return (
-                <button key={mode}
-                  onClick={() => setFilters(prev => ({
-                    ...prev, date_from: sc.date_from, date_to: sc.date_to, offset: 0,
-                  }))}
-                  className={`px-2 py-1 rounded-md text-[10px] font-medium border transition-colors ${
-                    active
-                      ? 'bg-accent-blue/15 border-accent-blue/40 text-accent-blue'
-                      : 'bg-background-tertiary border-border text-gray-500 hover:border-gray-500 hover:text-gray-300'
-                  }`}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
+          {/* Rango de fechas */}
+          <DateRangePicker
+            from={filters.date_from}
+            to={filters.date_to}
+            onChange={(f, t) => setFilters(prev => ({ ...prev, date_from: f, date_to: t, offset: 0 }))}
+          />
 
           {/* Solo manuales */}
           <button onClick={() => setFilter('manualOnly', !filters.manualOnly)}
