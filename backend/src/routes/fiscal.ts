@@ -818,4 +818,136 @@ router.get('/:year/export', async (req: Request, res: Response) => {
   }
 });
 
+// ── POST /api/fiscal/simulate-sale ────────────────────────────────────────
+// Simulación pura FIFO: no escribe nada en DB. Devuelve impacto fiscal de una
+// venta hipotética. Usa los lotes abiertos ordenados FIFO (oldest first).
+router.post('/simulate-sale', async (req: Request, res: Response) => {
+  const { asset, quantity, priceEur } = req.body as {
+    asset?: string;
+    quantity?: number;
+    priceEur?: number;
+  };
+
+  if (!asset || typeof quantity !== 'number' || quantity <= 0 || typeof priceEur !== 'number' || priceEur < 0) {
+    res.status(400).json({ error: 'Se requieren: asset (string), quantity (number > 0), priceEur (number >= 0)' });
+    return;
+  }
+
+  const lotsRes = await db.query(
+    `SELECT
+       fl.id,
+       fl.asset,
+       fl.quantity_remaining::float AS quantity_remaining,
+       fl.cost_basis_eur::float     AS cost_basis_eur,
+       fl.price_per_unit_eur::float AS price_per_unit_eur,
+       fl.opened_at,
+       w.name AS wallet_name
+     FROM fifo_lots fl
+     JOIN wallets w ON w.id = fl.wallet_id
+     WHERE fl.asset = $1
+       AND fl.is_closed = FALSE
+       AND fl.quantity_remaining > 0.0000001
+     ORDER BY fl.opened_at ASC, fl.id ASC`,
+    [asset.toUpperCase()]
+  );
+
+  if (lotsRes.rows.length === 0) {
+    res.status(404).json({ error: `No hay lotes abiertos para ${asset}` });
+    return;
+  }
+
+  const totalAvailable = lotsRes.rows.reduce((s: number, r: Record<string, number>) => s + r.quantity_remaining, 0);
+  if (quantity > totalAvailable + 0.0001) {
+    res.status(400).json({ error: `Solo hay ${totalAvailable.toFixed(6)} ${asset} disponibles` });
+    return;
+  }
+
+  // Simular consumo FIFO
+  let remaining = quantity;
+  let totalProceeds  = 0;
+  let totalCostBasis = 0;
+  let totalGain = 0;
+  let totalLoss = 0;
+
+  const lotsConsumed: {
+    lotId:        string;
+    walletName:   string;
+    openedAt:     string;
+    qtyAvailable: number;
+    qtyConsumed:  number;
+    costBasisConsumed: number;
+    pricePerUnit: number;
+    proceedsEur:  number;
+    gainLossEur:  number;
+  }[] = [];
+
+  for (const row of lotsRes.rows as Record<string, unknown>[]) {
+    if (remaining <= 0.0000001) break;
+
+    const lotQty   = row.quantity_remaining as number;
+    const costBasis = row.cost_basis_eur as number;
+    const consumed  = Math.min(lotQty, remaining);
+    const proportion = consumed / lotQty;
+    const costConsumed = costBasis * proportion;
+    const proceeds    = consumed * priceEur;
+    const gainLoss    = proceeds - costConsumed;
+
+    totalProceeds  += proceeds;
+    totalCostBasis += costConsumed;
+    if (gainLoss >= 0) totalGain += gainLoss;
+    else               totalLoss += gainLoss;
+
+    lotsConsumed.push({
+      lotId:             row.id as string,
+      walletName:        row.wallet_name as string,
+      openedAt:          new Date(row.opened_at as string).toISOString().slice(0, 10),
+      qtyAvailable:      lotQty,
+      qtyConsumed:       consumed,
+      costBasisConsumed: costConsumed,
+      pricePerUnit:      row.price_per_unit_eur as number,
+      proceedsEur:       proceeds,
+      gainLossEur:       gainLoss,
+    });
+
+    remaining -= consumed;
+  }
+
+  const netGainLoss = totalGain + totalLoss;
+
+  // Estimación IRPF (solo sobre ganancias netas; no considera otras rentas del año)
+  const TRAMOS = [
+    { hasta: 6_000,    tipo: 0.19 },
+    { hasta: 50_000,   tipo: 0.21 },
+    { hasta: 200_000,  tipo: 0.23 },
+    { hasta: 300_000,  tipo: 0.27 },
+    { hasta: Infinity, tipo: 0.28 },
+  ];
+
+  let irpfEstimate = 0;
+  if (netGainLoss > 0) {
+    let base = netGainLoss;
+    let anterior = 0;
+    for (const t of TRAMOS) {
+      if (base <= 0) break;
+      const tramo = Math.min(base, t.hasta - anterior);
+      irpfEstimate += tramo * t.tipo;
+      base    -= tramo;
+      anterior = t.hasta;
+    }
+  }
+
+  res.json({
+    asset:         asset.toUpperCase(),
+    quantity,
+    priceEur,
+    totalProceeds,
+    totalCostBasis,
+    totalGain,
+    totalLoss,
+    netGainLoss,
+    irpfEstimate,
+    lotsConsumed,
+  });
+});
+
 export default router;

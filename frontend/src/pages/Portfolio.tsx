@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { portfolioApi, FiatBalance, FifoLot } from '../api/portfolio'
 import { AssetTable } from '../components/AssetTable'
+import { SaleSimulatorModal } from '../components/SaleSimulatorModal'
 import { usePricesStore } from '../store/pricesStore'
 import { formatEur } from '../utils/format'
 import { InfoTooltip } from '../components/InfoTooltip'
@@ -202,7 +203,7 @@ function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatBalances
 }
 
 // ── WalletSections ── una sección por cada wallet real ─────────────────────
-function WalletSections({ lots, fiatBalances }: { lots: FifoLot[]; fiatBalances: FiatBalance[] }) {
+function WalletSections({ lots, fiatBalances, onSimulate }: { lots: FifoLot[]; fiatBalances: FiatBalance[]; onSimulate: (asset: string, qty: number, price: number) => void }) {
   // Coleccionar wallets únicas en orden: exchanges primero, luego frías
   const walletOrder: string[] = []
   const seen = new Set<string>()
@@ -269,7 +270,7 @@ function WalletSections({ lots, fiatBalances }: { lots: FifoLot[]; fiatBalances:
               </span>
             )}
           </div>
-          <AssetTable lots={g.lots} fiatBalances={g.fiats} />
+          <AssetTable lots={g.lots} fiatBalances={g.fiats} onSimulate={onSimulate} />
         </div>
       ))}
     </div>
@@ -294,6 +295,7 @@ export function Portfolio() {
 
   const [search, setSearch] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
+  const [simulator, setSimulator] = useState<{ asset: string; qty: number; price: number } | null>(null)
 
   // Filtrar lots y fiatBalances por búsqueda
   const q = search.trim().toUpperCase()
@@ -306,6 +308,7 @@ export function Portfolio() {
   const hasPrices = Object.keys(prices).length > 0
 
   return (
+    <>
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
 
       {/* Cabecera */}
@@ -473,10 +476,20 @@ export function Portfolio() {
               </button>
             </div>
           ) : (
-            <WalletSections lots={filteredLots} fiatBalances={filteredFiats} />
+            <WalletSections lots={filteredLots} fiatBalances={filteredFiats} onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} />
           )}
         </>
       )}
     </div>
+
+    {simulator && (
+      <SaleSimulatorModal
+        asset={simulator.asset}
+        totalQty={simulator.qty}
+        currentPrice={simulator.price}
+        onClose={() => setSimulator(null)}
+      />
+    )}
+    </>
   )
 }

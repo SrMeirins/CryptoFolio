@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
-import { ChevronDown, ChevronRight, Settings, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { ChevronDown, ChevronRight, Settings, ArrowUpDown, ArrowUp, ArrowDown, Calculator } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { FifoLot, FiatBalance } from '../api/portfolio'
 import { usePricesStore } from '../store/pricesStore'
@@ -41,6 +41,7 @@ function CryptoIcon({ symbol, size = 28 }: { symbol: string; size?: number }) {
 interface AssetTableProps {
   lots: FifoLot[]
   fiatBalances?: FiatBalance[]
+  onSimulate?: (asset: string, qty: number, price: number) => void
 }
 
 // ── Wallet breakdown dentro de un activo ──────────────────────────────────
@@ -153,11 +154,12 @@ function walletShortName(name: string, kind: string): string {
   return name
 }
 
-function CryptoRowComponent({ row, prices, totalPortfolioValue, compact = false }: {
+function CryptoRowComponent({ row, prices, totalPortfolioValue, compact = false, onSimulate }: {
   row: CryptoRow
   prices: Record<string, number>
   totalPortfolioValue: number
   compact?: boolean
+  onSimulate?: (asset: string, qty: number, price: number) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const price      = prices[row.asset] ?? 0
@@ -206,6 +208,15 @@ function CryptoRowComponent({ row, prices, totalPortfolioValue, compact = false 
                   </span>
                 ))}
               </div>
+            )}
+            {onSimulate && (
+              <button
+                onClick={e => { e.stopPropagation(); onSimulate(row.asset, row.totalQuantity, prices[row.asset] ?? 0) }}
+                className="ml-auto p-1 text-gray-600 hover:text-accent-blue hover:bg-accent-blue/10 rounded-md transition-colors shrink-0"
+                title="Simular venta"
+              >
+                <Calculator size={13} />
+              </button>
             )}
           </div>
         </td>
@@ -441,7 +452,7 @@ function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices: Record
   })
 }
 
-export function AssetTable({ lots, fiatBalances = [] }: AssetTableProps) {
+export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTableProps) {
   const prices   = usePricesStore(s => s.prices)
   const [dustOpen,  setDustOpen]  = useState(false)
   const [compact,   setCompact]   = useState(false)
@@ -518,7 +529,7 @@ export function AssetTable({ lots, fiatBalances = [] }: AssetTableProps) {
   const renderRow = (row: UnifiedRow) =>
     row.kind === 'fiat'
       ? <FiatRowComponent key={`fiat-${row.asset}`} row={row} totalPortfolioValue={totalValue} compact={compact} />
-      : <CryptoRowComponent key={row.asset} row={row} prices={prices} totalPortfolioValue={totalValue} compact={compact} />
+      : <CryptoRowComponent key={row.asset} row={row} prices={prices} totalPortfolioValue={totalValue} compact={compact} onSimulate={onSimulate} />
 
   // Activos sin precio configurado
   const noPriceAssets = mainRows
