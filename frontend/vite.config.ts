@@ -7,13 +7,19 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
-      '/api': {
-        target: 'http://backend:3001',
-        changeOrigin: true,
-      },
-      '/ws': {
-        target: 'ws://backend:3001',
-        ws: true,
+      '/api': { target: 'http://backend:3001', changeOrigin: true },
+      '/ws':  { target: 'ws://backend:3001',  ws: true },
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react':  ['react', 'react-dom', 'react-router-dom'],
+          'vendor-query':  ['@tanstack/react-query'],
+          'vendor-charts': ['recharts'],
+          'vendor-ui':     ['lucide-react', 'date-fns'],
+        },
       },
     },
   },

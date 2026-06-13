@@ -77,28 +77,77 @@ docker compose up -d --build
 
 ---
 
-## Configuración en un VPS (producción)
+## Despliegue en VPS (producción)
 
-Si quieres acceder desde fuera de localhost, necesitas un servidor con Docker y un proxy inverso (Nginx o Caddy).
+Para un servidor accesible desde Internet usa `docker-compose.prod.yml`, que:
+- Compila el frontend como estáticos servidos por **nginx** (sin Vite dev server)
+- No expone PostgreSQL ni el backend fuera de la red Docker interna
+- Escucha en el puerto 80
 
-### Variables adicionales para producción
-
-En tu `.env`:
+### 1. Prepara el `.env` para producción
 
 ```env
+POSTGRES_USER=cryptotracker
+POSTGRES_PASSWORD=cambia_esto_por_una_clave_segura
+POSTGRES_DB=cryptotracker
+DATABASE_URL=postgresql://cryptotracker:cambia_esto_por_una_clave_segura@postgres:5432/cryptotracker
+
+JWT_SECRET=genera_con_openssl_rand_hex_32
+
 NODE_ENV=production
-CORS_ORIGIN=https://tudominio.com
-VITE_API_URL=https://tudominio.com/api
-VITE_WS_URL=wss://tudominio.com
+COINGECKO_BASE_URL=https://api.coingecko.com/api/v3
+PRICE_REFRESH_INTERVAL_MS=60000
 ```
 
-### Ejemplo con Caddy (recomendado, HTTPS automático)
+Genera el JWT_SECRET con:
+```bash
+openssl rand -hex 32
+```
+
+### 2. Arranca en modo producción
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+La app quedará disponible en el puerto 80 del servidor.
+
+### 3. HTTPS con Caddy (recomendado)
+
+Caddy gestiona el certificado SSL automáticamente. Instálalo en el host y crea un `Caddyfile`:
 
 ```caddyfile
 tudominio.com {
-    reverse_proxy /api/* localhost:3001
-    reverse_proxy /* localhost:5173
+    reverse_proxy localhost:80
 }
+```
+
+```bash
+caddy start
+```
+
+### 3b. HTTPS con Nginx en el host
+
+Si prefieres Nginx, crea `/etc/nginx/sites-available/cryptofolio`:
+
+```nginx
+server {
+    server_name tudominio.com;
+
+    location / {
+        proxy_pass http://localhost:80;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
+}
+```
+
+Activa el sitio y obtén certificado con Certbot:
+```bash
+sudo ln -s /etc/nginx/sites-available/cryptofolio /etc/nginx/sites-enabled/
+sudo certbot --nginx -d tudominio.com
 ```
 
 ---
