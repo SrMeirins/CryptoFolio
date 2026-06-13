@@ -2,7 +2,7 @@
 
 **Portfolio de criptomonedas con módulo fiscal para España.**
 
-Seguimiento en tiempo real de tus wallets y exchanges, cálculo de ganancias y pérdidas patrimoniales por el método FIFO, estimación IRPF y exportación de informes fiscales — todo self-hosted, tus datos en tu servidor.
+Seguimiento en tiempo real de tus wallets y exchanges, cálculo de ganancias y pérdidas patrimoniales por el método FIFO, estimación IRPF y exportación de informes fiscales — todo self-hosted, tus datos en tu máquina.
 
 ---
 
@@ -15,11 +15,11 @@ Seguimiento en tiempo real de tus wallets y exchanges, cálculo de ganancias y p
 - **Informe PDF profesional** — apto para llevar al gestor o consultar con Hacienda
 - **Importación CSV** — compatible con exports de los principales exchanges
 - **Historial de operaciones** — filtros, búsqueda, exportación Excel
-- **Self-hosted** — tus datos no salen de tu servidor
+- **Self-hosted** — tus datos no salen de tu máquina
 
 ---
 
-## Instalación rápida
+## Instalación
 
 ### Requisitos
 
@@ -38,12 +38,12 @@ cd CryptoFolio
 cp .env.example .env
 ```
 
-Edita `.env` y cambia como mínimo:
+Edita `.env` y cambia al menos la contraseña y el JWT secret:
 
 ```env
 POSTGRES_PASSWORD=una_contraseña_segura
 DATABASE_URL=postgresql://cryptotracker:una_contraseña_segura@postgres:5432/cryptotracker
-JWT_SECRET=una_clave_aleatoria_de_minimo_32_caracteres
+JWT_SECRET=genera_con_openssl_rand_hex_32
 ```
 
 Genera el JWT_SECRET con:
@@ -52,7 +52,7 @@ Genera el JWT_SECRET con:
 openssl rand -hex 32
 ```
 
-### 3. Arranca la aplicación
+### 3. Arranca
 
 ```bash
 docker compose up -d
@@ -68,7 +68,7 @@ http://localhost:5173
 
 ---
 
-## Actualizar a una nueva versión
+## Actualizar
 
 ```bash
 git pull
@@ -77,64 +77,20 @@ docker compose up -d --build
 
 ---
 
-## Despliegue en VPS (producción)
-
-`docker-compose.prod.yml` incluye todo lo necesario para producción:
-
-- **Caddy** — HTTPS automático con Let's Encrypt, HTTP→HTTPS redirect
-- **nginx** — sirve el frontend compilado, proxea `/api` y `/ws` al backend
-- **Redes aisladas** — PostgreSQL y backend solo accesibles internamente
-- **Usuarios no-root** en todos los contenedores
-- **Límites de CPU y memoria** por servicio
-
-### 1. Requisitos previos en el VPS
-
-- Docker y Docker Compose instalados
-- Puertos **80** y **443** abiertos en el firewall
-- Un dominio con un registro **A** apuntando a la IP del VPS
-
-### 2. Configura el `.env`
-
-```bash
-cp .env.example .env
-```
-
-Edita `.env` con tus valores reales:
-
-```env
-POSTGRES_PASSWORD=una_clave_muy_segura
-DATABASE_URL=postgresql://cryptotracker:una_clave_muy_segura@postgres:5432/cryptotracker
-JWT_SECRET=genera_con_openssl_rand_hex_32
-DOMAIN=tudominio.com
-```
-
-### 3. Arranca
-
-```bash
-docker compose -f docker-compose.prod.yml up -d --build
-```
-
-Caddy obtiene el certificado SSL automáticamente en el primer arranque (~30 segundos).
-La app estará disponible en `https://tudominio.com`.
-
----
-
 ## Estructura del proyecto
 
 ```text
 CryptoFolio/
-├── backend/          # API Node.js + TypeScript
+├── backend/        # API Node.js + TypeScript
 │   └── src/
-│       ├── routes/   # Endpoints REST
-│       ├── modules/  # Lógica de negocio (FIFO, precios, operaciones)
-│       └── db/       # Schema SQL y cliente PostgreSQL
-├── frontend/         # React + TypeScript + Vite + Tailwind
+│       ├── routes/ # Endpoints REST
+│       ├── modules/# Lógica de negocio (FIFO, precios, operaciones)
+│       └── db/     # Schema SQL y cliente PostgreSQL
+├── frontend/       # React + TypeScript + Vite + Tailwind
 │   └── src/
-│       ├── pages/    # Dashboard, Portfolio, Fiscal, Historial, Settings
+│       ├── pages/  # Dashboard, Portfolio, Fiscal, Historial, Settings
 │       └── components/
-├── Caddyfile                 # Configuración HTTPS producción
-├── docker-compose.yml        # Desarrollo local
-└── docker-compose.prod.yml   # Producción
+└── docker-compose.yml
 ```
 
 ---
