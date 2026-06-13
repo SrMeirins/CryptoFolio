@@ -1,21 +1,19 @@
 FROM node:20-alpine
 
-WORKDIR /app
-
-# Instalar dependencias del sistema necesarias
 RUN apk add --no-cache wget
 
-# Copiar package files primero (aprovecha cache de Docker)
+WORKDIR /app
+
 COPY package*.json ./
+RUN npm ci --omit=dev --prefer-offline
 
-# Instalar dependencias
-RUN npm install
-
-# Copiar código fuente
 COPY . .
+RUN npm run build && \
+    # eliminar devDependencies del node_modules tras el build
+    npm prune --omit=dev && \
+    chown -R node:node /app
 
-# Compilar TypeScript
-RUN npm run build
+USER node
 
 EXPOSE 3001
 

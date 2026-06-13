@@ -39,7 +39,12 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  const allowed = process.env.CORS_ORIGIN?.split(',').map(s => s.trim())
+    ?? (process.env.NODE_ENV === 'development' ? ['http://localhost:5173', 'http://127.0.0.1:5173'] : []);
+  if (origin && allowed.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
 
   function send(phase: string, message: string, progress?: number, total?: number) {
     const data = JSON.stringify({ phase, message, progress, total });
