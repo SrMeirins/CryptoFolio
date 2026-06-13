@@ -35,6 +35,25 @@ Diseñada para inversores que quieren **control total** sobre sus datos: se inst
 
 ---
 
+## ⚠️ Compatibilidad actual
+
+Es importante que sepas qué soporta la app **a día de hoy** antes de instalarla:
+
+| Funcionalidad | Soportado |
+| --- | --- |
+| **Exchange para importar** | ✅ Binance (CSV en español e inglés) |
+| **Wallets frías** | ✅ Configuración manual (Ledger, Tangem, Trezor...) — sin conexión directa al hardware |
+| **Método de cálculo fiscal** | ✅ FIFO |
+| **País** | ✅ España (IRPF) |
+| **Otros exchanges** | ❌ No soportados de momento |
+| **Sincronización on-chain** | ❌ No disponible |
+| **Otros países / métodos** | ❌ No disponible |
+
+> Si usas Binance y tributas en España, esta app es para ti.  
+> Para otros exchanges o países, la app no es útil aún.
+
+---
+
 ## Índice
 
 - [Características](#-características)
@@ -53,12 +72,12 @@ Diseñada para inversores que quieren **control total** sobre sus datos: se inst
 
 ### 📊 Portfolio
 - Precios en **tiempo real** vía Binance WebSocket — sin delay, sin refresco manual
-- Soporte para **wallets frías** (Ledger, Tangem, Trezor...) y **exchanges** (Binance, Kraken...)
+- **Wallets frías** configuradas manualmente (Ledger, Tangem, Trezor...) y cuenta de **Binance** vía CSV
 - Variación **24h** por activo con indicadores visuales
 - Distribución del portfolio con gráfico interactivo
 - Detección de **posiciones de polvo** (dust)
 
-### 🧾 Fiscal (España)
+### 🧾 Fiscal — España
 - Cálculo **FIFO** según normativa española vigente (LIRPF)
 - Ganancias y pérdidas patrimoniales separadas por activo y año
 - Rendimientos del capital mobiliario (staking, intereses, airdrops)
@@ -67,17 +86,18 @@ Diseñada para inversores que quieren **control total** sobre sus datos: se inst
 - Modelo **721** (criptomonedas en el extranjero)
 - **Informe PDF profesional** listo para llevar al gestor
 
-### 📥 Importación
-- CSV de **Binance** (español e inglés)
+### 📥 Importación — Solo Binance
+
+- CSV exportado desde Binance (idioma español e inglés)
 - Deduplicación automática — importa el mismo CSV dos veces sin problemas
 - Preview antes de confirmar la importación
-- Asignación de coste de adquisición para depósitos externos
+- Asignación de coste de adquisición para depósitos externos (transfers desde wallets frías)
 - Motor FIFO que se **recalcula automáticamente** tras cada importación
 
 ### 📋 Historial
 - Búsqueda y filtrado por fecha, activo, tipo de operación y wallet
 - Exportación a **Excel**
-- Vista de operaciones manuales y agrupadas
+- Vista de operaciones agrupadas por tipo
 
 ---
 
@@ -94,8 +114,6 @@ Diseñada para inversores que quieren **control total** sobre sus datos: se inst
 | ![Fiscal](https://raw.githubusercontent.com/SrMeirins/CryptoFolio/main/docs/screenshots/fiscal.png) | ![PDF](https://raw.githubusercontent.com/SrMeirins/CryptoFolio/main/docs/screenshots/pdf.png) |
 
 </div>
-
-> 📌 *Añade tus propias capturas de pantalla en `docs/screenshots/` y actualiza este README.*
 
 ---
 
@@ -190,19 +208,21 @@ cd CryptoFolio
 Necesitas crear un archivo `.env` con la configuración de la base de datos.
 
 **En macOS / Linux:**
+
 ```bash
 cp .env.example .env
 ```
 
 **En Windows (PowerShell):**
+
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Ahora abre el archivo `.env` con cualquier editor de texto (Notepad, VSCode, etc.) y cambia los valores marcados:
+Abre el archivo `.env` con cualquier editor de texto (Notepad, VSCode...) y cambia los valores marcados:
 
 ```env
-# Cambia "cambia_esto" por una contraseña que tú elijas (sin espacios)
+# Elige una contraseña para la base de datos (sin espacios ni comillas)
 POSTGRES_PASSWORD=MiContraseñaSegura123
 DATABASE_URL=postgresql://cryptotracker:MiContraseñaSegura123@postgres:5432/cryptotracker
 
@@ -210,14 +230,16 @@ DATABASE_URL=postgresql://cryptotracker:MiContraseñaSegura123@postgres:5432/cry
 JWT_SECRET=pega_aqui_la_clave_generada
 ```
 
-**Para generar el JWT_SECRET:**
+**Cómo generar el JWT_SECRET:**
 
 *macOS / Linux:*
+
 ```bash
 openssl rand -hex 32
 ```
 
 *Windows (PowerShell):*
+
 ```powershell
 [System.Convert]::ToHexString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLower()
 ```
@@ -234,7 +256,7 @@ docker compose up -d
 
 La primera vez tardará unos minutos mientras descarga las imágenes. Verás algo así:
 
-```
+```text
 ✔ Container cryptotracker_postgres   Started
 ✔ Container cryptotracker_backend    Started
 ✔ Container cryptotracker_frontend   Started
@@ -244,7 +266,7 @@ La primera vez tardará unos minutos mientras descarga las imágenes. Verás alg
 
 ### Paso 5 — Abre el navegador
 
-```
+```text
 http://localhost:5173
 ```
 
@@ -293,28 +315,36 @@ Todas las opciones se configuran en el archivo `.env`:
 
 ## 📖 Cómo usar la app
 
-### 1. Importa tus transacciones
+### 1. Exporta tu CSV desde Binance
 
-Ve a **Importación** → exporta el CSV de tu exchange y súbelo.
+Dentro de Binance: **Cartera → Historial → Generar estado de cuenta → Todos los registros → Exportar**
 
-- **Binance:** Cartera → Historial → Generar estado de cuenta → exportar CSV
-- Otros exchanges: en desarrollo
+Descarga el CSV y guárdalo en tu ordenador.
 
-### 2. Ejecuta el motor FIFO
+> ⚠️ Solo se soporta el CSV de Binance. Otros exchanges no son compatibles actualmente.
 
-Tras importar, el motor FIFO se ejecuta automáticamente y calcula tus lotes de adquisición.
+### 2. Importa el CSV en CryptoFolio
 
-### 3. Revisa tu portfolio
+Ve a la sección **Importación**, sube el CSV y revisa el preview antes de confirmar. El motor FIFO se ejecuta automáticamente tras la importación.
 
-En **Portfolio** verás el valor actual de cada activo, el P&L y la distribución.
+### 3. Configura tus wallets frías (opcional)
 
-### 4. Consulta el módulo fiscal
+Si tienes activos en wallets frías (Ledger, Tangem, Trezor...), ve a **Settings → Wallets** y añádelas manualmente indicando qué activos tienes y en qué cantidad.
 
-En **Fiscal** selecciona el año y verás:
-- Ganancias y pérdidas patrimoniales
+> Las wallets frías no se sincronizan automáticamente. Deberás actualizar los saldos manualmente cuando muevas fondos.
+
+### 4. Revisa tu portfolio
+
+En **Portfolio** verás el valor actual de todos tus activos, el P&L y la distribución entre wallets y exchanges.
+
+### 5. Consulta el módulo fiscal
+
+En **Fiscal** selecciona el año fiscal y verás:
+
+- Ganancias y pérdidas patrimoniales (método FIFO)
 - Rendimientos del capital mobiliario
-- Estimación de cuota IRPF
-- Opción de exportar el informe en PDF
+- Estimación de cuota IRPF por tramos
+- Exportación del informe en PDF
 
 ---
 
@@ -323,14 +353,21 @@ En **Fiscal** selecciona el año y verás:
 <details>
 <summary><b>¿Es seguro? ¿Mis datos van a algún servidor?</b></summary>
 
-No. CryptoFolio funciona completamente en tu máquina. Los únicos datos que salen son las peticiones de precios a Binance y CoinGecko (que son APIs públicas sin autenticación). Tu historial de transacciones nunca sale de tu ordenador.
+No. CryptoFolio funciona completamente en tu máquina. Los únicos datos que salen son peticiones de precios a las APIs públicas de Binance y CoinGecko (sin autenticación, sin datos personales). Tu historial de transacciones nunca sale de tu ordenador.
 
 </details>
 
 <details>
-<summary><b>¿Puedo usar la app con exchanges distintos a Binance?</b></summary>
+<summary><b>¿Funciona con Kraken, Coinbase u otros exchanges?</b></summary>
 
-De momento el parser de CSV está optimizado para Binance (exportación en español e inglés). Se puede añadir soporte para otros exchanges. Si quieres contribuir, abre un issue.
+No. Actualmente solo se soporta la importación mediante el CSV de Binance. Otros exchanges requieren parsers específicos que no están implementados todavía. Si quieres contribuir añadiendo soporte para otro exchange, abre un issue.
+
+</details>
+
+<details>
+<summary><b>¿Puedo usarla si no estoy en España?</b></summary>
+
+El módulo de portfolio funciona para cualquier usuario. El módulo fiscal está diseñado exclusivamente para la normativa española (IRPF, método FIFO). Si tributas en otro país, los cálculos fiscales no serán válidos para ti.
 
 </details>
 
@@ -342,9 +379,9 @@ Los cálculos implementan el método FIFO según la normativa española vigente 
 </details>
 
 <details>
-<summary><b>¿Qué pasa si cierro el ordenador? ¿Se pierden los datos?</b></summary>
+<summary><b>¿Qué pasa con mis datos si cierro el ordenador?</b></summary>
 
-No. Los datos se guardan en un volumen Docker que persiste aunque pares o reinicias los contenedores. Solo se perderían si borras explícitamente el volumen (`docker volume rm`).
+Los datos se guardan en un volumen Docker que persiste aunque apagues o reinicies el ordenador. Solo se perderían si eliminas explícitamente el volumen con `docker volume rm`.
 
 </details>
 
@@ -352,11 +389,12 @@ No. Los datos se guardan en un volumen Docker que persiste aunque pares o reinic
 <summary><b>El comando docker compose up -d da error. ¿Qué hago?</b></summary>
 
 Los errores más comunes:
+
 - **Puerto ya en uso:** otro programa usa el puerto 5173 o 3001. Puedes cambiarlo en el `.env`.
 - **Docker no está corriendo:** abre Docker Desktop y espera a que arranque.
 - **Error de permisos en Linux:** asegúrate de haber ejecutado `sudo usermod -aG docker $USER` y haber cerrado sesión.
 
-Si el problema persiste, abre un [issue](https://github.com/SrMeirins/CryptoFolio/issues) con el mensaje de error.
+Si el problema persiste, abre un [issue](https://github.com/SrMeirins/CryptoFolio/issues) con el mensaje de error completo.
 
 </details>
 
@@ -364,11 +402,14 @@ Si el problema persiste, abre un [issue](https://github.com/SrMeirins/CryptoFoli
 
 ## 🤝 Contribuir
 
-Las contribuciones son bienvenidas. Si encuentras un bug, tienes una idea o quieres añadir soporte para un nuevo exchange:
+Las contribuciones son bienvenidas. Áreas donde ayudar:
 
-1. Abre un [issue](https://github.com/SrMeirins/CryptoFolio/issues) describiendo el problema o la mejora
-2. Si quieres implementarlo tú, haz un fork y abre un Pull Request
-3. Para cambios grandes, mejor discútelo en el issue antes de ponerte a programar
+- 🏦 **Parsers para otros exchanges** (Kraken, Coinbase, KuCoin...)
+- 🌍 **Soporte para otros países** (Portugal, Francia, Alemania...)
+- 🐛 **Reporte de bugs** — abre un [issue](https://github.com/SrMeirins/CryptoFolio/issues)
+- 💡 **Sugerencias** — también via issues
+
+Para cambios grandes, abre primero un issue para discutirlo antes de ponerte a programar.
 
 ---
 
