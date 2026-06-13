@@ -39,6 +39,8 @@ export const SPOT_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Buy Crypto With Card',                                       internalType: 'BUY',               status: 'supported' },
   // Sistema OCBS de Binance — variante de compra con EUR
   { csvLabel: 'Convert Fiat to Crypto OCBS',                                internalType: 'BUY',               status: 'supported', notes: 'Variante OCBS de compra EUR→cripto' },
+  // Fee rebate del grid/strategy trading — BNB fee pagada + rebate en el activo negociado
+  { csvLabel: 'Strategy Trading Fee Rebate', internalType: 'CASHBACK', status: 'supported', notes: 'BNB negativo → FEE_EXCHANGE; positivos → CASHBACK (rebate de fee)' },
   // Compra vía depósito directo (patrón antiguo Binance, pre-OCBS/2022)
   // El "Deposit EUR" al mismo timestamp se ignora automáticamente (buildFundingDepositKeys en parser.ts)
   { csvLabel: 'Transaction Related',                                         internalType: 'BUY',               status: 'supported', notes: 'Compra EUR→cripto con depósito inmediato — patrón pre-OCBS' },

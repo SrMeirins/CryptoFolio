@@ -610,6 +610,21 @@ function interpretGroup(
     }));
   }
 
+  // Fee rebate de Binance Strategy: BNB negativo (fee pagada) + positivos (rebate recibido)
+  if (firstOp === 'Strategy Trading Fee Rebate') {
+    return group.map(row => ({
+      operationType: row.change < 0 ? 'FEE_EXCHANGE' as const : 'CASHBACK' as const,
+      timestamp:     row.time,
+      asset:         row.coin,
+      amount:        abs(row.change),
+      amountNet:     abs(row.change),
+      account:       row.account,
+      notes:         'Strategy Trading Fee Rebate',
+      subTradeCount: 1,
+      rawRowHashes:  [row.rowHash],
+    }));
+  }
+
   // Operaciones de income (staking, lending, airdrop, cashback)
   if (INCOME_OPS[firstOp]) {
     const opType = INCOME_OPS[firstOp];
