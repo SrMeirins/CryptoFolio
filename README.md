@@ -103,17 +103,21 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 
 ## 📸 Capturas de pantalla
 
-<div align="center">
+### Dashboard
 
-| Dashboard | Portfolio |
-|:---------:|:---------:|
-| ![Dashboard](https://raw.githubusercontent.com/SrMeirins/CryptoFolio/main/docs/screenshots/dashboard.png) | ![Portfolio](https://raw.githubusercontent.com/SrMeirins/CryptoFolio/main/docs/screenshots/portfolio.png) |
+![Dashboard](docs/screenshots/dashboard.png)
 
-| Módulo Fiscal | Informe PDF |
-|:-------------:|:-----------:|
-| ![Fiscal](https://raw.githubusercontent.com/SrMeirins/CryptoFolio/main/docs/screenshots/fiscal.png) | ![PDF](https://raw.githubusercontent.com/SrMeirins/CryptoFolio/main/docs/screenshots/pdf.png) |
+### Portfolio
 
-</div>
+![Portfolio](docs/screenshots/portfolio.png)
+
+### Módulo Fiscal
+
+![Fiscal](docs/screenshots/fiscal.png)
+
+### Informe PDF
+
+![PDF](docs/screenshots/pdf.png)
 
 ---
 
