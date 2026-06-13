@@ -11,7 +11,7 @@ import {
 import { useToast } from '../components/Toast'
 import { ManualTxModal } from '../components/ManualTxModal'
 import { DateRangePicker } from '../components/DateRangePicker'
-import { formatEur } from '../utils/format'
+import { formatEur, formatPrice } from '../utils/format'
 import { OP_META } from '../constants/operations'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
@@ -275,13 +275,13 @@ function AnalyticsPanel({ stats, onAssetClick }: {
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
                 <Bar dataKey="Compras"        stackId="a" fill="#10b981" />
                 <Bar dataKey="Ventas"         stackId="a" fill="#ef4444" />
-                <Bar dataKey="Ingresos"       stackId="a" fill="#a78bfa" />
-                <Bar dataKey="Transferencias" stackId="a" fill="#f59e0b" />
+                <Bar dataKey="Ingresos"       stackId="a" fill="#f59e0b" />
+                <Bar dataKey="Transferencias" stackId="a" fill="#6b7280" />
                 <Bar dataKey="Otros"          stackId="a" fill="#4b5563" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
             <div className="flex items-center gap-4 mt-2">
-              {[['Compras','#10b981'],['Ventas','#ef4444'],['Ingresos','#a78bfa'],['Transferencias','#f59e0b'],['Otros','#4b5563']].map(([l,c]) => (
+              {[['Compras','#10b981'],['Ventas','#ef4444'],['Ingresos','#f59e0b'],['Transferencias','#6b7280'],['Otros','#4b5563']].map(([l,c]) => (
                 <div key={l} className="flex items-center gap-1.5 text-[10px] text-gray-500">
                   <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: c }} />{l}
                 </div>
@@ -429,7 +429,7 @@ function TxRow({
         <td className="px-3 py-2.5 text-right align-middle">
           {eurValue != null ? (
             <>
-              <div className="text-sm mono font-semibold text-white">{formatEur(eurValue)}</div>
+              <div className="text-sm mono font-semibold text-white">{formatPrice(eurValue)}</div>
               {priceLine && <div className="text-[10px] text-gray-600 mono mt-0.5">@ {priceLine}</div>}
             </>
           ) : hasCost ? (

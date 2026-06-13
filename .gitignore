@@ -81,3 +81,14 @@ logs/
 tmp/
 temp/
 .cache/
+
+# ── Documentación interna (no publicar) ────────────────────────────────────
+docs/binance-operations-pendientes.md
+docs/test-csvs/
+HistorialBinance_parsed.csv
+
+# ── Artefactos de extracción XLSX (estructura interna ZIP) ─────────────────
+_rels/
+docProps/
+xl/
+[Content_Types].xml

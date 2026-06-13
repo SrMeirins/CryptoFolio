@@ -3,13 +3,14 @@ import { searchAndSaveCoinGeckoId } from './coingecko';
 
 const REST_BASE = 'https://api.binance.com/api/v3';
 
-export type PriceSource = 'eur_direct' | 'usdt_proxy' | 'btc_proxy' | 'fiat' | 'coingecko' | 'unknown';
+export type PriceSource = 'eur_direct' | 'usdt_proxy' | 'btc_proxy' | 'eth_proxy' | 'fiat' | 'coingecko' | 'unknown';
 
 export interface AssetPairInfo {
   symbol: string;
   binanceEurPair: string | null;
   binanceUsdtPair: string | null;
   binanceBtcPair: string | null;
+  binanceEthPair: string | null;
   priceSource: PriceSource;
   isStablecoin: boolean;
 }
@@ -20,7 +21,7 @@ const pairCache = new Map<string, AssetPairInfo>();
 export async function loadPairCache(): Promise<void> {
   const res = await db.query(
     `SELECT symbol, binance_eur_pair, binance_usdt_pair, binance_btc_pair,
-            price_source, is_stablecoin
+            binance_eth_pair, price_source, is_stablecoin
      FROM asset_metadata`
   );
   for (const row of res.rows) {
@@ -29,6 +30,7 @@ export async function loadPairCache(): Promise<void> {
       binanceEurPair: row.binance_eur_pair,
       binanceUsdtPair: row.binance_usdt_pair,
       binanceBtcPair: row.binance_btc_pair,
+      binanceEthPair: row.binance_eth_pair,
       priceSource: row.price_source,
       isStablecoin: row.is_stablecoin,
     });
@@ -53,24 +55,27 @@ async function pairExists(pair: string): Promise<boolean> {
 export async function autoDetectPair(symbol: string): Promise<AssetPairInfo> {
 
   // Candidatos en orden de preferencia
-  const eurPair   = `${symbol}EUR`;
-  const usdtPair  = `${symbol}USDT`;
-  const btcPair   = `${symbol}BTC`;
+  const eurPair  = `${symbol}EUR`;
+  const usdtPair = `${symbol}USDT`;
+  const btcPair  = `${symbol}BTC`;
+  const ethPair  = `${symbol}ETH`;
 
   let info: AssetPairInfo = {
     symbol,
     binanceEurPair: null,
     binanceUsdtPair: null,
     binanceBtcPair: null,
+    binanceEthPair: null,
     priceSource: 'unknown',
     isStablecoin: false,
   };
 
   // Probar en paralelo
-  const [hasEur, hasUsdt, hasBtc] = await Promise.all([
+  const [hasEur, hasUsdt, hasBtc, hasEth] = await Promise.all([
     pairExists(eurPair),
     pairExists(usdtPair),
     pairExists(btcPair),
+    pairExists(ethPair),
   ]);
 
   if (hasEur) {
@@ -84,6 +89,10 @@ export async function autoDetectPair(symbol: string): Promise<AssetPairInfo> {
   if (hasBtc) {
     info.binanceBtcPair = btcPair;
     if (info.priceSource === 'unknown') info.priceSource = 'btc_proxy';
+  }
+  if (hasEth) {
+    info.binanceEthPair = ethPair;
+    if (info.priceSource === 'unknown') info.priceSource = 'eth_proxy';
   }
 
   // Fallback a CoinGecko si no hay ningún par en Binance
@@ -107,23 +116,25 @@ async function upsertAssetMetadata(info: AssetPairInfo): Promise<void> {
   await db.query(
     `INSERT INTO asset_metadata (
       symbol, name, coingecko_id, is_stablecoin,
-      binance_eur_pair, binance_usdt_pair, binance_btc_pair,
+      binance_eur_pair, binance_usdt_pair, binance_btc_pair, binance_eth_pair,
       price_source, auto_detected, last_price_check
-    ) VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, TRUE, NOW())
+    ) VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, TRUE, NOW())
     ON CONFLICT (symbol) DO UPDATE SET
       binance_eur_pair  = EXCLUDED.binance_eur_pair,
       binance_usdt_pair = EXCLUDED.binance_usdt_pair,
       binance_btc_pair  = EXCLUDED.binance_btc_pair,
+      binance_eth_pair  = EXCLUDED.binance_eth_pair,
       price_source      = EXCLUDED.price_source,
       auto_detected     = TRUE,
       last_price_check  = NOW()`,
     [
       info.symbol,
-      info.symbol, // nombre = símbolo si no lo conocemos
+      info.symbol,
       info.isStablecoin,
       info.binanceEurPair,
       info.binanceUsdtPair,
       info.binanceBtcPair,
+      info.binanceEthPair,
       info.priceSource,
     ]
   );
@@ -138,7 +149,7 @@ export async function getOrDetectPairInfo(symbol: string): Promise<AssetPairInfo
   // 2. DB
   const res = await db.query(
     `SELECT symbol, binance_eur_pair, binance_usdt_pair, binance_btc_pair,
-            price_source, is_stablecoin
+            binance_eth_pair, price_source, is_stablecoin
      FROM asset_metadata WHERE symbol = $1`,
     [symbol]
   );
@@ -150,6 +161,7 @@ export async function getOrDetectPairInfo(symbol: string): Promise<AssetPairInfo
       binanceEurPair: row.binance_eur_pair,
       binanceUsdtPair: row.binance_usdt_pair,
       binanceBtcPair: row.binance_btc_pair,
+      binanceEthPair: row.binance_eth_pair,
       priceSource: row.price_source,
       isStablecoin: row.is_stablecoin,
     };

@@ -6,7 +6,7 @@ import { parseBinanceCsv } from './parser';
 import { validateCsvStructure, ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
 import { ACCOUNT_TO_WALLET, TRANSFER_DESTINATIONS } from './binanceAccounts';
-import { getHistoricalPriceEur } from '../prices/binance';
+import { getHistoricalPriceEur, prefetchHistoricalPrices } from '../prices/binance';
 
 export interface ImportResult {
   importId: string;
@@ -92,6 +92,18 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
         };
       }
     }
+  }
+
+  // Avisar si hay income ops que necesitarán precio histórico al importar
+  const INCOME_OP_TYPES = new Set(['STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'CASHBACK', 'AIRDROP']);
+  const incomeOpsCount = parseResult.transactions.filter(
+    tx => INCOME_OP_TYPES.has(tx.operationType) && !tx.pricePerUnit
+  ).length;
+  if (incomeOpsCount > 0) {
+    validation.warnings.push(
+      `${incomeOpsCount} operaciones de rendimiento (staking, interés, airdrop) necesitan precio histórico. ` +
+      `Se consultará la API de Binance al confirmar la importación — puede tardar unos segundos adicionales.`
+    );
   }
 
   // Detectar gaps y solapamientos con imports existentes
@@ -234,6 +246,31 @@ export async function importCsvFile(
       `Este CSV exacto ya fue importado (${existing.rows[0].filename}). ` +
       `Si quieres importar un rango solapado, el sistema detectará automáticamente las filas nuevas.`
     );
+  }
+
+  // Enriquecer operaciones de rendimiento con precio histórico al momento de recepción.
+  // Esto garantiza que price_per_unit quede guardado en la BD para el módulo fiscal
+  // e historial (el motor FIFO tiene su propio fallback, pero la tabla transactions
+  // quedaría con NULL sin este paso, y el fiscal mostraría 0 EUR).
+  const INCOME_OP_TYPES = new Set(['STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'CASHBACK', 'AIRDROP']);
+  const incomeTxs = parseResult.transactions.filter(
+    tx => INCOME_OP_TYPES.has(tx.operationType) && !tx.pricePerUnit
+  );
+  if (incomeTxs.length > 0) {
+    // Precarga batch (deduplicada por symbol+fecha) para minimizar llamadas a la API
+    await prefetchHistoricalPrices(
+      incomeTxs.map(tx => ({ symbol: tx.asset, date: tx.timestamp }))
+    );
+    for (const tx of incomeTxs) {
+      try {
+        const price = await getHistoricalPriceEur(tx.asset, tx.timestamp);
+        if (price > 0) {
+          tx.pricePerUnit = price;
+          tx.costAsset   = 'EUR';
+          tx.costAmount  = tx.amount * price;
+        }
+      } catch { /* si falla, price_per_unit queda null — el FIFO lo recupera en runtime */ }
+    }
   }
 
   return await db.transaction(async (client) => {

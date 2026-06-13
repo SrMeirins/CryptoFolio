@@ -1,6 +1,7 @@
 import { db } from '../../db/client';
 import { WebSocket } from 'ws';
 import { getOrDetectPairInfo, loadPairCache, getPairInfo } from './pairDetector';
+import { getHistoricalPriceEur as getCoinGeckoHistoricalPrice, searchAndSaveCoinGeckoId } from './coingecko';
 
 const REST_BASE = 'https://api.binance.com/api/v3';
 
@@ -13,7 +14,8 @@ async function loadInitialPrices(): Promise<void> {
     await loadPairCache();
 
     const res = await db.query(
-      `SELECT symbol, binance_eur_pair, binance_usdt_pair, binance_btc_pair, price_source, is_stablecoin
+      `SELECT symbol, binance_eur_pair, binance_usdt_pair, binance_btc_pair,
+              binance_eth_pair, price_source, is_stablecoin
        FROM asset_metadata
        WHERE price_source != 'unknown'`
     );
@@ -24,6 +26,7 @@ async function loadInitialPrices(): Promise<void> {
       if (row.binance_eur_pair)  pairsToFetch.add(row.binance_eur_pair);
       if (row.binance_usdt_pair) pairsToFetch.add(row.binance_usdt_pair);
       if (row.binance_btc_pair)  pairsToFetch.add(row.binance_btc_pair);
+      if (row.binance_eth_pair)  pairsToFetch.add(row.binance_eth_pair);
     }
 
     const symbols = [...pairsToFetch].map(p => `"${p}"`).join(',');
@@ -63,6 +66,12 @@ async function loadInitialPrices(): Promise<void> {
         const p = priceMap.get(row.binance_btc_pair);
         const btcEur = priceMap.get('BTCEUR') ?? liveCache.get('BTC') ?? 0;
         if (p && btcEur) priceEur = p * btcEur;
+      }
+
+      if (!priceEur && row.binance_eth_pair) {
+        const p = priceMap.get(row.binance_eth_pair);
+        const ethEur = priceMap.get('ETHEUR') ?? liveCache.get('ETH') ?? 0;
+        if (p && ethEur) priceEur = p * ethEur;
       }
 
       if (priceEur) liveCache.set(row.symbol, priceEur);
@@ -125,33 +134,63 @@ export async function getHistoricalPriceEur(symbol: string, date: Date): Promise
 
   if (info.priceSource === 'fiat') {
     if (symbol === 'EUR') return 1;
-    // USDT: necesitamos tipo de cambio histórico
     const usdtEur = await getHistoricalUsdtEur(date);
     await cachePrice(symbol, usdtEur, dateStr);
     return usdtEur;
   }
 
-  if (info.priceSource === 'unknown') {
-    console.warn(`[PRICES] Sin par conocido para ${symbol} @ ${dateStr}, usando 0`);
-    return 0;
-  }
-
+  // 3. Intentar cada par de Binance en orden de preferencia.
+  //    Cada uno puede fallar si el activo fue delistado o sin datos históricos.
   let priceEur = 0;
 
   if (info.binanceEurPair) {
-    priceEur = await fetchKlinePrice(info.binanceEurPair, date);
-  } else if (info.binanceUsdtPair) {
-    const [priceUsdt, usdtEur] = await Promise.all([
-      fetchKlinePrice(info.binanceUsdtPair, date),
-      getHistoricalUsdtEur(date),
-    ]);
-    priceEur = priceUsdt * usdtEur;
-  } else if (info.binanceBtcPair) {
-    const [priceBtc, btcEur] = await Promise.all([
-      fetchKlinePrice(info.binanceBtcPair, date),
-      getHistoricalPriceEur('BTC', date),
-    ]);
-    priceEur = priceBtc * btcEur;
+    try {
+      priceEur = await fetchKlinePrice(info.binanceEurPair, date);
+    } catch { /* par sin datos — probar siguiente */ }
+  }
+
+  if (!priceEur && info.binanceUsdtPair) {
+    try {
+      const [priceUsdt, usdtEur] = await Promise.all([
+        fetchKlinePrice(info.binanceUsdtPair, date),
+        getHistoricalUsdtEur(date),
+      ]);
+      priceEur = priceUsdt * usdtEur;
+    } catch { /* par sin datos — probar siguiente */ }
+  }
+
+  if (!priceEur && info.binanceBtcPair) {
+    try {
+      const [pricePair, btcEur] = await Promise.all([
+        fetchKlinePrice(info.binanceBtcPair, date),
+        getHistoricalPriceEur('BTC', date),
+      ]);
+      priceEur = pricePair * btcEur;
+    } catch { /* par sin datos — probar ETH proxy */ }
+  }
+
+  if (!priceEur && info.binanceEthPair) {
+    try {
+      const [pricePair, ethEur] = await Promise.all([
+        fetchKlinePrice(info.binanceEthPair, date),
+        getHistoricalPriceEur('ETH', date),
+      ]);
+      priceEur = pricePair * ethEur;
+    } catch { /* par sin datos — probar CoinGecko */ }
+  }
+
+  // 4. Fallback a CoinGecko si Binance no tiene datos históricos
+  //    (activos delistados, tokens no nativos de Binance, etc.)
+  if (!priceEur) {
+    try {
+      // Asegurar que tenemos coingecko_id antes de llamar
+      await searchAndSaveCoinGeckoId(symbol);
+      priceEur = await getCoinGeckoHistoricalPrice(symbol, date);
+    } catch { /* sin precio disponible */ }
+  }
+
+  if (!priceEur) {
+    console.warn(`[PRICES] Sin precio para ${symbol} @ ${dateStr} en Binance ni CoinGecko`);
   }
 
   await cachePrice(symbol, priceEur, dateStr);
@@ -239,7 +278,7 @@ export function startLivePrices(): void {
 
   // Construir streams desde DB dinámicamente
   db.query(
-    `SELECT binance_eur_pair, binance_usdt_pair, binance_btc_pair
+    `SELECT binance_eur_pair, binance_usdt_pair, binance_btc_pair, binance_eth_pair
      FROM asset_metadata
      WHERE price_source NOT IN ('fiat', 'unknown')`
   ).then(res => {
@@ -248,6 +287,7 @@ export function startLivePrices(): void {
       if (row.binance_eur_pair)  pairs.add(row.binance_eur_pair.toLowerCase());
       if (row.binance_usdt_pair) pairs.add(row.binance_usdt_pair.toLowerCase());
       if (row.binance_btc_pair)  pairs.add(row.binance_btc_pair.toLowerCase());
+      if (row.binance_eth_pair)  pairs.add(row.binance_eth_pair.toLowerCase());
     }
 
     const streams = [...pairs].map(p => `${p}@miniTicker`).join('/');
@@ -274,9 +314,10 @@ function connectWebSocket(streamUrl: string): void {
 
       // Buscar qué activo corresponde a este par
       const allAssets = await db.query(
-        `SELECT symbol, binance_eur_pair, binance_usdt_pair, binance_btc_pair
+        `SELECT symbol, binance_eur_pair, binance_usdt_pair, binance_btc_pair, binance_eth_pair
          FROM asset_metadata
-         WHERE binance_eur_pair = $1 OR binance_usdt_pair = $1 OR binance_btc_pair = $1`,
+         WHERE binance_eur_pair = $1 OR binance_usdt_pair = $1
+            OR binance_btc_pair = $1 OR binance_eth_pair = $1`,
         [symbol]
       );
 
@@ -290,6 +331,9 @@ function connectWebSocket(streamUrl: string): void {
         } else if (row.binance_btc_pair === symbol) {
           const btcEur = liveCache.get('BTC') ?? 0;
           if (btcEur) priceEur = price * btcEur;
+        } else if (row.binance_eth_pair === symbol) {
+          const ethEur = liveCache.get('ETH') ?? 0;
+          if (ethEur) priceEur = price * ethEur;
         }
 
         if (priceEur) liveCache.set(row.symbol, priceEur);

@@ -277,6 +277,7 @@ CREATE TABLE asset_metadata (
   binance_eur_pair   TEXT,
   binance_usdt_pair  TEXT,
   binance_btc_pair   TEXT,
+  binance_eth_pair   TEXT,
   price_source       TEXT DEFAULT 'unknown',
   auto_detected      BOOLEAN DEFAULT FALSE,
   last_price_check   TIMESTAMPTZ
@@ -304,6 +305,9 @@ INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, price_sou
   ('EUR',  'Euro',   NULL,          TRUE,  'fiat'),
   ('USDT', 'Tether', NULL,          TRUE,  'fiat'),
   ('LUNC', 'Terra Classic', 'terra-luna', FALSE, 'coingecko');
+
+INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_eth_pair, price_source) VALUES
+  ('BETH', 'Binance ETH Staking', NULL, FALSE, 'BETHETH', 'eth_proxy');
 
 -- ============================================================
 -- VISTAS

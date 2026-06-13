@@ -46,6 +46,13 @@ export const SPOT_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Distribution',                                               internalType: 'AIRDROP',           status: 'supported', notes: 'Airdrop/distribución de tokens' },
   // Fee standalone pagada en BNB
   { csvLabel: 'BNB Fee Deduction',                                          internalType: 'FEE_EXCHANGE',      status: 'supported', notes: 'Fee de exchange pagada en BNB — evento imponible' },
+  // Staking y rendimientos — aparecen en cuenta Spot en los exports de Binance.
+  // El parser los reconoce y les asigna precio histórico al importar.
+  // Clasificación LIRPF pendiente de refinamiento (ver docs/binance-operations-pendientes.md).
+  { csvLabel: 'Staking Rewards',               internalType: 'STAKING_REWARD',   status: 'pending', notes: 'Rendimiento PoS — clasificación LIRPF y valoración en revisión' },
+  { csvLabel: 'ETH 2.0 Staking Rewards',       internalType: 'STAKING_REWARD',   status: 'pending', notes: 'Rendimiento validador ETH2 (BETH) — sin doctrina DGT clara' },
+  { csvLabel: 'Simple Earn Flexible Interest',  internalType: 'LENDING_INTEREST', status: 'pending', notes: 'Interés préstamo flexible — clasificación LIRPF en revisión' },
+  { csvLabel: 'Simple Earn Locked Rewards',     internalType: 'STAKING_REWARD',   status: 'pending', notes: 'Rendimiento staking bloqueado — clasificación LIRPF en revisión' },
 ];
 
 // ── Funding ────────────────────────────────────────────────────────────────
@@ -54,15 +61,18 @@ export const FUNDING_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Crypto Box',                                                 internalType: 'CASHBACK',         status: 'supported' },
   { csvLabel: 'Asset Recovery',                                             internalType: 'AIRDROP',          status: 'supported' },
   { csvLabel: 'Transfer Between Main and Funding Wallet',                   internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Movimiento Funding↔Spot — mueve lotes entre sub-cuentas' },
-  // Staking / rendimientos
-  { csvLabel: 'Staking Rewards',                                            internalType: 'STAKING_REWARD',   status: 'supported' },
-  { csvLabel: 'ETH 2.0 Staking Rewards',                                   internalType: 'STAKING_REWARD',   status: 'supported' },
-  { csvLabel: 'Simple Earn Flexible Interest',                              internalType: 'LENDING_INTEREST', status: 'supported' },
-  { csvLabel: 'Simple Earn Locked Rewards',                                 internalType: 'STAKING_REWARD',   status: 'supported' },
-  { csvLabel: 'Savings Interest',                                           internalType: 'LENDING_INTEREST', status: 'supported' },
-  { csvLabel: 'POS savings interest',                                       internalType: 'LENDING_INTEREST', status: 'supported' },
-  { csvLabel: 'Launchpool Interest',                                        internalType: 'STAKING_REWARD',   status: 'supported' },
-  { csvLabel: 'BNB Vault Rewards',                                          internalType: 'STAKING_REWARD',   status: 'supported' },
+  // Rendimientos de Funding (Savings, Launchpool, BNB Vault)
+  // Clasificación LIRPF pendiente de refinamiento.
+  { csvLabel: 'Savings Interest',      internalType: 'LENDING_INTEREST', status: 'pending', notes: 'Interés savings — clasificación LIRPF en revisión' },
+  { csvLabel: 'POS savings interest',  internalType: 'LENDING_INTEREST', status: 'pending', notes: 'Interés POS savings — clasificación LIRPF en revisión' },
+  { csvLabel: 'Launchpool Interest',   internalType: 'STAKING_REWARD',   status: 'pending', notes: 'Rendimiento Launchpool — clasificación LIRPF en revisión' },
+  { csvLabel: 'BNB Vault Rewards',     internalType: 'STAKING_REWARD',   status: 'pending', notes: 'Rendimiento BNB Vault — clasificación LIRPF en revisión' },
+  // Bloqueo/desbloqueo de staking y ETH 2.0 — movimientos internos sin transmisión.
+  // Registrados para evitar "operación desconocida". Tratamiento fiscal pendiente de estudio.
+  { csvLabel: 'Staking Purchase',          internalType: 'IGNORED', status: 'pending', notes: 'Bloqueo para staking — pendiente confirmar si es IGNORED o evento fiscal' },
+  { csvLabel: 'Staking Redemption',        internalType: 'IGNORED', status: 'pending', notes: 'Desbloqueo de staking — pendiente confirmar si es IGNORED o evento fiscal' },
+  { csvLabel: 'ETH 2.0 Staking',          internalType: 'IGNORED', status: 'pending', notes: 'Bloqueo ETH como validador — sin doctrina DGT clara' },
+  { csvLabel: 'ETH 2.0 Staking Withdrawals', internalType: 'IGNORED', status: 'pending', notes: 'Retirada ETH de validador — sin doctrina DGT clara' },
   // Airdrops / cashback
   { csvLabel: 'Airdrop Assets',                                             internalType: 'AIRDROP',          status: 'supported' },
   { csvLabel: 'Cash Voucher Distribution',                                  internalType: 'CASHBACK',         status: 'supported' },
