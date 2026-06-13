@@ -4,6 +4,7 @@ export interface ValidationResult {
   valid: boolean
   errors: string[]
   warnings: string[]
+  info: string[]           // mensajes informativos (sin acción requerida)
   detectedLanguage: string
   unknownOperations: string[]
   rowCount: number

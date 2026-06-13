@@ -94,16 +94,16 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
     }
   }
 
-  // Avisar si hay income ops que necesitarán precio histórico al importar
-  // DEPOSIT_CRYPTO se incluye para tener precio de referencia como estimación del coste
-  const INCOME_OP_TYPES = new Set(['STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'LENDING_INTEREST_LOCKED', 'CASHBACK', 'AIRDROP', 'DEPOSIT_CRYPTO']);
+  // Avisar si hay income ops que necesitarán precio histórico al importar.
+  // DEPOSIT_CRYPTO se excluye: ya aparece en el panel de revisión obligatoria — no duplicar aviso.
+  const INCOME_WARNING_OPS = new Set(['STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'LENDING_INTEREST_LOCKED', 'CASHBACK', 'AIRDROP']);
   const incomeOpsCount = parseResult.transactions.filter(
-    tx => INCOME_OP_TYPES.has(tx.operationType) && !tx.pricePerUnit
+    tx => INCOME_WARNING_OPS.has(tx.operationType) && !tx.pricePerUnit
   ).length;
   if (incomeOpsCount > 0) {
-    validation.warnings.push(
+    validation.info.push(
       `${incomeOpsCount} operaciones de rendimiento (staking, interés, airdrop) necesitan precio histórico. ` +
-      `Se consultará la API de Binance al confirmar la importación — puede tardar unos segundos adicionales.`
+      `Se consultará la API de Binance al confirmar — puede tardar unos segundos adicionales.`
     );
   }
 

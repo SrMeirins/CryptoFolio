@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle, Eye, ChevronUp, ChevronDown, AlertTriangle, X, Play } from 'lucide-react'
+import { AlertCircle, CheckCircle, Eye, ChevronUp, ChevronDown, AlertTriangle, X, Play, Info } from 'lucide-react'
 import { WithdrawalDestinations } from './WithdrawalDestinations'
 import { LANG_LABELS, OPERATION_LABELS, OPERATION_COLORS, ACCOUNT_COLORS } from './types'
 import { AccountChip } from './UploadZone'
@@ -85,6 +85,12 @@ export function PreviewStage({
           <div key={i} className="flex items-start gap-2 p-3 bg-accent-amber/5 border border-accent-amber/20 rounded-lg text-xs text-accent-amber">
             <AlertTriangle size={13} className="shrink-0 mt-0.5" />
             {w}
+          </div>
+        ))}
+        {(preview.validation.info ?? []).map((msg, i) => (
+          <div key={i} className="flex items-start gap-2 p-3 bg-accent-blue/5 border border-accent-blue/20 rounded-lg text-xs text-accent-blue">
+            <Info size={13} className="shrink-0 mt-0.5" />
+            {msg}
           </div>
         ))}
       </div>

@@ -11,6 +11,7 @@ export interface ValidationResult {
   valid: boolean;
   errors: string[];
   warnings: string[];
+  info: string[];           // mensajes informativos sin acción requerida
   detectedColumns: string[];
   detectedLanguage: SupportedLanguage;
   unknownOperations: string[];
@@ -23,6 +24,7 @@ export function validateCsvStructure(fileBuffer: Buffer): ValidationResult {
     valid: false,
     errors: [],
     warnings: [],
+    info: [],
     detectedColumns: [],
     detectedLanguage: 'unknown',
     unknownOperations: [],
