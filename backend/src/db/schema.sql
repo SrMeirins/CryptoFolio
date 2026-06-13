@@ -15,7 +15,7 @@ CREATE TYPE operation_type AS ENUM (
   'BUY_FIAT', 'BUY_CRYPTO',
   'SELL_FIAT', 'SELL_CRYPTO',
   'CONVERT_IN', 'CONVERT_OUT',
-  'DEPOSIT_FIAT',
+  'DEPOSIT_FIAT', 'DEPOSIT_CRYPTO',
   'WITHDRAW_FIAT',
   'WITHDRAW',
   'FEE', 'FEE_NETWORK', 'FEE_EXCHANGE',
@@ -325,7 +325,7 @@ SELECT
 FROM fifo_lots fl
 JOIN wallets w ON w.id = fl.wallet_id
 WHERE fl.is_closed = FALSE AND fl.quantity_remaining > 0
-GROUP BY fl.asset, fl.wallet_id, w.name, w.color, w.kind
+GROUP BY fl.asset, fl.wallet_id, w.name, w.color, w.type
 ORDER BY fl.asset, w.name;
 
 CREATE OR REPLACE VIEW v_fiscal_year AS

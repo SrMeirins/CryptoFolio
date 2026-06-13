@@ -68,6 +68,7 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
          WHEN 'BUY_FIAT'        THEN 1
          WHEN 'BUY_CRYPTO'      THEN 1
          WHEN 'AIRDROP'         THEN 1
+         WHEN 'DEPOSIT_CRYPTO'  THEN 1
          WHEN 'STAKING_REWARD'  THEN 1
          WHEN 'LENDING_INTEREST'        THEN 1
          WHEN 'LENDING_INTEREST_LOCKED' THEN 1
@@ -151,6 +152,11 @@ async function processTransaction(tx: Transaction, result: FifoRunResult): Promi
     case 'FEE_NETWORK':
     case 'FEE_EXCHANGE':
       await processFee(tx, result);
+      break;
+    case 'DEPOSIT_CRYPTO':
+      // Abre lote al precio de mercado en la fecha del depósito.
+      // No es un evento fiscal de income — el coste de adquisición viene de la wallet origen.
+      await processIncome(tx, result);
       break;
     case 'DEPOSIT_FIAT':
     case 'WITHDRAW_FIAT':   // Retiro a banco — no hay lote que mover

@@ -95,7 +95,8 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
   }
 
   // Avisar si hay income ops que necesitarán precio histórico al importar
-  const INCOME_OP_TYPES = new Set(['STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'LENDING_INTEREST_LOCKED', 'CASHBACK', 'AIRDROP']);
+  // DEPOSIT_CRYPTO se incluye para tener precio de referencia como estimación del coste
+  const INCOME_OP_TYPES = new Set(['STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'LENDING_INTEREST_LOCKED', 'CASHBACK', 'AIRDROP', 'DEPOSIT_CRYPTO']);
   const incomeOpsCount = parseResult.transactions.filter(
     tx => INCOME_OP_TYPES.has(tx.operationType) && !tx.pricePerUnit
   ).length;
@@ -252,7 +253,8 @@ export async function importCsvFile(
   // Esto garantiza que price_per_unit quede guardado en la BD para el módulo fiscal
   // e historial (el motor FIFO tiene su propio fallback, pero la tabla transactions
   // quedaría con NULL sin este paso, y el fiscal mostraría 0 EUR).
-  const INCOME_OP_TYPES = new Set(['STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'LENDING_INTEREST_LOCKED', 'CASHBACK', 'AIRDROP']);
+  // DEPOSIT_CRYPTO se incluye para tener precio de referencia como estimación del coste
+  const INCOME_OP_TYPES = new Set(['STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'LENDING_INTEREST_LOCKED', 'CASHBACK', 'AIRDROP', 'DEPOSIT_CRYPTO']);
   const incomeTxs = parseResult.transactions.filter(
     tx => INCOME_OP_TYPES.has(tx.operationType) && !tx.pricePerUnit
   );

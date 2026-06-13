@@ -10,7 +10,7 @@ const ZERO_COST_OPS = new Set(['FORK']);
 // Ops que consumen lotes (para preview)
 const CONSUME_OPS = new Set(['SELL', 'SELL_FIAT', 'SELL_CRYPTO', 'GIFT_SENT', 'LOST', 'FEE_NETWORK', 'FEE_EXCHANGE']);
 // Ops que crean lotes
-const OPEN_LOT_OPS = new Set(['BUY', 'BUY_FIAT', 'BUY_CRYPTO', 'AIRDROP', 'FORK', 'STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'LENDING_INTEREST_LOCKED', 'CASHBACK']);
+const OPEN_LOT_OPS = new Set(['BUY', 'BUY_FIAT', 'BUY_CRYPTO', 'AIRDROP', 'DEPOSIT_CRYPTO', 'FORK', 'STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'LENDING_INTEREST_LOCKED', 'CASHBACK']);
 
 // ── POST /api/transactions/manual/preview ──────────────────────────────────
 router.post('/manual/preview', async (req: Request, res: Response) => {
@@ -389,7 +389,7 @@ router.get('/stats', async (_req: Request, res: Response) => {
         COUNT(CASE WHEN operation_type IN ('BUY','BUY_FIAT','BUY_CRYPTO')                                        THEN 1 END)::int AS compras,
         COUNT(CASE WHEN operation_type IN ('SELL','SELL_FIAT','SELL_CRYPTO','GIFT_SENT','LOST')                   THEN 1 END)::int AS ventas,
         COUNT(CASE WHEN operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP','FORK') THEN 1 END)::int AS ingresos,
-        COUNT(CASE WHEN operation_type IN ('TRANSFER_INTERNAL','WITHDRAW','WITHDRAW_FIAT','DEPOSIT_FIAT')         THEN 1 END)::int AS transferencias,
+        COUNT(CASE WHEN operation_type IN ('TRANSFER_INTERNAL','WITHDRAW','WITHDRAW_FIAT','DEPOSIT_FIAT','DEPOSIT_CRYPTO') THEN 1 END)::int AS transferencias,
         COALESCE(SUM(CASE WHEN cost_asset='EUR' AND operation_type IN ('BUY','BUY_FIAT','BUY_CRYPTO') THEN cost_amount ELSE 0 END), 0)::float AS eur_invertido
       FROM transactions
       WHERE timestamp >= NOW() - INTERVAL '18 months'
@@ -553,6 +553,7 @@ function mapCatalogTypeToDb(catalogType: string): string {
     'LENDING_INTEREST_LOCKED': 'LENDING_INTEREST_LOCKED',
     'CASHBACK':          'CASHBACK',
     'AIRDROP':           'AIRDROP',
+    'DEPOSIT_CRYPTO':    'DEPOSIT_CRYPTO',
     'FORK':              'FORK',
     'GIFT_SENT':         'GIFT_SENT',
     'LOST':              'LOST',

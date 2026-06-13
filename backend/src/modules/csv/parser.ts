@@ -248,11 +248,28 @@ export function parseBinanceCsv(fileContent: Buffer | string): CsvParseResult {
     }
   }
 
-  // 4. Separar ignoradas (movimientos internos sin impacto fiscal)
+  // 4. Separar ignoradas de activas.
+  //    Las filas en IGNORED_OPERATIONS generan ParsedTransactions de tipo IGNORED
+  //    (se insertan en la BD y aparecen en historial) pero el motor FIFO las salta.
+  //    Las reclasificadas como 'Margin Short Sale' sí se descartan por completo.
   const activeRows: RawCsvRow[] = [];
+  const preIgnoredTxs: ParsedTransaction[] = [];
   for (const row of rows) {
-    if (IGNORED_OPERATIONS.has(row.operation) || row.operation === 'Margin Short Sale') {
-      ignoredRows.push(row);
+    if (row.operation === 'Margin Short Sale') {
+      ignoredRows.push(row);  // reclasificación interna — no insertar
+    } else if (IGNORED_OPERATIONS.has(row.operation)) {
+      ignoredRows.push(row);  // para stats
+      preIgnoredTxs.push({
+        operationType: 'IGNORED',
+        timestamp:  row.time,
+        asset:      row.coin,
+        amount:     abs(row.change),
+        amountNet:  abs(row.change),
+        account:    row.account,
+        notes:      row.operation,
+        subTradeCount: 1,
+        rawRowHashes: [row.rowHash],
+      });
     } else {
       activeRows.push(row);
     }
@@ -291,6 +308,8 @@ export function parseBinanceCsv(fileContent: Buffer | string): CsvParseResult {
     }
   }
 
+  // Fusionar las IGNORED pre-escaneadas (de IGNORED_OPERATIONS) con las del parser
+  transactions.push(...preIgnoredTxs);
   transactions.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
   return {
@@ -336,12 +355,13 @@ function interpretGroup(
         rawRowHashes: hashes,
       };
     }
-    // Fiat → DEPOSIT_FIAT (ignorado en FIFO, tracking contable de entrada de efectivo)
-    // Cripto → abre lote al precio de mercado. Puede ser auto-transferencia desde otra
-    // wallet (coste real desconocido) o ingreso externo. Se marca para revisión.
+    // Fiat → DEPOSIT_FIAT (tracking contable, FIFO lo salta)
+    // Cripto → DEPOSIT_CRYPTO: abre lote al precio de mercado estimado.
+    //   La cantidad proviene de otra wallet: coste real de adquisición desconocido.
+    //   Se marca para revisión manual del coste (needsCostReview).
     const isFiat = FIAT_ASSETS.has(row.coin.toUpperCase());
     return {
-      operationType: isFiat ? 'DEPOSIT_FIAT' : 'AIRDROP',
+      operationType: isFiat ? 'DEPOSIT_FIAT' : 'DEPOSIT_CRYPTO',
       timestamp,
       asset: row.coin,
       amount: abs(row.change),

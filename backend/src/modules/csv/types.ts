@@ -17,6 +17,7 @@ export type OperationType =
   | 'CONVERT_IN'
   | 'CONVERT_OUT'
   | 'DEPOSIT_FIAT'
+  | 'DEPOSIT_CRYPTO'
   | 'WITHDRAW_FIAT'
   | 'WITHDRAW'
   | 'FEE_EXCHANGE'
