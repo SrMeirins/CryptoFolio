@@ -27,4 +27,4 @@ To obtain a commercial license or discuss your use case:
 
 ---
 
-*Copyright (C) 2026 Jorge Marincase Ro. All rights reserved.*
+*Copyright (C) 2026 Jorge Marin Casero. All rights reserved.*
