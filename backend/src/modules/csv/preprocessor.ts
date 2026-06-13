@@ -21,9 +21,17 @@ export function preprocess(rows: RawCsvRow[]): RawCsvRow[] {
   const linkedRows = rows.filter((r) => REMARK_LINKED_OPS.has(r.operation));
   const linkedHashes = new Set(linkedRows.map((r) => r.rowHash));
 
-  // Agrupar por operación + remark para enlazar pares
+  // Solo enlazar por remark cuando el remark está presente.
+  // Sin remark, las filas ya comparten el mismo timestamp → groupByTimestamp las agrupa solo.
+  // Si agrupáramos filas sin remark bajo la misma clave vacía, mezclaríamos compras distintas.
   const byOpRemark = new Map<string, RawCsvRow[]>();
+  const noRemarkLinked: RawCsvRow[] = [];
+
   for (const row of linkedRows) {
+    if (!row.remark) {
+      noRemarkLinked.push(row);
+      continue;
+    }
     const key = `${row.operation}|${row.remark}`;
     if (!byOpRemark.has(key)) byOpRemark.set(key, []);
     byOpRemark.get(key)!.push(row);
@@ -39,6 +47,9 @@ export function preprocess(rows: RawCsvRow[]): RawCsvRow[] {
       result.push(...group);
     }
   }
+
+  // Sin remark → pasar sin modificar (ya están al timestamp correcto)
+  result.push(...noRemarkLinked);
 
   // Añadir el resto de filas sin modificar
   for (const row of rows) {

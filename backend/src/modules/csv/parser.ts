@@ -261,6 +261,10 @@ export function parseBinanceCsv(fileContent: Buffer | string): CsvParseResult {
   // 5. Pre-procesar (Buy Crypto With Fiat linking)
   const preprocessedRows = preprocess(activeRows);
 
+  // 5b. Pre-scan: claves de depósitos que financian una compra "Transaction Related"
+  //     Se construyen ANTES de agrupar para que el handler de Deposit pueda ignorarlos.
+  const fundingDepositKeys = buildFundingDepositKeys(preprocessedRows);
+
   // 6. Agrupar por timestamp
   const groups = groupByTimestamp(preprocessedRows);
 
@@ -269,7 +273,7 @@ export function parseBinanceCsv(fileContent: Buffer | string): CsvParseResult {
 
   for (const [, group] of groups) {
     try {
-      const parsed = interpretGroup(group);
+      const parsed = interpretGroup(group, fundingDepositKeys);
       if (parsed) {
         if (Array.isArray(parsed)) {
           transactions.push(...parsed);
@@ -305,7 +309,8 @@ export function parseBinanceCsv(fileContent: Buffer | string): CsvParseResult {
 
 // ── Interpretación de grupos ───────────────────────────────────────────────
 function interpretGroup(
-  group: RawCsvRow[]
+  group: RawCsvRow[],
+  fundingDepositKeys: Set<string>
 ): ParsedTransaction | ParsedTransaction[] | null {
   const ops = group.map((r) => r.operation);
   const firstOp = ops[0];
@@ -315,6 +320,22 @@ function interpretGroup(
 
   if (firstOp === 'Deposit') {
     const row = group[0];
+    // Depósitos que financian una compra "Transaction Related" al mismo timestamp → ignorar.
+    // La compra ya se registra en el grupo Transaction Related con su coste real.
+    const fundingKey = `${timestamp.getTime()}|${account}|${row.coin}|${abs(row.change)}`;
+    if (fundingDepositKeys.has(fundingKey)) {
+      return {
+        operationType: 'IGNORED' as const,
+        timestamp,
+        asset:     row.coin,
+        amount:    abs(row.change),
+        amountNet: abs(row.change),
+        account,
+        notes:     'Depósito de fondos para compra simultánea (Transaction Related)',
+        subTradeCount: 1,
+        rawRowHashes: hashes,
+      };
+    }
     // Fiat → DEPOSIT_FIAT (ignorado en FIFO, tracking contable de entrada de efectivo)
     // Cripto → abre lote al precio de mercado. Puede ser auto-transferencia desde otra
     // wallet (coste real desconocido) o ingreso externo. Se marca para revisión.
@@ -609,6 +630,13 @@ function interpretGroup(
     return results.length > 0 ? results : null;
   }
 
+  // Compra EUR→cripto vía depósito directo (patrón antiguo Binance)
+  // Rows: Transaction Related EUR -X + Transaction Related CRIPTO +Y (mismo remark hash)
+  // El Deposit EUR +X al mismo timestamp es ignorado por fundingDepositKeys.
+  if (firstOp === 'Transaction Related') {
+    return interpretTransactionRelated(group, hashes, timestamp, account);
+  }
+
   // Transferencias internas y suscripciones → ignoradas
   if (group.every((r) => IGNORED_OPERATIONS.has(r.operation))) {
     return group.map((row) => ({
@@ -628,6 +656,47 @@ function interpretGroup(
     `Grupo no reconocido: ops=[${[...new Set(ops)].join(', ')}] ` +
     `coin=${group.map((r) => r.coin).join(',')} ts=${timestamp.toISOString()}`
   );
+}
+
+// Construye el set de claves de depósitos que financian compras "Transaction Related".
+// Clave: `${ts_ms}|${account}|${coin}|${amount}` → el Deposit con esa clave se ignora.
+function buildFundingDepositKeys(preprocessedRows: RawCsvRow[]): Set<string> {
+  const keys = new Set<string>();
+  for (const row of preprocessedRows) {
+    if (row.operation === 'Transaction Related' && FIAT_ASSETS.has(row.coin.toUpperCase()) && row.change < 0) {
+      keys.add(`${row.time.getTime()}|${row.account}|${row.coin}|${abs(row.change)}`);
+    }
+  }
+  return keys;
+}
+
+function interpretTransactionRelated(
+  group: RawCsvRow[], hashes: string[], timestamp: Date, account: string
+): ParsedTransaction {
+  const cryptoRow = group.find(r => !FIAT_ASSETS.has(r.coin.toUpperCase()) && r.change > 0);
+  const fiatRow   = group.find(r => FIAT_ASSETS.has(r.coin.toUpperCase()) && r.change < 0);
+
+  if (!cryptoRow || !fiatRow) {
+    throw new Error(
+      `Transaction Related con patrón no reconocido en ${timestamp.toISOString()}: ` +
+      group.map(r => `${r.coin} ${r.change}`).join(' | ')
+    );
+  }
+
+  return {
+    operationType: 'BUY',
+    timestamp,
+    asset:        cryptoRow.coin,
+    amount:       abs(cryptoRow.change),
+    amountNet:    abs(cryptoRow.change),
+    costAsset:    fiatRow.coin,
+    costAmount:   abs(fiatRow.change),
+    pricePerUnit: abs(fiatRow.change) / abs(cryptoRow.change),
+    account,
+    notes:        'Compra via depósito directo (Transaction Related)',
+    subTradeCount: 1,
+    rawRowHashes: hashes,
+  };
 }
 
 function interpretConvert(

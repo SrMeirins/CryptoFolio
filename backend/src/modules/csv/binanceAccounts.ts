@@ -39,6 +39,9 @@ export const SPOT_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Buy Crypto With Card',                                       internalType: 'BUY',               status: 'supported' },
   // Sistema OCBS de Binance — variante de compra con EUR
   { csvLabel: 'Convert Fiat to Crypto OCBS',                                internalType: 'BUY',               status: 'supported', notes: 'Variante OCBS de compra EUR→cripto' },
+  // Compra vía depósito directo (patrón antiguo Binance, pre-OCBS/2022)
+  // El "Deposit EUR" al mismo timestamp se ignora automáticamente (buildFundingDepositKeys en parser.ts)
+  { csvLabel: 'Transaction Related',                                         internalType: 'BUY',               status: 'supported', notes: 'Compra EUR→cripto con depósito inmediato — patrón pre-OCBS' },
   // Asientos contables internos del sistema OCBS (ignorados, la compra ya se registra en la op. principal)
   { csvLabel: 'Fiat OCBS - Add Fiat and Fees',                              internalType: 'IGNORED',           status: 'ignored',   notes: 'Asiento contable OCBS, redundante con Buy Crypto With Card' },
   { csvLabel: 'Deposit Fiat OCBS',                                          internalType: 'IGNORED',           status: 'ignored',   notes: 'Asiento contable OCBS, redundante con Convert Fiat to Crypto OCBS' },
