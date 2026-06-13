@@ -49,6 +49,8 @@ const INCOME_OPS: Record<string, 'STAKING_REWARD' | 'LENDING_INTEREST' | 'LENDIN
   'Referral Kickback':              'CASHBACK',
   'Crypto Box':                     'CASHBACK',
   'Mission Reward Distribution':    'CASHBACK',
+  'Launchpool Airdrop - User Claim Distribution': 'AIRDROP',
+  'Launchpool Airdrop - System Distribution':     'AIRDROP',
 };
 
 function parseDate(raw: string): Date {

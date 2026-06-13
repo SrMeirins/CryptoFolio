@@ -51,6 +51,8 @@ export const SPOT_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Deposit Fiat OCBS',                                          internalType: 'IGNORED',           status: 'ignored',   notes: 'Asiento contable OCBS, redundante con Convert Fiat to Crypto OCBS' },
   // Airdrops y distribuciones
   { csvLabel: 'Distribution',                                               internalType: 'AIRDROP',           status: 'supported', notes: 'Airdrop/distribución de tokens' },
+  { csvLabel: 'Launchpool Airdrop - User Claim Distribution',               internalType: 'AIRDROP',           status: 'supported', notes: 'Distribución Launchpool reclamada por el usuario' },
+  { csvLabel: 'Launchpool Airdrop - System Distribution',                   internalType: 'AIRDROP',           status: 'supported', notes: 'Distribución Launchpool asignada automáticamente por Binance' },
   // Fee standalone pagada en BNB
   { csvLabel: 'BNB Fee Deduction',                                          internalType: 'FEE_EXCHANGE',      status: 'supported', notes: 'Fee de exchange pagada en BNB — evento imponible' },
   // Staking y rendimientos — aparecen en cuenta Spot en los exports de Binance.
