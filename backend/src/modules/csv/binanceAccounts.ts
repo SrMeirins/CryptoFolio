@@ -49,9 +49,9 @@ export const SPOT_OPERATIONS: BinanceOperation[] = [
   // Staking y rendimientos — aparecen en cuenta Spot en los exports de Binance.
   // El parser los reconoce y les asigna precio histórico al importar.
   // Clasificación LIRPF pendiente de refinamiento (ver docs/binance-operations-pendientes.md).
-  { csvLabel: 'Staking Rewards',               internalType: 'STAKING_REWARD',   status: 'pending', notes: 'Rendimiento PoS — clasificación LIRPF y valoración en revisión' },
-  { csvLabel: 'ETH 2.0 Staking Rewards',       internalType: 'STAKING_REWARD',   status: 'pending', notes: 'Rendimiento validador ETH2 (BETH) — sin doctrina DGT clara' },
-  { csvLabel: 'Simple Earn Flexible Interest',  internalType: 'LENDING_INTEREST', status: 'pending', notes: 'Interés préstamo flexible — clasificación LIRPF en revisión' },
+  { csvLabel: 'Staking Rewards',               internalType: 'STAKING_REWARD',   status: 'supported', notes: 'Rendimiento PoS — art. 25.4 LIRPF, base del ahorro' },
+  { csvLabel: 'ETH 2.0 Staking Rewards',       internalType: 'STAKING_REWARD',   status: 'supported', notes: 'Rendimiento validador ETH2 (BETH) — art. 25.4 LIRPF' },
+  { csvLabel: 'Simple Earn Flexible Interest',  internalType: 'LENDING_INTEREST', status: 'supported', notes: 'Interés préstamo flexible — art. 25.2 LIRPF, base del ahorro' },
   { csvLabel: 'Simple Earn Locked Rewards',     internalType: 'STAKING_REWARD',   status: 'pending', notes: 'Rendimiento staking bloqueado — clasificación LIRPF en revisión' },
 ];
 
