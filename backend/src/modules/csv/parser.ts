@@ -18,6 +18,7 @@ const IGNORED_OPERATIONS = ALL_IGNORED_OPERATIONS;
 const INTERNAL_TRANSFER_OPS = new Set([
   'Transfer Between Main and Funding Wallet',
   'Transfer Between Main Account/Futures and Margin Account',
+  'Transfer Between Spot and Strategy Account',
 ]);
 
 // Fiat real — depósitos/retiros de estas monedas no tienen lote FIFO

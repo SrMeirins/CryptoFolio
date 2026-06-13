@@ -115,7 +115,8 @@ INSERT INTO wallets (name, type, is_system, is_default, color) VALUES
   ('Binance Spot',             'exchange', TRUE, TRUE,  '#F0B90B'),
   ('Binance Funding',          'exchange', TRUE, FALSE, '#F0B90B'),
   ('Binance Cross Margin',     'exchange', TRUE, FALSE, '#E8892B'),
-  ('Binance Isolated Margin',  'exchange', TRUE, FALSE, '#C8812B');
+  ('Binance Isolated Margin',  'exchange', TRUE, FALSE, '#C8812B'),
+  ('Binance Strategy',         'exchange', TRUE, FALSE, '#8B5CF6');
 
 -- ============================================================
 -- TABLA: wallet_addresses

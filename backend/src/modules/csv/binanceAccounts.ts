@@ -40,7 +40,9 @@ export const SPOT_OPERATIONS: BinanceOperation[] = [
   // Sistema OCBS de Binance — variante de compra con EUR
   { csvLabel: 'Convert Fiat to Crypto OCBS',                                internalType: 'BUY',               status: 'supported', notes: 'Variante OCBS de compra EUR→cripto' },
   // Fee rebate del grid/strategy trading — BNB fee pagada + rebate en el activo negociado
-  { csvLabel: 'Strategy Trading Fee Rebate', internalType: 'CASHBACK', status: 'supported', notes: 'BNB negativo → FEE_EXCHANGE; positivos → CASHBACK (rebate de fee)' },
+  { csvLabel: 'Strategy Trading Fee Rebate',             internalType: 'CASHBACK',          status: 'supported', notes: 'BNB negativo → FEE_EXCHANGE; positivos → CASHBACK (rebate de fee)' },
+  // Transferencia entre Spot y la sub-cuenta de Strategy Trading (grid bots, etc.)
+  { csvLabel: 'Transfer Between Spot and Strategy Account', internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Movimiento Spot↔Strategy — mueve lotes entre sub-cuentas' },
   // Compra vía depósito directo (patrón antiguo Binance, pre-OCBS/2022)
   // El "Deposit EUR" al mismo timestamp se ignora automáticamente (buildFundingDepositKeys en parser.ts)
   { csvLabel: 'Transaction Related',                                         internalType: 'BUY',               status: 'supported', notes: 'Compra EUR→cripto con depósito inmediato — patrón pre-OCBS' },
@@ -130,6 +132,7 @@ export const ACCOUNT_TO_WALLET: Record<string, string> = {
   'Funding':          'Binance Funding',
   'Cross Margin':     'Binance Cross Margin',
   'Isolated Margin':  'Binance Isolated Margin',
+  'Strategy':         'Binance Strategy',
 };
 
 // ── Destino de cada tipo de transferencia interna ──────────────────────────
@@ -144,6 +147,10 @@ export const TRANSFER_DESTINATIONS: Record<string, Record<string, string>> = {
     'Cross Margin':     'Binance Spot',
     'Funding':          'Binance Cross Margin',
     'Isolated Margin':  'Binance Spot',
+  },
+  'Transfer Between Spot and Strategy Account': {
+    'Spot':     'Binance Strategy',
+    'Strategy': 'Binance Spot',
   },
 };
 
