@@ -1,12 +1,9 @@
 # Uso: docker compose -f docker-compose.prod.yml up -d --build
 #
-# Diferencias con el compose de desarrollo:
-#   - Frontend: build estático servido por nginx no-root (puerto 8080 interno → 80 host)
-#   - Sin volúmenes de hot-reload
-#   - Backend y PostgreSQL solo en red interna Docker (no expuestos al host)
-#   - Usuarios no-root en todos los contenedores
-#   - Límites de CPU y memoria
-#   - no-new-privileges: impide escalada de privilegios
+# Requisitos en el VPS antes de arrancar:
+#   1. Apuntar tu dominio (A record) a la IP del VPS
+#   2. Configurar DOMAIN en el .env
+#   3. Puertos 80 y 443 abiertos en el firewall
 
 services:
   # ── PostgreSQL ─────────────────────────────────────────────────────────────
@@ -55,7 +52,6 @@ services:
       COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
       PRICE_REFRESH_INTERVAL_MS: ${PRICE_REFRESH_INTERVAL_MS:-60000}
       JWT_SECRET: ${JWT_SECRET}
-      CORS_ORIGIN: ${CORS_ORIGIN:-}
     volumes:
       - csv_uploads:/app/uploads
     networks:
@@ -87,11 +83,9 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    ports:
-      - "${FRONTEND_PORT:-80}:8080"
     networks:
       - internal
-      - public
+      - proxy
     security_opt:
       - no-new-privileges:true
     read_only: true
@@ -105,15 +99,46 @@ services:
           cpus: '0.5'
           memory: 128M
 
+  # ── Caddy — HTTPS automático (Let's Encrypt) ───────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: cryptotracker_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - proxy
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    depends_on:
+      - frontend
+
 networks:
   internal:
     driver: bridge
     internal: true
-  public:
+  proxy:
     driver: bridge
 
 volumes:
   postgres_data:
     driver: local
   csv_uploads:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
     driver: local

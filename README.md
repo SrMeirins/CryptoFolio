@@ -28,8 +28,8 @@ Seguimiento en tiempo real de tus wallets y exchanges, cálculo de ganancias y p
 ### 1. Clona el repositorio
 
 ```bash
-git clone https://github.com/tu-usuario/cryptofolio.git
-cd cryptofolio
+git clone https://github.com/SrMeirins/CryptoFolio.git
+cd CryptoFolio
 ```
 
 ### 2. Configura el entorno
@@ -46,7 +46,7 @@ DATABASE_URL=postgresql://cryptotracker:una_contraseña_segura@postgres:5432/cry
 JWT_SECRET=una_clave_aleatoria_de_minimo_32_caracteres
 ```
 
-Puedes generar un JWT_SECRET seguro con:
+Genera el JWT_SECRET con:
 
 ```bash
 openssl rand -hex 32
@@ -62,7 +62,7 @@ La primera vez descargará las imágenes y construirá los contenedores (~2 minu
 
 ### 4. Abre el navegador
 
-```
+```text
 http://localhost:5173
 ```
 
@@ -79,83 +79,50 @@ docker compose up -d --build
 
 ## Despliegue en VPS (producción)
 
-Para un servidor accesible desde Internet usa `docker-compose.prod.yml`, que:
-- Compila el frontend como estáticos servidos por **nginx** (sin Vite dev server)
-- No expone PostgreSQL ni el backend fuera de la red Docker interna
-- Escucha en el puerto 80
+`docker-compose.prod.yml` incluye todo lo necesario para producción:
 
-### 1. Prepara el `.env` para producción
+- **Caddy** — HTTPS automático con Let's Encrypt, HTTP→HTTPS redirect
+- **nginx** — sirve el frontend compilado, proxea `/api` y `/ws` al backend
+- **Redes aisladas** — PostgreSQL y backend solo accesibles internamente
+- **Usuarios no-root** en todos los contenedores
+- **Límites de CPU y memoria** por servicio
+
+### 1. Requisitos previos en el VPS
+
+- Docker y Docker Compose instalados
+- Puertos **80** y **443** abiertos en el firewall
+- Un dominio con un registro **A** apuntando a la IP del VPS
+
+### 2. Configura el `.env`
+
+```bash
+cp .env.example .env
+```
+
+Edita `.env` con tus valores reales:
 
 ```env
-POSTGRES_USER=cryptotracker
-POSTGRES_PASSWORD=cambia_esto_por_una_clave_segura
-POSTGRES_DB=cryptotracker
-DATABASE_URL=postgresql://cryptotracker:cambia_esto_por_una_clave_segura@postgres:5432/cryptotracker
-
+POSTGRES_PASSWORD=una_clave_muy_segura
+DATABASE_URL=postgresql://cryptotracker:una_clave_muy_segura@postgres:5432/cryptotracker
 JWT_SECRET=genera_con_openssl_rand_hex_32
-
-NODE_ENV=production
-COINGECKO_BASE_URL=https://api.coingecko.com/api/v3
-PRICE_REFRESH_INTERVAL_MS=60000
+DOMAIN=tudominio.com
 ```
 
-Genera el JWT_SECRET con:
-```bash
-openssl rand -hex 32
-```
-
-### 2. Arranca en modo producción
+### 3. Arranca
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-La app quedará disponible en el puerto 80 del servidor.
-
-### 3. HTTPS con Caddy (recomendado)
-
-Caddy gestiona el certificado SSL automáticamente. Instálalo en el host y crea un `Caddyfile`:
-
-```caddyfile
-tudominio.com {
-    reverse_proxy localhost:80
-}
-```
-
-```bash
-caddy start
-```
-
-### 3b. HTTPS con Nginx en el host
-
-Si prefieres Nginx, crea `/etc/nginx/sites-available/cryptofolio`:
-
-```nginx
-server {
-    server_name tudominio.com;
-
-    location / {
-        proxy_pass http://localhost:80;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-    }
-}
-```
-
-Activa el sitio y obtén certificado con Certbot:
-```bash
-sudo ln -s /etc/nginx/sites-available/cryptofolio /etc/nginx/sites-enabled/
-sudo certbot --nginx -d tudominio.com
-```
+Caddy obtiene el certificado SSL automáticamente en el primer arranque (~30 segundos).
+La app estará disponible en `https://tudominio.com`.
 
 ---
 
 ## Estructura del proyecto
 
-```
-cryptofolio/
+```text
+CryptoFolio/
 ├── backend/          # API Node.js + TypeScript
 │   └── src/
 │       ├── routes/   # Endpoints REST
@@ -165,7 +132,9 @@ cryptofolio/
 │   └── src/
 │       ├── pages/    # Dashboard, Portfolio, Fiscal, Historial, Settings
 │       └── components/
-└── docker-compose.yml
+├── Caddyfile                 # Configuración HTTPS producción
+├── docker-compose.yml        # Desarrollo local
+└── docker-compose.prod.yml   # Producción
 ```
 
 ---

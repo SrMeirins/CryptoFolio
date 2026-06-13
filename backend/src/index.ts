@@ -19,12 +19,11 @@ import walletsRouter from './routes/wallets';
 const app = express();
 const server = createServer(app);
 const PORT = parseInt(process.env.BACKEND_PORT || '3001', 10);
-const isProd = process.env.NODE_ENV === 'production';
 
 // ── Security headers ───────────────────────────────────────────────────────
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
-  contentSecurityPolicy: isProd ? {
+  contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc:  ["'self'"],
@@ -32,18 +31,18 @@ app.use(helmet({
       imgSrc:     ["'self'", 'data:', 'https:'],
       connectSrc: ["'self'", 'wss:', 'https:'],
     },
-  } : false,
+  },
 }));
 
 // ── CORS ───────────────────────────────────────────────────────────────────
 const corsOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
-  : isProd ? [] : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+  : [];
 
-app.use(cors({ origin: corsOrigins, credentials: true }));
+app.use(cors({ origin: corsOrigins.length ? corsOrigins : false, credentials: true }));
 
-// ── Logging ────────────────────────────────────────────────────────────────
-app.use(morgan(isProd ? 'combined' : 'dev'));
+// ── Logging (structured, sin datos sensibles) ──────────────────────────────
+app.use(morgan('combined'));
 
 // ── Rate limiting ──────────────────────────────────────────────────────────
 const globalLimiter = rateLimit({
@@ -77,17 +76,14 @@ app.use('/api/fiscal', fiscalLimiter);
 // ── Body parsing ───────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 
+// ── Health check (sin datos internos sensibles) ────────────────────────────
 app.get('/health', async (_req, res) => {
   try {
     await db.query('SELECT 1');
-    res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok' });
   } catch {
-    res.status(503).json({ status: 'error', db: 'disconnected', timestamp: new Date().toISOString() });
+    res.status(503).json({ status: 'error' });
   }
-});
-
-app.get('/api/ping', (_req, res) => {
-  res.json({ message: 'CryptoTracker API v1.0' });
 });
 
 app.use('/api/imports', importsRouter);
@@ -99,26 +95,23 @@ app.use('/api/transactions', transactionsRouter);
 app.use('/api/fiscal', fiscalRouter);
 app.use('/api/wallets', walletsRouter);
 
+// ── Error handler — nunca filtra detalles internos al cliente ─────────────
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error('[ERROR]', err.message);
-  if (process.env.NODE_ENV === 'development') console.error(err.stack);
-  res.status(500).json({
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined,
-  });
+  console.error('[ERROR]', err.stack ?? err.message);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 async function bootstrap() {
   try {
     await db.query('SELECT NOW()');
-    console.log('[DB] Conexión a PostgreSQL establecida ✓');
+    console.log('[DB] Connected');
     setupPricesWebSocket(server);
     server.listen(PORT, '0.0.0.0', () => {
-      console.log(`[SERVER] CryptoTracker backend escuchando en puerto ${PORT}`);
+      console.log(`[SERVER] Listening on port ${PORT}`);
       startLivePrices();
     });
   } catch (err) {
-    console.error('[FATAL] No se pudo conectar a PostgreSQL:', err);
+    console.error('[FATAL] Cannot connect to PostgreSQL:', err);
     process.exit(1);
   }
 }

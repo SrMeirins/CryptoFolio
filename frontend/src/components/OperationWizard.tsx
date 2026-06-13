@@ -109,7 +109,7 @@ export function OperationWizard({ unknownOperation, onComplete, onCancel }: Oper
   const [autoPriceLoading, setAutoPriceLoading] = useState(false)
 
   useEffect(() => {
-    fetch('/api/catalog').then(r => r.json()).then(setCatalog).catch(console.error)
+    fetch('/api/catalog').then(r => r.json()).then(setCatalog).catch(() => {})
   }, [])
 
   useEffect(() => {
