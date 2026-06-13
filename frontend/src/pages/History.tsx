@@ -6,7 +6,7 @@ import {
   Trash2, AlertTriangle, PenLine, Download, ChevronDown,
   TrendingUp, TrendingDown, Zap, Calendar,
   ChevronUp, BarChart2, Package, ArrowUpDown, ArrowUp, ArrowDown,
-  Copy, Check,
+  Copy, Check, ArrowRight,
 } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { ManualTxModal } from '../components/ManualTxModal'
@@ -461,11 +461,27 @@ function TxRow({
 
         {/* Wallet */}
         <td className="px-3 py-2.5 align-middle">
-          <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold"
-            style={{ backgroundColor: `${tx.wallet_color}18`, color: tx.wallet_color }}>
-            {tx.wallet_name}
-          </span>
-          {tx.account && <div className="text-[10px] text-gray-600 mt-0.5">{tx.account}</div>}
+          {tx.operation_type === 'TRANSFER_INTERNAL' && tx.destination_wallet_name ? (
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold"
+                style={{ backgroundColor: `${tx.wallet_color}18`, color: tx.wallet_color }}>
+                {tx.wallet_name}
+              </span>
+              <ArrowRight size={10} className="text-gray-600 shrink-0" />
+              <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold"
+                style={{ backgroundColor: `${tx.destination_wallet_color}18`, color: tx.destination_wallet_color ?? '#6b7280' }}>
+                {tx.destination_wallet_name}
+              </span>
+            </div>
+          ) : (
+            <>
+              <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold"
+                style={{ backgroundColor: `${tx.wallet_color}18`, color: tx.wallet_color }}>
+                {tx.wallet_name}
+              </span>
+              {tx.account && <div className="text-[10px] text-gray-600 mt-0.5">{tx.account}</div>}
+            </>
+          )}
         </td>
 
         {/* Acciones */}

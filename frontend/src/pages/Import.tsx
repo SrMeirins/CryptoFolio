@@ -143,6 +143,7 @@ export function ImportPage() {
               queryClient.invalidateQueries({ queryKey: ['imports'] })
               queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
               queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
+              queryClient.invalidateQueries({ queryKey: ['transactions'] })
               try {
                 sessionStorage.removeItem('import_withdrawal_dest')
                 sessionStorage.removeItem('import_deposit_costs')
@@ -177,6 +178,7 @@ export function ImportPage() {
     queryClient.invalidateQueries({ queryKey: ['imports'] })
     queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
     queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
+    queryClient.invalidateQueries({ queryKey: ['transactions'] })
   }
 
   return (
@@ -304,6 +306,7 @@ export function ImportPage() {
             setShowManualTx(false)
             queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
             queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
+            queryClient.invalidateQueries({ queryKey: ['transactions'] })
           }}
         />
       )}

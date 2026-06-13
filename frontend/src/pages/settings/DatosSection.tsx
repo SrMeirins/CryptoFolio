@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
 import { RefreshCw, Trash2, Zap, Download } from 'lucide-react'
+import { useToast } from '../../components/Toast'
 
 const CONFIRM_WORD = 'CONFIRMAR'
 
 export function DatosSection() {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['settings-stats'],
     queryFn: portfolioApi.getStats,
@@ -61,10 +63,11 @@ export function DatosSection() {
     if (resetInput !== CONFIRM_WORD) return
     setResetting(true)
     await portfolioApi.resetAllData()
-    queryClient.invalidateQueries()
+    queryClient.invalidateQueries({ refetchType: 'all' })
     setResetting(false)
     setShowResetConfirm(false)
     setResetInput('')
+    toast.success('Datos borrados', 'Todas las transacciones y lotes FIFO han sido eliminados.')
   }
 
   const statCards = [

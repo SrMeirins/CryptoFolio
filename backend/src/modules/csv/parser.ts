@@ -597,20 +597,22 @@ function interpretGroup(
   }
 
   // Transferencias internas entre sub-cuentas de Binance
-  // La fila con change < 0 es la salida → TRANSFER_INTERNAL (el FIFO mueve el lote)
-  // La fila con change > 0 es la entrada → IGNORED (el FIFO abre el lote destino automáticamente)
+  // Solo emitimos la fila de salida (change < 0) como TRANSFER_INTERNAL.
+  // La fila de entrada es redundante: el FIFO mueve el lote al destino automáticamente.
   if (INTERNAL_TRANSFER_OPS.has(firstOp)) {
-    return group.map((row) => ({
-      operationType: row.change < 0 ? 'TRANSFER_INTERNAL' as const : 'IGNORED' as const,
-      timestamp:     row.time,
-      asset:         row.coin,
-      amount:        abs(row.change),
-      amountNet:     abs(row.change),
-      account:       row.account,
-      notes:         firstOp,  // preservamos la etiqueta para mapear destino en el importer
-      subTradeCount: 1,
-      rawRowHashes:  [row.rowHash],
-    }));
+    const outRow = group.find((r) => r.change < 0);
+    if (!outRow) return [];
+    return [{
+      operationType: 'TRANSFER_INTERNAL' as const,
+      timestamp:     outRow.time,
+      asset:         outRow.coin,
+      amount:        abs(outRow.change),
+      amountNet:     abs(outRow.change),
+      account:       outRow.account,
+      notes:         firstOp,
+      subTradeCount: group.length,
+      rawRowHashes:  group.map((r) => r.rowHash),
+    }];
   }
 
   // Fee rebate de Binance Strategy: BNB negativo (fee pagada) + positivos (rebate recibido)
