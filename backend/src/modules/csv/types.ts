@@ -26,6 +26,7 @@ export type OperationType =
   | 'STAKING_REWARD'
   | 'MINING_REWARD'
   | 'LENDING_INTEREST'
+  | 'LENDING_INTEREST_LOCKED'
   | 'CASHBACK'
   | 'AIRDROP'
   | 'FORK'

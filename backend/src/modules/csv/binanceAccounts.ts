@@ -52,7 +52,7 @@ export const SPOT_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Staking Rewards',               internalType: 'STAKING_REWARD',   status: 'supported', notes: 'Rendimiento PoS — art. 25.4 LIRPF, base del ahorro' },
   { csvLabel: 'ETH 2.0 Staking Rewards',       internalType: 'STAKING_REWARD',   status: 'supported', notes: 'Rendimiento validador ETH2 (BETH) — art. 25.4 LIRPF' },
   { csvLabel: 'Simple Earn Flexible Interest',  internalType: 'LENDING_INTEREST', status: 'supported', notes: 'Interés préstamo flexible — art. 25.2 LIRPF, base del ahorro' },
-  { csvLabel: 'Simple Earn Locked Rewards',     internalType: 'STAKING_REWARD',   status: 'pending', notes: 'Rendimiento staking bloqueado — clasificación LIRPF en revisión' },
+  { csvLabel: 'Simple Earn Locked Rewards',     internalType: 'LENDING_INTEREST_LOCKED', status: 'supported', notes: 'Interés depósito bloqueado — art. 25.2 LIRPF, base del ahorro' },
 ];
 
 // ── Funding ────────────────────────────────────────────────────────────────

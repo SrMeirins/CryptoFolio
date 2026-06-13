@@ -25,7 +25,8 @@ function getTipoRendimiento(operationType: string): string {
   const map: Record<string, string> = {
     'STAKING_REWARD':   'Staking',
     'MINING_REWARD':    'Minería',
-    'LENDING_INTEREST': 'Lending / Interés',
+    'LENDING_INTEREST':        'Lending / Interés flexible',
+    'LENDING_INTEREST_LOCKED': 'Lending / Interés bloqueado',
     'CASHBACK':         'Cashback / Bonus',
     'AIRDROP':          'Airdrop',
   };
@@ -170,7 +171,7 @@ async function getEventosAnio(year: number) {
     FROM transactions t
     JOIN wallets w ON w.id = t.wallet_id
     WHERE EXTRACT(YEAR FROM t.timestamp) = $1
-      AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP')
+      AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
     ORDER BY t.timestamp ASC
   `, [year]);
 
@@ -194,7 +195,7 @@ router.get('/years', async (_req: Request, res: Response) => {
     UNION
     SELECT DISTINCT EXTRACT(YEAR FROM timestamp)::int AS year
     FROM transactions
-    WHERE operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP')
+    WHERE operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
     ORDER BY year DESC
   `);
   res.json(result.rows.map((r: { year: number }) => r.year));
@@ -210,7 +211,7 @@ router.get('/overview', async (_req: Request, res: Response) => {
     UNION
     SELECT DISTINCT EXTRACT(YEAR FROM timestamp)::int AS year
     FROM transactions
-    WHERE operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP')
+    WHERE operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
     ORDER BY year ASC
   `);
 
@@ -232,7 +233,7 @@ router.get('/overview', async (_req: Request, res: Response) => {
       SELECT COALESCE(SUM(t.amount_net * COALESCE(t.price_per_unit, 0)), 0) AS total_rendimientos
       FROM transactions t
       WHERE EXTRACT(YEAR FROM t.timestamp) = $1
-        AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP')
+        AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
     `, [year]);
 
     return {
@@ -270,7 +271,7 @@ router.get('/carryforward', async (_req: Request, res: Response) => {
       SELECT COALESCE(SUM(t.amount_net * COALESCE(t.price_per_unit, 0)), 0) AS total
       FROM transactions t
       WHERE EXTRACT(YEAR FROM t.timestamp) = $1
-        AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP')
+        AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
     `, [y]);
     rows.push({
       year: y,
@@ -448,7 +449,7 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
       COUNT(*) AS num_rendimientos
     FROM transactions t
     WHERE EXTRACT(YEAR FROM t.timestamp) = $1
-      AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP')
+      AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
   `, [year]);
 
   const dec31 = esAnioEnCurso ? new Date() : new Date(`${year}-12-31T23:59:59Z`);

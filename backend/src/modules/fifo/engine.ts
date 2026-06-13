@@ -69,7 +69,8 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
          WHEN 'BUY_CRYPTO'      THEN 1
          WHEN 'AIRDROP'         THEN 1
          WHEN 'STAKING_REWARD'  THEN 1
-         WHEN 'LENDING_INTEREST'THEN 1
+         WHEN 'LENDING_INTEREST'        THEN 1
+         WHEN 'LENDING_INTEREST_LOCKED' THEN 1
          WHEN 'CASHBACK'        THEN 1
          WHEN 'FORK'            THEN 1
          WHEN 'SELL'            THEN 2
@@ -125,6 +126,7 @@ async function processTransaction(tx: Transaction, result: FifoRunResult): Promi
     case 'STAKING_REWARD':
     case 'MINING_REWARD':
     case 'LENDING_INTEREST':
+    case 'LENDING_INTEREST_LOCKED':
     case 'CASHBACK':
     case 'AIRDROP':
       await processIncome(tx, result);

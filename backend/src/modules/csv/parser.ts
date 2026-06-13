@@ -31,11 +31,11 @@ const FIAT_BUY_OPS = new Set([
 ]);
 
 // Mapa de operaciones de Binance → tipo fiscal (income/airdrops/cashback)
-const INCOME_OPS: Record<string, 'STAKING_REWARD' | 'LENDING_INTEREST' | 'CASHBACK' | 'AIRDROP'> = {
+const INCOME_OPS: Record<string, 'STAKING_REWARD' | 'LENDING_INTEREST' | 'LENDING_INTEREST_LOCKED' | 'CASHBACK' | 'AIRDROP'> = {
   'Staking Rewards':                'STAKING_REWARD',
   'ETH 2.0 Staking Rewards':        'STAKING_REWARD',
   'Simple Earn Flexible Interest':  'LENDING_INTEREST',
-  'Simple Earn Locked Rewards':     'STAKING_REWARD',
+  'Simple Earn Locked Rewards':     'LENDING_INTEREST_LOCKED',
   'Savings Interest':               'LENDING_INTEREST',
   'POS savings interest':           'LENDING_INTEREST',
   'Launchpool Interest':            'STAKING_REWARD',
