@@ -73,10 +73,10 @@ jobs:
         run: npm ci
 
       # ── 7. Inyectar versión del tag en electron/package.json ─────────────────
+      # npm version falla si la versión ya coincide; npm pkg set siempre escribe.
       - name: Set version
         working-directory: electron
-        shell: bash
-        run: npm version ${{ steps.version.outputs.VERSION }} --no-git-tag-version
+        run: npm pkg set version=${{ steps.version.outputs.VERSION }}
 
       # ── 8. Compilar TypeScript del proceso principal ──────────────────────────
       - name: Build Electron TS
