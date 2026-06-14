@@ -16,17 +16,45 @@ const NAV_ITEMS = [
 
 function AppLogo() {
   return (
-    <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="34" height="34" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="logoGrad" x1="0" y1="0" x2="34" y2="34" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#3b82f6"/>
-          <stop offset="100%" stopColor="#8b5cf6"/>
+        <linearGradient id="sBg" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%"   stopColor="#050A18"/>
+          <stop offset="100%" stopColor="#1E1B4B"/>
         </linearGradient>
+        <linearGradient id="sBarA" x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%"   stopColor="#3730A3"/>
+          <stop offset="100%" stopColor="#818CF8"/>
+        </linearGradient>
+        <linearGradient id="sBarB" x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%"   stopColor="#4338CA"/>
+          <stop offset="100%" stopColor="#A5B4FC"/>
+        </linearGradient>
+        <linearGradient id="sBarC" x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%"   stopColor="#4F46E5"/>
+          <stop offset="100%" stopColor="#C7D2FE"/>
+        </linearGradient>
+        <linearGradient id="sLine" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%"   stopColor="#6366F1"/>
+          <stop offset="100%" stopColor="#22D3EE"/>
+        </linearGradient>
+        <radialGradient id="sHalo" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stopColor="#22D3EE" stopOpacity="0.45"/>
+          <stop offset="100%" stopColor="#22D3EE" stopOpacity="0"/>
+        </radialGradient>
       </defs>
-      <rect width="34" height="34" rx="9" fill="url(#logoGrad)"/>
-      <rect x="6.5"  y="22" width="5" height="6"  rx="1.5" fill="white" fillOpacity="0.65"/>
-      <rect x="14.5" y="16" width="5" height="12" rx="1.5" fill="white" fillOpacity="0.82"/>
-      <rect x="22.5" y="10" width="5" height="18" rx="1.5" fill="white"/>
+      <rect width="200" height="200" rx="38" fill="url(#sBg)"/>
+      <polygon points="100,16 152,46 152,106 100,136 48,106 48,46"
+               fill="none" stroke="#6366F1" strokeWidth="1" opacity="0.07"/>
+      <rect x="26"  y="108" width="36" height="60" rx="6" fill="url(#sBarA)" opacity="0.80"/>
+      <rect x="76"  y="78"  width="36" height="90" rx="6" fill="url(#sBarB)" opacity="0.90"/>
+      <rect x="126" y="44"  width="36" height="124" rx="6" fill="url(#sBarC)"/>
+      <polyline points="44,103 94,73 144,39"
+                stroke="url(#sLine)" strokeWidth="5.5"
+                strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.95"/>
+      <circle cx="144" cy="39" r="20" fill="url(#sHalo)"/>
+      <circle cx="144" cy="39" r="9"  fill="#22D3EE"/>
+      <circle cx="144" cy="39" r="4.5" fill="white"/>
     </svg>
   )
 }
