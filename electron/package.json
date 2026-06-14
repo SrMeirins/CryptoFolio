@@ -1,7 +1,7 @@
 {
   "name": "cryptofolio-desktop",
   "productName": "CryptoFolio",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Gestión de portfolio y fiscalidad crypto para España — 100% local",
   "author": {
     "name": "SrMeirins",
@@ -23,8 +23,8 @@
     "dist:local": "electron-builder --config electron-builder.config.js --publish never"
   },
   "dependencies": {
-    "embedded-postgres": "18.4.0-beta.17",
-    "electron-updater": "^6.3.0"
+    "electron-updater": "^6.3.0",
+    "embedded-postgres": "18.4.0-beta.17"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

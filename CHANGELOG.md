@@ -9,7 +9,9 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-06-14
+## [0.0.1] - 2026-06-14
+
+> **Alpha** — versión funcional en pruebas. No recomendada para uso en producción sin supervisión.
 
 ### Añadido
 
@@ -35,7 +37,6 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `DEPOSIT_CRYPTO / WITHDRAW` — movimientos cripto con coste personalizable
 - `FEE_EXCHANGE` — comisiones de trading pagadas en BNB (Strategy Fee Rebate)
 - Cuenta **Strategy** (grid trading bots): soportada con todos sus tipos de operación
-- Fix: transferencias multi-activo al mismo timestamp (cierre de grid bot con USDT + token)
 
 #### Portfolio y fiscalidad
 - Cálculo FIFO conforme a la normativa española (IRPF)
@@ -52,10 +53,6 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Frontend Docker: proceso Vite no corre como root (`USER node`)
 - Electron: `contextIsolation`, `sandbox`, sin `nodeIntegration`, navegación externa bloqueada
 
-#### Documentación
-- [Referencia completa de operaciones soportadas](docs/operaciones-soportadas.md) con ejemplos por tipo
-- README actualizado con instrucciones de instalación Docker y desktop
-
 ---
 
 ## Cómo añadir una entrada
@@ -63,5 +60,5 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Antes de hacer un nuevo tag, añade una sección `## [X.Y.Z] - YYYY-MM-DD` encima de la anterior
 con los cambios agrupados en: **Añadido**, **Cambiado**, **Corregido**, **Eliminado**, **Seguridad**.
 
-[Unreleased]: https://github.com/SrMeirins/CryptoFolio/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/SrMeirins/CryptoFolio/releases/tag/v1.0.0
+[Unreleased]: https://github.com/SrMeirins/CryptoFolio/compare/v0.0.1...HEAD
+[0.0.1]: https://github.com/SrMeirins/CryptoFolio/releases/tag/v0.0.1
