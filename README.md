@@ -93,6 +93,9 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 - Preview antes de confirmar la importación
 - Asignación de coste de adquisición para depósitos externos (transfers desde wallets frías)
 - Motor FIFO que se **recalcula automáticamente** tras cada importación
+- **+35 tipos de operación soportados**: compras, ventas, staking, Launchpool, ETH 2.0, airdrops, cashback, transfers internos, margin…
+
+> 📖 **[Ver referencia completa de operaciones soportadas →](docs/operaciones-soportadas.md)**
 
 ### 📋 Historial
 - Búsqueda y filtrado por fecha, activo, tipo de operación y wallet
