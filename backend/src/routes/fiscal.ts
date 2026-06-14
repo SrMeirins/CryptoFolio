@@ -14,6 +14,12 @@ async function getUmbral721(): Promise<number> {
 
 const FIAT_ASSETS = new Set(['EUR', 'USD', 'GBP', 'CHF', 'BRL', 'ARS', 'USDT', 'USDC', 'BUSD', 'DAI']);
 
+function parseYear(raw: string): number | null {
+  const y = parseInt(raw, 10);
+  if (isNaN(y) || y < 2009 || y > 2100) return null; // Bitcoin nació en 2009
+  return y;
+}
+
 // Claves oficiales AEAT: D=Dinero, V=Valores/cripto, I=Inmueble, O=Otros/sin contrapartida
 function getContrapartidaClave(activoRecibido: string | null): { clave: string; descripcion: string } {
   if (!activoRecibido)                      return { clave: 'O', descripcion: 'Sin contrapartida directa (comision/perdida)' };
@@ -350,8 +356,8 @@ router.get('/carryforward', async (_req: Request, res: Response) => {
 // ── GET /api/fiscal/:year/breakdown ───────────────────────────────────────
 // G/P neto agrupado por activo transmitido para el año dado.
 router.get('/:year/breakdown', async (req: Request, res: Response) => {
-  const year = parseInt(req.params.year);
-  if (isNaN(year)) return res.status(400).json({ error: 'Año inválido' });
+  const year = parseYear(req.params.year);
+  if (!year) return res.status(400).json({ error: 'Año inválido' });
 
   const result = await db.query(`
     SELECT
@@ -380,8 +386,8 @@ router.get('/:year/breakdown', async (req: Request, res: Response) => {
 // ── GET /api/fiscal/:year/monthly ──────────────────────────────────────────
 // G/P acumulado mes a mes para el año dado (para gráfico de evolución).
 router.get('/:year/monthly', async (req: Request, res: Response) => {
-  const year = parseInt(req.params.year);
-  if (isNaN(year)) return res.status(400).json({ error: 'Año inválido' });
+  const year = parseYear(req.params.year);
+  if (!year) return res.status(400).json({ error: 'Año inválido' });
 
   const result = await db.query(`
     SELECT
@@ -426,8 +432,8 @@ router.get('/:year/monthly', async (req: Request, res: Response) => {
 
 // ── GET /api/fiscal/:year/summary ──────────────────────────────────────────
 router.get('/:year/summary', async (req: Request, res: Response) => {
-  const year = parseInt(req.params.year);
-  if (isNaN(year)) return res.status(400).json({ error: 'Año inválido' });
+  const year = parseYear(req.params.year);
+  if (!year) return res.status(400).json({ error: 'Año inválido' });
 
   const currentYear = new Date().getFullYear();
   const esAnioEnCurso = year === currentYear;
@@ -484,8 +490,8 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
 
 // ── GET /api/fiscal/:year/events ───────────────────────────────────────────
 router.get('/:year/events', async (req: Request, res: Response) => {
-  const year = parseInt(req.params.year);
-  if (isNaN(year)) return res.status(400).json({ error: 'Año inválido' });
+  const year = parseYear(req.params.year);
+  if (!year) return res.status(400).json({ error: 'Año inválido' });
 
   const data = await getEventosAnio(year);
   res.json(data);
@@ -493,8 +499,8 @@ router.get('/:year/events', async (req: Request, res: Response) => {
 
 // ── GET /api/fiscal/:year/modelo721 ───────────────────────────────────────
 router.get('/:year/modelo721', async (req: Request, res: Response) => {
-  const year = parseInt(req.params.year);
-  if (isNaN(year)) return res.status(400).json({ error: 'Año inválido' });
+  const year = parseYear(req.params.year);
+  if (!year) return res.status(400).json({ error: 'Año inválido' });
 
   const currentYear = new Date().getFullYear();
   const esAnioEnCurso = year === currentYear;
@@ -545,8 +551,8 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
 
 // ── GET /api/fiscal/:year/export ───────────────────────────────────────────
 router.get('/:year/export', async (req: Request, res: Response) => {
-  const year = parseInt(req.params.year);
-  if (isNaN(year)) return res.status(400).json({ error: 'Año inválido' });
+  const year = parseYear(req.params.year);
+  if (!year) return res.status(400).json({ error: 'Año inválido' });
 
   const format = (req.query.format as string) ?? 'csv';
   const { fiscalEvents, rendimientos } = await getEventosAnio(year);

@@ -8,11 +8,26 @@ import { db } from '../db/client';
 
 const router = Router();
 
+// Magic bytes de CSV: texto plano — los primeros bytes no deben ser un ejecutable
+const BINARY_MAGIC = [
+  [0x4d, 0x5a],             // MZ — PE/EXE Windows
+  [0x7f, 0x45, 0x4c, 0x46], // ELF — Linux executable
+  [0xff, 0xd8, 0xff],       // JPEG
+  [0x89, 0x50, 0x4e, 0x47], // PNG
+  [0x50, 0x4b, 0x03, 0x04], // ZIP / DOCX / XLSX
+  [0x25, 0x50, 0x44, 0x46], // %PDF
+];
+
+function hasBinaryMagic(buf: Buffer): boolean {
+  return BINARY_MAGIC.some(magic => magic.every((b, i) => buf[i] === b));
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!file.originalname.endsWith('.csv')) {
+    const ext = file.originalname.toLowerCase();
+    if (!ext.endsWith('.csv')) {
       cb(new Error('Solo se aceptan archivos CSV'));
       return;
     }
@@ -53,13 +68,35 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
   }
 
   try {
-    const withdrawalDestinations: Record<string, string> = req.body.withdrawalDestinations
-      ? JSON.parse(req.body.withdrawalDestinations as string)
-      : {};
+    // Validar magic bytes antes de parsear
+    if (hasBinaryMagic(req.file.buffer)) {
+      send('error', '⛔ El archivo no es un CSV válido (cabecera binaria detectada)');
+      res.end();
+      return;
+    }
+
+    // Deserializar y validar esquema de payloads JSON auxiliares
+    let withdrawalDestinations: Record<string, string> = {};
+    if (req.body.withdrawalDestinations) {
+      const raw = JSON.parse(req.body.withdrawalDestinations as string);
+      if (typeof raw !== 'object' || Array.isArray(raw)) throw new Error('withdrawalDestinations inválido');
+      for (const [k, v] of Object.entries(raw)) {
+        if (typeof k !== 'string' || typeof v !== 'string') throw new Error('withdrawalDestinations: valores inválidos');
+      }
+      withdrawalDestinations = raw as Record<string, string>;
+    }
+
     // null = usuario marcó "desconocido" — cuenta como revisado (no bloquea el import)
-    const depositCostsRaw: Record<string, number | null> = req.body.depositCosts
-      ? JSON.parse(req.body.depositCosts as string)
-      : {};
+    let depositCostsRaw: Record<string, number | null> = {};
+    if (req.body.depositCosts) {
+      const raw = JSON.parse(req.body.depositCosts as string);
+      if (typeof raw !== 'object' || Array.isArray(raw)) throw new Error('depositCosts inválido');
+      for (const [k, v] of Object.entries(raw)) {
+        if (typeof k !== 'string') throw new Error('depositCosts: clave inválida');
+        if (v !== null && typeof v !== 'number') throw new Error('depositCosts: valor debe ser número o null');
+      }
+      depositCostsRaw = raw as Record<string, number | null>;
+    }
 
     // ── GATE 0: comprobar depósitos externos ANTES de importar nada ──────────
     // 1. Depósitos en el CSV con needsCostReview

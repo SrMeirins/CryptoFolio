@@ -6,6 +6,13 @@ import { getHistoricalPriceEur } from '../modules/prices/binance';
 
 const router = Router();
 
+// Formato válido para un símbolo de activo: 1-20 caracteres alfanuméricos
+const SYMBOL_RE = /^[A-Z0-9]{1,20}$/;
+function validateSymbol(raw: string): string | null {
+  const s = raw.toUpperCase().trim();
+  return SYMBOL_RE.test(s) ? s : null;
+}
+
 // ── GET /api/settings/assets ───────────────────────────────────────────────
 router.get('/assets', async (_req: Request, res: Response) => {
   const result = await db.query(
@@ -86,7 +93,8 @@ router.put('/assets/:symbol', async (req: Request, res: Response) => {
 
 // ── DELETE /api/settings/assets/:symbol ───────────────────────────────────
 router.delete('/assets/:symbol', async (req: Request, res: Response) => {
-  const symbol = req.params.symbol.toUpperCase();
+  const symbol = validateSymbol(req.params.symbol);
+  if (!symbol) { res.status(400).json({ error: 'Símbolo inválido' }); return; }
 
   const txCheck = await db.query(
     'SELECT COUNT(*) FROM transactions WHERE asset = $1',
@@ -141,7 +149,8 @@ router.post('/assets/detect-all', async (_req: Request, res: Response) => {
 
 // ── POST /api/settings/assets/:symbol/detect ──────────────────────────────
 router.post('/assets/:symbol/detect', async (req: Request, res: Response) => {
-  const symbol = req.params.symbol.toUpperCase();
+  const symbol = validateSymbol(req.params.symbol);
+  if (!symbol) { res.status(400).json({ error: 'Símbolo inválido' }); return; }
   try {
     await autoDetectPair(symbol);
     const result = await db.query(

@@ -23,13 +23,27 @@ const PORT = parseInt(process.env.BACKEND_PORT || '3001', 10);
 // ── Security headers ───────────────────────────────────────────────────────
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: 'no-referrer' },
+  permittedCrossDomainPolicies: { permittedPolicies: 'none' },
   contentSecurityPolicy: {
     directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'"],
-      styleSrc:   ["'self'", "'unsafe-inline'"],
-      imgSrc:     ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", 'wss:', 'https:'],
+      defaultSrc:      ["'self'"],
+      scriptSrc:       ["'self'"],
+      styleSrc:        ["'self'", "'unsafe-inline'"],
+      imgSrc:          ["'self'", 'data:'],
+      // Restringir connectSrc a los dominios reales usados por la app
+      connectSrc:      [
+        "'self'",
+        'wss://stream.binance.com:9443',
+        'https://api.binance.com',
+        'https://api.coingecko.com',
+        // WebSocket local (dev y Electron)
+        'ws://localhost:*',
+        'wss://localhost:*',
+      ],
+      frameAncestors:  ["'none'"],
+      formAction:      ["'self'"],
+      upgradeInsecureRequests: [],
     },
   },
 }));
