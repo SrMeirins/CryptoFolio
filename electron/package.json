@@ -1,0 +1,27 @@
+{
+  "name": "cryptofolio-desktop",
+  "productName": "CryptoFolio",
+  "version": "1.0.0",
+  "description": "Gestión de portfolio y fiscalidad crypto para España — 100% local",
+  "main": "dist/main.js",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "dev": "NODE_ENV=development electron dist/main.js",
+    "dist": "electron-builder --publish always",
+    "dist:win": "electron-builder --win --publish always",
+    "dist:mac": "electron-builder --mac --publish always",
+    "dist:linux": "electron-builder --linux --publish always",
+    "dist:local": "electron-builder --publish never"
+  },
+  "dependencies": {
+    "embedded-postgres": "18.4.0-beta.17",
+    "electron-updater": "^6.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "electron": "^42.4.0",
+    "electron-builder": "^24.13.0",
+    "typescript": "^5.4.0"
+  }
+}

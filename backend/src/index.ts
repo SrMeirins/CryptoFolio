@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { db } from './db/client';
+import { runMigrations } from './db/run-migrations';
 import importsRouter from './routes/imports';
 import fifoRouter from './routes/fifo';
 import pricesRouter, { setupPricesWebSocket } from './routes/prices';
@@ -119,6 +120,12 @@ async function bootstrap() {
   try {
     await db.query('SELECT NOW()');
     console.log('[DB] Connected');
+
+    // En modo Electron/standalone, aplicar schema y migraciones automáticamente
+    if (process.env.ELECTRON_MODE === 'true') {
+      const dbUrl = process.env.DATABASE_URL!;
+      await runMigrations(dbUrl);
+    }
     setupPricesWebSocket(server);
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`[SERVER] Listening on port ${PORT}`);

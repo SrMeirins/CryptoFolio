@@ -1,0 +1,14 @@
+{
+  "name": "cryptofolio",
+  "private": true,
+  "scripts": {
+    "build:frontend": "npm run build --prefix frontend",
+    "build:backend":  "npm run build --prefix backend",
+    "build:electron": "npm run build --prefix electron",
+    "build": "npm run build:frontend && npm run build:backend && npm run build:electron",
+    "dist":       "npm run build && npm run dist:local --prefix electron",
+    "dist:win":   "npm run build && npm run dist:win   --prefix electron",
+    "dist:mac":   "npm run build && npm run dist:mac   --prefix electron",
+    "dist:linux": "npm run build && npm run dist:linux --prefix electron"
+  }
+}

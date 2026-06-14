@@ -1,0 +1,101 @@
+name: Release
+
+# Se dispara SOLO cuando subes un tag con formato v1.2.3
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+# Permisos para crear el GitHub Release y subir assets
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build — ${{ matrix.os }}
+    strategy:
+      fail-fast: false   # Si falla un OS, los otros siguen
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: mac
+          - os: windows-latest
+            platform: win
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Node.js ───────────────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+            electron/package-lock.json
+
+      # ── 3. Extraer versión del tag (v1.2.3 → 1.2.3) ─────────────────────────
+      - name: Extract version
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      # ── 4. Build frontend ─────────────────────────────────────────────────────
+      - name: Install & build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          VITE_API_URL=http://127.0.0.1:3001 VITE_WS_URL=ws://127.0.0.1:3001 npm run build
+
+      # ── 5. Build backend ──────────────────────────────────────────────────────
+      - name: Install & build backend
+        working-directory: backend
+        run: |
+          npm ci
+          npm run build
+
+      # ── 6. Instalar dependencias de Electron ──────────────────────────────────
+      - name: Install Electron deps
+        working-directory: electron
+        run: npm ci
+
+      # ── 7. Actualizar versión en package.json del electron ────────────────────
+      - name: Set version in electron/package.json
+        working-directory: electron
+        shell: bash
+        run: npm version ${{ steps.version.outputs.VERSION }} --no-git-tag-version
+
+      # ── 8. Build TypeScript de Electron ──────────────────────────────────────
+      - name: Build Electron TS
+        working-directory: electron
+        run: npm run build
+
+      # ── 9. Empaquetar y publicar en GitHub Release ───────────────────────────
+      - name: Package & publish
+        working-directory: electron
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Descomenta cuando tengas certificados:
+          # CSC_LINK: ${{ secrets.CSC_LINK }}
+          # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run dist:${{ matrix.platform }}
+
+      # ── 10. Subir artifacts (para debug si falla la publicación) ─────────────
+      - name: Upload artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: releases-${{ matrix.os }}
+          path: releases/
+          retention-days: 7
