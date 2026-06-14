@@ -3,6 +3,14 @@
   "productName": "CryptoFolio",
   "version": "1.0.0",
   "description": "Gestión de portfolio y fiscalidad crypto para España — 100% local",
+  "author": {
+    "name": "SrMeirins",
+    "url": "https://github.com/SrMeirins"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SrMeirins/CryptoFolio.git"
+  },
   "main": "dist/main.js",
   "private": true,
   "scripts": {
