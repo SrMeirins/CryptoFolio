@@ -29,6 +29,7 @@ frontend/build/
 backend/dist/
 backend/build/
 electron/compiled/
+electron/dist/
 
 # ── Docker / DB ────────────────────────────────────────────────────────────
 postgres_data/
