@@ -60,7 +60,9 @@ async function createWindow(): Promise<void> {
     minWidth: 1024,
     minHeight: 600,
     title: 'CryptoFolio',
-    icon: path.join(__dirname, '../assets/icon.png'),
+    icon: isDev
+      ? path.join(__dirname, '../assets/icon.png')
+      : path.join(process.resourcesPath, 'app', 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,   // El renderer NO puede acceder a Node.js

@@ -55,14 +55,22 @@ export class PostgresManager {
       persistent: true,
     });
 
-    await this.pg.initialise();
-    await this.pg.start();
+    // PG_VERSION existe solo en clusters correctamente inicializados.
+    // Si el directorio existe pero falta PG_VERSION, el arranque anterior
+    // falló a medias (p.ej. error de asar) — limpiamos y re-inicializamos.
+    const pgVersion = path.join(this.dataDir, 'PG_VERSION');
+    const clusterExists = fs.existsSync(pgVersion);
 
-    // Crear la base de datos si no existe (primer arranque)
-    try {
+    if (fs.existsSync(this.dataDir) && !clusterExists) {
+      fs.rmSync(this.dataDir, { recursive: true, force: true });
+    }
+
+    if (!clusterExists) {
+      await this.pg.initialise();
+      await this.pg.start();
       await this.pg.createDatabase(this.database);
-    } catch {
-      // Ya existe — normal en arranques posteriores al primero
+    } else {
+      await this.pg.start();
     }
   }
 
