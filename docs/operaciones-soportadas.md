@@ -34,9 +34,9 @@ Una compra es cualquier operación en la que adquieres criptomoneda a cambio de 
 
 | Etiqueta CSV | Cuenta | Descripción |
 |---|---|---|
-| `Transaction Buy` | Spot / Cross Margin / Isolated Margin | Compra en el mercado spot. Aparece junto a `Transaction Spend` (la salida de dinero) y opcionalmente `Transaction Fee` (la comisión). |
-| `Transaction Spend` | Spot / Cross Margin / Isolated Margin | Fila de coste de la compra anterior. Se agrupa automáticamente con `Transaction Buy`. |
-| `Transaction Fee` | Spot / Cross Margin / Isolated Margin | Fila de comisión de la compra o venta. Se agrupa automáticamente con su operación. |
+| `Transaction Buy` | Spot / Cross Margin / Isolated Margin / Strategy | Compra en el mercado spot. Aparece junto a `Transaction Spend` (la salida de dinero) y opcionalmente `Transaction Fee` (la comisión). |
+| `Transaction Spend` | Spot / Cross Margin / Isolated Margin / Strategy | Fila de coste de la compra anterior. Se agrupa automáticamente con `Transaction Buy`. |
+| `Transaction Fee` | Spot / Cross Margin / Isolated Margin / Strategy | Fila de comisión de la compra o venta. Se agrupa automáticamente con su operación. |
 | `Binance Convert` | Spot / Funding | Swap entre dos activos (EUR↔cripto o cripto↔cripto). Genera una fila de entrada y otra de salida. |
 | `Small Assets Exchange BNB` | Spot | Conversión de "dust" (saldos residuales ínfimos) a BNB. |
 | `Buy Crypto With Fiat` | Spot | Compra directa con euro bancario. |
@@ -53,6 +53,13 @@ Una compra es cualquier operación en la que adquieres criptomoneda a cambio de 
 84158159,24-01-15 10:30:00,Spot,Transaction Buy,BTC,0.00250000,
 84158159,24-01-15 10:30:00,Spot,Transaction Spend,EUR,-250.00000000,
 84158159,24-01-15 10:30:00,Spot,Transaction Fee,BNB,-0.00015000,
+```
+
+**Compra ejecutada por un grid bot en Strategy (USDT → AMP):**
+```
+84158159,24-03-15 12:36:00,Strategy,Transaction Buy,AMP,598,
+84158159,24-03-15 12:36:00,Strategy,Transaction Spend,USDT,-5.979402,
+84158159,24-03-15 12:36:00,Strategy,Transaction Fee,AMP,-0.598,
 ```
 
 **Swap cripto → cripto (Binance Convert USDT → SOL):**
@@ -107,8 +114,8 @@ Una venta es cualquier operación en la que entregas criptomoneda a cambio de eu
 
 | Etiqueta CSV | Cuenta | Descripción |
 |---|---|---|
-| `Transaction Sold` | Spot / Cross Margin / Isolated Margin | Venta en el mercado spot. Fila negativa que representa la salida de cripto. |
-| `Transaction Revenue` | Spot / Cross Margin / Isolated Margin | Fila de ingreso de la venta (el EUR recibido). Se agrupa con `Transaction Sold`. |
+| `Transaction Sold` | Spot / Cross Margin / Isolated Margin / Strategy | Venta en el mercado spot. Fila negativa que representa la salida de cripto. |
+| `Transaction Revenue` | Spot / Cross Margin / Isolated Margin / Strategy | Fila de ingreso de la venta (el EUR recibido). Se agrupa con `Transaction Sold`. |
 | `Cross Margin Liquidation - Small Assets Takeover` | Cross Margin | Venta forzosa de colateral durante una liquidación. Transmisión patrimonial imponible. |
 
 ### Ejemplo de CSV
@@ -481,7 +488,9 @@ Movimiento de activos entre dos sub-cuentas dentro del mismo exchange (ej. de Sp
 
 ### Cómo lo procesamos
 
-El parser genera **una sola transacción** `TRANSFER_INTERNAL` con origen y destino. La fila negativa marca el origen (wallet que envía) y la positiva el destino. La fila en el destino se ignora automáticamente para no duplicar.
+El parser genera **una transacción `TRANSFER_INTERNAL` por cada activo saliente**. La fila negativa marca el origen (wallet que envía) y la positiva el destino; la fila del destino se ignora para no duplicar.
+
+Cuando Binance emite varios activos en la misma transferencia al mismo segundo (ej: al cerrar un grid bot se transfieren simultáneamente el USDT de capital y el token residual no vendido), el parser crea una transacción separada por cada activo.
 
 ### En el historial
 
@@ -644,6 +653,44 @@ El parser los reconoce y los descarta silenciosamente. Quedan registrados como o
 ### Fiscalmente (España — IRPF)
 
 Ningún hecho imponible. Son movimientos internos entre cuentas propias o asientos contables auxiliares del exchange.
+
+---
+
+## Apéndice A — Cuenta Strategy (grid bots y bots de trading)
+
+La cuenta **Strategy** es la sub-cuenta que Binance usa para aislar los activos de los bots de grid trading y otros productos de trading algorítmico. El CSV la identifica con `Account = Strategy`.
+
+### Operaciones soportadas en Strategy
+
+| Etiqueta CSV | Tipo interno | Descripción |
+|---|---|---|
+| `Transaction Buy` | `BUY` | Compra ejecutada automáticamente por el bot (orden de compra del grid). |
+| `Transaction Spend` | `BUY` | Coste de la compra del bot (USDT u otro par base). |
+| `Transaction Fee` | `BUY` | Comisión de la operación del bot (normalmente en el activo comprado). |
+| `Transaction Sold` | `SELL` | Venta ejecutada automáticamente por el bot (orden de venta del grid). |
+| `Transaction Revenue` | `SELL` | Ingreso de la venta del bot. |
+| `Transfer Between Spot and Strategy Account` | `TRANSFER_INTERNAL` | Capital entrando o saliendo de la sub-cuenta Strategy. |
+
+### Flujo típico de un grid bot
+
+```text
+[Abrir bot]
+Spot → Strategy: USDT 200 (Transfer Between Spot and Strategy Account)
+
+[El bot opera durante días/semanas]
+Strategy: Transaction Buy AMP + Transaction Spend USDT  (compras del grid)
+Strategy: Transaction Sold AMP + Transaction Revenue USDT (ventas del grid)
+Spot:     Strategy Trading Fee Rebate AMP + BNB          (rebate de fees)
+
+[Cerrar bot]
+Strategy → Spot: USDT 212 + AMP 0.40 (dos TRANSFER_INTERNAL simultáneas al mismo segundo)
+```
+
+El capital USDT que entra y sale de Strategy se trata como transferencia interna — sin evento fiscal. Las compras y ventas que ejecuta el bot dentro de Strategy sí son hechos imponibles (cada venta genera ganancia o pérdida patrimonial).
+
+### Fiscalmente (España — IRPF)
+
+Cada venta ejecutada por el bot dentro de Strategy es una **transmisión patrimonial** (art. 33 LIRPF), igual que una venta manual en Spot. El hecho de que la operación la haga un bot automático no cambia su naturaleza fiscal.
 
 ---
 
