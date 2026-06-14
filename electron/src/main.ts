@@ -6,6 +6,10 @@ import { BackendManager } from './backend-manager';
 
 const isDev = process.env.NODE_ENV === 'development';
 
+// Evitar crash cuando stdout/stderr se cierra (ej: al pipear a `head`)
+process.stdout.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });
+process.stderr.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });
+
 let mainWindow: BrowserWindow | null = null;
 let postgresManager: PostgresManager;
 let backendManager: BackendManager;
@@ -85,12 +89,12 @@ async function createWindow(): Promise<void> {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           [
-            "default-src 'self' file:",
+            "default-src 'self'",
             "script-src 'self'",
             "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: file:",
-            // Solo conectar al backend local y APIs de precios conocidas
-            "connect-src 'self' http://127.0.0.1:3001 ws://127.0.0.1:3001 https://api.binance.com wss://stream.binance.com:9443 https://api.coingecko.com",
+            "img-src 'self' data:",
+            // 'self' cubre http://127.0.0.1:3001 porque el frontend se sirve desde ahí
+            "connect-src 'self' https://api.binance.com wss://stream.binance.com:9443 https://api.coingecko.com",
             "frame-ancestors 'none'",
             "form-action 'self'",
           ].join('; '),
@@ -101,7 +105,7 @@ async function createWindow(): Promise<void> {
 
   // Bloquear navegación fuera de la app
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const allowed = isDev ? 'http://localhost:5173' : 'file://';
+    const allowed = isDev ? 'http://localhost:5173' : 'http://127.0.0.1:3001';
     if (!url.startsWith(allowed)) {
       event.preventDefault();
       shell.openExternal(url);
@@ -118,9 +122,8 @@ async function createWindow(): Promise<void> {
     await mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    await mainWindow.loadFile(
-      path.join(__dirname, '../../frontend/dist/index.html')
-    );
+    // Frontend servido por el backend Express → mismo origen, sin CORS
+    await mainWindow.loadURL('http://127.0.0.1:3001');
   }
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());

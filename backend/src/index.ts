@@ -1,6 +1,8 @@
 import 'express-async-errors';
 import express from 'express';
 import { createServer } from 'http';
+import path from 'path';
+import fs from 'fs';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -113,6 +115,19 @@ app.use('/api/settings', settingsRouter);
 app.use('/api/transactions', transactionsRouter);
 app.use('/api/fiscal', fiscalRouter);
 app.use('/api/wallets', walletsRouter);
+
+// ── Frontend estático (solo en modo Electron) ──────────────────────────────
+// El frontend se sirve desde el mismo origen que el backend (127.0.0.1:3001),
+// eliminando CORS completamente. El catch-all envía index.html para React Router.
+if (process.env.ELECTRON_MODE === 'true') {
+  const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
+  if (fs.existsSync(frontendDist)) {
+    app.use(express.static(frontendDist));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(frontendDist, 'index.html'));
+    });
+  }
+}
 
 // ── Error handler — nunca filtra detalles internos al cliente ─────────────
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
