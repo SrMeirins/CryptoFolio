@@ -50,11 +50,15 @@ app.use(helmet({
 }));
 
 // ── CORS ───────────────────────────────────────────────────────────────────
-const corsOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
-  : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+// En modo Electron el frontend carga desde file://, que envía Origin: null.
+// El backend solo escucha en 127.0.0.1, así que permitir null es seguro.
+const corsOrigin = process.env.ELECTRON_MODE === 'true'
+  ? (origin: string | undefined, cb: (e: Error | null, allow?: boolean) => void) => cb(null, true)
+  : process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+    : ['http://localhost:5173', 'http://127.0.0.1:5173'];
 
-app.use(cors({ origin: corsOrigins, credentials: true }));
+app.use(cors({ origin: corsOrigin, credentials: true }));
 
 // ── Logging (structured, sin datos sensibles) ──────────────────────────────
 app.use(morgan('combined'));
