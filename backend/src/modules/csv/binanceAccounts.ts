@@ -138,6 +138,16 @@ export const CROSS_MARGIN_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Cross Margin Liquidation - Small Assets Takeover', internalType: 'SELL', status: 'supported', notes: 'Venta forzosa de colateral — transmisión patrimonial imponible' },
 ];
 
+// ── Strategy (Grid/Bot trading) ────────────────────────────────────────────
+export const STRATEGY_OPERATIONS: BinanceOperation[] = [
+  { csvLabel: 'Transaction Buy',                          internalType: 'BUY',               status: 'supported', notes: 'Compra ejecutada por el bot de strategy trading' },
+  { csvLabel: 'Transaction Spend',                        internalType: 'BUY',               status: 'supported', notes: 'Coste de la compra del bot' },
+  { csvLabel: 'Transaction Fee',                          internalType: 'BUY',               status: 'supported', notes: 'Comisión de la operación del bot' },
+  { csvLabel: 'Transaction Sold',                         internalType: 'SELL',              status: 'supported', notes: 'Venta ejecutada por el bot de strategy trading' },
+  { csvLabel: 'Transaction Revenue',                      internalType: 'SELL',              status: 'supported', notes: 'Ingreso de la venta del bot' },
+  { csvLabel: 'Transfer Between Spot and Strategy Account', internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Capital entrante/saliente de la sub-cuenta Strategy' },
+];
+
 // ── Mapeo cuenta CSV → nombre de wallet en la DB ──────────────────────────
 // Permite al importer asignar el wallet_id correcto a cada transacción.
 export const ACCOUNT_TO_WALLET: Record<string, string> = {
@@ -173,6 +183,7 @@ export const ACCOUNT_OPERATIONS: Record<string, BinanceOperation[]> = {
   'Funding':          FUNDING_OPERATIONS,
   'Cross Margin':     CROSS_MARGIN_OPERATIONS,
   'Isolated Margin':  ISOLATED_MARGIN_OPERATIONS,
+  'Strategy':         STRATEGY_OPERATIONS,
 };
 
 // Set de todas las operaciones conocidas (para el validador)

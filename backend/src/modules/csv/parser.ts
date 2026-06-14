@@ -726,9 +726,11 @@ function interpretGroup(
   // Solo emitimos la fila de salida (change < 0) como TRANSFER_INTERNAL.
   // La fila de entrada es redundante: el FIFO mueve el lote al destino automáticamente.
   if (INTERNAL_TRANSFER_OPS.has(firstOp)) {
-    const outRow = group.find((r) => r.change < 0);
-    if (!outRow) return [];
-    return [{
+    const outRows = group.filter((r) => r.change < 0);
+    if (outRows.length === 0) return [];
+    // Un activo distinto por fila saliente — pueden ser varios al mismo timestamp
+    // (ej: al cerrar un grid bot Binance transfiere USDT + el activo residual a la vez)
+    return outRows.map(outRow => ({
       operationType: 'TRANSFER_INTERNAL' as const,
       timestamp:     outRow.time,
       asset:         outRow.coin,
@@ -736,9 +738,9 @@ function interpretGroup(
       amountNet:     abs(outRow.change),
       account:       outRow.account,
       notes:         firstOp,
-      subTradeCount: group.length,
-      rawRowHashes:  group.map((r) => r.rowHash),
-    }];
+      subTradeCount: 1,
+      rawRowHashes:  [outRow.rowHash],
+    }));
   }
 
   // Fee rebate de Binance Strategy: BNB negativo (fee pagada) + positivos (rebate recibido)
