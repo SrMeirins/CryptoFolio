@@ -48,11 +48,11 @@ module.exports = {
     },
   ],
 
-  // Desempaquetar del asar los módulos con binarios nativos
-  asarUnpack: [
-    'node_modules/embedded-postgres/**/*',
-    'node_modules/@embedded-postgres/**/*',
-  ],
+  // embedded-postgres lanza binarios de PostgreSQL vía spawn().
+  // spawn() del SO no puede atravesar rutas dentro de un .asar (Linux ve el
+  // asar como fichero, no directorio → ENOTDIR). Deshabilitar asar evita
+  // este problema sin sacrificar funcionalidad en una app de uso personal.
+  asar: false,
 
   // ── Plataformas ────────────────────────────────────────────────────────────
   win: {
