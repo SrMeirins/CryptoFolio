@@ -14,9 +14,9 @@ module.exports = {
   // filtros de .gitignore — el directorio dist/ está gitignoreado pero sí
   // debe incluirse en el paquete (se genera en CI antes de empaquetar).
   files: [
-    { from: 'dist',         to: 'dist'         },
-    { from: 'assets',       to: 'assets'       },
-    { from: 'node_modules', to: 'node_modules' },
+    'compiled/**/*',
+    'assets/**/*',
+    'node_modules/**/*',
     'package.json',
   ],
 
