@@ -150,7 +150,6 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 | --- | --- | --- |
 | **Windows** | [CryptoFolio-Setup.exe](https://github.com/SrMeirins/CryptoFolio/releases/latest) | Instalador NSIS, no requiere admin |
 | **macOS** | [CryptoFolio.dmg](https://github.com/SrMeirins/CryptoFolio/releases/latest) | Apple Silicon (M1/M2/M3). Sin notarizar — ver nota abajo |
-| **Linux** | [CryptoFolio.AppImage](https://github.com/SrMeirins/CryptoFolio/releases/latest) | Portable, sin instalación |
 | **Linux** | [CryptoFolio.deb](https://github.com/SrMeirins/CryptoFolio/releases/latest) | Para Debian / Ubuntu |
 
 ### macOS Gatekeeper — cómo abrir la app sin notarizar

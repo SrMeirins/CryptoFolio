@@ -16,7 +16,7 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Añadido
 
 #### Aplicación de escritorio (Electron)
-- App nativa para **Windows** (NSIS installer), **macOS** (DMG universal) y **Linux** (AppImage + deb)
+- App nativa para **Windows** (NSIS installer), **macOS** (DMG universal) y **Linux** (deb)
 - PostgreSQL embebido: la base de datos se gestiona automáticamente, sin configuración
 - Backend Express arranca en segundo plano escuchando solo en `127.0.0.1` (no expuesto a la red)
 - Auto-updater: notifica y aplica actualizaciones desde GitHub Releases
