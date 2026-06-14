@@ -141,6 +141,16 @@ async function startup(): Promise<void> {
   console.log('[app] Arrancando backend...');
   backendManager = new BackendManager({
     databaseUrl: postgresManager.connectionString,
+    onCrash: async (detail) => {
+      await dialog.showMessageBox({
+        type: 'error',
+        title: 'Error crítico — CryptoFolio',
+        message: 'El backend ha fallado inesperadamente.',
+        detail,
+        buttons: ['Cerrar'],
+      });
+      app.quit();
+    },
   });
   await backendManager.start();
   console.log('[app] Backend listo.');
