@@ -92,3 +92,7 @@ _rels/
 docProps/
 xl/
 [Content_Types].xml
+
+# ── Electron build output ───────────────────────────────────────────────────
+releases/
+electron/dist/

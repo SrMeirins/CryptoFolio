@@ -11,6 +11,7 @@
 <br/>
 
 [![License: AGPL-3.0](https://img.shields.io/badge/licencia-AGPL--3.0-blue?style=flat-square)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/SrMeirins/CryptoFolio?style=flat-square&color=22c55e&label=release)](https://github.com/SrMeirins/CryptoFolio/releases/latest)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docs.docker.com/get-docker/)
 [![Node](https://img.shields.io/badge/node-20+-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![React](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
@@ -20,6 +21,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/SrMeirins/CryptoFolio?style=flat-square&color=f5a623)](https://github.com/SrMeirins/CryptoFolio/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/SrMeirins/CryptoFolio?style=flat-square&color=f5a623)](https://github.com/SrMeirins/CryptoFolio/forks)
 [![GitHub issues](https://img.shields.io/github/issues/SrMeirins/CryptoFolio?style=flat-square)](https://github.com/SrMeirins/CryptoFolio/issues)
+[![CI](https://img.shields.io/github/actions/workflow/status/SrMeirins/CryptoFolio/release.yml?style=flat-square&label=CI)](https://github.com/SrMeirins/CryptoFolio/actions)
 
 </div>
 
@@ -140,7 +142,28 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 
 ---
 
-## 🚀 Instalación paso a paso
+## 💾 Descarga la app de escritorio
+
+> La versión de escritorio instala todo automáticamente — sin Docker, sin configuración.
+
+| Sistema | Descarga | Notas |
+| --- | --- | --- |
+| **Windows** | [CryptoFolio-Setup.exe](https://github.com/SrMeirins/CryptoFolio/releases/latest) | Instalador NSIS, no requiere admin |
+| **macOS** | [CryptoFolio.dmg](https://github.com/SrMeirins/CryptoFolio/releases/latest) | Apple Silicon (M1/M2/M3). Sin notarizar — ver nota abajo |
+| **Linux** | [CryptoFolio.AppImage](https://github.com/SrMeirins/CryptoFolio/releases/latest) | Portable, sin instalación |
+| **Linux** | [CryptoFolio.deb](https://github.com/SrMeirins/CryptoFolio/releases/latest) | Para Debian / Ubuntu |
+
+### macOS Gatekeeper — cómo abrir la app sin notarizar
+
+La app no está notarizada con una cuenta Apple Developer de pago. Para abrirla la primera vez:
+
+1. Abre el `.dmg` y arrastra `CryptoFolio.app` a Aplicaciones
+2. Haz **clic derecho → Abrir** en el Finder (no doble clic)
+3. Acepta el aviso de "desarrollador no identificado"
+
+---
+
+## 🚀 Instalación con Docker (self-hosted)
 
 > ⏱️ **Tiempo estimado:** 5-10 minutos  
 > 🖥️ **Compatible con:** Windows, macOS y Linux

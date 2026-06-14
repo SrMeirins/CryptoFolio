@@ -1,18 +1,20 @@
 name: Release
 
-# Se dispara SOLO cuando subes un tag con formato v1.2.3
+# Se dispara cuando se sube un tag con formato v1.2.3
 on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
-# Permisos para crear el GitHub Release y subir assets
+# GITHUB_TOKEN necesita permisos de escritura para crear el Release
 permissions:
   contents: write
 
 jobs:
   build:
     name: Build — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
     strategy:
       fail-fast: false   # Si falla un OS, los otros siguen
       matrix:
@@ -24,14 +26,12 @@ jobs:
           - os: windows-latest
             platform: win
 
-    runs-on: ${{ matrix.os }}
-
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── 2. Node.js ───────────────────────────────────────────────────────────
+      # ── 2. Node.js 20 con caché de npm ───────────────────────────────────────
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -49,11 +49,16 @@ jobs:
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
       # ── 4. Build frontend ─────────────────────────────────────────────────────
+      # Las variables VITE_* se declaran como env: para que funcionen en todos
+      # los runners (bash / PowerShell / cmd) sin cambiar la sintaxis del run.
       - name: Install & build frontend
         working-directory: frontend
+        env:
+          VITE_API_URL: http://127.0.0.1:3001
+          VITE_WS_URL: ws://127.0.0.1:3001
         run: |
           npm ci
-          VITE_API_URL=http://127.0.0.1:3001 VITE_WS_URL=ws://127.0.0.1:3001 npm run build
+          npm run build
 
       # ── 5. Build backend ──────────────────────────────────────────────────────
       - name: Install & build backend
@@ -67,32 +72,36 @@ jobs:
         working-directory: electron
         run: npm ci
 
-      # ── 7. Actualizar versión en package.json del electron ────────────────────
-      - name: Set version in electron/package.json
+      # ── 7. Inyectar versión del tag en electron/package.json ─────────────────
+      - name: Set version
         working-directory: electron
         shell: bash
         run: npm version ${{ steps.version.outputs.VERSION }} --no-git-tag-version
 
-      # ── 8. Build TypeScript de Electron ──────────────────────────────────────
+      # ── 8. Compilar TypeScript del proceso principal ──────────────────────────
       - name: Build Electron TS
         working-directory: electron
         run: npm run build
 
       # ── 9. Empaquetar y publicar en GitHub Release ───────────────────────────
+      # El release se crea como DRAFT: puedes revisar los artefactos y añadir
+      # notas antes de publicarlo. Cambia releaseType a 'release' en
+      # electron-builder.config.js para publicar directamente.
       - name: Package & publish
         working-directory: electron
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Descomenta cuando tengas certificados:
-          # CSC_LINK: ${{ secrets.CSC_LINK }}
-          # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # Firma de código Windows (descomenta cuando tengas certificado EV):
+          # CSC_LINK:          ${{ secrets.WIN_CSC_LINK }}
+          # CSC_KEY_PASSWORD:  ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          # Notarización macOS (descomenta con cuenta Apple Developer):
+          # APPLE_ID:                    ${{ secrets.APPLE_ID }}
           # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
         run: npm run dist:${{ matrix.platform }}
 
-      # ── 10. Subir artifacts (para debug si falla la publicación) ─────────────
-      - name: Upload artifacts
+      # ── 10. Subir artefactos en caso de fallo (para diagnóstico) ─────────────
+      - name: Upload artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
