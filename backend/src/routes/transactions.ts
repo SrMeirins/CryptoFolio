@@ -470,10 +470,16 @@ router.get('/', async (req: Request, res: Response) => {
        t.wallet_id, w.name AS wallet_name, w.color AS wallet_color, w.type AS wallet_kind,
        t.account, t.destination_wallet_id,
        dw.name AS destination_wallet_name, dw.color AS destination_wallet_color,
-       t.destination_pending, t.notes, t.manually_added, t.created_at
+       t.destination_pending, t.notes, t.manually_added, t.created_at,
+       t.linked_tx_id,
+       lt.timestamp AS linked_tx_timestamp,
+       lt.operation_type AS linked_tx_operation_type,
+       lt.amount AS linked_tx_amount,
+       lt.asset AS linked_tx_asset
      FROM transactions t
      JOIN wallets w ON w.id = t.wallet_id
      LEFT JOIN wallets dw ON dw.id = t.destination_wallet_id
+     LEFT JOIN transactions lt ON lt.id = t.linked_tx_id
      ${where}
      ORDER BY t.timestamp DESC
      LIMIT $${paramIdx++} OFFSET $${paramIdx}`,

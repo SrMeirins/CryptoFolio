@@ -192,6 +192,41 @@ router.get('/lots', async (_req, res) => {
   res.json(result.rows);
 });
 
+// GET /api/fifo/locked — Cantidades netas bloqueadas en staking/launchpool (LOCK - UNLOCK) por wallet+activo
+router.get('/locked', async (_req, res) => {
+  const result = await db.query(
+    `SELECT
+       wallet_id,
+       wallet_name,
+       wallet_color,
+       asset,
+       staking_type,
+       lock_kind,
+       SUM(CASE WHEN op IN ('STAKING_LOCK','LAUNCHPOOL_LOCK')     THEN amount_net ELSE 0 END)
+     - SUM(CASE WHEN op IN ('STAKING_UNLOCK','LAUNCHPOOL_UNLOCK') THEN amount_net ELSE 0 END) AS locked_amount
+     FROM (
+       SELECT t.wallet_id, w.name AS wallet_name, w.color AS wallet_color,
+              t.asset, t.operation_type AS op, t.amount_net,
+              CASE t.operation_type
+                WHEN 'STAKING_LOCK'      THEN REPLACE(t.notes, 'Staking Redemption',    'Staking Purchase')
+                WHEN 'STAKING_UNLOCK'    THEN REPLACE(t.notes, 'Staking Redemption',    'Staking Purchase')
+                WHEN 'LAUNCHPOOL_LOCK'   THEN REPLACE(t.notes, 'Launchpool Redemption', 'Launchpool Subscription')
+                WHEN 'LAUNCHPOOL_UNLOCK' THEN REPLACE(t.notes, 'Launchpool Redemption', 'Launchpool Subscription')
+              END AS staking_type,
+              CASE WHEN t.operation_type IN ('LAUNCHPOOL_LOCK','LAUNCHPOOL_UNLOCK')
+                   THEN 'launchpool' ELSE 'staking' END AS lock_kind
+       FROM transactions t
+       JOIN wallets w ON w.id = t.wallet_id
+       WHERE t.operation_type IN ('STAKING_LOCK','STAKING_UNLOCK','LAUNCHPOOL_LOCK','LAUNCHPOOL_UNLOCK')
+     ) sub
+     GROUP BY wallet_id, wallet_name, wallet_color, asset, staking_type, lock_kind
+     HAVING SUM(CASE WHEN op IN ('STAKING_LOCK','LAUNCHPOOL_LOCK')     THEN amount_net ELSE 0 END)
+          - SUM(CASE WHEN op IN ('STAKING_UNLOCK','LAUNCHPOOL_UNLOCK') THEN amount_net ELSE 0 END) > 0.000001
+     ORDER BY asset, wallet_name`
+  );
+  res.json(result.rows);
+});
+
 // ── Helper: cómputo de puntos desde price_cache (sin red) ────────────────────
 async function computeHistoryFromCache(
   days: number,

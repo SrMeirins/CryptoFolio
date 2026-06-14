@@ -45,12 +45,15 @@ const INCOME_OPS: Record<string, 'STAKING_REWARD' | 'LENDING_INTEREST' | 'LENDIN
   'Asset Recovery':                 'AIRDROP',
   'Distribution':                   'AIRDROP',
   'Cash Voucher Distribution':      'CASHBACK',
+  'Cashback Voucher':               'CASHBACK',
   'Commission Rebate':              'CASHBACK',
+  'Commission History':             'CASHBACK',
   'Referral Kickback':              'CASHBACK',
   'Crypto Box':                     'CASHBACK',
   'Mission Reward Distribution':    'CASHBACK',
   'Launchpool Airdrop - User Claim Distribution': 'AIRDROP',
   'Launchpool Airdrop - System Distribution':     'AIRDROP',
+  'Token Swap - Distribution':                    'AIRDROP',
 };
 
 function parseDate(raw: string): Date {
@@ -594,6 +597,129 @@ function interpretGroup(
       subTradeCount: 1,
       rawRowHashes: hashes,
     };
+  }
+
+  // Bloqueo de fondos para staking (Staking Purchase)
+  // Fila única negativa en Funding/Spot. Los lotes permanecen en la wallet origen (no-op FIFO).
+  if (firstOp === 'Staking Purchase') {
+    const outRow = group.find((r) => r.change < 0);
+    if (!outRow) return [];
+    return [{
+      operationType: 'STAKING_LOCK' as const,
+      timestamp:     outRow.time,
+      asset:         outRow.coin,
+      amount:        abs(outRow.change),
+      amountNet:     abs(outRow.change),
+      account:       outRow.account,
+      notes:         firstOp,
+      subTradeCount: group.length,
+      rawRowHashes:  group.map((r) => r.rowHash),
+    }];
+  }
+
+  // Desbloqueo de staking (Staking Redemption)
+  // Fila única positiva en Funding/Spot. Los lotes vuelven a estar disponibles (no-op FIFO).
+  // El importer enlazará esta tx con el STAKING_LOCK correspondiente via linked_tx_id.
+  if (firstOp === 'Staking Redemption') {
+    const inRow = group.find((r) => r.change > 0);
+    if (!inRow) return [];
+    return [{
+      operationType: 'STAKING_UNLOCK' as const,
+      timestamp:     inRow.time,
+      asset:         inRow.coin,
+      amount:        abs(inRow.change),
+      amountNet:     abs(inRow.change),
+      account:       inRow.account,
+      notes:         firstOp,
+      subTradeCount: group.length,
+      rawRowHashes:  group.map((r) => r.rowHash),
+    }];
+  }
+
+  // Bloqueo de activo en Launchpool (cualquier activo — BNB, FDUSD, etc.)
+  // Fila única negativa. Los lotes permanecen en el wallet (no-op FIFO).
+  if (firstOp === 'Launchpool Subscription') {
+    const outRow = group.find((r) => r.change < 0);
+    if (!outRow) return [];
+    return [{
+      operationType: 'LAUNCHPOOL_LOCK' as const,
+      timestamp:     outRow.time,
+      asset:         outRow.coin,
+      amount:        abs(outRow.change),
+      amountNet:     abs(outRow.change),
+      account:       outRow.account,
+      notes:         firstOp,
+      subTradeCount: group.length,
+      rawRowHashes:  group.map((r) => r.rowHash),
+    }];
+  }
+
+  // Desbloqueo de activo al salir del Launchpool.
+  // Fila única positiva. El importer enlaza con el LAUNCHPOOL_LOCK correspondiente.
+  if (firstOp === 'Launchpool Redemption') {
+    const inRow = group.find((r) => r.change > 0);
+    if (!inRow) return [];
+    return [{
+      operationType: 'LAUNCHPOOL_UNLOCK' as const,
+      timestamp:     inRow.time,
+      asset:         inRow.coin,
+      amount:        abs(inRow.change),
+      amountNet:     abs(inRow.change),
+      account:       inRow.account,
+      notes:         firstOp,
+      subTradeCount: group.length,
+      rawRowHashes:  group.map((r) => r.rowHash),
+    }];
+  }
+
+  // ETH 2.0 Staking: ETH → BETH (1:1, mismo timestamp)
+  // Tratamiento: swap/convert — se consume el lote de ETH y se abre lote de BETH
+  // al precio de mercado del día. El G/P se calcula como en cualquier permuta cripto↔cripto.
+  if (firstOp === 'ETH 2.0 Staking') {
+    const outRow = group.find(r => r.change < 0); // ETH saliente
+    const inRow  = group.find(r => r.change > 0); // BETH entrante
+    if (!outRow || !inRow) {
+      // Fila suelta (solo entrada o solo salida) → ignorar
+      return [];
+    }
+    return [{
+      operationType: 'BUY' as const,
+      timestamp,
+      asset:        inRow.coin,
+      amount:       abs(inRow.change),
+      amountNet:    abs(inRow.change),
+      costAsset:    outRow.coin,
+      costAmount:   abs(outRow.change),
+      pricePerUnit: abs(outRow.change) / abs(inRow.change),
+      account,
+      notes: `ETH 2.0 Staking: ${outRow.coin}→${inRow.coin}`,
+      subTradeCount: group.length,
+      rawRowHashes:  hashes,
+    }];
+  }
+
+  // ETH 2.0 Staking Withdrawals: BETH → ETH (1:1, mismo timestamp)
+  // Tratamiento: swap/convert inverso — se consumen lotes de BETH y se abre lote de ETH.
+  if (firstOp === 'ETH 2.0 Staking Withdrawals') {
+    const outRow = group.find(r => r.change < 0); // BETH saliente
+    const inRow  = group.find(r => r.change > 0); // ETH entrante
+    if (!outRow || !inRow) {
+      return [];
+    }
+    return [{
+      operationType: 'BUY' as const,
+      timestamp,
+      asset:        inRow.coin,
+      amount:       abs(inRow.change),
+      amountNet:    abs(inRow.change),
+      costAsset:    outRow.coin,
+      costAmount:   abs(outRow.change),
+      pricePerUnit: abs(outRow.change) / abs(inRow.change),
+      account,
+      notes: `ETH 2.0 Staking Withdrawals: ${outRow.coin}→${inRow.coin}`,
+      subTradeCount: group.length,
+      rawRowHashes:  hashes,
+    }];
   }
 
   // Transferencias internas entre sub-cuentas de Binance

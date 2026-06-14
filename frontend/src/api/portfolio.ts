@@ -11,6 +11,16 @@ export interface FifoLot {
   avg_price_eur: string
 }
 
+export interface LockedAmount {
+  wallet_id:    string
+  wallet_name:  string
+  wallet_color: string
+  asset:        string
+  staking_type: string
+  lock_kind:    'staking' | 'launchpool'
+  locked_amount: string
+}
+
 export interface FiscalYear {
   fiscal_year: number
   total_gain_loss_eur: string
@@ -95,6 +105,11 @@ export interface Transaction {
   destination_wallet_id: string | null
   destination_wallet_name: string | null
   destination_wallet_color: string | null
+  linked_tx_id: string | null
+  linked_tx_timestamp: string | null
+  linked_tx_operation_type: string | null
+  linked_tx_amount: string | null
+  linked_tx_asset: string | null
 }
 
 export interface FiatBalance {
@@ -108,6 +123,7 @@ export interface FiatBalance {
 
 export const portfolioApi = {
   getLots: () => api.get<FifoLot[]>('/fifo/lots'),
+  getLockedAmounts: () => api.get<LockedAmount[]>('/fifo/locked'),
   getFiatBalances: () => api.get<FiatBalance[]>('/fifo/fiat-balances'),
   getFiscalSummary: () => api.get<FiscalYear[]>('/fifo/summary'),
   runFifo: () => api.post<{ success: boolean; lotsCreated: number; lotsConsumed: number; totalGainEur: number; totalLossEur: number }>('/fifo/run'),

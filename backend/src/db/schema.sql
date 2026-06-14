@@ -21,6 +21,7 @@ CREATE TYPE operation_type AS ENUM (
   'FEE', 'FEE_NETWORK', 'FEE_EXCHANGE',
   'INTERNAL_TRANSFER',
   'TRANSFER_INTERNAL',
+  'STAKING_LOCK', 'STAKING_UNLOCK', 'LAUNCHPOOL_LOCK', 'LAUNCHPOOL_UNLOCK',
   'STAKING_REWARD', 'MINING_REWARD',
   'LENDING_INTEREST', 'LENDING_INTEREST_LOCKED', 'CASHBACK',
   'AIRDROP', 'FORK',
@@ -116,7 +117,8 @@ INSERT INTO wallets (name, type, is_system, is_default, color) VALUES
   ('Binance Funding',          'exchange', TRUE, FALSE, '#F0B90B'),
   ('Binance Cross Margin',     'exchange', TRUE, FALSE, '#E8892B'),
   ('Binance Isolated Margin',  'exchange', TRUE, FALSE, '#C8812B'),
-  ('Binance Strategy',         'exchange', TRUE, FALSE, '#8B5CF6');
+  ('Binance Strategy',         'exchange', TRUE, FALSE, '#8B5CF6'),
+  ('Binance Staking',          'exchange', TRUE, FALSE, '#f59e0b');
 
 -- ============================================================
 -- TABLA: wallet_addresses
@@ -197,6 +199,7 @@ CREATE TABLE transactions (
   manually_added        BOOLEAN NOT NULL DEFAULT FALSE,
   destination_wallet_id UUID REFERENCES wallets(id),
   destination_pending   BOOLEAN NOT NULL DEFAULT FALSE,
+  linked_tx_id          UUID REFERENCES transactions(id) ON DELETE SET NULL,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

@@ -60,7 +60,9 @@ function fmtMonthLabel(mes: string): string {
 
 function calcEurValue(tx: Transaction): number | null {
   if (tx.cost_asset === 'EUR' && tx.cost_amount) return Math.abs(parseFloat(tx.cost_amount))
-  if (tx.price_per_unit && tx.amount_net) {
+  // price_per_unit solo está en EUR para ops sin cost_asset (income: staking, airdrop...)
+  // Para swaps cripto↔cripto price_per_unit es el ratio en units del cost_asset, no en EUR
+  if (!tx.cost_asset && tx.price_per_unit && tx.amount_net) {
     const p = parseFloat(tx.price_per_unit), a = Math.abs(parseFloat(tx.amount_net))
     if (!isNaN(p) && !isNaN(a) && p > 0 && a > 0) return p * a
   }
@@ -550,6 +552,18 @@ function TxRow({
                   {tx.manually_added && <span className="ml-1.5 text-accent-blue font-medium">· Manual</span>}
                 </div>
               </div>
+              {tx.linked_tx_id && tx.linked_tx_timestamp && (
+                <div className="col-span-2">
+                  <div className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">
+                    {tx.operation_type === 'STAKING_UNLOCK' ? 'Staking purchase vinculado' : 'Staking redemption vinculada'}
+                  </div>
+                  <div className="text-[11px] text-amber-400/80 font-mono">
+                    {new Date(tx.linked_tx_timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {' · '}
+                    {tx.linked_tx_amount ? parseFloat(tx.linked_tx_amount).toFixed(6) : ''} {tx.linked_tx_asset}
+                  </div>
+                </div>
+              )}
               {tx.notes && (
                 <div className="col-span-2">
                   <div className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">Notas</div>

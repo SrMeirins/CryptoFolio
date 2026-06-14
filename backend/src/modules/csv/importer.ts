@@ -6,7 +6,8 @@ import { parseBinanceCsv } from './parser';
 import { validateCsvStructure, ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
 import { ACCOUNT_TO_WALLET, TRANSFER_DESTINATIONS } from './binanceAccounts';
-import { getHistoricalPriceEur, prefetchHistoricalPrices } from '../prices/binance';
+import { getHistoricalPriceEur, prefetchHistoricalPrices, refreshLivePrices } from '../prices/binance';
+import { getOrDetectPairInfo } from '../prices/pairDetector';
 
 export interface ImportResult {
   importId: string;
@@ -275,7 +276,7 @@ export async function importCsvFile(
     }
   }
 
-  return await db.transaction(async (client) => {
+  const result = await db.transaction(async (client) => {
     // Cargar todas las wallets de sistema para asignar wallet_id correctamente
     const walletsRes = await client.query(
       `SELECT id, name, type FROM wallets WHERE is_system = TRUE`
@@ -327,10 +328,37 @@ export async function importCsvFile(
       }
       const walletId = getWalletId(tx.account);
       let destinationWalletId: string | null = null;
+      let linkedTxId: string | null = null;
       let effectiveOpType = tx.operationType;
 
       if (tx.operationType === 'TRANSFER_INTERNAL') {
         destinationWalletId = getDestinationWalletId(tx.notes, tx.account);
+      } else if (tx.operationType === 'STAKING_UNLOCK' || tx.operationType === 'LAUNCHPOOL_UNLOCK') {
+        // Enlazar con el LOCK más antiguo no emparejado del mismo wallet+asset
+        const isLaunchpool = tx.operationType === 'LAUNCHPOOL_UNLOCK';
+        const lockType  = isLaunchpool ? 'LAUNCHPOOL_LOCK'  : 'STAKING_LOCK';
+        const unlockType = tx.operationType;
+        const lockLabel = isLaunchpool
+          ? tx.notes?.replace('Launchpool Redemption', 'Launchpool Subscription') ?? 'Launchpool Subscription'
+          : tx.notes?.replace('Staking Redemption', 'Staking Purchase') ?? 'Staking Purchase';
+        const matchRes = await client.query(
+          `SELECT id FROM transactions
+           WHERE operation_type = $1
+             AND wallet_id = $2
+             AND asset = $3
+             AND notes = $4
+             AND id NOT IN (
+               SELECT linked_tx_id FROM transactions
+               WHERE linked_tx_id IS NOT NULL
+                 AND operation_type = $5
+             )
+           ORDER BY timestamp ASC
+           LIMIT 1`,
+          [lockType, walletId, tx.asset, lockLabel, unlockType]
+        );
+        if (matchRes.rows.length > 0) {
+          linkedTxId = matchRes.rows[0].id as string;
+        }
       } else if (tx.operationType === 'WITHDRAW') {
         // Buscar destino por txKey (rawRowHashes[0]) → más granular que por activo.
         // Fallback al activo para compatibilidad con importaciones anteriores.
@@ -366,7 +394,7 @@ export async function importCsvFile(
         ? (depositCosts[tx.rawRowHashes[0]] ?? null)
         : null;
 
-      await insertTransaction(client, tx, importId, walletId, destinationWalletId, effectiveOpType, depositPriceOverride);
+      await insertTransaction(client, tx, importId, walletId, destinationWalletId, effectiveOpType, depositPriceOverride, linkedTxId);
       newTransactions++;
     }
 
@@ -390,6 +418,24 @@ export async function importCsvFile(
       validation,
     };
   });
+
+  // Auto-detectar pares de precio para TODOS los activos del CSV, no solo los de income.
+  // Esto garantiza que cualquier activo nuevo (comprado, recibido, etc.) quede en
+  // asset_metadata con sus pares de Binance y con precio en tiempo real disponible
+  // sin necesitar reiniciar el backend.
+  const allAssets = [...new Set(
+    parseResult.transactions
+      .map(tx => tx.asset)
+      .filter(a => a && a !== 'EUR')
+  )];
+  if (allAssets.length > 0) {
+    // getOrDetectPairInfo inserta en asset_metadata si no existe y actualiza pares.
+    // refreshLivePrices carga el precio actual en el liveCache del proceso.
+    await Promise.allSettled(allAssets.map(a => getOrDetectPairInfo(a)));
+    await refreshLivePrices(allAssets);
+  }
+
+  return result;
 }
 
 async function insertTransaction(
@@ -400,6 +446,7 @@ async function insertTransaction(
   destinationWalletId: string | null = null,
   operationTypeOverride?: string,
   depositPriceOverride: number | null = null,
+  linkedTxId: string | null = null,
 ): Promise<void> {
   const opType = operationTypeOverride ?? tx.operationType;
   // WITHDRAW sin destino asignado → pending (usuario lo asignará después)
@@ -421,7 +468,8 @@ async function insertTransaction(
       fee_asset, fee_amount,
       wallet_id, account,
       notes, manually_added,
-      destination_wallet_id, destination_pending
+      destination_wallet_id, destination_pending,
+      linked_tx_id
     ) VALUES (
       $1, $2::operation_type, $3,
       $4, $5, $6,
@@ -429,7 +477,8 @@ async function insertTransaction(
       $10, $11,
       $12, $13,
       $14, false,
-      $15, $16
+      $15, $16,
+      $17
     ) RETURNING id`,
     [
       importId,
@@ -448,6 +497,7 @@ async function insertTransaction(
       tx.notes ?? null,
       destId,
       destPending,
+      linkedTxId,
     ]
   );
   const txId: string = txRes.rows[0].id;

@@ -374,3 +374,41 @@ export function getAllLivePrices(): Map<string, number> {
 export async function loadAssetMetadata(): Promise<void> {
   await loadPairCache();
 }
+
+// Refresca el liveCache para un conjunto de activos recién detectados.
+// Se llama al final del import para que nuevos activos tengan precio inmediatamente.
+export async function refreshLivePrices(symbols: string[]): Promise<void> {
+  if (symbols.length === 0) return;
+
+  const pairsToFetch = new Set<string>(['EURUSDT']);
+  for (const symbol of symbols) {
+    const info = await getOrDetectPairInfo(symbol);
+    if (info.binanceEurPair)  pairsToFetch.add(info.binanceEurPair);
+    if (info.binanceUsdtPair) pairsToFetch.add(info.binanceUsdtPair);
+    if (info.binanceBtcPair)  pairsToFetch.add(info.binanceBtcPair);
+    if (info.binanceEthPair)  pairsToFetch.add(info.binanceEthPair);
+  }
+
+  try {
+    const syms = [...pairsToFetch].map(p => `"${p}"`).join(',');
+    const fetchRes = await fetch(`${REST_BASE}/ticker/price?symbols=[${syms}]`);
+    if (!fetchRes.ok) return;
+    const data = await fetchRes.json() as Array<{ symbol: string; price: string }>;
+    const priceMap = new Map(data.map(d => [d.symbol, parseFloat(d.price)]));
+
+    const eurusdt = priceMap.get('EURUSDT');
+    const localEurUsdtRate = eurusdt ? 1 / eurusdt : eurUsdtRate;
+
+    for (const symbol of symbols) {
+      const info = getPairInfo(symbol);
+      if (!info) continue;
+      let priceEur: number | null = null;
+      if (info.binanceEurPair)  priceEur = priceMap.get(info.binanceEurPair) ?? null;
+      if (!priceEur && info.binanceUsdtPair) {
+        const p = priceMap.get(info.binanceUsdtPair);
+        if (p) priceEur = p * localEurUsdtRate;
+      }
+      if (priceEur) liveCache.set(symbol, priceEur);
+    }
+  } catch { /* silencioso — se reintentará en el siguiente ciclo WebSocket */ }
+}

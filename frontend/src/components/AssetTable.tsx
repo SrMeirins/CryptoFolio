@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, Settings, ArrowUpDown, ArrowUp, ArrowDown, Calculator } from 'lucide-react'
+import { ChevronDown, ChevronRight, Settings, ArrowUpDown, ArrowUp, ArrowDown, Calculator, Lock } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { FifoLot, FiatBalance, portfolioApi } from '../api/portfolio'
+import { FifoLot, FiatBalance, LockedAmount, portfolioApi } from '../api/portfolio'
 import { usePricesStore } from '../store/pricesStore'
 import { formatEur, formatPrice, formatAmount, pnlColor } from '../utils/format'
 
@@ -154,20 +154,21 @@ function walletShortName(name: string, kind: string): string {
   return name
 }
 
-function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate }: {
+function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate, lockedAmounts = [] }: {
   row: CryptoRow
   prices: Record<string, number>
   yesterdayPrices: Record<string, number>
   totalPortfolioValue: number
   compact?: boolean
   onSimulate?: (asset: string, qty: number, price: number) => void
+  lockedAmounts?: LockedAmount[]
 }) {
   const [expanded, setExpanded] = useState(false)
   const price      = prices[row.asset] ?? 0
   const pnl        = row.value - row.totalCostBasis
   const pnlPct     = row.totalCostBasis > 0 ? (pnl / row.totalCostBasis) * 100 : 0
   const hasPrice   = price > 0
-  const canExpand  = row.wallets.length > 1
+  const canExpand  = row.wallets.length > 1 || lockedAmounts.length > 0
 
   // 24h change
   const ydayPrice   = yesterdayPrices[row.asset]
@@ -202,7 +203,7 @@ function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue,
             <CryptoIcon symbol={row.asset} size={28} />
             <span className="font-medium">{row.asset}</span>
             {!expanded && (
-              <div className="flex gap-1 ml-1">
+              <div className="flex gap-1 ml-1 flex-wrap">
                 {row.wallets.map(w => (
                   <span key={w.wallet_id}
                     className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
@@ -210,6 +211,15 @@ function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue,
                     {walletShortName(w.wallet_name, w.wallet_kind)}
                   </span>
                 ))}
+                {lockedAmounts.length > 0 && (() => {
+                  const onlyLaunchpool = lockedAmounts.every(l => l.lock_kind === 'launchpool')
+                  return (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex items-center gap-0.5 ${onlyLaunchpool ? 'bg-violet-500/10 text-violet-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                      <Lock size={8} />
+                      {formatAmount(lockedAmounts.reduce((s, l) => s + parseFloat(l.locked_amount), 0))}
+                    </span>
+                  )
+                })()}
               </div>
             )}
             {onSimulate && (
@@ -299,41 +309,63 @@ function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue,
         const wValue     = w.quantity * price
         const wPnl       = hasPrice ? wValue - w.costBasis : null
         const wPnlPct    = w.costBasis > 0 && wPnl !== null ? (wPnl / w.costBasis) * 100 : null
+        const wLocked    = lockedAmounts.filter(l => l.wallet_id === w.wallet_id)
 
         return (
-          <tr key={w.wallet_id} className="bg-background-tertiary/20 border-l-2"
-            style={{ borderLeftColor: w.wallet_color }}>
-            <td className="pl-12 pr-4 py-2">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: w.wallet_color }} />
-                <span className="text-xs text-gray-400">{w.wallet_name}</span>
-              </div>
-            </td>
-            <td className="px-4 py-2 text-right mono text-xs text-gray-400">{formatAmount(w.quantity)}</td>
-            <td className="px-4 py-2 text-right mono text-xs text-gray-600">—</td>
-            <td className="px-4 py-2 text-right mono text-xs">
-              {hasPrice ? <span className="text-gray-300">{formatEur(wValue)}</span> : <span className="text-gray-600">—</span>}
-            </td>
-            {/* Coste base por wallet — oculto en compacto */}
-            {!compact && <td className="px-4 py-2 text-right mono text-xs text-gray-500">{formatEur(w.costBasis)}</td>}
-            {/* P&L € sub-wallet — oculto en compacto */}
-            {!compact && (
-              <td className={`px-4 py-2 text-right mono text-xs ${wPnl !== null ? pnlColor(wPnl) : 'text-gray-600'}`}>
-                {wPnl !== null ? (wPnl >= 0 ? '+' : '') + formatEur(wPnl) : '—'}
+          <>
+            <tr key={w.wallet_id} className="bg-background-tertiary/20 border-l-2"
+              style={{ borderLeftColor: w.wallet_color }}>
+              <td className="pl-12 pr-4 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: w.wallet_color }} />
+                  <span className="text-xs text-gray-400">{w.wallet_name}</span>
+                </div>
               </td>
-            )}
-            <td className={`px-4 py-2 text-right mono text-xs ${wPnlPct !== null ? pnlColor(wPnlPct) : 'text-gray-600'}`}>
-              {wPnlPct !== null ? (wPnlPct >= 0 ? '+' : '') + wPnlPct.toFixed(2) + '%' : '—'}
-            </td>
-            {/* % cartera — por sub-wallet */}
-            <td className="px-4 py-2 text-right">
-              {hasPrice && totalPortfolioValue > 0 ? (
-                <span className="text-[10px] mono text-gray-600">
-                  {((wValue / totalPortfolioValue) * 100).toFixed(1)}%
-                </span>
-              ) : <span className="text-gray-700 text-xs">—</span>}
-            </td>
-          </tr>
+              <td className="px-4 py-2 text-right mono text-xs text-gray-400">{formatAmount(w.quantity)}</td>
+              <td className="px-4 py-2 text-right mono text-xs text-gray-600">—</td>
+              <td className="px-4 py-2 text-right mono text-xs">
+                {hasPrice ? <span className="text-gray-300">{formatEur(wValue)}</span> : <span className="text-gray-600">—</span>}
+              </td>
+              {!compact && <td className="px-4 py-2 text-right mono text-xs text-gray-500">{formatEur(w.costBasis)}</td>}
+              {!compact && (
+                <td className={`px-4 py-2 text-right mono text-xs ${wPnl !== null ? pnlColor(wPnl) : 'text-gray-600'}`}>
+                  {wPnl !== null ? (wPnl >= 0 ? '+' : '') + formatEur(wPnl) : '—'}
+                </td>
+              )}
+              <td className={`px-4 py-2 text-right mono text-xs ${wPnlPct !== null ? pnlColor(wPnlPct) : 'text-gray-600'}`}>
+                {wPnlPct !== null ? (wPnlPct >= 0 ? '+' : '') + wPnlPct.toFixed(2) + '%' : '—'}
+              </td>
+              <td className="px-4 py-2 text-right">
+                {hasPrice && totalPortfolioValue > 0 ? (
+                  <span className="text-[10px] mono text-gray-600">
+                    {((wValue / totalPortfolioValue) * 100).toFixed(1)}%
+                  </span>
+                ) : <span className="text-gray-700 text-xs">—</span>}
+              </td>
+            </tr>
+            {/* Sub-filas de staking bloqueado */}
+            {wLocked.map((l, i) => {
+              const isLaunchpool = l.lock_kind === 'launchpool'
+              const clr = isLaunchpool ? { bg: 'rgba(139,92,246,0.03)', border: 'rgba(139,92,246,0.3)', icon: 'text-violet-500/70', text: 'text-violet-400/80', amount: 'text-violet-400/70', label: 'text-violet-500/50' }
+                                       : { bg: 'rgba(245,158,11,0.03)',  border: 'rgba(245,158,11,0.3)',  icon: 'text-amber-500/70',  text: 'text-amber-400/80',  amount: 'text-amber-400/70',  label: 'text-amber-500/50'  }
+              return (
+                <tr key={`locked-${i}`} style={{ backgroundColor: clr.bg, borderLeft: `2px solid ${clr.border}` }}>
+                  <td className="pl-16 pr-4 py-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Lock size={10} className={`${clr.icon} shrink-0`} />
+                      <span className={`text-[11px] ${clr.text}`}>{l.staking_type}</span>
+                    </div>
+                  </td>
+                  <td className={`px-4 py-1.5 text-right mono text-[11px] ${clr.amount}`}>
+                    {formatAmount(parseFloat(l.locked_amount))}
+                  </td>
+                  <td colSpan={compact ? 3 : 5} className={`px-4 py-1.5 text-[10px] ${clr.label} italic`}>
+                    {isLaunchpool ? 'bloqueado en launchpool' : 'bloqueado en staking'}
+                  </td>
+                </tr>
+              )
+            })}
+          </>
         )
       })}
     </>
@@ -440,6 +472,11 @@ export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTablePr
     queryFn: portfolioApi.getYesterdayPrices,
     staleTime: 10 * 60_000,
   })
+  const { data: lockedAmounts = [] } = useQuery({
+    queryKey: ['locked-amounts'],
+    queryFn: portfolioApi.getLockedAmounts,
+    staleTime: 60_000,
+  })
   const yesterdayPrices = ydayData?.prices ?? {}
   const [dustOpen,  setDustOpen]  = useState(false)
   const [compact,   setCompact]   = useState(false)
@@ -516,7 +553,7 @@ export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTablePr
   const renderRow = (row: UnifiedRow) =>
     row.kind === 'fiat'
       ? <FiatRowComponent key={`fiat-${row.asset}`} row={row} totalPortfolioValue={totalValue} compact={compact} />
-      : <CryptoRowComponent key={row.asset} row={row} prices={prices} yesterdayPrices={yesterdayPrices} totalPortfolioValue={totalValue} compact={compact} onSimulate={onSimulate} />
+      : <CryptoRowComponent key={row.asset} row={row} prices={prices} yesterdayPrices={yesterdayPrices} totalPortfolioValue={totalValue} compact={compact} onSimulate={onSimulate} lockedAmounts={lockedAmounts.filter(l => l.asset === row.asset)} />
 
   // Activos sin precio configurado
   const noPriceAssets = mainRows

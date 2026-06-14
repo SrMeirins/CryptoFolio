@@ -55,6 +55,12 @@ export const SPOT_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Launchpool Airdrop - System Distribution',                   internalType: 'AIRDROP',           status: 'supported', notes: 'Distribución Launchpool asignada automáticamente por Binance' },
   // Fee standalone pagada en BNB
   { csvLabel: 'BNB Fee Deduction',                                          internalType: 'FEE_EXCHANGE',      status: 'supported', notes: 'Fee de exchange pagada en BNB — evento imponible' },
+  // Bloqueo/desbloqueo para staking desde Spot (alternativa a Funding)
+  { csvLabel: 'Staking Purchase',   internalType: 'STAKING_LOCK',   status: 'supported', notes: 'Bloqueo para staking desde Spot' },
+  { csvLabel: 'Staking Redemption', internalType: 'STAKING_UNLOCK', status: 'supported', notes: 'Desbloqueo de staking desde Spot' },
+  // Launchpool desde Spot
+  { csvLabel: 'Launchpool Subscription', internalType: 'LAUNCHPOOL_LOCK',   status: 'supported', notes: 'Bloqueo de activo en Launchpool desde Spot' },
+  { csvLabel: 'Launchpool Redemption',   internalType: 'LAUNCHPOOL_UNLOCK', status: 'supported', notes: 'Desbloqueo de Launchpool desde Spot' },
   // Staking y rendimientos — aparecen en cuenta Spot en los exports de Binance.
   // El parser los reconoce y les asigna precio histórico al importar.
   // Clasificación LIRPF pendiente de refinamiento (ver docs/binance-operations-pendientes.md).
@@ -78,14 +84,18 @@ export const FUNDING_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'BNB Vault Rewards',     internalType: 'STAKING_REWARD',   status: 'pending', notes: 'Rendimiento BNB Vault — clasificación LIRPF en revisión' },
   // Bloqueo/desbloqueo de staking y ETH 2.0 — movimientos internos sin transmisión.
   // Registrados para evitar "operación desconocida". Tratamiento fiscal pendiente de estudio.
-  { csvLabel: 'Staking Purchase',          internalType: 'IGNORED', status: 'pending', notes: 'Bloqueo para staking — pendiente confirmar si es IGNORED o evento fiscal' },
-  { csvLabel: 'Staking Redemption',        internalType: 'IGNORED', status: 'pending', notes: 'Desbloqueo de staking — pendiente confirmar si es IGNORED o evento fiscal' },
-  { csvLabel: 'ETH 2.0 Staking',          internalType: 'IGNORED', status: 'pending', notes: 'Bloqueo ETH como validador — sin doctrina DGT clara' },
-  { csvLabel: 'ETH 2.0 Staking Withdrawals', internalType: 'IGNORED', status: 'pending', notes: 'Retirada ETH de validador — sin doctrina DGT clara' },
+  { csvLabel: 'Staking Purchase',    internalType: 'STAKING_LOCK',      status: 'supported', notes: 'Bloqueo para staking — mueve lotes Funding → Binance Staking' },
+  { csvLabel: 'Staking Redemption',    internalType: 'STAKING_UNLOCK',    status: 'supported', notes: 'Desbloqueo de staking — enlazado al STAKING_LOCK correspondiente via linked_tx_id' },
+  { csvLabel: 'Launchpool Subscription', internalType: 'LAUNCHPOOL_LOCK',   status: 'supported', notes: 'Bloqueo de activo en Launchpool (BNB, FDUSD...) — no-op FIFO' },
+  { csvLabel: 'Launchpool Redemption',   internalType: 'LAUNCHPOOL_UNLOCK', status: 'supported', notes: 'Desbloqueo al salir del Launchpool — enlazado al LAUNCHPOOL_LOCK via linked_tx_id' },
+  { csvLabel: 'ETH 2.0 Staking',            internalType: 'BUY', status: 'supported', notes: 'Swap ETH→BETH (1:1) — se consume lote ETH y abre lote BETH al precio de mercado' },
+  { csvLabel: 'ETH 2.0 Staking Withdrawals', internalType: 'BUY', status: 'supported', notes: 'Swap BETH→ETH (1:1) — se consumen lotes BETH y abre lote ETH al precio de mercado' },
   // Airdrops / cashback
   { csvLabel: 'Airdrop Assets',                                             internalType: 'AIRDROP',          status: 'supported' },
   { csvLabel: 'Cash Voucher Distribution',                                  internalType: 'CASHBACK',         status: 'supported' },
+  { csvLabel: 'Cashback Voucher',                                           internalType: 'CASHBACK',         status: 'supported', notes: 'Voucher de cashback de Binance — promociones y campañas' },
   { csvLabel: 'Commission Rebate',                                          internalType: 'CASHBACK',         status: 'supported' },
+  { csvLabel: 'Commission History',                                         internalType: 'CASHBACK',         status: 'supported', notes: 'Comisión de referido recibida en el activo operado por el referido' },
   { csvLabel: 'Referral Kickback',                                          internalType: 'CASHBACK',         status: 'supported' },
   { csvLabel: 'Mission Reward Distribution',                                internalType: 'CASHBACK',         status: 'supported' },
   // Movimientos internos (sin impacto fiscal)
@@ -94,6 +104,7 @@ export const FUNDING_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Simple Earn Locked Subscription',                            internalType: 'IGNORED',          status: 'ignored' },
   { csvLabel: 'Simple Earn Locked Redemption',                              internalType: 'IGNORED',          status: 'ignored' },
   { csvLabel: 'Token Swap - Redenomination/Rebranding',                     internalType: 'IGNORED',          status: 'ignored' },
+  { csvLabel: 'Token Swap - Distribution',                                  internalType: 'AIRDROP',          status: 'supported' },
   { csvLabel: 'Dual Investment - Subscribe',                                internalType: 'IGNORED',          status: 'ignored' },
   { csvLabel: 'Dual Investment - Settlement',                               internalType: 'IGNORED',          status: 'ignored' },
 ];

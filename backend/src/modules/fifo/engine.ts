@@ -148,6 +148,11 @@ async function processTransaction(tx: Transaction, result: FifoRunResult): Promi
     case 'WITHDRAW':
       await processTransfer(tx, result);
       break;
+    case 'STAKING_LOCK':
+    case 'STAKING_UNLOCK':
+    case 'LAUNCHPOOL_LOCK':
+    case 'LAUNCHPOOL_UNLOCK':
+      break; // registrado en historial pero sin movimiento FIFO — los lotes permanecen en su wallet
     case 'FEE':
     case 'FEE_NETWORK':
     case 'FEE_EXCHANGE':
