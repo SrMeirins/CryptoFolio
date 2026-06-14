@@ -97,7 +97,7 @@ SELECT id, 'PYTH', NULL, TRUE FROM networks WHERE name = 'Solana';
 -- ============================================================
 CREATE TABLE wallets (
   id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name         TEXT NOT NULL,
+  name         TEXT NOT NULL UNIQUE,
   type         wallet_kind NOT NULL,
   is_system    BOOLEAN NOT NULL DEFAULT FALSE,
   is_default   BOOLEAN NOT NULL DEFAULT FALSE,
