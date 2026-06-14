@@ -105,6 +105,8 @@ module.exports = {
     category: 'Finance',
     maintainer: 'CryptoFolio',
     description: 'Gestión de portfolio y fiscalidad crypto para España',
+    // AppImages no pueden instalar chrome-sandbox con SUID root — flag requerido
+    executableArgs: ['--no-sandbox'],
   },
 
   // ── Publicación en GitHub Releases ─────────────────────────────────────────
