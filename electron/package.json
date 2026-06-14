@@ -16,11 +16,11 @@
   "scripts": {
     "build": "tsc",
     "dev": "NODE_ENV=development electron compiled/main.js",
-    "dist": "electron-builder --publish always",
-    "dist:win": "electron-builder --win --publish always",
-    "dist:mac": "electron-builder --mac --publish always",
-    "dist:linux": "electron-builder --linux --publish always",
-    "dist:local": "electron-builder --publish never"
+    "dist": "electron-builder --config electron-builder.config.js --publish always",
+    "dist:win": "electron-builder --win --config electron-builder.config.js --publish always",
+    "dist:mac": "electron-builder --mac --config electron-builder.config.js --publish always",
+    "dist:linux": "electron-builder --linux --config electron-builder.config.js --publish always",
+    "dist:local": "electron-builder --config electron-builder.config.js --publish never"
   },
   "dependencies": {
     "embedded-postgres": "18.4.0-beta.17",
