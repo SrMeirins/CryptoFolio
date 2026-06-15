@@ -61,6 +61,34 @@ export class PostgresManager {
     }
   }
 
+  // En Windows, mata cualquier proceso que esté escuchando en nuestro puerto.
+  // Necesario cuando la app se cierra de forma abrupta (crash, kill) y postgres
+  // queda como proceso huérfano manteniendo el bloque de memoria compartida abierto.
+  private async killStalePostgresOnPort(): Promise<void> {
+    if (process.platform !== 'win32') return;
+    try {
+      const out = execSync(
+        `netstat -ano | findstr ":${this.config.port} "`,
+        { stdio: 'pipe', encoding: 'utf8', timeout: 3000 }
+      );
+      const pids = new Set<string>();
+      for (const line of out.split('\n')) {
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[parts.length - 1];
+        if (pid && /^\d+$/.test(pid) && pid !== '0') pids.add(pid);
+      }
+      if (pids.size === 0) return;
+      for (const pid of pids) {
+        try {
+          execSync(`taskkill /F /PID ${pid}`, { stdio: 'pipe', timeout: 2000 });
+          console.warn(`[postgres] Proceso PID ${pid} (puerto ${this.config.port}) terminado`);
+        } catch { /* ya no existe */ }
+      }
+      // Dar tiempo al SO para liberar los recursos (handles, shared memory)
+      await new Promise(r => setTimeout(r, 1500));
+    } catch { /* netstat no encontró nada — situación normal */ }
+  }
+
   // Limpia postmaster.pid si el proceso anotado ya no existe.
   // Evita el error "pre-existing shared memory block" tras un cierre abrupto.
   private cleanStalePostmasterPid(): boolean {
@@ -139,8 +167,9 @@ export class PostgresManager {
       return;
     }
 
-    // Limpiar PID obsoleto antes de intentar arrancar
+    // Limpiar PID obsoleto y procesos huérfanos antes de intentar arrancar
     this.cleanStalePostmasterPid();
+    await this.killStalePostgresOnPort();
 
     await this.startWithRecovery(pgStderr);
 
@@ -167,6 +196,7 @@ export class PostgresManager {
       if (stderr.includes('shared memory') || stderr.includes('postmaster.pid')) {
         console.warn('[postgres] Memoria compartida huérfana detectada. Limpiando y reintentando...');
         this.cleanStalePostmasterPid();
+        await this.killStalePostgresOnPort();
         pgStderr.length = 0;
 
         try {
@@ -187,6 +217,13 @@ export class PostgresManager {
       return new Error(
         'PostgreSQL no puede arrancar con permisos de Administrador elevados (UAC).\n\n' +
         'Cierra la aplicación y ábrela sin "Ejecutar como administrador".'
+      );
+    }
+    if (stderr.includes('shared memory')) {
+      return new Error(
+        'PostgreSQL no pudo arrancar: hay un bloqueo de memoria compartida de una sesión anterior.\n\n' +
+        'Cierra CryptoFolio, espera unos segundos y vuelve a abrirlo. ' +
+        'Si el problema persiste, reinicia el ordenador.'
       );
     }
     const base = raw instanceof Error ? raw.message : String(raw ?? '');

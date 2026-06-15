@@ -291,6 +291,8 @@ async function startup(): Promise<void> {
   console.log('[app] Backend listo.');
 }
 
+let shuttingDown = false;
+
 async function shutdown(): Promise<void> {
   console.log('[app] Cerrando...');
   backendManager?.stop();
@@ -318,9 +320,10 @@ app.whenReady().then(async () => {
     // 4. Iniciar comprobaciones periódicas en segundo plano
     schedulePeriodicUpdateCheck();
   } catch (err) {
-    splashWindow?.close();
     const message = err instanceof Error ? err.message : String(err ?? 'Error desconocido');
     console.error('[app] Error fatal en startup:', message);
+    // Mostrar el diálogo ANTES de cerrar el splash — si cerramos el splash primero,
+    // window-all-closed dispara app.quit() y el diálogo se destruye antes de que el usuario lo lea.
     await dialog.showMessageBox({
       type: 'error',
       title: 'Error al iniciar CryptoFolio',
@@ -328,6 +331,7 @@ app.whenReady().then(async () => {
       detail: message,
       buttons: ['Cerrar'],
     });
+    splashWindow?.close();
     app.quit();
   }
 });
@@ -340,6 +344,17 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
-app.on('before-quit', async () => {
-  await shutdown();
+// before-quit es síncrono en Electron — el async no se awaita.
+// Usamos event.preventDefault() + app.exit() para esperar el shutdown de postgres
+// antes de salir. Sin esto, el proceso muere mientras postgres sigue vivo,
+// dejando un bloque de memoria compartida huérfano que impide el siguiente arranque.
+app.on('before-quit', (event) => {
+  if (shuttingDown) return;
+  event.preventDefault();
+  shuttingDown = true;
+  const forceExit = setTimeout(() => app.exit(0), 8000);
+  shutdown().finally(() => {
+    clearTimeout(forceExit);
+    app.exit(0);
+  });
 });
