@@ -9,6 +9,17 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.0.3] - 2026-06-15
+
+### Añadido
+
+- **Splash screen** — pantalla de carga animada mientras arrancan PostgreSQL y el backend
+
+### Corregido
+
+- **Windows — "Ejecutar como administrador"** — PostgreSQL rechaza arrancar con privilegios elevados; ahora se detecta antes del arranque y se muestra un mensaje claro indicando que hay que abrir la app sin permisos de administrador
+- **Crash al mostrar error de arranque** — si el error lanzado por embedded-postgres no era una instancia de `Error`, el diálogo de fallo fallaba a su vez con `UnhandledPromiseRejection`; corregido con manejo defensivo del tipo de error
+
 ## [0.0.2] - 2026-06-15
 
 ### Corregido

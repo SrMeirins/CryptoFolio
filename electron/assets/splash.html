@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0f0f1a;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      user-select: none;
+      -webkit-app-region: drag;
+      overflow: hidden;
+    }
+
+    .icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      margin-bottom: 18px;
+      animation: popIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    .title {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+      margin-bottom: 6px;
+      animation: fadeUp 0.4s ease 0.1s both;
+    }
+
+    .tagline {
+      font-size: 12px;
+      color: #4b5563;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 40px;
+      animation: fadeUp 0.4s ease 0.18s both;
+    }
+
+    .dots {
+      display: flex;
+      gap: 7px;
+      animation: fadeUp 0.4s ease 0.26s both;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #3b82f6;
+      animation: pulse 1.3s ease-in-out infinite;
+    }
+    .dot:nth-child(2) { animation-delay: 0.22s; background: #6366f1; }
+    .dot:nth-child(3) { animation-delay: 0.44s; background: #8b5cf6; }
+
+    .version {
+      position: absolute;
+      bottom: 18px;
+      font-size: 11px;
+      color: #1f2937;
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.7); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%, 80%, 100% { transform: scale(0.55); opacity: 0.35; }
+      40%            { transform: scale(1);    opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <img src="./icon.png" alt="" class="icon" />
+  <div class="title">CryptoFolio</div>
+  <div class="tagline">Portfolio &amp; Fiscalidad Crypto</div>
+  <div class="dots">
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
+  <div class="version" id="ver"></div>
+  <script>
+    const p = new URLSearchParams(window.location.search);
+    const v = p.get('v');
+    if (v) document.getElementById('ver').textContent = 'v' + v;
+  </script>
+</body>
+</html>

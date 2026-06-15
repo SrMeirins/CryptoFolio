@@ -10,9 +10,10 @@ const isDev = process.env.NODE_ENV === 'development';
 process.stdout.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });
 process.stderr.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });
 
-let mainWindow: BrowserWindow | null = null;
+let mainWindow:   BrowserWindow | null = null;
+let splashWindow: BrowserWindow | null = null;
 let postgresManager: PostgresManager;
-let backendManager: BackendManager;
+let backendManager:  BackendManager;
 
 // ── Seguridad: un solo proceso ──────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
@@ -27,6 +28,32 @@ app.on('second-instance', () => {
     mainWindow.focus();
   }
 });
+
+// ── Splash screen ───────────────────────────────────────────────────────────
+function createSplash(): void {
+  const splashPath = isDev
+    ? path.join(__dirname, '../assets/splash.html')
+    : path.join(process.resourcesPath, 'app', 'assets', 'splash.html');
+
+  splashWindow = new BrowserWindow({
+    width: 480,
+    height: 320,
+    frame: false,
+    resizable: false,
+    center: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    backgroundColor: '#0f0f1a',
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  splashWindow.loadFile(splashPath, { query: { v: app.getVersion() } });
+  splashWindow.on('closed', () => { splashWindow = null; });
+}
 
 // ── Configuración de autoUpdater ────────────────────────────────────────────
 function setupAutoUpdater(): void {
@@ -46,7 +73,6 @@ function setupAutoUpdater(): void {
   });
 
   if (!isDev) {
-    // Comprobar actualizaciones al arrancar y cada hora
     autoUpdater.checkForUpdates().catch(() => {});
     setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 60 * 60 * 1000);
   }
@@ -69,20 +95,19 @@ async function createWindow(): Promise<void> {
       : path.join(process.resourcesPath, 'app', 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,   // El renderer NO puede acceder a Node.js
-      nodeIntegration: false,   // Nunca activar esto
-      sandbox: true,            // Sandbox del proceso renderer
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
-      // Bloquear navegación a URLs externas desde el renderer
       navigateOnDragDrop: false,
     },
     backgroundColor: '#0f0f1a',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    show: false, // No mostrar hasta que esté lista
+    show: false,
   });
 
-  // CSP adicional para el renderer (sobre el que ya aplica el backend)
+  // CSP adicional para el renderer
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -93,7 +118,6 @@ async function createWindow(): Promise<void> {
             "script-src 'self'",
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data:",
-            // 'self' cubre http://127.0.0.1:3001 porque el frontend se sirve desde ahí
             "connect-src 'self' https://api.binance.com wss://stream.binance.com:9443 https://api.coingecko.com",
             "frame-ancestors 'none'",
             "form-action 'self'",
@@ -122,25 +146,27 @@ async function createWindow(): Promise<void> {
     await mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    // Frontend servido por el backend Express → mismo origen, sin CORS
     await mainWindow.loadURL('http://127.0.0.1:3001');
   }
 
-  mainWindow.once('ready-to-show', () => mainWindow?.show());
+  // Cuando la ventana principal esté lista: cerrar splash y mostrar app
+  mainWindow.once('ready-to-show', () => {
+    splashWindow?.close();
+    mainWindow?.show();
+  });
+
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
-// ── Startup y shutdown ──────────────────────────────────────────────────────
+// ── Startup ─────────────────────────────────────────────────────────────────
 async function startup(): Promise<void> {
   console.log('[app] Iniciando CryptoFolio...');
 
-  // 1. PostgreSQL embebido
   console.log('[app] Arrancando PostgreSQL...');
   postgresManager = new PostgresManager();
   await postgresManager.start();
   console.log('[app] PostgreSQL listo.');
 
-  // 2. Backend Express (corre migraciones en su propio startup)
   console.log('[app] Arrancando backend...');
   backendManager = new BackendManager({
     databaseUrl: postgresManager.connectionString,
@@ -157,12 +183,6 @@ async function startup(): Promise<void> {
   });
   await backendManager.start();
   console.log('[app] Backend listo.');
-
-  // 3. Ventana
-  await createWindow();
-
-  // 4. Auto-updater (no bloquea el startup)
-  setupAutoUpdater();
 }
 
 async function shutdown(): Promise<void> {
@@ -173,13 +193,17 @@ async function shutdown(): Promise<void> {
 
 // ── Ciclo de vida de Electron ───────────────────────────────────────────────
 app.whenReady().then(async () => {
-  // Quitar menú nativo en producción (la UI tiene el suyo)
   if (!isDev) Menu.setApplicationMenu(null);
+
+  createSplash();
 
   try {
     await startup();
+    await createWindow();
+    setupAutoUpdater();
   } catch (err) {
-    const message = (err as Error).message;
+    splashWindow?.close();
+    const message = err instanceof Error ? err.message : String(err ?? 'Error desconocido');
     console.error('[app] Error fatal en startup:', message);
     await dialog.showMessageBox({
       type: 'error',
@@ -193,7 +217,6 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  // En macOS la app sigue activa aunque se cierren todas las ventanas
   if (process.platform !== 'darwin') app.quit();
 });
 
