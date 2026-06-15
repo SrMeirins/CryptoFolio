@@ -179,6 +179,7 @@ export const portfolioApi = {
     priceCache: number; wallets: number; assets: number
   }>('/settings/stats'),
   clearPriceCache: () => api.delete<{ deleted: number }>('/settings/price-cache'),
+  fixStaleWithdrawals: () => api.post<{ fixed: number; records: { id: string; asset: string; timestamp: string }[] }>('/settings/transactions/fix-stale-withdrawals', {}),
   resetAllData: () => api.delete<{ success: boolean }>('/settings/data/transactions'),
   getRealizedPnl: () => api.get<{
     totalGains:  number

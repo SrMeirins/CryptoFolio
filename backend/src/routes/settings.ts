@@ -175,6 +175,28 @@ router.post('/assets/:symbol/detect', async (req: Request, res: Response) => {
   }
 });
 
+// ── POST /api/settings/transactions/fix-stale-withdrawals ─────────────────
+// Convierte a LOST los WITHDRAW con destination_pending=TRUE cuyas notas
+// indican que Binance retiró el activo (Asset Recovery, Token Swap forzado).
+// Útil para datos importados antes de que el parser reconociera estos casos.
+router.post('/transactions/fix-stale-withdrawals', async (_req: Request, res: Response) => {
+  try {
+    const result = await db.query(
+      `UPDATE transactions
+       SET operation_type = 'LOST'::operation_type,
+           destination_wallet_id = NULL,
+           destination_pending = FALSE
+       WHERE operation_type = 'WITHDRAW'
+         AND destination_pending = TRUE
+         AND notes ILIKE '%asset recovery%'
+       RETURNING id, asset, timestamp`
+    );
+    res.json({ fixed: result.rows.length, records: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 // ── POST /api/settings/pairs/test ─────────────────────────────────────────
 router.post('/pairs/test', async (req: Request, res: Response) => {
   const { pair } = req.body;

@@ -355,12 +355,22 @@ export async function importCsvFile(
     const importId: string = importRes.rows[0].id;
 
     onStatus?.('Cargando hashes existentes para detección de duplicados...');
-    // Batch check duplicados dentro de la transacción
+    // Batch check duplicados — también recuperamos transaction_id + op_type para detectar
+    // registros que existían con una clasificación antigua y que ahora deben actualizarse
+    // (p.ej. Asset Recovery importado como WITHDRAW antes de que añadiéramos el mapeo a LOST).
     const allTxHashes = parseResult.transactions.flatMap(tx => tx.rawRowHashes);
     const existingInDb = allTxHashes.length > 0
-      ? await client.query('SELECT row_hash FROM raw_transactions WHERE row_hash = ANY($1)', [allTxHashes])
-      : { rows: [] as { row_hash: string }[] };
-    const existingHashSet = new Set(existingInDb.rows.map((r: { row_hash: string }) => r.row_hash));
+      ? await client.query(
+          `SELECT rt.row_hash, t.id AS transaction_id, t.operation_type, t.destination_pending
+           FROM raw_transactions rt
+           JOIN transactions t ON t.id = rt.transaction_id
+           WHERE rt.row_hash = ANY($1)`,
+          [allTxHashes]
+        )
+      : { rows: [] as { row_hash: string; transaction_id: string; operation_type: string; destination_pending: boolean }[] };
+    const existingHashSet = new Set(existingInDb.rows.map((r) => r.row_hash));
+    // Mapa hash → {transaction_id, operation_type} para detectar cambios de clasificación
+    const existingHashMeta = new Map(existingInDb.rows.map((r) => [r.row_hash, r]));
     onStatus?.(`${existingHashSet.size} duplicados detectados. Insertando transacciones nuevas...`);
 
     let newTransactions = 0;
@@ -383,11 +393,27 @@ export async function importCsvFile(
 
     const normalRows: InsertRow[] = [];
     const unlockRows: InsertRow[] = [];
+    // Registros existentes que deben actualizarse porque su clasificación cambió
+    // (p.ej. WITHDRAW con destination_pending que ahora el parser clasifica como LOST)
+    const upgradeRows: { transactionId: string; newOpType: string }[] = [];
 
     for (const tx of parseResult.transactions) {
       processed++;
       if (tx.rawRowHashes.some(h => existingHashSet.has(h))) {
         duplicateRows++;
+        // Detectar si la clasificación ha mejorado (e.g. WITHDRAW → LOST)
+        const existingHash = tx.rawRowHashes.find(h => existingHashSet.has(h));
+        if (existingHash) {
+          const meta = existingHashMeta.get(existingHash);
+          if (
+            meta &&
+            meta.destination_pending &&
+            meta.operation_type === 'WITHDRAW' &&
+            (tx.operationType === 'LOST' || tx.operationType === 'GIFT_SENT')
+          ) {
+            upgradeRows.push({ transactionId: meta.transaction_id, newOpType: tx.operationType });
+          }
+        }
         onProgress?.(processed, totalTx, tx.asset, tx.operationType);
         continue;
       }
@@ -508,6 +534,22 @@ export async function importCsvFile(
          destinationWalletId, false, linkedTxId]
       );
       newTransactions++;
+    }
+
+    // ── Paso D: actualizar registros reclasificados ───────────────────────────
+    // Registros que existían como WITHDRAW pendiente y el parser ahora reconoce como LOST.
+    if (upgradeRows.length > 0) {
+      onStatus?.(`Actualizando ${upgradeRows.length} registros reclasificados...`);
+      for (const { transactionId, newOpType } of upgradeRows) {
+        await client.query(
+          `UPDATE transactions
+           SET operation_type = $1::operation_type,
+               destination_wallet_id = NULL,
+               destination_pending = FALSE
+           WHERE id = $2`,
+          [newOpType, transactionId]
+        );
+      }
     }
 
     // ── Paso C: batch INSERT de raw_transactions para todas ──────────────────

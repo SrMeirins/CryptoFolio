@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { portfolioApi } from '../../api/portfolio'
-import { AlertCircle, Bell, BellOff, X, ArrowRight } from 'lucide-react'
+import { AlertCircle, Bell, BellOff, X, ArrowRight, Wrench } from 'lucide-react'
 
 const NOTIFICATION_ROUTES: Record<string, string> = {
   'no-price':            '/settings?tab=assets',
@@ -96,13 +96,25 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
                       )}
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{n.message}</p>
-                    {dest && (
-                      <button onClick={() => goTo(dest)}
-                        className="inline-flex items-center gap-1 mt-2 text-xs font-medium transition-colors hover:opacity-80"
-                        style={{ color: meta.color }}>
-                        {actionLabel} <ArrowRight size={10} />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      {dest && (
+                        <button onClick={() => goTo(dest)}
+                          className="inline-flex items-center gap-1 text-xs font-medium transition-colors hover:opacity-80"
+                          style={{ color: meta.color }}>
+                          {actionLabel} <ArrowRight size={10} />
+                        </button>
+                      )}
+                      {n.id === 'pending-withdrawals' && (
+                        <button
+                          onClick={async () => {
+                            const r = await portfolioApi.fixStaleWithdrawals()
+                            if (r.fixed > 0) queryClient.invalidateQueries({ queryKey: ['notifications'] })
+                          }}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-white transition-colors">
+                          <Wrench size={10} /> Corregir auto ({n.count})
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <button
                     onClick={async () => {
