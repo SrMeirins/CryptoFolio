@@ -183,45 +183,34 @@ async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<numbe
     return usdtEur;
   }
 
-  // 3. Intentar cada par de Binance en orden de preferencia.
-  //    Cada uno puede fallar si el activo fue delistado o sin datos históricos.
+  // 3. Lanzar todos los pares de Binance en paralelo (no tienen rate limit propio).
+  //    Preferencia EUR > USDT > BTC > ETH: usamos el de mayor prioridad que tenga dato.
+  //    inFlightPrices deduplicará llamadas concurrentes al mismo (BTC/ETH, fecha).
   let priceEur = 0;
 
-  if (info.binanceEurPair) {
-    try {
-      priceEur = await fetchKlinePrice(info.binanceEurPair, date);
-    } catch { /* par sin datos — probar siguiente */ }
-  }
+  const [eurR, usdtR, btcR, ethR] = await Promise.allSettled([
+    info.binanceEurPair
+      ? fetchKlinePrice(info.binanceEurPair, date)
+      : Promise.reject(new Error('no pair')),
+    info.binanceUsdtPair
+      ? Promise.all([fetchKlinePrice(info.binanceUsdtPair, date), getHistoricalUsdtEur(date)])
+          .then(([p, u]) => p * u)
+      : Promise.reject(new Error('no pair')),
+    info.binanceBtcPair
+      ? Promise.all([fetchKlinePrice(info.binanceBtcPair, date), getHistoricalPriceEur('BTC', date)])
+          .then(([p, b]) => p * b)
+      : Promise.reject(new Error('no pair')),
+    info.binanceEthPair
+      ? Promise.all([fetchKlinePrice(info.binanceEthPair, date), getHistoricalPriceEur('ETH', date)])
+          .then(([p, e]) => p * e)
+      : Promise.reject(new Error('no pair')),
+  ]);
 
-  if (!priceEur && info.binanceUsdtPair) {
-    try {
-      const [priceUsdt, usdtEur] = await Promise.all([
-        fetchKlinePrice(info.binanceUsdtPair, date),
-        getHistoricalUsdtEur(date),
-      ]);
-      priceEur = priceUsdt * usdtEur;
-    } catch { /* par sin datos — probar siguiente */ }
-  }
-
-  if (!priceEur && info.binanceBtcPair) {
-    try {
-      const [pricePair, btcEur] = await Promise.all([
-        fetchKlinePrice(info.binanceBtcPair, date),
-        getHistoricalPriceEur('BTC', date),
-      ]);
-      priceEur = pricePair * btcEur;
-    } catch { /* par sin datos — probar ETH proxy */ }
-  }
-
-  if (!priceEur && info.binanceEthPair) {
-    try {
-      const [pricePair, ethEur] = await Promise.all([
-        fetchKlinePrice(info.binanceEthPair, date),
-        getHistoricalPriceEur('ETH', date),
-      ]);
-      priceEur = pricePair * ethEur;
-    } catch { /* par sin datos — probar CoinGecko */ }
-  }
+  priceEur =
+    (eurR.status  === 'fulfilled' && eurR.value  > 0 ? eurR.value  : 0) ||
+    (usdtR.status === 'fulfilled' && usdtR.value > 0 ? usdtR.value : 0) ||
+    (btcR.status  === 'fulfilled' && btcR.value  > 0 ? btcR.value  : 0) ||
+    (ethR.status  === 'fulfilled' && ethR.value  > 0 ? ethR.value  : 0);
 
   // 4. Fallback a CoinGecko si Binance no tiene datos históricos
   //    (activos delistados, tokens no nativos de Binance, etc.)

@@ -246,9 +246,10 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
     if (toFetch > 0) {
       send('prices', `Cargando ${toFetch} precios históricos...`, 0, toFetch);
 
-      // Concurrencia baja: CoinGecko tiene rate limit estricto (10-30 req/min).
-      // Con 3 en paralelo + la cola serial interna de coingecko.ts no saturamos la API.
-      const CONCURRENCY = 3;
+      // Concurrencia 10: Binance no tiene rate limit; CoinGecko está serializado
+      // por su cola interna (6.5s entre llamadas) independientemente de cuántas
+      // llamadas concurrentes haya — el cuello de botella lo gestiona la cola.
+      const CONCURRENCY = 10;
       let done = 0;
       for (let i = 0; i < toFetchList.length; i += CONCURRENCY) {
         const batch = toFetchList.slice(i, i + CONCURRENCY);

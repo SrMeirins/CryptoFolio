@@ -277,35 +277,45 @@ export async function importCsvFile(
     }
     const uniquePairs = [...uniquePairsMap.values()];
 
-    onStatus?.(`Enriqueciendo ${incomeTxs.length} operaciones de rendimiento — ${uniquePairs.length} pares únicos a consultar`, 0, uniquePairs.length);
+    const totalPairs = uniquePairs.length;
+    onStatus?.(`Enriqueciendo ${incomeTxs.length} operaciones de rendimiento — ${totalPairs} pares únicos (concurrencia 10)`, 0, totalPairs);
 
     // Enganchar el callback de CoinGecko para que rate limits aparezcan en el log
     setCoinGeckoStatusCallback(onStatus);
 
-    let pairIdx = 0;
-    for (const { symbol, date, txList } of uniquePairs) {
-      pairIdx++;
-      const dateStr = date.toISOString().slice(0, 10);
-      onStatus?.(`[${pairIdx}/${uniquePairs.length}] Consultando ${symbol} @ ${dateStr}...`, pairIdx, uniquePairs.length);
-      try {
-        const price = await getHistoricalPriceEur(symbol, date);
-        if (price > 0) {
-          onStatus?.(`[${pairIdx}/${uniquePairs.length}] ✓ ${symbol} @ ${dateStr} = ${price.toFixed(4)} €`, pairIdx, uniquePairs.length);
-          for (const tx of txList) {
-            tx.pricePerUnit = price;
-            tx.costAsset    = 'EUR';
-            tx.costAmount   = tx.amount * price;
+    // Concurrencia 10: Binance no tiene rate limit estricto, los pares que
+    // recaigan en CoinGecko quedan serializados automáticamente por su cola.
+    let completed = 0;
+    const PRICE_CONCURRENCY = 10;
+    for (let i = 0; i < uniquePairs.length; i += PRICE_CONCURRENCY) {
+      const batch = uniquePairs.slice(i, i + PRICE_CONCURRENCY);
+      await Promise.allSettled(
+        batch.map(async ({ symbol, date, txList }) => {
+          const dateStr = date.toISOString().slice(0, 10);
+          onStatus?.(`Consultando ${symbol} @ ${dateStr}...`);
+          try {
+            const price = await getHistoricalPriceEur(symbol, date);
+            completed++;
+            if (price > 0) {
+              onStatus?.(`✓ ${symbol} @ ${dateStr} = ${price.toFixed(4)} €`, completed, totalPairs);
+              for (const tx of txList) {
+                tx.pricePerUnit = price;
+                tx.costAsset    = 'EUR';
+                tx.costAmount   = tx.amount * price;
+              }
+            } else {
+              onStatus?.(`— ${symbol} @ ${dateStr} sin precio`, completed, totalPairs);
+            }
+          } catch (e) {
+            completed++;
+            onStatus?.(`⚠ ${symbol} @ ${dateStr} error: ${(e as Error).message}`, completed, totalPairs);
           }
-        } else {
-          onStatus?.(`[${pairIdx}/${uniquePairs.length}] — ${symbol} @ ${dateStr} sin precio disponible`, pairIdx, uniquePairs.length);
-        }
-      } catch (e) {
-        onStatus?.(`[${pairIdx}/${uniquePairs.length}] ⚠ ${symbol} @ ${dateStr} error: ${(e as Error).message}`, pairIdx, uniquePairs.length);
-      }
+        })
+      );
     }
 
     setCoinGeckoStatusCallback(undefined);
-    onStatus?.(`Precios de rendimiento completados: ${uniquePairs.length} pares procesados`);
+    onStatus?.(`Precios de rendimiento completados: ${totalPairs} pares procesados`);
   }
 
   onStatus?.('Iniciando transacción en base de datos...');
