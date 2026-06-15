@@ -205,11 +205,22 @@ router.get('/locked', async (_req, res) => {
      FROM (
        SELECT t.wallet_id, w.name AS wallet_name, w.color AS wallet_color,
               t.asset, t.operation_type AS op, t.amount_net,
+              -- Para UNLOCKs usamos las notes del LOCK enlazado (linked_tx_id) en lugar de
+              -- las del propio UNLOCK. Binance renombra productos a mitad de ciclo
+              -- (ej. "Staking Purchase" → redimido como "Simple Earn Locked Redemption"),
+              -- así que el UNLOCK tiene notes distintas al LOCK, y sin este join no se
+              -- cancelarían en el GROUP BY.
               CASE t.operation_type
-                WHEN 'STAKING_LOCK'      THEN REPLACE(t.notes, 'Staking Redemption',    'Staking Purchase')
-                WHEN 'STAKING_UNLOCK'    THEN REPLACE(t.notes, 'Staking Redemption',    'Staking Purchase')
-                WHEN 'LAUNCHPOOL_LOCK'   THEN REPLACE(t.notes, 'Launchpool Redemption', 'Launchpool Subscription')
-                WHEN 'LAUNCHPOOL_UNLOCK' THEN REPLACE(t.notes, 'Launchpool Redemption', 'Launchpool Subscription')
+                WHEN 'STAKING_LOCK'      THEN t.notes
+                WHEN 'STAKING_UNLOCK'    THEN COALESCE(
+                  (SELECT t2.notes FROM transactions t2 WHERE t2.id = t.linked_tx_id),
+                  t.notes
+                )
+                WHEN 'LAUNCHPOOL_LOCK'   THEN t.notes
+                WHEN 'LAUNCHPOOL_UNLOCK' THEN COALESCE(
+                  (SELECT t2.notes FROM transactions t2 WHERE t2.id = t.linked_tx_id),
+                  t.notes
+                )
               END AS staking_type,
               CASE WHEN t.operation_type IN ('LAUNCHPOOL_LOCK','LAUNCHPOOL_UNLOCK')
                    THEN 'launchpool' ELSE 'staking' END AS lock_kind

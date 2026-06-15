@@ -223,7 +223,8 @@ export async function importCsvFile(
   fileBuffer: Buffer,
   filename: string,
   withdrawalDestinations: Record<string, string> = {},
-  depositCosts: Record<string, number> = {}   // txKey → pricePerUnit (EUR)
+  depositCosts: Record<string, number> = {},
+  onProgress?: (done: number, total: number, asset?: string, operation?: string) => void,
 ): Promise<ImportResult> {
   const validation = validateCsvStructure(fileBuffer);
   if (!validation.valid) {
@@ -321,10 +322,14 @@ export async function importCsvFile(
 
     let newTransactions = 0;
     let duplicateRows = 0;
+    const totalTx = parseResult.transactions.length;
+    let processed = 0;
 
     for (const tx of parseResult.transactions) {
+      processed++;
       if (tx.rawRowHashes.some(h => existingHashSet.has(h))) {
         duplicateRows++;
+        onProgress?.(processed, totalTx, tx.asset, tx.operationType);
         continue;
       }
       const walletId = getWalletId(tx.account);
@@ -335,34 +340,26 @@ export async function importCsvFile(
       if (tx.operationType === 'TRANSFER_INTERNAL') {
         destinationWalletId = getDestinationWalletId(tx.notes, tx.account);
       } else if (tx.operationType === 'STAKING_UNLOCK' || tx.operationType === 'LAUNCHPOOL_UNLOCK') {
-        // Enlazar con el LOCK más antiguo no emparejado del mismo wallet+asset
+        // Enlazar con el LOCK más antiguo no emparejado del mismo wallet+asset.
+        // No usamos notes para el match porque Binance renombra productos a mitad de ciclo:
+        // un "Staking Purchase" puede ser redimido como "Simple Earn Locked Redemption",
+        // lo que haría fallar la búsqueda por notes. FIFO puro (timestamp ASC) es correcto.
         const isLaunchpool = tx.operationType === 'LAUNCHPOOL_UNLOCK';
         const lockType  = isLaunchpool ? 'LAUNCHPOOL_LOCK'  : 'STAKING_LOCK';
         const unlockType = tx.operationType;
-        const UNLOCK_TO_LOCK_NOTE: Record<string, string> = {
-          'Staking Redemption':                'Staking Purchase',
-          'Simple Earn Locked Redemption':     'Simple Earn Locked Subscription',
-          'Simple Earn Flexible Redemption':   'Simple Earn Flexible Subscription',
-          'Launchpool Redemption':             'Launchpool Subscription',
-          'Launchpool Subscription/Redemption':'Launchpool Subscription/Redemption',
-        };
-        const lockLabel = tx.notes
-          ? (UNLOCK_TO_LOCK_NOTE[tx.notes] ?? tx.notes)
-          : (isLaunchpool ? 'Launchpool Subscription' : 'Staking Purchase');
         const matchRes = await client.query(
           `SELECT id FROM transactions
            WHERE operation_type = $1
              AND wallet_id = $2
              AND asset = $3
-             AND notes = $4
              AND id NOT IN (
                SELECT linked_tx_id FROM transactions
                WHERE linked_tx_id IS NOT NULL
-                 AND operation_type = $5
+                 AND operation_type = $4
              )
            ORDER BY timestamp ASC
            LIMIT 1`,
-          [lockType, walletId, tx.asset, lockLabel, unlockType]
+          [lockType, walletId, tx.asset, unlockType]
         );
         if (matchRes.rows.length > 0) {
           linkedTxId = matchRes.rows[0].id as string;
@@ -404,6 +401,7 @@ export async function importCsvFile(
 
       await insertTransaction(client, tx, importId, walletId, destinationWalletId, effectiveOpType, depositPriceOverride, linkedTxId);
       newTransactions++;
+      onProgress?.(processed, totalTx, tx.asset, effectiveOpType);
     }
 
     await client.query(

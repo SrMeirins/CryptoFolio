@@ -32,6 +32,10 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
     e => e.phase === 'prices' && e.total !== undefined && e.total > 0
   )
 
+  const latestImportingEvent = [...log].reverse().find(
+    e => e.phase === 'importing' && e.total !== undefined && e.total > 0
+  )
+
   const importLine = log.find(e => e.message.includes('transacciones nuevas'))
   const fifoLine   = log.find(e => e.message.includes('lotes') && e.message.includes('consumos'))
   const gpLine     = log.find(e => e.message.includes('G/P neto'))
@@ -53,7 +57,11 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
           } else if (isDone) {
             barClass += 'bg-accent-green w-full'
           } else if (isCurrent) {
-            if (phase.key === 'prices' && latestPricesEvent) {
+            if (phase.key === 'importing' && latestImportingEvent) {
+              const pct = Math.min(100, Math.round((latestImportingEvent.progress! / latestImportingEvent.total!) * 100))
+              barClass += 'bg-accent-blue'
+              barStyle = { width: `${pct}%` }
+            } else if (phase.key === 'prices' && latestPricesEvent) {
               const pct = Math.min(100, Math.round((latestPricesEvent.progress! / latestPricesEvent.total!) * 100))
               barClass += 'bg-accent-blue'
               barStyle = { width: `${pct}%` }
@@ -110,6 +118,11 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
           <span className="text-sm text-gray-300 truncate">
             {log.length > 0 ? log[log.length - 1].message : 'Iniciando...'}
           </span>
+          {latestImportingEvent && currentPhase === 'importing' && (
+            <span className="ml-auto text-xs text-gray-500 font-mono shrink-0">
+              {latestImportingEvent.progress}/{latestImportingEvent.total}
+            </span>
+          )}
           {latestPricesEvent && currentPhase === 'prices' && (
             <span className="ml-auto text-xs text-gray-500 font-mono shrink-0">
               {latestPricesEvent.progress}/{latestPricesEvent.total}
@@ -134,21 +147,25 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
       {(!done || showLog) && (
         <div
           ref={logRef}
-          className="bg-black/50 rounded-lg p-4 font-mono text-xs space-y-1 max-h-48 overflow-y-auto"
+          className="bg-black/50 rounded-lg p-4 font-mono text-xs space-y-1 max-h-64 overflow-y-auto"
         >
           {log.length === 0 && (
             <span className="text-gray-600">Esperando inicio...</span>
           )}
           {log.map((event, i) => {
-            const isNoPrice = event.phase === 'prices' && event.message.startsWith('—')
-            const isOkPrice = event.phase === 'prices' && event.message.startsWith('✓')
+            const isNoPrice    = event.phase === 'prices' && event.message.startsWith('—')
+            const isOkPrice    = event.phase === 'prices' && event.message.startsWith('✓')
+            const isFifoWarn   = event.phase === 'fifo' && event.message.includes('⚠')
+            const isImportProgress = event.phase === 'importing' && event.progress !== undefined
             const color =
-              event.phase === 'error'   ? 'text-accent-red'   :
-              event.phase === 'done'    ? 'text-accent-green' :
-              event.phase === 'fifo'    ? 'text-accent-blue'  :
-              isNoPrice                 ? 'text-yellow-600'   :
-              isOkPrice                 ? 'text-gray-500'     :
-              event.phase === 'prices'  ? 'text-gray-400'     :
+              event.phase === 'error'   ? 'text-accent-red'    :
+              event.phase === 'done'    ? 'text-accent-green'  :
+              isFifoWarn                ? 'text-yellow-500'    :
+              event.phase === 'fifo'    ? 'text-accent-blue'   :
+              isNoPrice                 ? 'text-yellow-600'    :
+              isOkPrice                 ? 'text-gray-500'      :
+              event.phase === 'prices'  ? 'text-gray-400'      :
+              isImportProgress          ? 'text-gray-500'      :
               'text-gray-300'
             return (
               <div key={i} className={color}>

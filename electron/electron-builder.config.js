@@ -68,7 +68,7 @@ module.exports = {
     installerIcon: 'assets/icon.ico',
     uninstallerIcon: 'assets/icon.ico',
     license: '../LICENSE',
-    include: 'assets/installer.nsh',   // hooks: ShowInstDetails + auto-kill
+    include: 'assets/installer.nsh',   // hooks: auto-kill procesos antes de instalar
   },
 
   mac: {

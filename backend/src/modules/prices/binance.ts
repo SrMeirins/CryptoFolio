@@ -127,9 +127,12 @@ async function fetchKlinePrice(pair: string, date: Date, retries = 3): Promise<n
 }
 
 // In-flight dedup: evita N queries concurrentes para el mismo (symbol, date).
-// Cuando hay 10 requests paralelas en imports.ts y 3 necesitan ETH @ 2024-03-15,
-// solo se lanza una consulta real; las otras esperan su resultado.
 const inFlightPrices = new Map<string, Promise<number>>();
+
+// Cache en memoria de pares sin precio conocido (symbol|dateStr = -1 sentinel).
+// Cuando Binance+CoinGecko fallan, se persiste -1 en DB Y en este Set para que
+// el motor FIFO y reimportaciones no relancen el mismo ciclo de reintentos + 429.
+const noPricePairs = new Set<string>();
 
 export async function getHistoricalPriceEur(symbol: string, date: Date): Promise<number> {
   if (symbol === 'EUR') return 1;
@@ -151,15 +154,23 @@ export async function getHistoricalPriceEur(symbol: string, date: Date): Promise
 
 async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<number> {
   const dateStr = date.toISOString().slice(0, 10);
+  const key = `${symbol}|${dateStr}`;
 
-  // 1. Caché DB (incluye sentinela -1 de CoinGecko "sin datos")
+  // Cache en memoria: par ya conocido sin precio en esta sesión — evita DB + API
+  if (noPricePairs.has(key)) return 0;
+
+  // 1. Caché DB (incluye sentinela -1 = sin precio disponible en ninguna fuente)
   const cached = await db.query(
     'SELECT price_eur FROM price_cache WHERE asset = $1 AND price_date = $2',
     [symbol, dateStr]
   );
   if (cached.rows.length > 0) {
     const price = parseFloat(cached.rows[0].price_eur);
-    return price < 0 ? 0 : price;
+    if (price < 0) {
+      noPricePairs.add(key); // también en memoria para siguientes requests
+      return 0;
+    }
+    return price;
   }
 
   // 2. Obtener info del par (DB o auto-detectar)
@@ -224,6 +235,15 @@ async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<numbe
 
   if (!priceEur) {
     console.warn(`[PRICES] Sin precio para ${symbol} @ ${dateStr} en Binance ni CoinGecko`);
+    // Persistir sentinel -1: evita reintentos en el motor FIFO y próximas sesiones.
+    // ON CONFLICT DO NOTHING para no pisar un precio real que llegara después.
+    noPricePairs.add(key);
+    await db.query(
+      `INSERT INTO price_cache (asset, price_eur, price_date, source)
+       VALUES ($1, -1, $2, 'no_data')
+       ON CONFLICT (asset, price_date) DO NOTHING`,
+      [symbol, dateStr]
+    );
     return 0;
   }
 

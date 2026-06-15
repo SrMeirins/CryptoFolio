@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { FileText, Info, Calendar } from 'lucide-react'
+import { FileText, Info, Calendar, AlertTriangle } from 'lucide-react'
 import { formatEur, pnlColor } from '../utils/format'
 import { pnlBg } from './fiscal/helpers'
 import { ComparativaAnual, EvolucionMensual, DesglosePorActivo } from './fiscal/Charts'
@@ -14,24 +14,30 @@ import type {
   YearOverview, Carryforward, BreakdownItem, MonthlyData,
 } from './fiscal/types'
 
+async function fetchOk(url: string) {
+  const r = await fetch(url)
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${url}`)
+  return r.json()
+}
+
 export function Fiscal() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const currentYear = new Date().getFullYear()
 
   const { data: years = [] } = useQuery<number[]>({
     queryKey: ['fiscal-years'],
-    queryFn: () => fetch('/api/fiscal/years').then(r => r.json()),
+    queryFn: () => fetchOk('/api/fiscal/years'),
   })
 
   const { data: overview = [] } = useQuery<YearOverview[]>({
     queryKey: ['fiscal-overview'],
-    queryFn: () => fetch('/api/fiscal/overview').then(r => r.json()),
+    queryFn: () => fetchOk('/api/fiscal/overview'),
     staleTime: 5 * 60_000,
   })
 
   const { data: carryforward } = useQuery<Carryforward>({
     queryKey: ['fiscal-carryforward'],
-    queryFn: () => fetch('/api/fiscal/carryforward').then(r => r.json()),
+    queryFn: () => fetchOk('/api/fiscal/carryforward'),
     staleTime: 5 * 60_000,
   })
 
@@ -39,41 +45,57 @@ export function Fiscal() {
 
   const { data: summary, isLoading: summaryLoading } = useQuery<FiscalSummary>({
     queryKey: ['fiscal-summary-detail', activeYear],
-    queryFn: () => fetch(`/api/fiscal/${activeYear}/summary`).then(r => r.json()),
+    queryFn: () => fetchOk(`/api/fiscal/${activeYear}/summary`),
     enabled: !!activeYear,
     staleTime: 5 * 60_000,
   })
 
-  const { data: events, isLoading: eventsLoading } = useQuery<{
+  const { data: events, isLoading: eventsLoading, isError: eventsError } = useQuery<{
     fiscalEvents: FiscalEvent[]
     rendimientos: RendimientoEvent[]
   }>({
     queryKey: ['fiscal-events', activeYear],
-    queryFn: () => fetch(`/api/fiscal/${activeYear}/events`).then(r => r.json()),
+    queryFn: () => fetchOk(`/api/fiscal/${activeYear}/events`),
     enabled: !!activeYear,
     staleTime: 5 * 60_000,
+    retry: false,
   })
 
   const { data: modelo721, isLoading: modelo721Loading } = useQuery<Modelo721>({
     queryKey: ['fiscal-721', activeYear],
-    queryFn: () => fetch(`/api/fiscal/${activeYear}/modelo721`).then(r => r.json()),
+    queryFn: () => fetchOk(`/api/fiscal/${activeYear}/modelo721`),
     enabled: !!activeYear,
     staleTime: 5 * 60_000,
+    retry: false,
   })
 
-  const { data: breakdown = [] } = useQuery<BreakdownItem[]>({
+  const { data: breakdown = [], isError: breakdownError } = useQuery<BreakdownItem[]>({
     queryKey: ['fiscal-breakdown', activeYear],
-    queryFn: () => fetch(`/api/fiscal/${activeYear}/breakdown`).then(r => r.json()),
+    queryFn: () => fetchOk(`/api/fiscal/${activeYear}/breakdown`),
     enabled: !!activeYear,
     staleTime: 5 * 60_000,
+    retry: false,
   })
 
-  const { data: monthly } = useQuery<MonthlyData>({
+  const { data: monthly, isError: monthlyError } = useQuery<MonthlyData>({
     queryKey: ['fiscal-monthly', activeYear],
-    queryFn: () => fetch(`/api/fiscal/${activeYear}/monthly`).then(r => r.json()),
+    queryFn: () => fetchOk(`/api/fiscal/${activeYear}/monthly`),
     enabled: !!activeYear,
     staleTime: 5 * 60_000,
+    retry: false,
   })
+
+  const hasError = eventsError || breakdownError || monthlyError
+
+  if (hasError && activeYear) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center h-64 gap-3">
+        <AlertTriangle size={32} className="text-accent-red" />
+        <p className="text-gray-300 text-sm font-medium">Error al cargar los datos fiscales de {activeYear}</p>
+        <p className="text-gray-600 text-xs">Inténtalo de nuevo en unos segundos.</p>
+      </div>
+    )
+  }
 
   if (!activeYear) {
     return (

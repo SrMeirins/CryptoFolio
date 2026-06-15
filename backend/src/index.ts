@@ -66,33 +66,18 @@ app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(morgan('combined'));
 
 // ── Rate limiting ──────────────────────────────────────────────────────────
+// El backend escucha en 127.0.0.1 para un único usuario local (Electron).
+// El globalLimiter previene loops accidentales; no es un límite de seguridad
+// frente a terceros (no hay acceso externo).
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 500,
+  max: 5000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' },
 });
 
-const importLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Import limit reached, please wait before importing again.' },
-});
-
-const fiscalLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many export requests.' },
-});
-
 app.use(globalLimiter);
-app.use('/api/imports', importLimiter);
-app.use('/api/fiscal', fiscalLimiter);
 
 // ── Body parsing ───────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));

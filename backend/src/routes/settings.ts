@@ -76,7 +76,7 @@ router.put('/assets/:symbol', async (req: Request, res: Response) => {
 
   await db.query(
     `UPDATE asset_metadata SET
-      name              = $1,
+      name              = COALESCE($1, name),
       is_stablecoin     = $2,
       binance_eur_pair  = $3,
       binance_usdt_pair = $4,
@@ -84,7 +84,7 @@ router.put('/assets/:symbol', async (req: Request, res: Response) => {
       price_source      = $6,
       last_price_check  = NOW()
      WHERE symbol = $7`,
-    [name, isStablecoin || false, binanceEurPair || null,
+    [name || null, isStablecoin || false, binanceEurPair || null,
      binanceUsdtPair || null, binanceBtcPair || null, priceSource, symbol.toUpperCase()]
   );
 

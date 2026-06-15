@@ -137,7 +137,8 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
     }
 
     // ── FASE 1: Importar transacciones ────────────────────────────────────────
-    send('importing', 'Importando transacciones...');
+    const totalParsed = preparse.transactions.length;
+    send('importing', `Importando ${totalParsed} transacciones...`, 0, totalParsed);
 
     // Separar costes: UUIDs (ya en DB) vs hashes (nuevos en CSV)
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -165,7 +166,23 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
       }
     }
 
-    const importResult = await importCsvFile(req.file.buffer, req.file.originalname, withdrawalDestinations, newDepositCosts);
+    // Emitir progreso cada 50 transacciones para no saturar el SSE
+    const IMPORT_REPORT_EVERY = 50;
+    let lastImportReport = 0;
+
+    const importResult = await importCsvFile(
+      req.file.buffer,
+      req.file.originalname,
+      withdrawalDestinations,
+      newDepositCosts,
+      (done, total, asset, operation) => {
+        if (done - lastImportReport >= IMPORT_REPORT_EVERY || done === total) {
+          lastImportReport = done;
+          const label = asset && operation ? `${asset} · ${operation}` : 'Procesando...';
+          send('importing', label, done, total);
+        }
+      }
+    );
     send('importing', `✓ ${importResult.newTransactions} transacciones nuevas importadas (${importResult.duplicateRows} duplicadas ignoradas)`);
 
     // FASE 2: Precios históricos
@@ -269,7 +286,14 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
     send('fifo', `✓ FIFO completado: ${fifoResult.lotsCreated} lotes, ${fifoResult.lotsConsumed} consumos`);
 
     if (fifoResult.errors.length > 0) {
-      send('fifo', `⚠ ${fifoResult.errors.length} advertencias en el cálculo FIFO`);
+      const MAX_SHOW = 30;
+      send('fifo', `⚠ ${fifoResult.errors.length} advertencia${fifoResult.errors.length > 1 ? 's' : ''} en el cálculo FIFO:`);
+      for (const err of fifoResult.errors.slice(0, MAX_SHOW)) {
+        send('fifo', `  ⚠ ${err}`);
+      }
+      if (fifoResult.errors.length > MAX_SHOW) {
+        send('fifo', `  ... y ${fifoResult.errors.length - MAX_SHOW} más`);
+      }
     }
 
     const netGP = fifoResult.totalGainEur + fifoResult.totalLossEur;

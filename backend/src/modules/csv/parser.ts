@@ -349,18 +349,20 @@ function interpretGroup(
 
   if (firstOp === 'Deposit') {
     const row = group[0];
-    // Depósitos que financian una compra "Transaction Related" al mismo timestamp → ignorar.
-    // La compra ya se registra en el grupo Transaction Related con su coste real.
+    // Depósitos que financian una compra "Transaction Related" al mismo timestamp.
+    // El dinero SÍ entró desde el banco → DEPOSIT_FIAT para que fiat-balances lo contabilice.
+    // La compra queda registrada por separado (BUY con costAsset=EUR), y ambos se cancelan.
     const fundingKey = `${timestamp.getTime()}|${account}|${row.coin}|${abs(row.change)}`;
     if (fundingDepositKeys.has(fundingKey)) {
+      const isFundingFiat = FIAT_ASSETS.has(row.coin.toUpperCase());
       return {
-        operationType: 'IGNORED' as const,
+        operationType: isFundingFiat ? 'DEPOSIT_FIAT' as const : 'IGNORED' as const,
         timestamp,
         asset:     row.coin,
         amount:    abs(row.change),
         amountNet: abs(row.change),
         account,
-        notes:     'Depósito de fondos para compra simultánea (Transaction Related)',
+        notes:     'Depósito bancario para compra simultánea (Transaction Related)',
         subTradeCount: 1,
         rawRowHashes: hashes,
       };
