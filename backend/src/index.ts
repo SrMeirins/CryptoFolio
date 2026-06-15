@@ -132,6 +132,17 @@ async function bootstrap() {
       await runMigrations(dbUrl);
     }
     setupPricesWebSocket(server);
+
+    // Limpiar destination_pending=TRUE en transacciones que ya no son WITHDRAW
+    // (datos corruptos de ediciones previas o upgrades del importer)
+    const staleRes = await db.query(
+      `UPDATE transactions SET destination_pending = FALSE
+       WHERE destination_pending = TRUE AND operation_type != 'WITHDRAW'`
+    );
+    if (staleRes.rowCount && staleRes.rowCount > 0) {
+      console.log(`[STARTUP] Limpiados ${staleRes.rowCount} registros con destination_pending incorrecto`);
+    }
+
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`[SERVER] Listening on port ${PORT}`);
       startLivePrices();

@@ -278,9 +278,11 @@ router.get('/notifications', async (_req: Request, res: Response) => {
     });
   }
 
-  // 2. Retiros sin wallet destino asignada
+  // 2. Retiros sin wallet destino asignada (solo WITHDRAWs reales; otros types con el flag son datos corruptos)
   const pendingRes = await db.query(
-    `SELECT asset, COUNT(*) as cnt FROM transactions WHERE destination_pending = TRUE GROUP BY asset ORDER BY asset`
+    `SELECT asset, COUNT(*) as cnt FROM transactions
+     WHERE destination_pending = TRUE AND operation_type = 'WITHDRAW'
+     GROUP BY asset ORDER BY asset`
   );
   if (pendingRes.rows.length > 0) {
     const total = pendingRes.rows.reduce((s: number, r: {cnt: string}) => s + parseInt(r.cnt), 0);

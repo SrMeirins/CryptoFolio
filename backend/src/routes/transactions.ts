@@ -328,25 +328,30 @@ router.put('/:id', async (req: Request, res: Response) => {
     finalCostAmount = parseFloat(finalAmount) * finalPricePerUnit;
   }
 
+  const dbOpType = mapCatalogTypeToDb(operationType);
+  // Si el tipo editado ya no es WITHDRAW, limpiar destination_pending
+  const shouldClearPending = dbOpType !== 'WITHDRAW';
+
   await db.query(
     `UPDATE transactions SET
-       operation_type = $1::operation_type,
-       timestamp      = $2,
-       asset          = $3,
-       amount         = $4,
-       amount_net     = $5,
-       cost_asset     = $6,
-       cost_amount    = $7,
-       price_per_unit = $8,
-       fee_asset      = $9,
-       fee_amount     = $10,
-       wallet_id      = $11,
+       operation_type        = $1::operation_type,
+       timestamp             = $2,
+       asset                 = $3,
+       amount                = $4,
+       amount_net            = $5,
+       cost_asset            = $6,
+       cost_amount           = $7,
+       price_per_unit        = $8,
+       fee_asset             = $9,
+       fee_amount            = $10,
+       wallet_id             = $11,
        destination_wallet_id = $12,
-       notes          = $13,
-       updated_at     = NOW()
+       destination_pending   = CASE WHEN $15 THEN FALSE ELSE destination_pending END,
+       notes                 = $13,
+       updated_at            = NOW()
      WHERE id = $14`,
     [
-      mapCatalogTypeToDb(operationType), new Date(timestamp),
+      dbOpType, new Date(timestamp),
       finalAsset ? finalAsset.toUpperCase() : null,
       finalAmount ? parseFloat(finalAmount) : null,
       finalAmount ? parseFloat(amountNet ?? finalAmount) : null,
@@ -357,6 +362,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       destinationWalletId ?? null,
       notes ?? null,
       id,
+      shouldClearPending,
     ]
   );
 
