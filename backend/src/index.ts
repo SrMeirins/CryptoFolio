@@ -143,6 +143,26 @@ async function bootstrap() {
       console.log(`[STARTUP] Limpiados ${staleRes.rowCount} registros con destination_pending incorrecto`);
     }
 
+    // Convertir automáticamente WITHDRAW+destination_pending=TRUE que en el CSV
+    // original eran "Asset Recovery" o "Token Swap - Distribution" negativos.
+    // Binance fuerza estos retiros (delisting): no van a ninguna wallet, son LOST.
+    const forcedLostRes = await db.query(
+      `UPDATE transactions t
+       SET operation_type        = 'LOST'::operation_type,
+           destination_wallet_id = NULL,
+           destination_pending   = FALSE,
+           notes = COALESCE(t.notes, rt.operation || ' — activo retirado por Binance')
+       FROM raw_transactions rt
+       WHERE rt.transaction_id = t.id
+         AND t.operation_type = 'WITHDRAW'
+         AND t.destination_pending = TRUE
+         AND rt.operation IN ('Asset Recovery', 'Token Swap - Distribution')
+         AND rt.change < 0`
+    );
+    if (forcedLostRes.rowCount && forcedLostRes.rowCount > 0) {
+      console.log(`[STARTUP] Reclasificados ${forcedLostRes.rowCount} retiros forzados (Asset Recovery/Token Swap) → LOST`);
+    }
+
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`[SERVER] Listening on port ${PORT}`);
       startLivePrices();

@@ -176,20 +176,25 @@ router.post('/assets/:symbol/detect', async (req: Request, res: Response) => {
 });
 
 // ── POST /api/settings/transactions/fix-stale-withdrawals ─────────────────
-// Convierte a LOST los WITHDRAW con destination_pending=TRUE cuyas notas
-// indican que Binance retiró el activo (Asset Recovery, Token Swap forzado).
-// Útil para datos importados antes de que el parser reconociera estos casos.
+// Convierte a LOST los WITHDRAW+destination_pending=TRUE cuya operación CSV
+// original era "Asset Recovery" o "Token Swap - Distribution" con change < 0.
+// Binance fuerza estos retiros (delisting): no van a ninguna wallet, son pérdidas.
 router.post('/transactions/fix-stale-withdrawals', async (_req: Request, res: Response) => {
   try {
     const result = await db.query(
-      `UPDATE transactions
-       SET operation_type = 'LOST'::operation_type,
+      `UPDATE transactions t
+       SET operation_type        = 'LOST'::operation_type,
            destination_wallet_id = NULL,
-           destination_pending = FALSE
-       WHERE operation_type = 'WITHDRAW'
-         AND destination_pending = TRUE
-         AND notes ILIKE '%asset recovery%'
-       RETURNING id, asset, timestamp`
+           destination_pending   = FALSE,
+           notes = COALESCE(t.notes,
+             rt.operation || ' — activo retirado por Binance')
+       FROM raw_transactions rt
+       WHERE rt.transaction_id = t.id
+         AND t.operation_type = 'WITHDRAW'
+         AND t.destination_pending = TRUE
+         AND rt.operation IN ('Asset Recovery', 'Token Swap - Distribution')
+         AND rt.change < 0
+       RETURNING t.id, t.asset, t.timestamp`
     );
     res.json({ fixed: result.rows.length, records: result.rows });
   } catch (err) {
