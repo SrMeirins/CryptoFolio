@@ -48,11 +48,7 @@ module.exports = {
     },
   ],
 
-  // embedded-postgres lanza binarios de PostgreSQL vía spawn(), que no puede
-  // atravesar rutas dentro de un .asar. Con asarUnpack solo ese módulo se
-  // extrae al filesystem real; el resto del app permanece empaquetado.
-  asar: true,
-  asarUnpack: ['node_modules/embedded-postgres/**/*'],
+  asar: false,
 
   // ── Plataformas ────────────────────────────────────────────────────────────
   win: {
