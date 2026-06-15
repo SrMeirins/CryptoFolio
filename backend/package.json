@@ -1,6 +1,6 @@
 {
   "name": "cryptotracker-backend",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "CryptoTracker backend — portfolio y fiscal España",
   "main": "dist/index.js",
   "scripts": {

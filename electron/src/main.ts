@@ -6,7 +6,6 @@ import { BackendManager } from './backend-manager';
 
 const isDev = process.env.NODE_ENV === 'development';
 
-// Evitar crash cuando stdout/stderr se cierra (ej: al pipear a `head`)
 process.stdout.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });
 process.stderr.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });
 
@@ -15,18 +14,40 @@ let splashWindow: BrowserWindow | null = null;
 let postgresManager: PostgresManager;
 let backendManager:  BackendManager;
 
+// ── Estado de actualización ─────────────────────────────────────────────────
+// Persiste entre la comprobación inicial y la carga de la ventana principal
+let pendingUpdateVersion: string | null = null;
+let updateDownloaded = false;
+
 // ── Seguridad: un solo proceso ──────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) {
-  app.quit();
-  process.exit(0);
-}
+if (!gotLock) { app.quit(); process.exit(0); }
 
 app.on('second-instance', () => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
   }
+});
+
+// ── IPC de actualización ────────────────────────────────────────────────────
+ipcMain.handle('get-update-status', () => ({
+  available:  pendingUpdateVersion !== null,
+  downloaded: updateDownloaded,
+  version:    pendingUpdateVersion,
+}));
+
+ipcMain.handle('download-and-install', async () => {
+  if (updateDownloaded) {
+    autoUpdater.quitAndInstall(false, true);
+    return;
+  }
+  await autoUpdater.downloadUpdate();
+  autoUpdater.quitAndInstall(false, true);
+});
+
+ipcMain.on('install-update', () => {
+  autoUpdater.quitAndInstall(false, true);
 });
 
 // ── Splash screen ───────────────────────────────────────────────────────────
@@ -55,32 +76,121 @@ function createSplash(): void {
   splashWindow.on('closed', () => { splashWindow = null; });
 }
 
-// ── Configuración de autoUpdater ────────────────────────────────────────────
-function setupAutoUpdater(): void {
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
-
-  autoUpdater.on('update-available', (info) => {
-    mainWindow?.webContents.send('update-available', info);
-  });
-
-  autoUpdater.on('update-downloaded', (info) => {
-    mainWindow?.webContents.send('update-downloaded', info);
-  });
-
-  autoUpdater.on('error', (err) => {
-    console.error('[updater]', err.message);
-  });
-
-  if (!isDev) {
-    autoUpdater.checkForUpdates().catch(() => {});
-    setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 60 * 60 * 1000);
-  }
+function setSplashStatus(text: string): void {
+  splashWindow?.webContents
+    .executeJavaScript(`document.getElementById('status').textContent = ${JSON.stringify(text)}`)
+    .catch(() => {});
 }
 
-ipcMain.on('install-update', () => {
-  autoUpdater.quitAndInstall();
-});
+// ── Comprobación de actualizaciones al arrancar ─────────────────────────────
+// Se ejecuta ANTES de levantar postgres — si hay update y el usuario acepta,
+// ni siquiera arrancamos la base de datos.
+async function checkForUpdateOnStartup(): Promise<void> {
+  if (isDev) return;
+
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+
+  return new Promise<void>((resolve) => {
+    // Timeout: si en 6s no responde GitHub, continuamos el arranque normal
+    const timeout = setTimeout(() => {
+      cleanupListeners();
+      resolve();
+    }, 6000);
+
+    function cleanupListeners() {
+      autoUpdater.removeListener('update-available',     onAvailable);
+      autoUpdater.removeListener('update-not-available', onNotAvailable);
+      autoUpdater.removeListener('error',                onError);
+    }
+
+    async function onAvailable(info: { version: string }) {
+      clearTimeout(timeout);
+      cleanupListeners();
+
+      const { response } = await dialog.showMessageBox({
+        type: 'info',
+        title: 'Actualización disponible',
+        message: `Nueva versión ${info.version} disponible`,
+        detail: '¿Deseas descargar e instalar la actualización ahora?\nLa aplicación se reiniciará automáticamente.',
+        buttons: ['Actualizar ahora', 'Más tarde'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+
+      if (response === 0) {
+        // Usuario acepta → descargar y reiniciar (sin arrancar postgres)
+        setSplashStatus('Descargando actualización...');
+
+        autoUpdater.on('download-progress', (p) => {
+          setSplashStatus(`Descargando actualización... ${Math.round(p.percent)}%`);
+        });
+
+        autoUpdater.once('update-downloaded', () => {
+          setSplashStatus('Instalando...');
+          autoUpdater.quitAndInstall(false, true);
+        });
+
+        autoUpdater.downloadUpdate().catch(() => resolve());
+        // No llamamos resolve() aquí — la app se reiniciará sola
+      } else {
+        // Usuario pospone → guardar estado, iniciar descarga en segundo plano
+        pendingUpdateVersion = info.version;
+
+        autoUpdater.downloadUpdate().catch(() => {});
+
+        autoUpdater.once('update-downloaded', () => {
+          updateDownloaded = true;
+          mainWindow?.webContents.send('update-downloaded', { version: info.version });
+        });
+
+        resolve();
+      }
+    }
+
+    function onNotAvailable() {
+      clearTimeout(timeout);
+      cleanupListeners();
+      resolve();
+    }
+
+    function onError(err: Error) {
+      clearTimeout(timeout);
+      cleanupListeners();
+      console.warn('[updater] Error al comprobar actualizaciones:', err?.message ?? String(err));
+      resolve();
+    }
+
+    autoUpdater.on('update-available',     onAvailable);
+    autoUpdater.on('update-not-available', onNotAvailable);
+    autoUpdater.on('error',                onError);
+
+    autoUpdater.checkForUpdates().catch(() => {
+      clearTimeout(timeout);
+      cleanupListeners();
+      resolve();
+    });
+  });
+}
+
+// ── Comprobación periódica (cada hora, una vez la app está corriendo) ───────
+function schedulePeriodicUpdateCheck(): void {
+  if (isDev) return;
+
+  setInterval(async () => {
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      if (!result) return;
+      // Si hay versión nueva y aún no la teníamos, notificar a la ventana
+      const newVersion = (result.updateInfo as { version: string }).version;
+      if (newVersion && newVersion !== app.getVersion() && !pendingUpdateVersion) {
+        pendingUpdateVersion = newVersion;
+        mainWindow?.webContents.send('update-available', { version: newVersion });
+        autoUpdater.downloadUpdate().catch(() => {});
+      }
+    } catch { /* silencioso */ }
+  }, 60 * 60 * 1000);
+}
 
 // ── Ventana principal ───────────────────────────────────────────────────────
 async function createWindow(): Promise<void> {
@@ -107,7 +217,6 @@ async function createWindow(): Promise<void> {
     show: false,
   });
 
-  // CSP adicional para el renderer
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -127,7 +236,6 @@ async function createWindow(): Promise<void> {
     });
   });
 
-  // Bloquear navegación fuera de la app
   mainWindow.webContents.on('will-navigate', (event, url) => {
     const allowed = isDev ? 'http://localhost:5173' : 'http://127.0.0.1:3001';
     if (!url.startsWith(allowed)) {
@@ -136,7 +244,6 @@ async function createWindow(): Promise<void> {
     }
   });
 
-  // Abrir links target="_blank" en el browser del sistema
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
@@ -149,7 +256,6 @@ async function createWindow(): Promise<void> {
     await mainWindow.loadURL('http://127.0.0.1:3001');
   }
 
-  // Cuando la ventana principal esté lista: cerrar splash y mostrar app
   mainWindow.once('ready-to-show', () => {
     splashWindow?.close();
     mainWindow?.show();
@@ -191,16 +297,26 @@ async function shutdown(): Promise<void> {
   await postgresManager?.stop();
 }
 
-// ── Ciclo de vida de Electron ───────────────────────────────────────────────
+// ── Ciclo de vida ───────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
   if (!isDev) Menu.setApplicationMenu(null);
 
   createSplash();
 
   try {
+    // 1. Comprobar actualizaciones antes de levantar postgres
+    setSplashStatus('Comprobando actualizaciones...');
+    await checkForUpdateOnStartup();
+    setSplashStatus('');
+
+    // 2. Levantar postgres + backend
     await startup();
+
+    // 3. Crear ventana principal
     await createWindow();
-    setupAutoUpdater();
+
+    // 4. Iniciar comprobaciones periódicas en segundo plano
+    schedulePeriodicUpdateCheck();
   } catch (err) {
     splashWindow?.close();
     const message = err instanceof Error ? err.message : String(err ?? 'Error desconocido');

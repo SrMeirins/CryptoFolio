@@ -9,6 +9,18 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-06-15
+
+### Añadido
+
+- **Auto-update al arrancar** — antes de levantar PostgreSQL, la app consulta GitHub Releases con timeout de 6 s. Si hay versión nueva, muestra un diálogo preguntando si actualizar ahora o más tarde. Si el usuario acepta, descarga e instala automáticamente (con progreso visible en el splash screen). Si pospone, la descarga continúa en segundo plano.
+- **Banner de actualización en la UI** — si el usuario pospone la actualización, aparece una barra azul persistente en la parte superior con la versión disponible y el botón "Reiniciar y actualizar" (activo al terminar la descarga en segundo plano).
+- **Comprobación periódica** — cada hora se comprueba si hay versión nueva publicada; si la hay, el banner aparece sin necesidad de reiniciar la app.
+
+### Notas
+
+El auto-updater solo detecta releases **publicadas** en GitHub (no drafts). Publica cada release antes de que los usuarios puedan actualizar.
+
 ## [0.0.4] - 2026-06-15
 
 ### Corregido

@@ -6,25 +6,25 @@
 import { contextBridge, ipcRenderer, shell } from 'electron';
 
 contextBridge.exposeInMainWorld('__CRYPTOFOLIO__', {
-  // La URL del backend — el renderer usa esto para saber dónde conectarse
-  apiUrl: 'http://127.0.0.1:3001',
-  wsUrl:  'ws://127.0.0.1:3001',
-
-  // Versión de la app (para mostrar en UI o comprobar actualizaciones)
-  version: process.env.npm_package_version ?? '0.0.0',
-
-  // Permite al renderer saber que está corriendo en Electron
+  apiUrl:     'http://127.0.0.1:3001',
+  wsUrl:      'ws://127.0.0.1:3001',
   isElectron: true,
 
-  // Abrir una URL en el navegador del sistema (no en Electron)
   openExternal: (url: string) => shell.openExternal(url),
 
-  // Escuchar eventos del proceso principal (actualizaciones, etc.)
-  onUpdateAvailable: (cb: (info: unknown) => void) =>
+  // ── Actualizaciones ───────────────────────────────────────────────────────
+  // Estado actual: si hay update pendiente y si ya está descargado
+  getUpdateStatus: (): Promise<{ available: boolean; downloaded: boolean; version: string | null }> =>
+    ipcRenderer.invoke('get-update-status'),
+
+  // Descarga el update (si no estaba descargado) e instala reiniciando la app
+  downloadAndInstall: (): Promise<void> =>
+    ipcRenderer.invoke('download-and-install'),
+
+  // Eventos push desde el proceso principal
+  onUpdateAvailable: (cb: (info: { version: string }) => void) =>
     ipcRenderer.on('update-available', (_e, info) => cb(info)),
 
-  onUpdateDownloaded: (cb: (info: unknown) => void) =>
+  onUpdateDownloaded: (cb: (info: { version: string }) => void) =>
     ipcRenderer.on('update-downloaded', (_e, info) => cb(info)),
-
-  installUpdate: () => ipcRenderer.send('install-update'),
 });
