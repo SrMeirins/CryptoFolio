@@ -13,6 +13,12 @@ export async function loadAssetMetadata(): Promise<void> {
   coinGeckoIds = new Map(res.rows.map((r: { symbol: string; coingecko_id: string }) => [r.symbol, r.coingecko_id]));
 }
 
+// Callback opcional para surfacear eventos de precios (rate limiting, etc.) al caller.
+let _statusCallback: ((msg: string) => void) | undefined;
+export function setCoinGeckoStatusCallback(cb: ((msg: string) => void) | undefined): void {
+  _statusCallback = cb;
+}
+
 // ── Rate limiter simple ────────────────────────────────────────────────────
 // CoinGecko free: 10-30 req/min. Usamos 6s entre llamadas = 10/min máximo.
 class RateLimitedQueue {
@@ -74,7 +80,9 @@ async function fetchWithRetry(url: string, retries = 3): Promise<unknown> {
         // Respetar Retry-After si CoinGecko lo envía, si no usar backoff progresivo
         const retryAfter = parseInt(res.headers.get('retry-after') ?? '0', 10);
         const waitMs = retryAfter > 0 ? retryAfter * 1000 : attempt * 15000;
-        console.warn(`[PRICES] Rate limit (429), esperando ${waitMs / 1000}s...`);
+        const waitSec = Math.round(waitMs / 1000);
+        console.warn(`[PRICES] Rate limit (429), esperando ${waitSec}s...`);
+        _statusCallback?.(`⚠ Rate limit CoinGecko 429 — esperando ${waitSec}s (intento ${attempt}/${retries})...`);
         await sleep(waitMs);
         continue;
       }

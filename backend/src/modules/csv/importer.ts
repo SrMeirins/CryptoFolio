@@ -6,7 +6,8 @@ import { parseBinanceCsv } from './parser';
 import { validateCsvStructure, ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
 import { ACCOUNT_TO_WALLET, TRANSFER_DESTINATIONS } from './binanceAccounts';
-import { getHistoricalPriceEur, prefetchHistoricalPrices, refreshLivePrices } from '../prices/binance';
+import { getHistoricalPriceEur, refreshLivePrices } from '../prices/binance';
+import { setCoinGeckoStatusCallback } from '../prices/coingecko';
 import { getOrDetectPairInfo } from '../prices/pairDetector';
 
 export interface ImportResult {
@@ -266,22 +267,46 @@ export async function importCsvFile(
     tx => INCOME_OP_TYPES.has(tx.operationType) && !tx.pricePerUnit
   );
   if (incomeTxs.length > 0) {
-    onStatus?.(`Precargando precios para ${incomeTxs.length} operaciones de rendimiento (staking, airdrops, intereses...) — puede tardar si no están en caché`);
-    // Precarga batch (deduplicada por symbol+fecha) para minimizar llamadas a la API
-    await prefetchHistoricalPrices(
-      incomeTxs.map(tx => ({ symbol: tx.asset, date: tx.timestamp }))
-    );
+    // Deduplicar pares únicos (symbol|fecha) y agrupar las txs que los comparten
+    const uniquePairsMap = new Map<string, { symbol: string; date: Date; txList: ParsedTransaction[] }>();
     for (const tx of incomeTxs) {
-      try {
-        const price = await getHistoricalPriceEur(tx.asset, tx.timestamp);
-        if (price > 0) {
-          tx.pricePerUnit = price;
-          tx.costAsset   = 'EUR';
-          tx.costAmount  = tx.amount * price;
-        }
-      } catch { /* si falla, price_per_unit queda null — el FIFO lo recupera en runtime */ }
+      const key = `${tx.asset}|${tx.timestamp.toISOString().slice(0, 10)}`;
+      if (!uniquePairsMap.has(key)) {
+        uniquePairsMap.set(key, { symbol: tx.asset, date: tx.timestamp, txList: [] });
+      }
+      uniquePairsMap.get(key)!.txList.push(tx);
     }
-    onStatus?.(`Precios de rendimiento listos`);
+    const uniquePairs = [...uniquePairsMap.values()];
+
+    onStatus?.(`Enriqueciendo ${incomeTxs.length} operaciones de rendimiento — ${uniquePairs.length} pares únicos (symbol+fecha) a consultar`);
+
+    // Enganchar el callback de CoinGecko para que rate limits aparezcan en el log
+    setCoinGeckoStatusCallback(onStatus);
+
+    let pairIdx = 0;
+    for (const { symbol, date, txList } of uniquePairs) {
+      pairIdx++;
+      const dateStr = date.toISOString().slice(0, 10);
+      onStatus?.(`[${pairIdx}/${uniquePairs.length}] Consultando ${symbol} @ ${dateStr}...`);
+      try {
+        const price = await getHistoricalPriceEur(symbol, date);
+        if (price > 0) {
+          onStatus?.(`[${pairIdx}/${uniquePairs.length}] ✓ ${symbol} @ ${dateStr} = ${price.toFixed(4)} €`);
+          for (const tx of txList) {
+            tx.pricePerUnit = price;
+            tx.costAsset    = 'EUR';
+            tx.costAmount   = tx.amount * price;
+          }
+        } else {
+          onStatus?.(`[${pairIdx}/${uniquePairs.length}] — ${symbol} @ ${dateStr} sin precio disponible`);
+        }
+      } catch (e) {
+        onStatus?.(`[${pairIdx}/${uniquePairs.length}] ⚠ ${symbol} @ ${dateStr} error: ${(e as Error).message}`);
+      }
+    }
+
+    setCoinGeckoStatusCallback(undefined);
+    onStatus?.(`Precios de rendimiento completados: ${uniquePairs.length} pares procesados`);
   }
 
   onStatus?.('Iniciando transacción en base de datos...');

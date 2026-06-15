@@ -153,19 +153,23 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
             <span className="text-gray-600">Esperando inicio...</span>
           )}
           {log.map((event, absIdx) => ({ event, absIdx })).slice(-300).map(({ event, absIdx }) => {
-            const isNoPrice    = event.phase === 'prices' && event.message.startsWith('—')
-            const isOkPrice    = event.phase === 'prices' && event.message.startsWith('✓')
-            const isFifoWarn   = event.phase === 'fifo' && event.message.includes('⚠')
+            const isNoPrice        = event.phase === 'prices' && event.message.startsWith('—')
+            const isOkPrice        = event.phase === 'prices' && event.message.startsWith('✓')
+            const isImportOk       = event.phase === 'importing' && event.message.includes('✓')
+            const isImportNoPrice  = event.phase === 'importing' && event.message.startsWith('[') && event.message.includes('sin precio')
+            const isWarn           = event.message.includes('⚠')
             const isImportProgress = event.phase === 'importing' && event.progress !== undefined
             const color =
-              event.phase === 'error'   ? 'text-accent-red'    :
-              event.phase === 'done'    ? 'text-accent-green'  :
-              isFifoWarn                ? 'text-yellow-500'    :
-              event.phase === 'fifo'    ? 'text-accent-blue'   :
-              isNoPrice                 ? 'text-yellow-600'    :
-              isOkPrice                 ? 'text-gray-500'      :
-              event.phase === 'prices'  ? 'text-gray-400'      :
-              isImportProgress          ? 'text-gray-500'      :
+              event.phase === 'error'  ? 'text-accent-red'    :
+              event.phase === 'done'   ? 'text-accent-green'  :
+              isWarn                   ? 'text-yellow-500'    :
+              isImportOk               ? 'text-accent-green'  :
+              isImportNoPrice          ? 'text-yellow-600'    :
+              event.phase === 'fifo'   ? 'text-accent-blue'   :
+              isNoPrice                ? 'text-yellow-600'    :
+              isOkPrice                ? 'text-gray-500'      :
+              event.phase === 'prices' ? 'text-gray-400'      :
+              isImportProgress         ? 'text-gray-500'      :
               'text-gray-300'
             return (
               <div key={absIdx} className={color}>
