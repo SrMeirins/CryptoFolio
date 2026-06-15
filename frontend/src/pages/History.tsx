@@ -489,16 +489,20 @@ function TxRow({
         {/* Acciones */}
         <td className="px-3 py-2.5 align-middle" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-end gap-0.5">
-            {tx.manually_added && !confirmDelete && (
+            {!confirmDelete && (
               <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
                 <button onClick={() => onEdit(tx)}
-                  className="p-1.5 rounded-lg hover:bg-accent-blue/10 text-gray-600 hover:text-accent-blue transition-colors">
+                  className="p-1.5 rounded-lg hover:bg-accent-blue/10 text-gray-600 hover:text-accent-blue transition-colors"
+                  title="Editar transacción">
                   <PenLine size={12} />
                 </button>
-                <button onClick={() => setConfirmDelete(true)}
-                  className="p-1.5 rounded-lg hover:bg-accent-red/10 text-gray-600 hover:text-accent-red transition-colors">
-                  <Trash2 size={12} />
-                </button>
+                {tx.manually_added && (
+                  <button onClick={() => setConfirmDelete(true)}
+                    className="p-1.5 rounded-lg hover:bg-accent-red/10 text-gray-600 hover:text-accent-red transition-colors"
+                    title="Eliminar transacción">
+                    <Trash2 size={12} />
+                  </button>
+                )}
               </div>
             )}
             {tx.manually_added && confirmDelete && (
@@ -939,6 +943,7 @@ export function History() {
         <ManualTxModal
           onClose={() => { setShowNewTx(false); setEditingTx(null) }}
           onSuccess={handleModalSuccess}
+          transaction={editingTx ?? undefined}
         />
       )}
     </div>

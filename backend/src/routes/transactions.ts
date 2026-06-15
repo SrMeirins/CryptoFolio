@@ -288,34 +288,40 @@ router.put('/:id', async (req: Request, res: Response) => {
     wallet_id, destinationWalletId, timestamp, notes,
   } = req.body;
 
-  const tx = await db.query('SELECT manually_added FROM transactions WHERE id = $1', [id]);
+  const tx = await db.query('SELECT id FROM transactions WHERE id = $1', [id]);
   if (tx.rows.length === 0) {
     res.status(404).json({ error: 'Transacción no encontrada' });
     return;
   }
-  if (!tx.rows[0].manually_added) {
-    res.status(403).json({ error: 'Solo se pueden editar transacciones manuales' });
-    return;
-  }
 
-  const isFeeOp = operationType === 'FEE_NETWORK' || operationType === 'FEE_EXCHANGE';
-  const isFork  = operationType === 'FORK';
+  const isFeeOp    = operationType === 'FEE_NETWORK' || operationType === 'FEE_EXCHANGE';
+  const isFork     = operationType === 'FORK';
+  const isFiatOnly = operationType === 'DEPOSIT_FIAT' || operationType === 'WITHDRAW_FIAT';
+  const isIgnored  = operationType === 'IGNORED';
 
   const finalAsset  = isFeeOp ? (feeAsset  ?? asset)  : asset;
   const finalAmount = isFeeOp ? (feeAmount ?? amount) : amount;
 
-  if (!finalAsset || !finalAmount || !timestamp || !wallet_id) {
+  if (!timestamp || !wallet_id) {
     res.status(400).json({ error: 'Faltan campos requeridos' });
+    return;
+  }
+  if (!isFiatOnly && !isIgnored && !isFeeOp && (!finalAsset || !finalAmount)) {
+    res.status(400).json({ error: 'asset y amount son requeridos para este tipo de operación' });
+    return;
+  }
+  if (isFeeOp && !finalAsset) {
+    res.status(400).json({ error: 'fee_asset es requerido para operaciones de fee' });
     return;
   }
 
   let finalPricePerUnit: number | null = isFork ? 0 : (pricePerUnit ? parseFloat(pricePerUnit) : null);
-  if (!isFork && !finalPricePerUnit) {
+  if (!isFork && !finalPricePerUnit && finalAsset) {
     try { finalPricePerUnit = await getHistoricalPriceEur(finalAsset, new Date(timestamp)); } catch { /* ignorar */ }
   }
 
   const resolvedCostAsset = costAsset ?? (
-    ['BUY_FIAT', 'SELL_FIAT', 'DEPOSIT_FIAT'].includes(operationType) ? 'EUR' : null
+    ['BUY_FIAT', 'SELL_FIAT', 'DEPOSIT_FIAT', 'WITHDRAW_FIAT'].includes(operationType) ? 'EUR' : null
   );
   let finalCostAmount: number | null = isFork ? 0 : (costAmount ? parseFloat(costAmount) : null);
   if (!isFork && !finalCostAmount && finalPricePerUnit) {
@@ -341,8 +347,9 @@ router.put('/:id', async (req: Request, res: Response) => {
      WHERE id = $14`,
     [
       mapCatalogTypeToDb(operationType), new Date(timestamp),
-      finalAsset.toUpperCase(), parseFloat(finalAmount),
-      parseFloat(amountNet ?? finalAmount),
+      finalAsset ? finalAsset.toUpperCase() : null,
+      finalAmount ? parseFloat(finalAmount) : null,
+      finalAmount ? parseFloat(amountNet ?? finalAmount) : null,
       resolvedCostAsset, finalCostAmount, finalPricePerUnit,
       feeAsset  ?? null,
       feeAmount ? parseFloat(feeAmount) : null,
@@ -560,6 +567,8 @@ function mapCatalogTypeToDb(catalogType: string): string {
     'CASHBACK':          'CASHBACK',
     'AIRDROP':           'AIRDROP',
     'DEPOSIT_CRYPTO':    'DEPOSIT_CRYPTO',
+    'DEPOSIT_FIAT':      'DEPOSIT_FIAT',
+    'WITHDRAW_FIAT':     'WITHDRAW_FIAT',
     'FORK':              'FORK',
     'GIFT_SENT':         'GIFT_SENT',
     'LOST':              'LOST',

@@ -57,6 +57,7 @@ interface OperationWizardProps {
     originalLabel: string; timestamp: string; asset: string; amount: number
     rawData?: Record<string, unknown>
   }
+  initialValues?: { operationTypeId: string; fields: Record<string, unknown> }
   onComplete: (result: WizardResult) => void
   onCancel: () => void
 }
@@ -97,7 +98,7 @@ const BADGE_COLORS: Record<string, string> = {
 const CATEGORIES_ORDER = ['ACQUISITION', 'DISPOSITION', 'INCOME', 'MOVEMENT', 'FEE', 'SPECIAL']
 
 // ── Componente principal ───────────────────────────────────────────────────
-export function OperationWizard({ unknownOperation, onComplete, onCancel }: OperationWizardProps) {
+export function OperationWizard({ unknownOperation, initialValues, onComplete, onCancel }: OperationWizardProps) {
   const [catalog, setCatalog]           = useState<CatalogData | null>(null)
   const [step, setStep]                 = useState<'type' | 'fields' | 'confirm'>('type')
   const [selectedType, setSelectedType] = useState<OperationType | null>(null)
@@ -111,6 +112,17 @@ export function OperationWizard({ unknownOperation, onComplete, onCancel }: Oper
   useEffect(() => {
     fetch('/api/catalog').then(r => r.json()).then(setCatalog).catch(() => {})
   }, [])
+
+  // Pre-populate from initialValues (edit mode) once catalog is loaded
+  useEffect(() => {
+    if (!catalog || !initialValues) return
+    const opType = catalog.operations.find(op => op.id === initialValues.operationTypeId)
+    if (opType) {
+      setSelectedType(opType)
+      setFieldValues(initialValues.fields)
+      setStep('fields')
+    }
+  }, [catalog]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (unknownOperation) {
@@ -204,7 +216,7 @@ export function OperationWizard({ unknownOperation, onComplete, onCancel }: Oper
       <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
         <div>
           <h2 className="font-semibold text-lg">
-            {unknownOperation ? 'Catalogar operación' : 'Nueva transacción'}
+            {unknownOperation ? 'Catalogar operación' : initialValues ? 'Editar transacción' : 'Nueva transacción'}
           </h2>
           {unknownOperation && (
             <p className="text-xs text-gray-500 mt-0.5">

@@ -4,13 +4,34 @@ import {
   Loader, ArrowRight, Package, Zap,
 } from 'lucide-react'
 import { OperationWizard, WizardResult } from './OperationWizard'
-import { portfolioApi, ManualTxPreview } from '../api/portfolio'
+import { portfolioApi, ManualTxPreview, Transaction } from '../api/portfolio'
 import { formatEur, formatPrice, formatAmount, pnlColor } from '../utils/format'
 import { useToast } from './Toast'
 
 interface ManualTxModalProps {
   onClose: () => void
   onSuccess: () => void
+  transaction?: Transaction
+}
+
+function txToInitialValues(tx: Transaction): { operationTypeId: string; fields: Record<string, unknown> } {
+  const isFeeOp = tx.operation_type === 'FEE_NETWORK' || tx.operation_type === 'FEE_EXCHANGE'
+  return {
+    operationTypeId: tx.operation_type,
+    fields: {
+      timestamp:   tx.timestamp,
+      asset:       isFeeOp ? undefined : tx.asset,
+      amount:      isFeeOp ? undefined : tx.amount,
+      cost_asset:  tx.cost_asset  ?? undefined,
+      cost_amount: tx.cost_amount ?? undefined,
+      price_eur:   tx.price_per_unit ?? undefined,
+      fee_asset:   tx.fee_asset   ?? undefined,
+      fee_amount:  tx.fee_amount  ?? undefined,
+      from_wallet: tx.wallet_id,
+      to_wallet:   tx.destination_wallet_id ?? undefined,
+      notes:       tx.notes ?? undefined,
+    },
+  }
 }
 
 type Step = 'wizard' | 'preview' | 'saving' | 'done'
@@ -22,14 +43,17 @@ interface FifoStats {
   totalLossEur: number
 }
 
-export function ManualTxModal({ onClose, onSuccess }: ManualTxModalProps) {
+export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModalProps) {
   const toast = useToast()
+  const isEditMode = !!transaction
   const [step, setStep]             = useState<Step>('wizard')
   const [wizardResult, setWizardResult] = useState<WizardResult | null>(null)
   const [preview, setPreview]       = useState<ManualTxPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [error, setError]           = useState<string | null>(null)
   const [fifoStats, setFifoStats]   = useState<FifoStats | null>(null)
+
+  const initialValues = transaction ? txToInitialValues(transaction) : undefined
 
   async function handleWizardComplete(result: WizardResult) {
     setWizardResult(result)
@@ -55,14 +79,25 @@ export function ManualTxModal({ onClose, onSuccess }: ManualTxModalProps) {
 
     try {
       const data = buildTxData(wizardResult)
-      const result = await portfolioApi.createManualTx(data) as { success: boolean; fifo?: FifoStats }
-      if (result.fifo) setFifoStats(result.fifo)
-      setStep('done')
-      onSuccess()
-      toast.success(
-        'Transacción guardada',
-        result.fifo ? `FIFO recalculado · ${result.fifo.lotsCreated} lotes creados` : 'FIFO actualizándose...'
-      )
+      if (isEditMode && transaction) {
+        const result = await portfolioApi.updateManualTx(transaction.id, data) as { success: boolean; fifo?: FifoStats }
+        if (result.fifo) setFifoStats(result.fifo)
+        setStep('done')
+        onSuccess()
+        toast.success(
+          'Transacción actualizada',
+          result.fifo ? `FIFO recalculado · ${result.fifo.lotsCreated} lotes creados` : 'FIFO actualizándose...'
+        )
+      } else {
+        const result = await portfolioApi.createManualTx(data) as { success: boolean; fifo?: FifoStats }
+        if (result.fifo) setFifoStats(result.fifo)
+        setStep('done')
+        onSuccess()
+        toast.success(
+          'Transacción guardada',
+          result.fifo ? `FIFO recalculado · ${result.fifo.lotsCreated} lotes creados` : 'FIFO actualizándose...'
+        )
+      }
     } catch (e) {
       setError((e as Error).message)
       setStep('preview')
@@ -99,6 +134,7 @@ export function ManualTxModal({ onClose, onSuccess }: ManualTxModalProps) {
 
         {step === 'wizard' && (
           <OperationWizard
+            initialValues={initialValues}
             onComplete={handleWizardComplete}
             onCancel={onClose}
           />
@@ -107,7 +143,7 @@ export function ManualTxModal({ onClose, onSuccess }: ManualTxModalProps) {
         {(step === 'preview' || step === 'saving') && wizardResult && (
           <>
             <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-              <h2 className="font-semibold text-lg">Confirmar transacción</h2>
+              <h2 className="font-semibold text-lg">{isEditMode ? 'Confirmar edición' : 'Confirmar transacción'}</h2>
               <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors p-1">
                 <X size={18} />
               </button>
@@ -137,7 +173,7 @@ export function ManualTxModal({ onClose, onSuccess }: ManualTxModalProps) {
                 onClick={() => setStep('wizard')}
                 className="text-sm text-gray-400 hover:text-white transition-colors"
               >
-                ← Volver al wizard
+                ← {isEditMode ? 'Volver a editar' : 'Volver al wizard'}
               </button>
               <button
                 onClick={handleConfirm}
@@ -145,8 +181,8 @@ export function ManualTxModal({ onClose, onSuccess }: ManualTxModalProps) {
                 className="flex items-center gap-2 px-5 py-2 bg-accent-green hover:bg-accent-green/80 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
               >
                 {step === 'saving'
-                  ? <><Loader size={14} className="animate-spin" /> Guardando y recalculando FIFO...</>
-                  : <><CheckCircle size={14} /> Confirmar y guardar</>
+                  ? <><Loader size={14} className="animate-spin" /> {isEditMode ? 'Actualizando y recalculando FIFO...' : 'Guardando y recalculando FIFO...'}</>
+                  : <><CheckCircle size={14} /> {isEditMode ? 'Confirmar y actualizar' : 'Confirmar y guardar'}</>
                 }
               </button>
             </div>
@@ -154,12 +190,17 @@ export function ManualTxModal({ onClose, onSuccess }: ManualTxModalProps) {
         )}
 
         {step === 'done' && (
-          <DoneScreen fifoStats={fifoStats} onClose={onClose} onAddAnother={() => {
-            setStep('wizard')
-            setPreview(null)
-            setWizardResult(null)
-            setFifoStats(null)
-          }} />
+          <DoneScreen
+            fifoStats={fifoStats}
+            isEditMode={isEditMode}
+            onClose={onClose}
+            onAddAnother={isEditMode ? undefined : () => {
+              setStep('wizard')
+              setPreview(null)
+              setWizardResult(null)
+              setFifoStats(null)
+            }}
+          />
         )}
       </div>
     </div>
@@ -280,12 +321,12 @@ function PreviewContent({ preview, wizardResult }: { preview: ManualTxPreview & 
 
 // ── DoneScreen ─────────────────────────────────────────────────────────────
 function DoneScreen({
-  fifoStats, onClose, onAddAnother,
-}: { fifoStats: FifoStats | null; onClose: () => void; onAddAnother: () => void }) {
+  fifoStats, isEditMode, onClose, onAddAnother,
+}: { fifoStats: FifoStats | null; isEditMode: boolean; onClose: () => void; onAddAnother?: () => void }) {
   return (
     <>
       <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-        <h2 className="font-semibold text-lg">Transacción guardada</h2>
+        <h2 className="font-semibold text-lg">{isEditMode ? 'Transacción actualizada' : 'Transacción guardada'}</h2>
         <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors p-1">
           <X size={18} />
         </button>
@@ -297,7 +338,7 @@ function DoneScreen({
         </div>
         <div>
           <p className="font-medium text-white mb-1">Guardada correctamente</p>
-          <p className="text-sm text-gray-500">El motor FIFO ha recalculado todos los lotes</p>
+          <p className="text-sm text-gray-500">{isEditMode ? 'El motor FIFO ha recalculado todos los lotes' : 'El motor FIFO ha recalculado todos los lotes'}</p>
         </div>
 
         {fifoStats && (
@@ -327,12 +368,16 @@ function DoneScreen({
       </div>
 
       <div className="flex items-center justify-between px-6 py-4 border-t border-border shrink-0">
-        <button
-          onClick={onAddAnother}
-          className="text-sm text-accent-blue hover:text-accent-blue/80 transition-colors"
-        >
-          + Añadir otra transacción
-        </button>
+        {onAddAnother ? (
+          <button
+            onClick={onAddAnother}
+            className="text-sm text-accent-blue hover:text-accent-blue/80 transition-colors"
+          >
+            + Añadir otra transacción
+          </button>
+        ) : (
+          <span />
+        )}
         <button
           onClick={onClose}
           className="px-5 py-2 bg-background-tertiary hover:bg-border rounded-lg text-sm font-medium transition-colors"
