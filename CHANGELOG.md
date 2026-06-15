@@ -9,6 +9,13 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-06-15
+
+### Corregido
+
+- **Detección de Administrador en Windows** — el check anterior (`reg query HKLM\SECURITY`) solo detectaba UAC elevado; PostgreSQL bloquea a cualquier miembro del grupo Administrators aunque no tenga elevación. Ahora se usa `whoami /groups` buscando el SID `S-1-5-32-544`, que es la misma comprobación que hace PostgreSQL internamente.
+- **"Error desconocido" al fallar PostgreSQL** — `embedded-postgres` lanzaba `null` en lugar de un `Error` cuando el proceso postgres fallaba al arrancar. Ahora se captura el stderr vía `onError` y se convierte a un mensaje legible. Si el stderr contiene "administrative", se muestra el mensaje de solución correcto.
+
 ## [0.0.5] - 2026-06-15
 
 ### Añadido
