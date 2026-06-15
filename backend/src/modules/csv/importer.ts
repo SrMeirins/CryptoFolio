@@ -225,12 +225,14 @@ export async function importCsvFile(
   withdrawalDestinations: Record<string, string> = {},
   depositCosts: Record<string, number> = {},
   onProgress?: (done: number, total: number, asset?: string, operation?: string) => void,
+  onStatus?: (message: string) => void,
 ): Promise<ImportResult> {
   const validation = validateCsvStructure(fileBuffer);
   if (!validation.valid) {
     throw new Error(validation.errors.join(' | '));
   }
 
+  onStatus?.('Parseando CSV...');
   const fileHash = createHash('sha256').update(fileBuffer).digest('hex');
   const parseResult = parseBinanceCsv(fileBuffer);
 
@@ -240,6 +242,8 @@ export async function importCsvFile(
       parseResult.errors.map((e) => e.message).join(' | ')
     );
   }
+
+  onStatus?.(`CSV parseado: ${parseResult.transactions.length} transacciones encontradas`);
 
   const existing = await db.query(
     'SELECT id, filename FROM csv_imports WHERE file_hash = $1',
@@ -262,6 +266,7 @@ export async function importCsvFile(
     tx => INCOME_OP_TYPES.has(tx.operationType) && !tx.pricePerUnit
   );
   if (incomeTxs.length > 0) {
+    onStatus?.(`Precargando precios para ${incomeTxs.length} operaciones de rendimiento (staking, airdrops, intereses...) — puede tardar si no están en caché`);
     // Precarga batch (deduplicada por symbol+fecha) para minimizar llamadas a la API
     await prefetchHistoricalPrices(
       incomeTxs.map(tx => ({ symbol: tx.asset, date: tx.timestamp }))
@@ -276,8 +281,10 @@ export async function importCsvFile(
         }
       } catch { /* si falla, price_per_unit queda null — el FIFO lo recupera en runtime */ }
     }
+    onStatus?.(`Precios de rendimiento listos`);
   }
 
+  onStatus?.('Iniciando transacción en base de datos...');
   const result = await db.transaction(async (client) => {
     // Cargar todas las wallets de sistema para asignar wallet_id correctamente
     const walletsRes = await client.query(
@@ -313,12 +320,14 @@ export async function importCsvFile(
     );
     const importId: string = importRes.rows[0].id;
 
+    onStatus?.('Cargando hashes existentes para detección de duplicados...');
     // Batch check duplicados dentro de la transacción
     const allTxHashes = parseResult.transactions.flatMap(tx => tx.rawRowHashes);
     const existingInDb = allTxHashes.length > 0
       ? await client.query('SELECT row_hash FROM raw_transactions WHERE row_hash = ANY($1)', [allTxHashes])
       : { rows: [] as { row_hash: string }[] };
     const existingHashSet = new Set(existingInDb.rows.map((r: { row_hash: string }) => r.row_hash));
+    onStatus?.(`${existingHashSet.size} duplicados detectados. Insertando transacciones nuevas...`);
 
     let newTransactions = 0;
     let duplicateRows = 0;

@@ -152,7 +152,7 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
           {log.length === 0 && (
             <span className="text-gray-600">Esperando inicio...</span>
           )}
-          {log.map((event, i) => {
+          {log.map((event, absIdx) => ({ event, absIdx })).slice(-300).map(({ event, absIdx }) => {
             const isNoPrice    = event.phase === 'prices' && event.message.startsWith('—')
             const isOkPrice    = event.phase === 'prices' && event.message.startsWith('✓')
             const isFifoWarn   = event.phase === 'fifo' && event.message.includes('⚠')
@@ -168,7 +168,7 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
               isImportProgress          ? 'text-gray-500'      :
               'text-gray-300'
             return (
-              <div key={i} className={color}>
+              <div key={absIdx} className={color}>
                 {event.progress !== undefined && event.total !== undefined
                   ? `[${event.progress}/${event.total}] ${event.message}`
                   : event.message

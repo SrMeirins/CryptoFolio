@@ -61,10 +61,12 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
   if (origin && allowed.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
+  res.flushHeaders();
 
   function send(phase: string, message: string, progress?: number, total?: number) {
     const data = JSON.stringify({ phase, message, progress, total });
     res.write(`data: ${data}\n\n`);
+    (res as any).flush?.();
   }
 
   try {
@@ -166,8 +168,8 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
       }
     }
 
-    // Emitir progreso cada 50 transacciones para no saturar el SSE
-    const IMPORT_REPORT_EVERY = 50;
+    // Emitir progreso cada 5 transacciones para mantener el log vivo
+    const IMPORT_REPORT_EVERY = 5;
     let lastImportReport = 0;
 
     const importResult = await importCsvFile(
@@ -181,6 +183,9 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
           const label = asset && operation ? `${asset} · ${operation}` : 'Procesando...';
           send('importing', label, done, total);
         }
+      },
+      (message) => {
+        send('importing', message);
       }
     );
     send('importing', `✓ ${importResult.newTransactions} transacciones nuevas importadas (${importResult.duplicateRows} duplicadas ignoradas)`);
