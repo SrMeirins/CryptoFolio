@@ -139,6 +139,9 @@ export const portfolioApi = {
   detectPairs: (symbol: string) => api.post<AssetMetadata>(`/settings/assets/${symbol}/detect`, {}),
   detectAllPairs: () => api.post<{ detected: number; failed: number; total: number }>('/settings/assets/detect-all', {}),
   testPair: (pair: string) => api.post<{ exists: boolean; price?: number }>('/settings/pairs/test', { pair }),
+  testCoinGeckoId: (id: string) => api.get<{ id: string; price_eur: number | null; valid: boolean }>(`/settings/coingecko/test?id=${encodeURIComponent(id)}`),
+  updateCoinGeckoId: (symbol: string, coingecko_id: string) => api.put<{ symbol: string; coingecko_id: string; price_eur: number }>(`/settings/assets/${symbol}/coingecko-id`, { coingecko_id }),
+  searchCoinGecko: (symbol: string) => api.get<{ found: boolean; coingecko_id?: string; price_eur?: number }>(`/settings/coingecko/search?symbol=${encodeURIComponent(symbol)}`),
   previewManualTx: (data: Record<string, unknown>) =>
     api.post<ManualTxPreview>('/transactions/manual/preview', data),
   createManualTx: (data: Record<string, unknown>) =>

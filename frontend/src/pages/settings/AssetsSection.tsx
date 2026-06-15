@@ -63,6 +63,89 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
   )
 }
 
+// ── CoinGeckoIdEditor ──────────────────────────────────────────────────────
+function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; onSaved: () => void }) {
+  const queryClient = useQueryClient()
+  const [geckoId,    setGeckoId]    = useState(asset.coingecko_id ?? '')
+  const [testing,    setTesting]    = useState(false)
+  const [saving,     setSaving]     = useState(false)
+  const [testResult, setTestResult] = useState<{ valid: boolean; price_eur: number | null } | null>(null)
+  const [error,      setError]      = useState<string | null>(null)
+
+  const isDirty = geckoId.trim() !== (asset.coingecko_id ?? '')
+
+  async function handleTest() {
+    if (!geckoId.trim()) return
+    setTesting(true)
+    setTestResult(null)
+    setError(null)
+    try {
+      const result = await portfolioApi.testCoinGeckoId(geckoId.trim())
+      setTestResult(result)
+    } catch { setError('Error al conectar con CoinGecko') }
+    finally { setTesting(false) }
+  }
+
+  async function handleSave() {
+    if (!geckoId.trim()) return
+    setSaving(true)
+    setError(null)
+    try {
+      await portfolioApi.updateCoinGeckoId(asset.symbol, geckoId.trim())
+      queryClient.invalidateQueries({ queryKey: ['assets'] })
+      onSaved()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error al guardar'
+      setError(msg.includes('422') ? `"${geckoId}" no devuelve precio en CoinGecko` : msg)
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="pt-3 border-t border-border/50 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-600">ID de CoinGecko</p>
+        <a href={`https://www.coingecko.com/es/buscar?query=${asset.symbol}`}
+          target="_blank" rel="noopener noreferrer"
+          className="text-xs text-accent-blue/70 hover:text-accent-blue transition-colors">
+          Buscar en CoinGecko ↗
+        </a>
+      </div>
+      <p className="text-xs text-gray-700">
+        Visible en la URL: <span className="mono">coingecko.com/coins/<span className="text-gray-500">bitcoin</span></span>
+      </p>
+      <div className="flex gap-2">
+        <input
+          value={geckoId}
+          onChange={e => { setGeckoId(e.target.value.toLowerCase().trim()); setTestResult(null); setError(null) }}
+          onKeyDown={e => e.key === 'Enter' && handleTest()}
+          placeholder="ej. bitcoin, ethereum, ethereumpow"
+          className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm mono placeholder-gray-600 focus:outline-none focus:border-accent-blue"
+        />
+        <button onClick={handleTest} disabled={testing || !geckoId.trim()}
+          title="Verificar que este ID devuelve precio en CoinGecko"
+          className="px-3 py-2 bg-background-tertiary hover:bg-border disabled:opacity-50 rounded-lg text-sm transition-colors">
+          {testing ? <RefreshCw size={13} className="animate-spin" /> : <Search size={13} />}
+        </button>
+        {isDirty && (
+          <button onClick={handleSave} disabled={saving || !geckoId.trim()}
+            className="px-3 py-2 bg-accent-blue/20 hover:bg-accent-blue/30 disabled:opacity-50 rounded-lg text-xs font-medium text-accent-blue transition-colors whitespace-nowrap">
+            {saving ? <RefreshCw size={12} className="animate-spin" /> : 'Guardar'}
+          </button>
+        )}
+      </div>
+      {testResult && (
+        <div className={`flex items-center gap-2 text-xs ${testResult.valid ? 'text-accent-green' : 'text-accent-red'}`}>
+          {testResult.valid
+            ? <><CheckCircle size={12} /> Válido — precio actual: <span className="mono font-medium">{testResult.price_eur?.toFixed(6)} EUR</span></>
+            : <><XCircle size={12} /> Este ID no devuelve precio en CoinGecko</>
+          }
+        </div>
+      )}
+      {error && <p className="flex items-center gap-1.5 text-xs text-accent-red"><AlertCircle size={12} />{error}</p>}
+    </div>
+  )
+}
+
 // ── AssetEditPanel ─────────────────────────────────────────────────────────
 function AssetEditPanel({ asset, onSaved, onCancel }: {
   asset: AssetMetadata; onSaved: () => void; onCancel: () => void
@@ -113,6 +196,8 @@ function AssetEditPanel({ asset, onSaved, onCancel }: {
     setSaving(false)
     onSaved()
   }
+
+  const isCoinGeckoSource = asset.price_source === 'coingecko'
 
   return (
     <div className="border-t border-border bg-background-tertiary/20 px-4 py-4 space-y-4">
@@ -167,6 +252,8 @@ function AssetEditPanel({ asset, onSaved, onCancel }: {
           </div>
         )}
       </div>
+
+      {isCoinGeckoSource && <CoinGeckoIdEditor asset={asset} onSaved={onSaved} />}
 
       <div className="flex justify-end gap-2 pt-1">
         <button onClick={onCancel} className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">Cancelar</button>
@@ -225,28 +312,34 @@ function AssetItem({ asset, price, isEditing, onEdit, onSaved, onDelete }: {
 }
 
 // ── AddAssetDialog ─────────────────────────────────────────────────────────
-type DetectStatus = 'idle' | 'detecting' | 'found' | 'notfound'
+type DetectStatus = 'idle' | 'detecting' | 'found_binance' | 'found_coingecko' | 'notfound'
 
 function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [symbol,   setSymbol]   = useState('')
-  const [name,     setName]     = useState('')
-  const [eurPair,  setEurPair]  = useState('')
-  const [usdtPair, setUsdtPair] = useState('')
-  const [btcPair,  setBtcPair]  = useState('')
-  const [isStable, setIsStable] = useState(false)
-  const [status,   setStatus]   = useState<DetectStatus>('idle')
-  const [saving,   setSaving]   = useState(false)
+  const [symbol,     setSymbol]     = useState('')
+  const [name,       setName]       = useState('')
+  const [eurPair,    setEurPair]    = useState('')
+  const [usdtPair,   setUsdtPair]   = useState('')
+  const [btcPair,    setBtcPair]    = useState('')
+  const [geckoId,    setGeckoId]    = useState<string | null>(null)
+  const [isStable,   setIsStable]   = useState(false)
+  const [status,     setStatus]     = useState<DetectStatus>('idle')
+  const [saving,     setSaving]     = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
 
   const inputClass = "w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm mono placeholder-gray-600 focus:outline-none focus:border-accent-blue"
 
   useEffect(() => {
     const sym = symbol.trim()
-    if (sym.length < 2) { setStatus('idle'); setEurPair(''); setUsdtPair(''); setBtcPair(''); return }
+    if (sym.length < 2) {
+      setStatus('idle')
+      setEurPair(''); setUsdtPair(''); setBtcPair(''); setGeckoId(null)
+      return
+    }
     clearTimeout(debounceRef.current)
     setStatus('detecting')
     debounceRef.current = setTimeout(async () => {
       try {
+        // 1. Buscar en Binance
         const [eur, usdt, btc] = await Promise.all([
           portfolioApi.testPair(`${sym}EUR`),
           portfolioApi.testPair(`${sym}USDT`),
@@ -256,8 +349,19 @@ function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           setEurPair(eur.exists  ? `${sym}EUR`  : '')
           setUsdtPair(usdt.exists ? `${sym}USDT` : '')
           setBtcPair(btc.exists  ? `${sym}BTC`  : '')
-          setStatus('found')
+          setGeckoId(null)
+          setStatus('found_binance')
+          return
+        }
+
+        // 2. Fallback a CoinGecko
+        const cg = await portfolioApi.searchCoinGecko(sym)
+        if (cg.found && cg.coingecko_id) {
+          setGeckoId(cg.coingecko_id)
+          setEurPair(''); setUsdtPair(''); setBtcPair('')
+          setStatus('found_coingecko')
         } else {
+          setGeckoId(null)
           setStatus('notfound')
         }
       } catch { setStatus('notfound') }
@@ -269,16 +373,23 @@ function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
     if (!symbol) return
     setSaving(true)
     await portfolioApi.createAsset({
-      symbol: symbol.toUpperCase(),
-      name: name || symbol.toUpperCase(),
+      symbol:            symbol.toUpperCase(),
+      name:              name || symbol.toUpperCase(),
       binance_eur_pair:  eurPair  || null,
       binance_usdt_pair: usdtPair || null,
       binance_btc_pair:  btcPair  || null,
       is_stablecoin:     isStable,
+      coingecko_id:      geckoId  || null,
     } as Partial<AssetMetadata>)
     setSaving(false)
     onSaved()
   }
+
+  const statusIcon = status === 'detecting'        ? <RefreshCw size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 animate-spin" />
+                   : status === 'found_binance'    ? <CheckCircle size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-accent-green" />
+                   : status === 'found_coingecko'  ? <CheckCircle size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: '#8b5cf6' }} />
+                   : status === 'notfound'         ? <AlertCircle size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-accent-amber" />
+                   : null
 
   return (
     <div className="rounded-xl border border-border bg-background-card p-5 space-y-4">
@@ -291,11 +402,9 @@ function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           <label className="text-xs text-gray-500">Símbolo *</label>
           <div className="relative">
             <input autoFocus value={symbol}
-              onChange={e => { setSymbol(e.target.value.toUpperCase()); setEurPair(''); setUsdtPair(''); setBtcPair('') }}
+              onChange={e => { setSymbol(e.target.value.toUpperCase()); setEurPair(''); setUsdtPair(''); setBtcPair(''); setGeckoId(null) }}
               placeholder="BTC, ETH, PEPE..." className={`${inputClass} pr-8`} />
-            {status === 'detecting' && <RefreshCw size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 animate-spin" />}
-            {status === 'found'     && <CheckCircle size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-accent-green" />}
-            {status === 'notfound'  && <AlertCircle size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-accent-amber" />}
+            {statusIcon}
           </div>
         </div>
         <div className="space-y-1">
@@ -303,29 +412,41 @@ function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Pepe Coin" className={inputClass} />
         </div>
       </div>
-      {status === 'found' && (
+
+      {status === 'found_binance' && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent-green/8 border border-accent-green/20 text-xs text-accent-green">
           <CheckCircle size={12} /> Encontrado en Binance — pares configurados automáticamente
         </div>
       )}
+      {status === 'found_coingecko' && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs"
+          style={{ backgroundColor: '#8b5cf608', borderColor: '#8b5cf630', color: '#8b5cf6' }}>
+          <CheckCircle size={12} />
+          Encontrado en CoinGecko — precio vía <span className="mono font-medium">{geckoId}</span>
+        </div>
+      )}
       {status === 'notfound' && (
         <div className="px-3 py-2.5 rounded-lg bg-accent-amber/8 border border-accent-amber/20 space-y-1">
-          <div className="flex items-center gap-2 text-xs text-accent-amber"><AlertCircle size={12} /> No encontrado en Binance</div>
+          <div className="flex items-center gap-2 text-xs text-accent-amber"><AlertCircle size={12} /> No encontrado en Binance ni CoinGecko</div>
           <p className="text-xs text-gray-500">Introduce los pares manualmente o márcalo como stablecoin.</p>
         </div>
       )}
-      <div className="grid grid-cols-3 gap-3">
-        {([
-          { label: 'Par EUR',  val: eurPair,  set: setEurPair,  ph: `${symbol || '?'}EUR`  },
-          { label: 'Par USDT', val: usdtPair, set: setUsdtPair, ph: `${symbol || '?'}USDT` },
-          { label: 'Par BTC',  val: btcPair,  set: setBtcPair,  ph: `${symbol || '?'}BTC`  },
-        ] as const).map(({ label, val, set, ph }) => (
-          <div key={label} className="space-y-1">
-            <label className="text-xs text-gray-500">{label}</label>
-            <input value={val} onChange={e => set(e.target.value.toUpperCase())} placeholder={ph} className={inputClass} />
-          </div>
-        ))}
-      </div>
+
+      {status !== 'found_coingecko' && (
+        <div className="grid grid-cols-3 gap-3">
+          {([
+            { label: 'Par EUR',  val: eurPair,  set: setEurPair,  ph: `${symbol || '?'}EUR`  },
+            { label: 'Par USDT', val: usdtPair, set: setUsdtPair, ph: `${symbol || '?'}USDT` },
+            { label: 'Par BTC',  val: btcPair,  set: setBtcPair,  ph: `${symbol || '?'}BTC`  },
+          ] as const).map(({ label, val, set, ph }) => (
+            <div key={label} className="space-y-1">
+              <label className="text-xs text-gray-500">{label}</label>
+              <input value={val} onChange={e => set(e.target.value.toUpperCase())} placeholder={ph} className={inputClass} />
+            </div>
+          ))}
+        </div>
+      )}
+
       <Toggle checked={isStable} onChange={setIsStable} label="Stablecoin o fiat (sin precio de mercado)" />
       <div className="flex justify-end gap-2 pt-1">
         <button onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">Cancelar</button>

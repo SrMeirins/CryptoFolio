@@ -287,6 +287,43 @@ export async function prefetchHistoricalPrices(
 }
 
 // ── Auto-detección de coingecko_id ────────────────────────────────────────
+// Busca en CoinGecko el mejor candidato para un símbolo sin guardar nada en DB.
+// Devuelve { id, price_eur } del primer candidato que tenga precio activo, o null.
+export async function searchCoinGeckoBySymbol(
+  symbol: string
+): Promise<{ id: string; price_eur: number } | null> {
+  const url = `${BASE_URL}/search?query=${encodeURIComponent(symbol)}`;
+  try {
+    const data = await queue.enqueue(() => fetchWithRetry(url)) as {
+      coins: { id: string; symbol: string; market_cap_rank: number | null }[]
+    };
+    const candidates = data.coins
+      .filter(c => c.symbol.toUpperCase() === symbol.toUpperCase())
+      .sort((a, b) => {
+        if (a.market_cap_rank === null) return 1;
+        if (b.market_cap_rank === null) return -1;
+        return a.market_cap_rank - b.market_cap_rank;
+      })
+      .slice(0, 5)
+      .map(c => c.id);
+
+    if (candidates.length === 0) return null;
+
+    const ids = candidates.join(',');
+    const prices = await fetchWithRetry(
+      `${BASE_URL}/simple/price?ids=${ids}&vs_currencies=eur`
+    ) as Record<string, { eur: number }>;
+
+    for (const id of candidates) {
+      const price = prices[id]?.eur;
+      if (price != null && price > 0) return { id, price_eur: price };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // Activos cuya búsqueda ya falló — evita reintentos infinitos en la misma sesión
 const failedSearches = new Set<string>();
 
@@ -318,31 +355,76 @@ async function _searchAndSaveCoinGeckoId(symbol: string): Promise<string | null>
       };
     });
 
-    const matches = data.coins.filter(c => c.symbol.toUpperCase() === symbol.toUpperCase());
+    const matches = data.coins
+      .filter(c => c.symbol.toUpperCase() === symbol.toUpperCase())
+      .sort((a, b) => {
+        if (a.market_cap_rank === null) return 1;
+        if (b.market_cap_rank === null) return -1;
+        return a.market_cap_rank - b.market_cap_rank;
+      });
+
     if (matches.length === 0) {
       console.warn(`[PRICES] Sin coincidencia en CoinGecko para ${symbol}`);
       failedSearches.add(symbol);
       return null;
     }
 
-    matches.sort((a, b) => {
-      if (a.market_cap_rank === null) return 1;
-      if (b.market_cap_rank === null) return -1;
-      return a.market_cap_rank - b.market_cap_rank;
-    });
+    // Verificar cuál candidato devuelve precio activo con una sola llamada batch.
+    // Esto evita guardar un ID incorrecto (p.ej. tokens IOU pre-lanzamiento sin mercado activo).
+    const candidates = matches.slice(0, 5).map(c => c.id);
+    const geckoId = await verifyBestCandidateId(candidates) ?? candidates[0];
 
-    const geckoId = matches[0].id;
-
-    await db.query(
-      'UPDATE asset_metadata SET coingecko_id = $1 WHERE symbol = $2',
-      [geckoId, symbol]
-    );
-    coinGeckoIds.set(symbol, geckoId);
-
+    await saveCoinGeckoId(symbol, geckoId);
     return geckoId;
   } catch (e) {
     console.error(`[PRICES] Error buscando coingecko_id para ${symbol}:`, (e as Error).message);
     failedSearches.add(symbol);
+    return null;
+  }
+}
+
+// Llama a simple/price con todos los candidatos a la vez y devuelve el primero con precio real.
+// Usa un fetch directo (sin la cola) para no bloquear otras operaciones en curso.
+async function verifyBestCandidateId(candidates: string[]): Promise<string | null> {
+  try {
+    const ids = candidates.join(',');
+    const data = await fetchWithRetry(
+      `${BASE_URL}/simple/price?ids=${ids}&vs_currencies=eur`
+    ) as Record<string, { eur: number }>;
+
+    for (const id of candidates) {
+      if (data[id]?.eur != null && data[id].eur > 0) return id;
+    }
+  } catch { /* si falla la verificación, el caller usa candidates[0] */ }
+  return null;
+}
+
+async function saveCoinGeckoId(symbol: string, geckoId: string): Promise<void> {
+  await db.query(
+    'UPDATE asset_metadata SET coingecko_id = $1 WHERE symbol = $2',
+    [geckoId, symbol]
+  );
+  coinGeckoIds.set(symbol, geckoId);
+}
+
+// Actualiza el coingecko_id manualmente (desde la UI de Settings).
+// Recarga el map en memoria inmediatamente para que el siguiente fetch lo use.
+export async function updateCoinGeckoId(symbol: string, geckoId: string): Promise<void> {
+  await saveCoinGeckoId(symbol, geckoId);
+  // Limpiar el map de fallidos para permitir reintentos si el usuario corrige el ID
+  failedSearches.delete(symbol);
+}
+
+// Verifica si un coingecko_id concreto devuelve precio activo.
+// Usado por el endpoint de test en Settings antes de guardar.
+export async function verifyCoinGeckoId(geckoId: string): Promise<number | null> {
+  try {
+    const data = await fetchWithRetry(
+      `${BASE_URL}/simple/price?ids=${encodeURIComponent(geckoId)}&vs_currencies=eur`
+    ) as Record<string, { eur: number }>;
+    const price = data[geckoId]?.eur;
+    return price != null && price > 0 ? price : null;
+  } catch {
     return null;
   }
 }

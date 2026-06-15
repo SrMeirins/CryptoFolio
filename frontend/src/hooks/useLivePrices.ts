@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { usePricesStore } from '../store/pricesStore'
 
 export function useLivePrices() {
-  const { setPrices, setConnected } = usePricesStore()
+  const { setPrices, mergePrices, setConnected } = usePricesStore()
 
   // Carga inicial via REST — instantáneo, sin esperar WebSocket
   useEffect(() => {
@@ -33,7 +33,7 @@ export function useLivePrices() {
         try {
           const data = JSON.parse(event.data)
           if (data.type === 'prices') {
-            setPrices(data.payload)
+            mergePrices(data.payload)
           }
         } catch {
           // ignorar

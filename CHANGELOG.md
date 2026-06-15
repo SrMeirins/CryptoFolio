@@ -9,6 +9,50 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.0.8] - 2026-06-15
+
+### Añadido
+
+#### Gestión de activos — fuente de precio
+
+- **Búsqueda en CoinGecko al añadir activo** — al escribir un símbolo en el diálogo "Añadir activo", si no existe ningún par en Binance la app busca automáticamente en CoinGecko. Se muestra el ID encontrado y se guarda configurado directamente como fuente CoinGecko.
+- **ID de CoinGecko editable en Settings** — los activos con fuente CoinGecko muestran un nuevo campo en su panel de edición donde se puede ver, probar (verifica precio en tiempo real) y cambiar el `coingecko_id` manualmente sin tocar la base de datos. Incluye enlace directo a la búsqueda en CoinGecko.
+- **Nuevos endpoints de CoinGecko**:
+  - `GET /api/settings/coingecko/search?symbol=XXX` — busca el mejor ID para un símbolo y verifica que tenga precio activo (usado por el diálogo de añadir activo).
+  - `GET /api/settings/coingecko/test?id=XXX` — verifica si un ID concreto devuelve precio (usado por el editor de Settings).
+  - `PUT /api/settings/assets/:symbol/coingecko-id` — guarda un ID manual, lo verifica contra CoinGecko antes de persistir y recarga el mapa en memoria inmediatamente.
+
+#### Catálogo de operaciones
+
+- **4 nuevos tipos manuales**: `Depósito EUR`, `Depósito cripto`, `Retirada cripto`, `Retirada EUR` — completan la cobertura de movimientos fiat y cripto entre wallets/exchanges sin evento fiscal.
+
+### Cambiado
+
+#### Edición de transacciones
+
+- **Botón de editar visible en todas las transacciones** — antes solo aparecía en transacciones marcadas como `manually_added`. Ahora cualquier transacción del historial es editable desde el botón de lápiz (hover). El botón de eliminar sigue reservado a las añadidas manualmente.
+- **Modal de edición pre-relleno** — al editar, el asistente de operación se abre directamente en el paso de campos con los valores actuales de la transacción. El encabezado distingue entre "Nueva transacción" / "Editar transacción" / "Catalogar operación".
+
+### Corregido
+
+#### Portfolio — precio de activos CoinGecko
+
+- **Precios CoinGecko borrados por el WebSocket** — cada actualización del WebSocket de Binance llamaba a `setPrices()` reemplazando todo el store, borrando los precios de CoinGecko (como ETHW) que se habían cargado vía REST al inicio. Ahora el WebSocket usa `mergePrices()` que fusiona sin destruir los precios existentes.
+- **Detección de `coingecko_id` incorrecto** — la búsqueda automática guardaba el candidato con mayor market cap sin verificar que tuviera precio activo. Ahora se hace una llamada batch a `simple/price` con los primeros 5 candidatos y se guarda el primero que devuelve precio real (p. ej. para ETHW elegía `ethereum-pow-iou` correctamente en vez de un IOU sin mercado activo).
+
+#### Importación CSV — Binance Asset Recovery / Token Swap
+
+- **WITHDRAW fantasma por Asset Recovery forzado** — las operaciones "Asset Recovery" y "Token Swap - Distribution" negativos de Binance (activos retirados por delisting forzado) se importaban como `WITHDRAW` con `destination_pending = TRUE`, generando una notificación de alerta permanente. Al arrancar el servidor se reclasifican automáticamente como `LOST` usando el campo `operation` del CSV original.
+- **Notificación de retiro pendiente demasiado amplia** — la query de notificaciones comprobaba `destination_pending = TRUE` en cualquier tipo de operación, pudiendo mostrar alertas falsas en datos corruptos. Ahora filtra estrictamente `operation_type = 'WITHDRAW'`.
+
+#### UI — posición de modales al hacer scroll
+
+- **Modal aparecía en mitad de la página** — la animación de entrada de página (`pageIn`) terminaba con `transform: translateY(0)` aplicado permanentemente al contenedor de rutas. Cualquier `transform` en un ancestro convierte a sus hijos `position: fixed` en relativos a ese ancestro, no al viewport. Cambiando el keyframe final a `transform: none` los modales vuelven a centrarse correctamente en el viewport independientemente del scroll.
+
+#### Docker — hot-reload del backend
+
+- **Los cambios en `backend/src/` no se recargaban** — el Dockerfile compilaba TypeScript a `dist/` y ejecutaba `node dist/index.js`; el volume mount reemplazaba el código fuente pero el compilado era el de la imagen original. Ahora el `docker-compose.yml` sobreescribe el comando con `ts-node-dev`, igual que el frontend usa Vite. Cualquier cambio en fuente del backend se recarga automáticamente sin reconstruir la imagen.
+
 ## [0.0.7] - 2026-06-15
 
 ### Corregido

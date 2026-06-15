@@ -3,6 +3,7 @@ import { db } from '../db/client';
 import { autoDetectPair, testPair } from '../modules/prices/pairDetector';
 import { runFifoEngine } from '../modules/fifo/engine';
 import { getHistoricalPriceEur } from '../modules/prices/binance';
+import { updateCoinGeckoId, verifyCoinGeckoId } from '../modules/prices/coingecko';
 
 const router = Router();
 
@@ -27,7 +28,7 @@ router.get('/assets', async (_req: Request, res: Response) => {
 
 // ── POST /api/settings/assets ──────────────────────────────────────────────
 router.post('/assets', async (req: Request, res: Response) => {
-  const { symbol, name, binanceEurPair, binanceUsdtPair, binanceBtcPair, isStablecoin } = req.body;
+  const { symbol, name, binanceEurPair, binanceUsdtPair, binanceBtcPair, isStablecoin, coingecko_id } = req.body;
 
   if (!symbol) {
     res.status(400).json({ error: 'El simbolo es requerido' });
@@ -41,24 +42,32 @@ router.post('/assets', async (req: Request, res: Response) => {
   else if (binanceEurPair) priceSource = 'eur_direct';
   else if (binanceUsdtPair) priceSource = 'usdt_proxy';
   else if (binanceBtcPair) priceSource = 'btc_proxy';
+  else if (coingecko_id) priceSource = 'coingecko';
 
   await db.query(
     `INSERT INTO asset_metadata (
       symbol, name, is_stablecoin,
       binance_eur_pair, binance_usdt_pair, binance_btc_pair,
-      price_source, auto_detected, last_price_check
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, NOW())
+      coingecko_id, price_source, auto_detected, last_price_check
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, NOW())
     ON CONFLICT (symbol) DO UPDATE SET
       name              = EXCLUDED.name,
       is_stablecoin     = EXCLUDED.is_stablecoin,
       binance_eur_pair  = EXCLUDED.binance_eur_pair,
       binance_usdt_pair = EXCLUDED.binance_usdt_pair,
       binance_btc_pair  = EXCLUDED.binance_btc_pair,
+      coingecko_id      = COALESCE(EXCLUDED.coingecko_id, asset_metadata.coingecko_id),
       price_source      = EXCLUDED.price_source,
       last_price_check  = NOW()`,
     [upperSymbol, name || upperSymbol, isStablecoin || false,
-     binanceEurPair || null, binanceUsdtPair || null, binanceBtcPair || null, priceSource]
+     binanceEurPair || null, binanceUsdtPair || null, binanceBtcPair || null,
+     coingecko_id || null, priceSource]
   );
+
+  // Recargar el map en memoria si se proporcionó coingecko_id
+  if (coingecko_id) {
+    await updateCoinGeckoId(upperSymbol, coingecko_id);
+  }
 
   res.json({ success: true, symbol: upperSymbol });
 });
@@ -197,6 +206,78 @@ router.post('/transactions/fix-stale-withdrawals', async (_req: Request, res: Re
        RETURNING t.id, t.asset, t.timestamp`
     );
     res.json({ fixed: result.rows.length, records: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ── GET /api/settings/coingecko/search?symbol=XXX ────────────────────────
+// Busca el mejor coingecko_id para un símbolo sin guardar nada en DB.
+// Usado por AddAssetDialog como fallback cuando no hay pares Binance.
+router.get('/coingecko/search', async (req: Request, res: Response) => {
+  const symbol = validateSymbol((req.query.symbol as string) ?? '');
+  if (!symbol) { res.status(400).json({ error: 'Símbolo inválido' }); return; }
+  try {
+    const { searchCoinGeckoBySymbol } = await import('../modules/prices/coingecko');
+    const result = await searchCoinGeckoBySymbol(symbol);
+    if (!result) {
+      res.json({ found: false });
+      return;
+    }
+    res.json({ found: true, coingecko_id: result.id, price_eur: result.price_eur });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ── GET /api/settings/coingecko/test?id=xxx ───────────────────────────────
+// Verifica si un coingecko_id devuelve precio activo. Usado por la UI antes de guardar.
+router.get('/coingecko/test', async (req: Request, res: Response) => {
+  const { id } = req.query;
+  if (!id || typeof id !== 'string' || !/^[a-z0-9-]{1,80}$/.test(id)) {
+    res.status(400).json({ error: 'ID inválido' });
+    return;
+  }
+  try {
+    const price = await verifyCoinGeckoId(id);
+    res.json({ id, price_eur: price, valid: price !== null });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ── PUT /api/settings/assets/:symbol/coingecko-id ─────────────────────────
+// Guarda un coingecko_id manual y recarga el map en memoria.
+router.put('/assets/:symbol/coingecko-id', async (req: Request, res: Response) => {
+  const symbol = validateSymbol(req.params.symbol);
+  if (!symbol) { res.status(400).json({ error: 'Símbolo inválido' }); return; }
+
+  const { coingecko_id } = req.body as { coingecko_id: string };
+  if (!coingecko_id || typeof coingecko_id !== 'string' || !/^[a-z0-9-]{1,80}$/.test(coingecko_id)) {
+    res.status(400).json({ error: 'coingecko_id inválido' });
+    return;
+  }
+
+  try {
+    // Verificar que el ID devuelve precio antes de guardar
+    const price = await verifyCoinGeckoId(coingecko_id);
+    if (price === null) {
+      res.status(422).json({ error: `El ID "${coingecko_id}" no devuelve precio activo en CoinGecko` });
+      return;
+    }
+
+    await updateCoinGeckoId(symbol, coingecko_id);
+
+    // También actualizar price_source a 'coingecko' si era 'unknown'
+    await db.query(
+      `UPDATE asset_metadata
+       SET price_source = CASE WHEN price_source = 'unknown' THEN 'coingecko' ELSE price_source END,
+           last_price_check = NOW()
+       WHERE symbol = $1`,
+      [symbol]
+    );
+
+    res.json({ symbol, coingecko_id, price_eur: price });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

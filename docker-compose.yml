@@ -40,9 +40,10 @@ services:
       COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
       PRICE_REFRESH_INTERVAL_MS: ${PRICE_REFRESH_INTERVAL_MS:-60000}
       JWT_SECRET: ${JWT_SECRET}
+    command: ["npx", "ts-node-dev", "--respawn", "--transpile-only", "--poll", "src/index.ts"]
     volumes:
-      # Hot reload en desarrollo
-      - ./backend/src:/app/src:ro
+      # Hot reload: ts-node-dev lee directamente src/ (no usa dist/)
+      - ./backend/src:/app/src
       # Carpeta para subida de CSVs (persiste entre reinicios)
       - csv_uploads:/app/uploads
     ports:
