@@ -184,8 +184,8 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
           send('importing', label, done, total);
         }
       },
-      (message) => {
-        send('importing', message);
+      (message, progress, total) => {
+        send('importing', message, progress, total);
       }
     );
     send('importing', `✓ ${importResult.newTransactions} transacciones nuevas importadas (${importResult.duplicateRows} duplicadas ignoradas)`);

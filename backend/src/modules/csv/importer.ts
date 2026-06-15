@@ -1,6 +1,5 @@
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { parse } from 'csv-parse/sync';
-import { PoolClient } from 'pg';
 import { db } from '../../db/client';
 import { parseBinanceCsv } from './parser';
 import { validateCsvStructure, ValidationResult } from './validator';
@@ -226,7 +225,7 @@ export async function importCsvFile(
   withdrawalDestinations: Record<string, string> = {},
   depositCosts: Record<string, number> = {},
   onProgress?: (done: number, total: number, asset?: string, operation?: string) => void,
-  onStatus?: (message: string) => void,
+  onStatus?: (message: string, progress?: number, total?: number) => void,
 ): Promise<ImportResult> {
   const validation = validateCsvStructure(fileBuffer);
   if (!validation.valid) {
@@ -278,7 +277,7 @@ export async function importCsvFile(
     }
     const uniquePairs = [...uniquePairsMap.values()];
 
-    onStatus?.(`Enriqueciendo ${incomeTxs.length} operaciones de rendimiento — ${uniquePairs.length} pares únicos (symbol+fecha) a consultar`);
+    onStatus?.(`Enriqueciendo ${incomeTxs.length} operaciones de rendimiento — ${uniquePairs.length} pares únicos a consultar`, 0, uniquePairs.length);
 
     // Enganchar el callback de CoinGecko para que rate limits aparezcan en el log
     setCoinGeckoStatusCallback(onStatus);
@@ -287,21 +286,21 @@ export async function importCsvFile(
     for (const { symbol, date, txList } of uniquePairs) {
       pairIdx++;
       const dateStr = date.toISOString().slice(0, 10);
-      onStatus?.(`[${pairIdx}/${uniquePairs.length}] Consultando ${symbol} @ ${dateStr}...`);
+      onStatus?.(`[${pairIdx}/${uniquePairs.length}] Consultando ${symbol} @ ${dateStr}...`, pairIdx, uniquePairs.length);
       try {
         const price = await getHistoricalPriceEur(symbol, date);
         if (price > 0) {
-          onStatus?.(`[${pairIdx}/${uniquePairs.length}] ✓ ${symbol} @ ${dateStr} = ${price.toFixed(4)} €`);
+          onStatus?.(`[${pairIdx}/${uniquePairs.length}] ✓ ${symbol} @ ${dateStr} = ${price.toFixed(4)} €`, pairIdx, uniquePairs.length);
           for (const tx of txList) {
             tx.pricePerUnit = price;
             tx.costAsset    = 'EUR';
             tx.costAmount   = tx.amount * price;
           }
         } else {
-          onStatus?.(`[${pairIdx}/${uniquePairs.length}] — ${symbol} @ ${dateStr} sin precio disponible`);
+          onStatus?.(`[${pairIdx}/${uniquePairs.length}] — ${symbol} @ ${dateStr} sin precio disponible`, pairIdx, uniquePairs.length);
         }
       } catch (e) {
-        onStatus?.(`[${pairIdx}/${uniquePairs.length}] ⚠ ${symbol} @ ${dateStr} error: ${(e as Error).message}`);
+        onStatus?.(`[${pairIdx}/${uniquePairs.length}] ⚠ ${symbol} @ ${dateStr} error: ${(e as Error).message}`, pairIdx, uniquePairs.length);
       }
     }
 
@@ -359,6 +358,22 @@ export async function importCsvFile(
     const totalTx = parseResult.transactions.length;
     let processed = 0;
 
+    // ── Preparación (sin DB): clasificar cada tx y resolver metadatos síncronos ──
+    // Los STAKING/LAUNCHPOOL_UNLOCK necesitan una SELECT por cada uno para encontrar
+    // su LOCK (que debe estar ya insertado), así que se separan para un segundo paso.
+    interface InsertRow {
+      id: string;
+      tx: ParsedTransaction;
+      walletId: string;
+      destinationWalletId: string | null;
+      effectiveOpType: string;
+      depositPriceOverride: number | null;
+      linkedTxId: string | null;
+    }
+
+    const normalRows: InsertRow[] = [];
+    const unlockRows: InsertRow[] = [];
+
     for (const tx of parseResult.transactions) {
       processed++;
       if (tx.rawRowHashes.some(h => existingHashSet.has(h))) {
@@ -366,76 +381,151 @@ export async function importCsvFile(
         onProgress?.(processed, totalTx, tx.asset, tx.operationType);
         continue;
       }
+
+      const id = randomUUID();
       const walletId = getWalletId(tx.account);
       let destinationWalletId: string | null = null;
-      let linkedTxId: string | null = null;
       let effectiveOpType = tx.operationType;
 
       if (tx.operationType === 'TRANSFER_INTERNAL') {
         destinationWalletId = getDestinationWalletId(tx.notes, tx.account);
-      } else if (tx.operationType === 'STAKING_UNLOCK' || tx.operationType === 'LAUNCHPOOL_UNLOCK') {
-        // Enlazar con el LOCK más antiguo no emparejado del mismo wallet+asset.
-        // No usamos notes para el match porque Binance renombra productos a mitad de ciclo:
-        // un "Staking Purchase" puede ser redimido como "Simple Earn Locked Redemption",
-        // lo que haría fallar la búsqueda por notes. FIFO puro (timestamp ASC) es correcto.
-        const isLaunchpool = tx.operationType === 'LAUNCHPOOL_UNLOCK';
-        const lockType  = isLaunchpool ? 'LAUNCHPOOL_LOCK'  : 'STAKING_LOCK';
-        const unlockType = tx.operationType;
-        const matchRes = await client.query(
-          `SELECT id FROM transactions
-           WHERE operation_type = $1
-             AND wallet_id = $2
-             AND asset = $3
-             AND id NOT IN (
-               SELECT linked_tx_id FROM transactions
-               WHERE linked_tx_id IS NOT NULL
-                 AND operation_type = $4
-             )
-           ORDER BY timestamp ASC
-           LIMIT 1`,
-          [lockType, walletId, tx.asset, unlockType]
-        );
-        if (matchRes.rows.length > 0) {
-          linkedTxId = matchRes.rows[0].id as string;
-        }
       } else if (tx.operationType === 'WITHDRAW') {
-        // Buscar destino por txKey (rawRowHashes[0]) → más granular que por activo.
-        // Fallback al activo para compatibilidad con importaciones anteriores.
         const txKey = tx.rawRowHashes[0] ?? tx.asset;
         const dest  = withdrawalDestinations[txKey] ?? withdrawalDestinations[tx.asset];
-
         if (dest === '__lost__') {
-          // Pérdida de acceso → LOST
-          // FIFO consume el lote a 0 proceeds → pérdida patrimonial
           effectiveOpType = 'LOST';
-          destinationWalletId = null;
         } else if (dest === '__gift__') {
-          // Regalo, donación o pago a tercero → GIFT_SENT
-          // FIFO procesa como venta al precio de mercado → transmisión patrimonial
-          // G/P = precio de mercado en fecha de envío − coste de adquisición
           effectiveOpType = 'GIFT_SENT';
-          destinationWalletId = null;
         } else if (dest === '__external__') {
-          // Retirado a wallet externa no rastreada (MetaMask, otro exchange…)
-          // El lote se mueve a la wallet "Wallets externas" del sistema
-          const extWallet = walletsRes.rows.find(
-            (r: { name: string }) => r.name === 'Wallets externas'
-          );
+          const extWallet = walletsRes.rows.find((r: { name: string }) => r.name === 'Wallets externas');
           destinationWalletId = extWallet?.id ?? null;
         } else {
-          // Wallet fría del usuario
           destinationWalletId = dest ?? null;
         }
       }
 
-      // Coste de adquisición para depósitos externos
       const depositPriceOverride = tx.needsCostReview
         ? (depositCosts[tx.rawRowHashes[0]] ?? null)
         : null;
 
-      await insertTransaction(client, tx, importId, walletId, destinationWalletId, effectiveOpType, depositPriceOverride, linkedTxId);
-      newTransactions++;
+      const row: InsertRow = { id, tx, walletId, destinationWalletId, effectiveOpType, depositPriceOverride, linkedTxId: null };
+
+      if (tx.operationType === 'STAKING_UNLOCK' || tx.operationType === 'LAUNCHPOOL_UNLOCK') {
+        unlockRows.push(row);
+      } else {
+        normalRows.push(row);
+      }
+
       onProgress?.(processed, totalTx, tx.asset, effectiveOpType);
+    }
+
+    // ── Paso A: batch INSERT de todas las transacciones normales ──────────────
+    // Una sola query por chunk de 500 en lugar de una por tx → ~100x más rápido
+    if (normalRows.length > 0) {
+      onStatus?.(`Insertando ${normalRows.length} transacciones en batch...`);
+      const CHUNK = 500;
+      for (let i = 0; i < normalRows.length; i += CHUNK) {
+        const chunk = normalRows.slice(i, i + CHUNK);
+        const params: unknown[] = [];
+        const valueClauses: string[] = [];
+        for (const row of chunk) {
+          const { id, tx, walletId, destinationWalletId, effectiveOpType, depositPriceOverride } = row;
+          const isWithdrawType = ['WITHDRAW', 'LOST', 'GIFT_SENT'].includes(effectiveOpType);
+          const destPending = isWithdrawType && !destinationWalletId;
+          const finalPricePerUnit = depositPriceOverride ?? tx.pricePerUnit ?? null;
+          const finalCostAmount = depositPriceOverride
+            ? tx.amount * depositPriceOverride
+            : (tx.costAmount ?? null);
+          const b = params.length;
+          params.push(
+            id, importId, effectiveOpType, tx.timestamp,
+            tx.asset, tx.amount, tx.amountNet,
+            tx.costAsset ?? null, finalCostAmount, finalPricePerUnit,
+            tx.feeAsset ?? null, tx.feeAmount ?? null,
+            walletId, tx.account, tx.notes ?? null,
+            destinationWalletId, destPending,
+          );
+          valueClauses.push(
+            `($${b+1},$${b+2},$${b+3}::operation_type,$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},$${b+15},false,$${b+16},$${b+17},NULL)`
+          );
+        }
+        await client.query(
+          `INSERT INTO transactions
+           (id,import_id,operation_type,timestamp,asset,amount,amount_net,
+            cost_asset,cost_amount,price_per_unit,fee_asset,fee_amount,
+            wallet_id,account,notes,manually_added,destination_wallet_id,destination_pending,linked_tx_id)
+           VALUES ${valueClauses.join(',')}`,
+          params
+        );
+        newTransactions += chunk.length;
+      }
+    }
+
+    // ── Paso B: STAKING/LAUNCHPOOL_UNLOCK — buscar LOCK + INSERT individual ───
+    // No usamos notes para el match: Binance renombra productos a mitad de ciclo
+    // (ej. "Staking Purchase" redimido como "Simple Earn Locked Redemption").
+    // FIFO puro (timestamp ASC) es correcto.
+    for (const row of unlockRows) {
+      const isLaunchpool = row.effectiveOpType === 'LAUNCHPOOL_UNLOCK';
+      const lockType   = isLaunchpool ? 'LAUNCHPOOL_LOCK'  : 'STAKING_LOCK';
+      const unlockType = row.effectiveOpType;
+      const matchRes = await client.query(
+        `SELECT id FROM transactions
+         WHERE operation_type = $1 AND wallet_id = $2 AND asset = $3
+           AND id NOT IN (
+             SELECT linked_tx_id FROM transactions
+             WHERE linked_tx_id IS NOT NULL AND operation_type = $4
+           )
+         ORDER BY timestamp ASC LIMIT 1`,
+        [lockType, row.walletId, row.tx.asset, unlockType]
+      );
+      row.linkedTxId = matchRes.rows[0]?.id ?? null;
+
+      const { id, tx, walletId, destinationWalletId, effectiveOpType, depositPriceOverride, linkedTxId } = row;
+      const finalPricePerUnit = depositPriceOverride ?? tx.pricePerUnit ?? null;
+      const finalCostAmount = depositPriceOverride ? tx.amount * depositPriceOverride : (tx.costAmount ?? null);
+      await client.query(
+        `INSERT INTO transactions
+         (id,import_id,operation_type,timestamp,asset,amount,amount_net,
+          cost_asset,cost_amount,price_per_unit,fee_asset,fee_amount,
+          wallet_id,account,notes,manually_added,destination_wallet_id,destination_pending,linked_tx_id)
+         VALUES ($1,$2,$3::operation_type,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,false,$16,$17,$18)`,
+        [id, importId, effectiveOpType, tx.timestamp,
+         tx.asset, tx.amount, tx.amountNet,
+         tx.costAsset ?? null, finalCostAmount, finalPricePerUnit,
+         tx.feeAsset ?? null, tx.feeAmount ?? null,
+         walletId, tx.account, tx.notes ?? null,
+         destinationWalletId, false, linkedTxId]
+      );
+      newTransactions++;
+    }
+
+    // ── Paso C: batch INSERT de raw_transactions para todas ──────────────────
+    const allRows = [...normalRows, ...unlockRows];
+    if (allRows.length > 0) {
+      onStatus?.(`Guardando ${allRows.length} hashes en raw_transactions...`);
+      const CHUNK = 500;
+      const allHashes = allRows.flatMap(row =>
+        row.tx.rawRowHashes.map(hash => ({ hash, row }))
+      );
+      for (let i = 0; i < allHashes.length; i += CHUNK) {
+        const chunk = allHashes.slice(i, i + CHUNK);
+        const params: unknown[] = [];
+        const valueClauses: string[] = [];
+        for (const { hash, row } of chunk) {
+          const { id, tx } = row;
+          const b = params.length;
+          params.push(importId, tx.timestamp, tx.account, tx.operationType, tx.asset, tx.amount, tx.notes ?? '', hash, id);
+          valueClauses.push(`($${b+1},'',$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9})`);
+        }
+        await client.query(
+          `INSERT INTO raw_transactions
+           (import_id,user_id,time,account,operation,coin,change,remark,row_hash,transaction_id)
+           VALUES ${valueClauses.join(',')}
+           ON CONFLICT (row_hash) DO NOTHING`,
+          params
+        );
+      }
     }
 
     await client.query(
@@ -478,88 +568,3 @@ export async function importCsvFile(
   return result;
 }
 
-async function insertTransaction(
-  client: PoolClient,
-  tx: ParsedTransaction,
-  importId: string,
-  walletId: string,
-  destinationWalletId: string | null = null,
-  operationTypeOverride?: string,
-  depositPriceOverride: number | null = null,
-  linkedTxId: string | null = null,
-): Promise<void> {
-  const opType = operationTypeOverride ?? tx.operationType;
-  // WITHDRAW sin destino asignado → pending (usuario lo asignará después)
-  const isWithdraw  = opType === 'WITHDRAW';
-  const destPending = isWithdraw && !destinationWalletId;
-  const destId      = destinationWalletId;
-
-  // Para depósitos externos: usar precio override si fue provisto
-  const finalPricePerUnit = depositPriceOverride ?? tx.pricePerUnit ?? null;
-  const finalCostAmount   = depositPriceOverride
-    ? tx.amount * depositPriceOverride
-    : (tx.costAmount ?? null);
-
-  const txRes = await client.query(
-    `INSERT INTO transactions (
-      import_id, operation_type, timestamp,
-      asset, amount, amount_net,
-      cost_asset, cost_amount, price_per_unit,
-      fee_asset, fee_amount,
-      wallet_id, account,
-      notes, manually_added,
-      destination_wallet_id, destination_pending,
-      linked_tx_id
-    ) VALUES (
-      $1, $2::operation_type, $3,
-      $4, $5, $6,
-      $7, $8, $9,
-      $10, $11,
-      $12, $13,
-      $14, false,
-      $15, $16,
-      $17
-    ) RETURNING id`,
-    [
-      importId,
-      opType,
-      tx.timestamp,
-      tx.asset,
-      tx.amount,
-      tx.amountNet,
-      tx.costAsset ?? null,
-      finalCostAmount,
-      finalPricePerUnit,
-      tx.feeAsset ?? null,
-      tx.feeAmount ?? null,
-      walletId,
-      tx.account,
-      tx.notes ?? null,
-      destId,
-      destPending,
-      linkedTxId,
-    ]
-  );
-  const txId: string = txRes.rows[0].id;
-
-  // Guardar datos reales del CSV en raw_transactions (no strings vacíos)
-  for (const hash of tx.rawRowHashes) {
-    await client.query(
-      `INSERT INTO raw_transactions
-       (import_id, user_id, time, account, operation, coin, change, remark, row_hash, transaction_id)
-       VALUES ($1, '', $2, $3, $4, $5, $6, $7, $8, $9)
-       ON CONFLICT (row_hash) DO NOTHING`,
-      [
-        importId,
-        tx.timestamp,
-        tx.account,
-        tx.operationType,
-        tx.asset,
-        tx.amount,
-        tx.notes ?? '',
-        hash,
-        txId,
-      ]
-    );
-  }
-}
