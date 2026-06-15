@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { execSync } from 'child_process';
+import { Client } from 'pg';
 
 const CONFIG_FILE = 'electron-db.json';
 
@@ -53,6 +54,27 @@ export class PostgresManager {
     }
   }
 
+  // Consulta la codificación del clúster arrancado.
+  // Conecta al template1 (siempre existe tras initdb, no necesita createDatabase).
+  private async getClusterEncoding(): Promise<string> {
+    const client = new Client({
+      host: '127.0.0.1',
+      port: this.config.port,
+      user: this.user,
+      password: this.config.password,
+      database: 'template1',
+    });
+    try {
+      await client.connect();
+      const res = await client.query('SHOW server_encoding');
+      return (res.rows[0]?.server_encoding ?? '').toUpperCase();
+    } catch {
+      return 'UTF8'; // si no podemos leer, asumimos OK
+    } finally {
+      try { await client.end(); } catch { /* ignorar */ }
+    }
+  }
+
   async start(): Promise<void> {
     if (this.isWindowsAdmin()) {
       throw new Error(
@@ -74,11 +96,15 @@ export class PostgresManager {
       password: this.config.password,
       port: this.config.port,
       persistent: true,
+      // Forzar UTF-8 independientemente del locale del sistema operativo.
+      // Sin esto, en Windows con locale regional se inicializa con WIN1252
+      // y los caracteres multibyte (→, —, tildes en notas, etc.) fallan.
+      initdbFlags: ['--encoding=UTF8', '--locale=C'],
     });
 
     // PG_VERSION existe solo en clusters correctamente inicializados.
     // Si el directorio existe pero falta PG_VERSION, el arranque anterior
-    // falló a medias (p.ej. error de asar) — limpiamos y re-inicializamos.
+    // falló a medias — limpiamos y re-inicializamos.
     const pgVersion = path.join(this.dataDir, 'PG_VERSION');
     const clusterExists = fs.existsSync(pgVersion);
 
@@ -90,8 +116,24 @@ export class PostgresManager {
       await this.pg.initialise();
       await this.pg.start();
       await this.pg.createDatabase(this.database);
-    } else {
+      return;
+    }
+
+    // Clúster existente: arrancar y verificar codificación
+    await this.pg.start();
+
+    const encoding = await this.getClusterEncoding();
+    if (encoding !== 'UTF8') {
+      // Clúster con WIN1252 u otra codificación no-Unicode.
+      // Los imports con caracteres multibyte (→, —, tildes, etc.) fallarán.
+      // Hay que borrar el clúster y re-inicializar con UTF-8.
+      // En alpha los datos se pueden re-importar desde los CSV originales.
+      console.warn(`[postgres] Codificación del clúster: ${encoding}. Re-inicializando con UTF-8...`);
+      await this.pg.stop();
+      fs.rmSync(this.dataDir, { recursive: true, force: true });
+      await this.pg.initialise();
       await this.pg.start();
+      await this.pg.createDatabase(this.database);
     }
   }
 

@@ -9,6 +9,12 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-06-15
+
+### Corregido
+
+- **Windows — codificación WIN1252** — en sistemas Windows con locale regional, PostgreSQL se inicializaba con WIN1252 en lugar de UTF-8, lo que hacía fallar cualquier insert con caracteres como `→`, `—` o tildes en campos de texto. Los clústeres nuevos se crean ahora con `--encoding=UTF8 --locale=C`. Los clústeres existentes con codificación incorrecta se re-inicializan automáticamente al arrancar (los datos se pierden pero pueden re-importarse desde los CSV originales)
+
 ## [0.0.3] - 2026-06-15
 
 ### Añadido
