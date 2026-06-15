@@ -292,6 +292,7 @@ async function startup(): Promise<void> {
 }
 
 let shuttingDown = false;
+let handlingStartupError = false;
 
 async function shutdown(): Promise<void> {
   console.log('[app] Cerrando...');
@@ -322,8 +323,10 @@ app.whenReady().then(async () => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err ?? 'Error desconocido');
     console.error('[app] Error fatal en startup:', message);
-    // Mostrar el diálogo ANTES de cerrar el splash — si cerramos el splash primero,
-    // window-all-closed dispara app.quit() y el diálogo se destruye antes de que el usuario lo lea.
+    // Cerrar el splash ANTES del diálogo: el splash tiene alwaysOnTop y lo taparía.
+    // El flag evita que window-all-closed dispare app.quit() mientras esperamos al usuario.
+    handlingStartupError = true;
+    splashWindow?.close();
     await dialog.showMessageBox({
       type: 'error',
       title: 'Error al iniciar CryptoFolio',
@@ -331,13 +334,12 @@ app.whenReady().then(async () => {
       detail: message,
       buttons: ['Cerrar'],
     });
-    splashWindow?.close();
     app.quit();
   }
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (process.platform !== 'darwin' && !handlingStartupError) app.quit();
 });
 
 app.on('activate', () => {

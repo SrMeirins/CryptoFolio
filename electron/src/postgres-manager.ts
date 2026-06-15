@@ -61,32 +61,17 @@ export class PostgresManager {
     }
   }
 
-  // En Windows, mata cualquier proceso que esté escuchando en nuestro puerto.
-  // Necesario cuando la app se cierra de forma abrupta (crash, kill) y postgres
-  // queda como proceso huérfano manteniendo el bloque de memoria compartida abierto.
-  private async killStalePostgresOnPort(): Promise<void> {
+  // En Windows, mata todos los procesos postgres.exe huérfanos.
+  // netstat no sirve aquí: el error de shared memory ocurre ANTES de que
+  // postgres llegue a bindear el puerto, así que el proceso huérfano existe
+  // pero no aparece en netstat. La única forma fiable es matar por nombre.
+  private async killStalePostgresProcesses(): Promise<void> {
     if (process.platform !== 'win32') return;
     try {
-      const out = execSync(
-        `netstat -ano | findstr ":${this.config.port} "`,
-        { stdio: 'pipe', encoding: 'utf8', timeout: 3000 }
-      );
-      const pids = new Set<string>();
-      for (const line of out.split('\n')) {
-        const parts = line.trim().split(/\s+/);
-        const pid = parts[parts.length - 1];
-        if (pid && /^\d+$/.test(pid) && pid !== '0') pids.add(pid);
-      }
-      if (pids.size === 0) return;
-      for (const pid of pids) {
-        try {
-          execSync(`taskkill /F /PID ${pid}`, { stdio: 'pipe', timeout: 2000 });
-          console.warn(`[postgres] Proceso PID ${pid} (puerto ${this.config.port}) terminado`);
-        } catch { /* ya no existe */ }
-      }
-      // Dar tiempo al SO para liberar los recursos (handles, shared memory)
+      execSync('taskkill /F /IM postgres.exe', { stdio: 'pipe', timeout: 5000 });
+      console.warn('[postgres] Procesos postgres.exe huérfanos terminados');
       await new Promise(r => setTimeout(r, 1500));
-    } catch { /* netstat no encontró nada — situación normal */ }
+    } catch { /* no había procesos postgres.exe — situación normal */ }
   }
 
   // Limpia postmaster.pid si el proceso anotado ya no existe.
@@ -169,7 +154,7 @@ export class PostgresManager {
 
     // Limpiar PID obsoleto y procesos huérfanos antes de intentar arrancar
     this.cleanStalePostmasterPid();
-    await this.killStalePostgresOnPort();
+    await this.killStalePostgresProcesses();
 
     await this.startWithRecovery(pgStderr);
 
@@ -196,7 +181,7 @@ export class PostgresManager {
       if (stderr.includes('shared memory') || stderr.includes('postmaster.pid')) {
         console.warn('[postgres] Memoria compartida huérfana detectada. Limpiando y reintentando...');
         this.cleanStalePostmasterPid();
-        await this.killStalePostgresOnPort();
+        await this.killStalePostgresProcesses();
         pgStderr.length = 0;
 
         try {

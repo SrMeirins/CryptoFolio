@@ -1,24 +1,23 @@
 ; Hooks personalizados del installer NSIS
-; Referencia: https://www.electron.build/configuration/nsis
 
-; Mostrar el panel de detalles de instalación (lista de archivos copiados).
-; Sin esto la barra de progreso avanza sin ninguna información al usuario.
+; Muestra el panel de detalles (el panel existe pero electron-builder
+; extrae con 7z internamente — los DetailPrint de abajo son los que aparecen).
 !macro customHeader
   ShowInstDetails show
   ShowUninstDetails show
 !macroend
 
-; Ejecutado al arrancar el installer (.onInit), antes de mostrar ninguna página.
-; Mata CryptoFolio si está corriendo para evitar el diálogo "no se puede cerrar".
+; Ejecutado en .onInit (arranque del installer, antes de cualquier página).
+; Mata CryptoFolio.exe y postgres.exe para evitar el diálogo "cannot be closed"
+; y liberar el bloque de memoria compartida de PostgreSQL.
+; ExecWait con taskkill devuelve error si el proceso no existe — lo ignoramos.
 !macro customInit
-  DetailPrint "Comprobando si CryptoFolio está en ejecución..."
-  nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq CryptoFolio.exe" /NH'
-  Pop $0
-  Pop $1
-  ${If} $1 != ""
-  ${AndIf} $1 != "INFO: No tasks are running which match the specified criteria."
-    DetailPrint "Cerrando CryptoFolio..."
-    nsExec::Exec 'taskkill /F /IM "CryptoFolio.exe"'
-    Sleep 1500
-  ${EndIf}
+  ExecWait 'taskkill /F /IM "CryptoFolio.exe"'
+  ExecWait 'taskkill /F /IM "postgres.exe"'
+  Sleep 2000
+!macroend
+
+; Mensajes de fase para que el panel no quede completamente vacío.
+!macro customInstall
+  DetailPrint "CryptoFolio instalado correctamente."
 !macroend
