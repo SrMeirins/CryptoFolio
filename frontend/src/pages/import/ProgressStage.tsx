@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { FileText, HardDrive, CheckCircle, RefreshCw, AlertTriangle, ChevronDown, ArrowRight } from 'lucide-react'
 import type { ProgressEvent } from './types'
 
@@ -8,6 +8,13 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
   onGoToDashboard: () => void
 }) {
   const [showLog, setShowLog] = useState(false)
+  const logRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!done && logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight
+    }
+  }, [log, done])
 
   const PHASES = [
     { key: 'importing', label: 'Importando',   icon: FileText    },
@@ -16,10 +23,14 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
     { key: 'done',      label: 'Completado',    icon: CheckCircle },
   ] as const
 
-  const isError     = log.some(e => e.phase === 'error')
+  const isError      = log.some(e => e.phase === 'error')
   const currentPhase = log.length > 0 ? log[log.length - 1].phase : 'importing'
-  const phaseOrder  = PHASES.map(p => p.key)
-  const currentIdx  = phaseOrder.indexOf(currentPhase as typeof phaseOrder[number])
+  const phaseOrder   = PHASES.map(p => p.key)
+  const currentIdx   = phaseOrder.indexOf(currentPhase as typeof phaseOrder[number])
+
+  const latestPricesEvent = [...log].reverse().find(
+    e => e.phase === 'prices' && e.total !== undefined && e.total > 0
+  )
 
   const importLine = log.find(e => e.message.includes('transacciones nuevas'))
   const fifoLine   = log.find(e => e.message.includes('lotes') && e.message.includes('consumos'))
@@ -28,11 +39,30 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
   return (
     <div className="card space-y-6">
       <div className="grid grid-cols-4 gap-2">
-        {PHASES.map((phase, i) => {
+        {PHASES.map((phase) => {
           const idx       = phaseOrder.indexOf(phase.key)
           const isDone    = done ? true : idx < currentIdx
           const isCurrent = !done && phase.key === currentPhase
           const Icon      = phase.icon
+
+          let barStyle: React.CSSProperties | undefined
+          let barClass = 'h-full rounded-full transition-all duration-300 '
+
+          if (isError && isCurrent) {
+            barClass += 'bg-accent-red w-full'
+          } else if (isDone) {
+            barClass += 'bg-accent-green w-full'
+          } else if (isCurrent) {
+            if (phase.key === 'prices' && latestPricesEvent) {
+              const pct = Math.min(100, Math.round((latestPricesEvent.progress! / latestPricesEvent.total!) * 100))
+              barClass += 'bg-accent-blue'
+              barStyle = { width: `${pct}%` }
+            } else {
+              barClass += 'bg-accent-blue w-1/2 animate-pulse'
+            }
+          } else {
+            barClass += 'w-0'
+          }
 
           return (
             <div
@@ -67,11 +97,7 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
                 {phase.label}
               </span>
               <div className="w-full h-0.5 rounded-full overflow-hidden bg-background-tertiary">
-                <div className={`h-full rounded-full transition-all duration-500 ${
-                  isError && isCurrent ? 'bg-accent-red w-full' :
-                  isDone ? 'bg-accent-green w-full' :
-                  isCurrent ? 'bg-accent-blue w-1/2 animate-pulse' : 'w-0'
-                }`} />
+                <div className={barClass} style={barStyle} />
               </div>
             </div>
           )
@@ -81,12 +107,12 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
       {!done && !isError && (
         <div className="flex items-center gap-3 p-3 bg-background-tertiary rounded-xl">
           <RefreshCw size={14} className="text-accent-blue animate-spin shrink-0" />
-          <span className="text-sm text-gray-300">
+          <span className="text-sm text-gray-300 truncate">
             {log.length > 0 ? log[log.length - 1].message : 'Iniciando...'}
           </span>
-          {log[log.length - 1]?.progress !== undefined && (
-            <span className="ml-auto text-xs text-gray-500 mono">
-              {log[log.length - 1].progress}/{log[log.length - 1].total}
+          {latestPricesEvent && currentPhase === 'prices' && (
+            <span className="ml-auto text-xs text-gray-500 mono shrink-0">
+              {latestPricesEvent.progress}/{latestPricesEvent.total}
             </span>
           )}
         </div>
@@ -101,6 +127,33 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
               {log.find(e => e.phase === 'error')?.message ?? 'Error desconocido'}
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Log siempre visible mientras se importa, ocultable tras completar */}
+      {(!done || showLog) && (
+        <div
+          ref={logRef}
+          className="bg-black/50 rounded-lg p-4 font-mono text-xs space-y-1 max-h-48 overflow-y-auto"
+        >
+          {log.length === 0 && (
+            <span className="text-gray-600">Esperando inicio...</span>
+          )}
+          {log.map((event, i) => (
+            <div key={i} className={
+              event.phase === 'error' ? 'text-accent-red' :
+              event.phase === 'done'  ? 'text-accent-green' :
+              event.phase === 'fifo'  ? 'text-accent-blue' :
+              event.phase === 'prices' ? 'text-gray-400' :
+              'text-gray-300'
+            }>
+              {event.progress !== undefined && event.total !== undefined
+                ? `[${event.progress}/${event.total}] ${event.message}`
+                : event.message
+              }
+            </div>
+          ))}
+          {!done && <div className="text-accent-blue animate-pulse">▍</div>}
         </div>
       )}
 
@@ -167,25 +220,6 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
               <ArrowRight size={14} />
             </button>
           </div>
-        </div>
-      )}
-
-      {(showLog || (!done && log.length > 3)) && (
-        <div className="bg-black/50 rounded-lg p-4 font-mono text-xs space-y-1 max-h-48 overflow-y-auto">
-          {log.map((event, i) => (
-            <div key={i} className={
-              event.phase === 'error' ? 'text-accent-red' :
-              event.phase === 'done'  ? 'text-accent-green' :
-              event.phase === 'fifo'  ? 'text-accent-blue' :
-              'text-gray-500'
-            }>
-              {event.progress !== undefined && event.total !== undefined
-                ? `[${event.progress}/${event.total}] ${event.message}`
-                : event.message
-              }
-            </div>
-          ))}
-          {!done && <div className="text-accent-blue animate-pulse">▍</div>}
         </div>
       )}
     </div>

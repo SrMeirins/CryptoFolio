@@ -119,6 +119,11 @@ export async function getHistoricalPriceEur(
     return 0;
   }
 
+  // Si ya sabemos que CoinGecko no tiene datos de este símbolo, no reintentar
+  if (noPriceSymbols.has(symbol)) {
+    return 0;
+  }
+
   // 4. Llamar a CoinGecko con rate limiting
   const price = await queue.enqueue(async () => {
     // Formato fecha CoinGecko: DD-MM-YYYY
@@ -131,13 +136,16 @@ export async function getHistoricalPriceEur(
 
     const price = data?.market_data?.current_price?.eur;
     if (!price) {
-      console.warn(`[PRICES] Sin precio EUR para ${symbol} @ ${dateStr}, fallback 0`);
+      console.warn(`[PRICES] Sin precio EUR para ${symbol} @ ${dateStr} — marcando como sin datos`);
+      noPriceSymbols.add(symbol);
       return 0;
     }
     return price;
   });
 
-  // 5. Guardar en caché
+  if (!price) return 0;
+
+  // 5. Guardar en caché solo si tenemos precio real
   await db.query(
     `INSERT INTO price_cache (asset, price_eur, price_date, source)
      VALUES ($1, $2, $3, 'coingecko')
@@ -223,6 +231,10 @@ export async function prefetchHistoricalPrices(
 // ── Auto-detección de coingecko_id ────────────────────────────────────────
 // Activos cuya búsqueda ya falló — evita reintentos infinitos en la misma sesión
 const failedSearches = new Set<string>();
+
+// Activos para los que CoinGecko no tiene precio histórico en ninguna fecha.
+// Si falla una vez, saltamos todas las fechas restantes de esa sesión.
+const noPriceSymbols = new Set<string>();
 
 export async function searchAndSaveCoinGeckoId(symbol: string): Promise<string | null> {
   if (failedSearches.has(symbol)) return null;

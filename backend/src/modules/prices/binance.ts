@@ -5,6 +5,15 @@ import { getHistoricalPriceEur as getCoinGeckoHistoricalPrice, searchAndSaveCoin
 
 const REST_BASE = 'https://api.binance.com/api/v3';
 
+// Tokens cuyo precio es equivalente al de otro activo (1:1 o redemption peg).
+// Se resuelven antes de tocar caché o APIs externas.
+const PRICE_ALIASES: Record<string, string> = {
+  'BETH':  'ETH',   // Binance staked ETH (1:1 ETH, retirado en 2023)
+  'WETH':  'ETH',   // Wrapped ETH
+  'WBTC':  'BTC',   // Wrapped BTC
+  'BTCB':  'BTC',   // Binance-pegged BTC
+};
+
 const liveCache = new Map<string, number>();
 let eurUsdtRate = 1.0;
 
@@ -120,6 +129,11 @@ async function fetchKlinePrice(pair: string, date: Date, retries = 3): Promise<n
 export async function getHistoricalPriceEur(symbol: string, date: Date): Promise<number> {
   if (symbol === 'EUR') return 1;
 
+  // Alias 1:1 — resolver antes de cualquier caché o llamada externa
+  if (PRICE_ALIASES[symbol]) {
+    return getHistoricalPriceEur(PRICE_ALIASES[symbol], date);
+  }
+
   const dateStr = date.toISOString().slice(0, 10);
 
   // 1. Caché DB
@@ -191,6 +205,7 @@ export async function getHistoricalPriceEur(symbol: string, date: Date): Promise
 
   if (!priceEur) {
     console.warn(`[PRICES] Sin precio para ${symbol} @ ${dateStr} en Binance ni CoinGecko`);
+    return 0;
   }
 
   await cachePrice(symbol, priceEur, dateStr);

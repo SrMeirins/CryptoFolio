@@ -9,6 +9,23 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-06-15
+
+### Corregido
+
+#### Importación
+
+- **BETH sin precio** — BETH (Binance staked ETH, retirado en 2023) ahora resuelve su precio usando ETH directamente (ratio 1:1), evitando llamadas fallidas a Binance y CoinGecko que bloqueaban el import durante minutos por rate-limit
+- Añadidos aliases de precio para tokens 1:1: `BETH→ETH`, `WETH→ETH`, `WBTC→BTC`, `BTCB→BTC`
+- **Rate limit 429 de CoinGecko** — si CoinGecko no devuelve datos históricos para un símbolo, las fechas restantes de ese símbolo se saltan en la misma sesión, evitando la cascada de llamadas que agotaban el límite de peticiones
+- **Caché de precio cero** — los precios no encontrados ya no se persisten como `0` en la base de datos; cada importación futura reintentará la consulta correctamente
+
+#### UI de importación
+
+- **Consola siempre visible** — el log de progreso se muestra en tiempo real durante toda la importación, no solo al finalizar
+- **Auto-scroll del log** — la consola se desplaza automáticamente al último mensaje recibido
+- **Barra de progreso real en fase de precios** — la barra de "Precios hist." muestra el porcentaje real (`N/total`) en lugar de un indicador estático al 50%
+
 ## [0.0.1] - 2026-06-14
 
 > **Alpha** — versión funcional en pruebas. No recomendada para uso en producción sin supervisión.
@@ -16,6 +33,7 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Añadido
 
 #### Aplicación de escritorio (Electron)
+
 - App nativa para **Windows** (NSIS installer), **macOS** (DMG universal) y **Linux** (deb)
 - PostgreSQL embebido: la base de datos se gestiona automáticamente, sin configuración
 - Backend Express arranca en segundo plano escuchando solo en `127.0.0.1` (no expuesto a la red)
@@ -24,6 +42,7 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CI/CD con GitHub Actions: build matrix en Ubuntu, macOS y Windows en cada tag `vX.Y.Z`
 
 #### Importación de operaciones Binance
+
 - Soporte completo para **19 tipos de operación** de Binance CSV (Spot, Funding, Earn, Strategy)
 - `BUY / SELL` — operaciones de compra/venta spot y swaps cripto↔cripto
 - `STAKING_REWARD` — recompensas de staking (ETH Staking, Simple Earn Locked Rewards)
@@ -39,12 +58,14 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Cuenta **Strategy** (grid trading bots): soportada con todos sus tipos de operación
 
 #### Portfolio y fiscalidad
+
 - Cálculo FIFO conforme a la normativa española (IRPF)
 - Exportación de informe fiscal PDF para la declaración de la renta
 - Valoración de activos con precios históricos de CoinGecko
 - Historial de operaciones con coste en activo origen para swaps cripto↔cripto
 
 #### Seguridad
+
 - Validación de magic bytes en subida de ficheros CSV (bloquea EXE/ELF/PDF/ZIP/JPEG/PNG)
 - Validación de esquema en parámetros JSON para prevenir prototype pollution
 - `parseYear()` con rango 2009–2100 en rutas fiscales
@@ -60,5 +81,6 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Antes de hacer un nuevo tag, añade una sección `## [X.Y.Z] - YYYY-MM-DD` encima de la anterior
 con los cambios agrupados en: **Añadido**, **Cambiado**, **Corregido**, **Eliminado**, **Seguridad**.
 
-[Unreleased]: https://github.com/SrMeirins/CryptoFolio/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/SrMeirins/CryptoFolio/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/SrMeirins/CryptoFolio/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/SrMeirins/CryptoFolio/releases/tag/v0.0.1
