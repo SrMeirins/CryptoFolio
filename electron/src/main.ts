@@ -268,11 +268,13 @@ async function createWindow(): Promise<void> {
 async function startup(): Promise<void> {
   console.log('[app] Iniciando CryptoFolio...');
 
+  setSplashStatus('Iniciando base de datos...');
   console.log('[app] Arrancando PostgreSQL...');
   postgresManager = new PostgresManager();
   await postgresManager.start();
   console.log('[app] PostgreSQL listo.');
 
+  setSplashStatus('Iniciando servidor...');
   console.log('[app] Arrancando backend...');
   backendManager = new BackendManager({
     databaseUrl: postgresManager.connectionString,
@@ -289,6 +291,7 @@ async function startup(): Promise<void> {
   });
   await backendManager.start();
   console.log('[app] Backend listo.');
+  setSplashStatus('');
 }
 
 let shuttingDown = false;

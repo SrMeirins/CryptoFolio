@@ -60,25 +60,49 @@ export class BackendManager {
       if (this.recentStderr.length > 30) this.recentStderr.shift();
     });
 
+    // Detectar si el proceso muere antes de estar listo
+    let exitedBeforeReady = false;
+    let exitCode: number | null = null;
+
     this.process.on('exit', (code) => {
+      if (!this.running) {
+        // El proceso murió antes de confirmar que estaba listo
+        exitedBeforeReady = true;
+        exitCode = code ?? 1;
+        return;
+      }
       if (code === 0 || code === null) return;
       console.error(`[backend] Proceso terminó con código ${code}`);
-      if (this.running) {
-        this.running = false;
-        this.onCrash?.(this.buildCrashDetail(code));
-      }
+      this.running = false;
+      this.onCrash?.(this.buildCrashDetail(code));
     });
 
     // Esperar a que el backend esté listo (health check)
-    await this.waitUntilReady();
+    await this.waitUntilReady(
+      () => exitedBeforeReady,
+      () => exitCode,
+    );
     this.running = true;
   }
 
-  private async waitUntilReady(maxWaitMs = 15_000): Promise<void> {
+  private async waitUntilReady(
+    hasExited: () => boolean,
+    getExitCode: () => number | null,
+    maxWaitMs = 30_000,
+  ): Promise<void> {
     const url = `http://127.0.0.1:${this.port}/health`;
     const deadline = Date.now() + maxWaitMs;
 
     while (Date.now() < deadline) {
+      // Si el proceso ya murió, reportar inmediatamente con los logs de error
+      if (hasExited()) {
+        const stderr = this.recentStderr.join('').trim();
+        const code = getExitCode();
+        throw new Error(
+          `El backend terminó inesperadamente (código ${code}).\n\n` +
+          (stderr ? `Error:\n${stderr}` : 'Sin detalles adicionales en los logs.')
+        );
+      }
       try {
         const res = await fetch(url);
         if (res.ok) return;
@@ -88,7 +112,11 @@ export class BackendManager {
       await new Promise(r => setTimeout(r, 300));
     }
 
-    throw new Error(`El backend no respondió en ${maxWaitMs / 1000}s. Comprueba los logs.`);
+    const stderr = this.recentStderr.slice(-5).join('').trim();
+    throw new Error(
+      `El backend no respondió en ${maxWaitMs / 1000}s.\n\n` +
+      (stderr ? `Últimos logs:\n${stderr}` : 'Sin salida en stderr.')
+    );
   }
 
   private buildCrashDetail(code: number): string {

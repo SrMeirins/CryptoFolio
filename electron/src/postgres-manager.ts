@@ -114,6 +114,31 @@ export class PostgresManager {
     }
   }
 
+  // Verifica que postgres acepta conexiones reales antes de continuar.
+  // pg.start() devuelve cuando el proceso arranca, pero si hay crash recovery
+  // postgres puede tardar varios segundos más en aceptar conexiones nuevas.
+  async waitUntilReady(maxWaitMs = 30_000): Promise<void> {
+    const deadline = Date.now() + maxWaitMs;
+    while (Date.now() < deadline) {
+      const client = new Client({
+        host: '127.0.0.1',
+        port: this.config.port,
+        user: this.user,
+        password: this.config.password,
+        database: this.database,
+        connectionTimeoutMillis: 2000,
+      });
+      try {
+        await client.connect();
+        await client.end();
+        return;
+      } catch {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+    throw new Error('PostgreSQL no aceptó conexiones en 30s tras el arranque');
+  }
+
   async start(): Promise<void> {
     this.config = this.loadOrCreateConfig();
 
@@ -157,6 +182,7 @@ export class PostgresManager {
     await this.killStalePostgresProcesses();
 
     await this.startWithRecovery(pgStderr);
+    await this.waitUntilReady();
 
     // Verificar codificación — re-inicializar si no es UTF-8
     const encoding = await this.getClusterEncoding();
