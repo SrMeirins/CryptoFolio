@@ -32,6 +32,7 @@ export const SPOT_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Binance Convert',                                            internalType: 'BUY',              status: 'supported',  notes: 'Swap EUR→cripto o cripto→cripto' },
   { csvLabel: 'Small Assets Exchange BNB',                                  internalType: 'BUY',              status: 'supported',  notes: 'Conversión de dust a BNB' },
   { csvLabel: 'Transfer Between Main and Funding Wallet',                   internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Movimiento Spot↔Funding — mueve lotes entre sub-cuentas' },
+  { csvLabel: 'Transfer Between Spot and Funding',                          internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Alias nuevo Binance para Transfer Between Main and Funding Wallet' },
   { csvLabel: 'Transfer Between Main Account/Futures and Margin Account',   internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Movimiento Spot↔Margin — mueve lotes entre sub-cuentas' },
   // Retiro de fiat al banco (no hay lote FIFO que mover, solo tracking contable)
   { csvLabel: 'Fiat Withdraw',                                              internalType: 'WITHDRAW_FIAT',     status: 'supported' },
@@ -43,14 +44,19 @@ export const SPOT_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Strategy Trading Fee Rebate',             internalType: 'CASHBACK',          status: 'supported', notes: 'BNB negativo → FEE_EXCHANGE; positivos → CASHBACK (rebate de fee)' },
   // Transferencia entre Spot y la sub-cuenta de Strategy Trading (grid bots, etc.)
   { csvLabel: 'Transfer Between Spot and Strategy Account', internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Movimiento Spot↔Strategy — mueve lotes entre sub-cuentas' },
+  { csvLabel: 'Transfer Between Spot and Strategy',         internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Alias nuevo Binance para Transfer Between Spot and Strategy Account' },
   // Compra vía depósito directo (patrón antiguo Binance, pre-OCBS/2022)
   // El "Deposit EUR" al mismo timestamp se ignora automáticamente (buildFundingDepositKeys en parser.ts)
   { csvLabel: 'Transaction Related',                                         internalType: 'BUY',               status: 'supported', notes: 'Compra EUR→cripto con depósito inmediato — patrón pre-OCBS' },
   // Asientos contables internos del sistema OCBS (ignorados, la compra ya se registra en la op. principal)
   { csvLabel: 'Fiat OCBS - Add Fiat and Fees',                              internalType: 'IGNORED',           status: 'ignored',   notes: 'Asiento contable OCBS, redundante con Buy Crypto With Card' },
   { csvLabel: 'Deposit Fiat OCBS',                                          internalType: 'IGNORED',           status: 'ignored',   notes: 'Asiento contable OCBS, redundante con Convert Fiat to Crypto OCBS' },
+  // Cashback y comisiones de referido — pueden aparecer en Spot o Funding según el export
+  { csvLabel: 'Commission History',                                         internalType: 'CASHBACK',          status: 'supported', notes: 'Comisión de referido — aparece en Spot en algunos exports' },
+  { csvLabel: 'Cashback Voucher',                                           internalType: 'CASHBACK',          status: 'supported', notes: 'Voucher de cashback — aparece en Spot en algunos exports' },
   // Airdrops y distribuciones
   { csvLabel: 'Distribution',                                               internalType: 'AIRDROP',           status: 'supported', notes: 'Airdrop/distribución de tokens' },
+  { csvLabel: 'Token Swap - Distribution',                                  internalType: 'AIRDROP',           status: 'supported', notes: 'Token Swap — aparece en Spot en algunos exports' },
   { csvLabel: 'Launchpool Airdrop - User Claim Distribution',               internalType: 'AIRDROP',           status: 'supported', notes: 'Distribución Launchpool reclamada por el usuario' },
   { csvLabel: 'Launchpool Airdrop - System Distribution',                   internalType: 'AIRDROP',           status: 'supported', notes: 'Distribución Launchpool asignada automáticamente por Binance' },
   // Fee standalone pagada en BNB
@@ -59,8 +65,9 @@ export const SPOT_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Staking Purchase',   internalType: 'STAKING_LOCK',   status: 'supported', notes: 'Bloqueo para staking desde Spot' },
   { csvLabel: 'Staking Redemption', internalType: 'STAKING_UNLOCK', status: 'supported', notes: 'Desbloqueo de staking desde Spot' },
   // Launchpool desde Spot
-  { csvLabel: 'Launchpool Subscription', internalType: 'LAUNCHPOOL_LOCK',   status: 'supported', notes: 'Bloqueo de activo en Launchpool desde Spot' },
-  { csvLabel: 'Launchpool Redemption',   internalType: 'LAUNCHPOOL_UNLOCK', status: 'supported', notes: 'Desbloqueo de Launchpool desde Spot' },
+  { csvLabel: 'Launchpool Subscription',            internalType: 'LAUNCHPOOL_LOCK',   status: 'supported', notes: 'Bloqueo de activo en Launchpool desde Spot' },
+  { csvLabel: 'Launchpool Redemption',              internalType: 'LAUNCHPOOL_UNLOCK', status: 'supported', notes: 'Desbloqueo de Launchpool desde Spot' },
+  { csvLabel: 'Launchpool Subscription/Redemption', internalType: 'LAUNCHPOOL_LOCK',   status: 'supported', notes: 'Label combinada nueva Binance — negativo=lock, positivo=unlock (parser resuelve por signo)' },
   // Staking y rendimientos — aparecen en cuenta Spot en los exports de Binance.
   // El parser los reconoce y les asigna precio histórico al importar.
   // Clasificación LIRPF pendiente de refinamiento (ver docs/binance-operations-pendientes.md).
@@ -86,8 +93,10 @@ export const FUNDING_OPERATIONS: BinanceOperation[] = [
   // Registrados para evitar "operación desconocida". Tratamiento fiscal pendiente de estudio.
   { csvLabel: 'Staking Purchase',    internalType: 'STAKING_LOCK',      status: 'supported', notes: 'Bloqueo para staking — mueve lotes Funding → Binance Staking' },
   { csvLabel: 'Staking Redemption',    internalType: 'STAKING_UNLOCK',    status: 'supported', notes: 'Desbloqueo de staking — enlazado al STAKING_LOCK correspondiente via linked_tx_id' },
-  { csvLabel: 'Launchpool Subscription', internalType: 'LAUNCHPOOL_LOCK',   status: 'supported', notes: 'Bloqueo de activo en Launchpool (BNB, FDUSD...) — no-op FIFO' },
-  { csvLabel: 'Launchpool Redemption',   internalType: 'LAUNCHPOOL_UNLOCK', status: 'supported', notes: 'Desbloqueo al salir del Launchpool — enlazado al LAUNCHPOOL_LOCK via linked_tx_id' },
+  { csvLabel: 'Launchpool Subscription',            internalType: 'LAUNCHPOOL_LOCK',   status: 'supported', notes: 'Bloqueo de activo en Launchpool (BNB, FDUSD...) — no-op FIFO' },
+  { csvLabel: 'Launchpool Redemption',              internalType: 'LAUNCHPOOL_UNLOCK', status: 'supported', notes: 'Desbloqueo al salir del Launchpool — enlazado al LAUNCHPOOL_LOCK via linked_tx_id' },
+  { csvLabel: 'Launchpool Subscription/Redemption', internalType: 'LAUNCHPOOL_LOCK',   status: 'supported', notes: 'Label combinada nueva Binance — negativo=lock, positivo=unlock (parser resuelve por signo)' },
+  { csvLabel: 'Transfer Between Spot and Funding',  internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Alias nuevo Binance para Transfer Between Main and Funding Wallet' },
   { csvLabel: 'ETH 2.0 Staking',            internalType: 'BUY', status: 'supported', notes: 'Swap ETH→BETH (1:1) — se consume lote ETH y abre lote BETH al precio de mercado' },
   { csvLabel: 'ETH 2.0 Staking Withdrawals', internalType: 'BUY', status: 'supported', notes: 'Swap BETH→ETH (1:1) — se consumen lotes BETH y abre lote ETH al precio de mercado' },
   // Airdrops / cashback
@@ -146,6 +155,7 @@ export const STRATEGY_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Transaction Sold',                         internalType: 'SELL',              status: 'supported', notes: 'Venta ejecutada por el bot de strategy trading' },
   { csvLabel: 'Transaction Revenue',                      internalType: 'SELL',              status: 'supported', notes: 'Ingreso de la venta del bot' },
   { csvLabel: 'Transfer Between Spot and Strategy Account', internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Capital entrante/saliente de la sub-cuenta Strategy' },
+  { csvLabel: 'Transfer Between Spot and Strategy',         internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Alias nuevo Binance para Transfer Between Spot and Strategy Account' },
 ];
 
 // ── Mapeo cuenta CSV → nombre de wallet en la DB ──────────────────────────
@@ -174,6 +184,14 @@ export const TRANSFER_DESTINATIONS: Record<string, Record<string, string>> = {
   'Transfer Between Spot and Strategy Account': {
     'Spot':     'Binance Strategy',
     'Strategy': 'Binance Spot',
+  },
+  'Transfer Between Spot and Strategy': {
+    'Spot':     'Binance Strategy',
+    'Strategy': 'Binance Spot',
+  },
+  'Transfer Between Spot and Funding': {
+    'Spot':    'Binance Funding',
+    'Funding': 'Binance Spot',
   },
 };
 

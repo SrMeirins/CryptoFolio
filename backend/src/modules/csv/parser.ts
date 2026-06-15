@@ -17,8 +17,10 @@ const IGNORED_OPERATIONS = ALL_IGNORED_OPERATIONS;
 // o IGNORED (positivo — el FIFO crea el lote destino automáticamente)
 const INTERNAL_TRANSFER_OPS = new Set([
   'Transfer Between Main and Funding Wallet',
+  'Transfer Between Spot and Funding',
   'Transfer Between Main Account/Futures and Margin Account',
   'Transfer Between Spot and Strategy Account',
+  'Transfer Between Spot and Strategy',
 ]);
 
 // Fiat real — depósitos/retiros de estas monedas no tienen lote FIFO
@@ -638,7 +640,10 @@ function interpretGroup(
 
   // Bloqueo de activo en Launchpool (cualquier activo — BNB, FDUSD, etc.)
   // Fila única negativa. Los lotes permanecen en el wallet (no-op FIFO).
-  if (firstOp === 'Launchpool Subscription') {
+  // "Launchpool Subscription/Redemption" es la nueva label combinada de Binance (2025+):
+  // negativo = suscripción (lock), positivo = redención (unlock) — se resuelve por signo.
+  if (firstOp === 'Launchpool Subscription' ||
+      (firstOp === 'Launchpool Subscription/Redemption' && group.some(r => r.change < 0))) {
     const outRow = group.find((r) => r.change < 0);
     if (!outRow) return [];
     return [{
@@ -656,7 +661,8 @@ function interpretGroup(
 
   // Desbloqueo de activo al salir del Launchpool.
   // Fila única positiva. El importer enlaza con el LAUNCHPOOL_LOCK correspondiente.
-  if (firstOp === 'Launchpool Redemption') {
+  if (firstOp === 'Launchpool Redemption' ||
+      (firstOp === 'Launchpool Subscription/Redemption' && group.some(r => r.change > 0))) {
     const inRow = group.find((r) => r.change > 0);
     if (!inRow) return [];
     return [{
