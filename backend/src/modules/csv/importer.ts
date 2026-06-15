@@ -82,7 +82,8 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
         const timeRaw = sample['Time'] || sample['Tiempo'] || '';
         let timestamp = new Date().toISOString();
         try {
-          timestamp = new Date('20' + timeRaw.replace(' ', 'T') + 'Z').toISOString();
+          const normalizedTime = /^\d{4}-/.test(timeRaw) ? timeRaw : '20' + timeRaw;
+          timestamp = new Date(normalizedTime.replace(' ', 'T') + 'Z').toISOString();
         } catch { /* usar now */ }
 
         unknownOperationSamples[unknownOp] = {

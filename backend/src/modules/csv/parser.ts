@@ -59,7 +59,9 @@ const INCOME_OPS: Record<string, 'STAKING_REWARD' | 'LENDING_INTEREST' | 'LENDIN
 };
 
 function parseDate(raw: string): Date {
-  const normalized = '20' + raw.trim();
+  const trimmed = raw.trim();
+  // Binance exporta con año de 4 dígitos (2021-02-19). Versiones antiguas usaban 2 (21-02-19).
+  const normalized = /^\d{4}-/.test(trimmed) ? trimmed : '20' + trimmed;
   const d = new Date(normalized.replace(' ', 'T') + 'Z');
   if (isNaN(d.getTime())) throw new Error(`Fecha inválida: ${raw}`);
   return d;

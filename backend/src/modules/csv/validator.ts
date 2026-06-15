@@ -119,7 +119,8 @@ export function validateCsvStructure(fileBuffer: Buffer): ValidationResult {
 
     if (timeStr) {
       try {
-        const d = new Date('20' + timeStr.replace(' ', 'T') + 'Z');
+        const normalized = /^\d{4}-/.test(timeStr) ? timeStr : '20' + timeStr;
+        const d = new Date(normalized.replace(' ', 'T') + 'Z');
         if (!isNaN(d.getTime())) dates.push(d);
       } catch { /* ignorar */ }
     }
