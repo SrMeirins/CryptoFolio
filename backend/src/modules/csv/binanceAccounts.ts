@@ -102,10 +102,10 @@ export const ALL_BINANCE_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Cross Margin Liquidation - Small Assets Takeover',        internalType: 'SELL',         status: 'supported', notes: 'Venta forzosa de colateral' },
 
   // Ignoradas (asientos contables internos sin impacto fiscal)
-  { csvLabel: 'Simple Earn Flexible Subscription',    internalType: 'IGNORED', status: 'ignored' },
-  { csvLabel: 'Simple Earn Flexible Redemption',      internalType: 'IGNORED', status: 'ignored' },
-  { csvLabel: 'Simple Earn Locked Subscription',      internalType: 'IGNORED', status: 'ignored' },
-  { csvLabel: 'Simple Earn Locked Redemption',        internalType: 'IGNORED', status: 'ignored' },
+  { csvLabel: 'Simple Earn Flexible Subscription',    internalType: 'STAKING_LOCK',   status: 'supported', notes: 'Bloqueo en Simple Earn Flexible — movimiento Spot→Earn sin evento fiscal' },
+  { csvLabel: 'Simple Earn Flexible Redemption',      internalType: 'STAKING_UNLOCK', status: 'supported', notes: 'Desbloqueo de Simple Earn Flexible — movimiento Earn→Spot sin evento fiscal' },
+  { csvLabel: 'Simple Earn Locked Subscription',      internalType: 'STAKING_LOCK',   status: 'supported', notes: 'Bloqueo en Simple Earn Locked — equivalente a Staking Purchase' },
+  { csvLabel: 'Simple Earn Locked Redemption',        internalType: 'STAKING_UNLOCK', status: 'supported', notes: 'Desbloqueo de Simple Earn Locked — equivalente a Staking Redemption' },
   { csvLabel: 'Token Swap - Redenomination/Rebranding', internalType: 'IGNORED', status: 'ignored' },
   { csvLabel: 'Dual Investment - Subscribe',          internalType: 'IGNORED', status: 'ignored' },
   { csvLabel: 'Dual Investment - Settlement',         internalType: 'IGNORED', status: 'ignored' },

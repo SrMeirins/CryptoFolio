@@ -126,22 +126,41 @@ async function fetchKlinePrice(pair: string, date: Date, retries = 3): Promise<n
   throw new Error(`fetchKlinePrice agotó reintentos para ${pair}`);
 }
 
+// In-flight dedup: evita N queries concurrentes para el mismo (symbol, date).
+// Cuando hay 10 requests paralelas en imports.ts y 3 necesitan ETH @ 2024-03-15,
+// solo se lanza una consulta real; las otras esperan su resultado.
+const inFlightPrices = new Map<string, Promise<number>>();
+
 export async function getHistoricalPriceEur(symbol: string, date: Date): Promise<number> {
   if (symbol === 'EUR') return 1;
 
-  // Alias 1:1 — resolver antes de cualquier caché o llamada externa
   if (PRICE_ALIASES[symbol]) {
     return getHistoricalPriceEur(PRICE_ALIASES[symbol], date);
   }
 
+  const key = `${symbol}|${date.toISOString().slice(0, 10)}`;
+  const existing = inFlightPrices.get(key);
+  if (existing) return existing;
+
+  const promise = _getHistoricalPriceEur(symbol, date).finally(() => {
+    inFlightPrices.delete(key);
+  });
+  inFlightPrices.set(key, promise);
+  return promise;
+}
+
+async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<number> {
   const dateStr = date.toISOString().slice(0, 10);
 
-  // 1. Caché DB
+  // 1. Caché DB (incluye sentinela -1 de CoinGecko "sin datos")
   const cached = await db.query(
     'SELECT price_eur FROM price_cache WHERE asset = $1 AND price_date = $2',
     [symbol, dateStr]
   );
-  if (cached.rows.length > 0) return parseFloat(cached.rows[0].price_eur);
+  if (cached.rows.length > 0) {
+    const price = parseFloat(cached.rows[0].price_eur);
+    return price < 0 ? 0 : price;
+  }
 
   // 2. Obtener info del par (DB o auto-detectar)
   const info = await getOrDetectPairInfo(symbol);

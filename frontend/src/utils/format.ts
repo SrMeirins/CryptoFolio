@@ -51,7 +51,7 @@ export function formatPrice(value: number): string {
 export function formatAmount(value: number): string {
   if (value >= 1000) return value.toLocaleString('es-ES', { maximumFractionDigits: 2 })
   if (value >= 1) return value.toLocaleString('es-ES', { maximumFractionDigits: 4 })
-  return value.toLocaleString('es-ES', { maximumFractionDigits: 6 })
+  return value.toLocaleString('es-ES', { maximumFractionDigits: 8 })
 }
 
 export function pnlColor(value: number): string {

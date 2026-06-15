@@ -111,7 +111,7 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
             {log.length > 0 ? log[log.length - 1].message : 'Iniciando...'}
           </span>
           {latestPricesEvent && currentPhase === 'prices' && (
-            <span className="ml-auto text-xs text-gray-500 mono shrink-0">
+            <span className="ml-auto text-xs text-gray-500 font-mono shrink-0">
               {latestPricesEvent.progress}/{latestPricesEvent.total}
             </span>
           )}
@@ -139,20 +139,26 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
           {log.length === 0 && (
             <span className="text-gray-600">Esperando inicio...</span>
           )}
-          {log.map((event, i) => (
-            <div key={i} className={
-              event.phase === 'error' ? 'text-accent-red' :
-              event.phase === 'done'  ? 'text-accent-green' :
-              event.phase === 'fifo'  ? 'text-accent-blue' :
-              event.phase === 'prices' ? 'text-gray-400' :
+          {log.map((event, i) => {
+            const isNoPrice = event.phase === 'prices' && event.message.startsWith('—')
+            const isOkPrice = event.phase === 'prices' && event.message.startsWith('✓')
+            const color =
+              event.phase === 'error'   ? 'text-accent-red'   :
+              event.phase === 'done'    ? 'text-accent-green' :
+              event.phase === 'fifo'    ? 'text-accent-blue'  :
+              isNoPrice                 ? 'text-yellow-600'   :
+              isOkPrice                 ? 'text-gray-500'     :
+              event.phase === 'prices'  ? 'text-gray-400'     :
               'text-gray-300'
-            }>
-              {event.progress !== undefined && event.total !== undefined
-                ? `[${event.progress}/${event.total}] ${event.message}`
-                : event.message
-              }
-            </div>
-          ))}
+            return (
+              <div key={i} className={color}>
+                {event.progress !== undefined && event.total !== undefined
+                  ? `[${event.progress}/${event.total}] ${event.message}`
+                  : event.message
+                }
+              </div>
+            )
+          })}
           {!done && <div className="text-accent-blue animate-pulse">▍</div>}
         </div>
       )}

@@ -92,39 +92,71 @@ async function fetchWithRetry(url: string, retries = 3): Promise<unknown> {
   throw new Error(`fetchWithRetry agotó reintentos para ${url}`);
 }
 
+// ── Deduplicación de requests in-flight ──────────────────────────────────
+// Evita que N llamadas concurrentes para el mismo par (symbol, date) generen
+// N requests a CoinGecko. Todas comparten la misma Promise.
+const inFlightPrices = new Map<string, Promise<number>>();
+
+// Cache en memoria de pares sin precio (symbol|date).
+// Más granular que el antiguo noPriceSymbols (solo por símbolo):
+// si ETHFI no tiene precio el 15-Mar-24 pero sí el 1-Apr-24, este cache lo maneja correctamente.
+const noPricePairs = new Set<string>();
+
 // ── Precio histórico por fecha ─────────────────────────────────────────────
 export async function getHistoricalPriceEur(
   symbol: string,
   date: Date
 ): Promise<number> {
-  const dateStr = toDateStr(date); // YYYY-MM-DD
+  const dateStr = toDateStr(date);
+  const key = `${symbol}|${dateStr}`;
 
-  // 1. Buscar en caché DB
+  // Deduplicar: si ya hay una Promise en vuelo para este par, devolverla directamente.
+  // Esto evita que 10 requests concurrentes para ETHFI @ 2024-03-15 generen 10 queries a CoinGecko.
+  const existing = inFlightPrices.get(key);
+  if (existing) return existing;
+
+  const promise = _getHistoricalPriceEur(symbol, date, dateStr, key).finally(() => {
+    inFlightPrices.delete(key);
+  });
+  inFlightPrices.set(key, promise);
+  return promise;
+}
+
+async function _getHistoricalPriceEur(
+  symbol: string,
+  date: Date,
+  dateStr: string,
+  key: string
+): Promise<number> {
+  // Cache en memoria: par ya conocido sin precio en esta sesión
+  if (noPricePairs.has(key)) return 0;
+
+  // 1. Buscar en caché DB (incluye sentinel -1 = sin precio disponible)
   const cached = await db.query(
     'SELECT price_eur FROM price_cache WHERE asset = $1 AND price_date = $2',
     [symbol, dateStr]
   );
   if (cached.rows.length > 0) {
-    return parseFloat(cached.rows[0].price_eur);
+    const price = parseFloat(cached.rows[0].price_eur);
+    if (price < 0) {
+      noPricePairs.add(key); // también en memoria para evitar la query DB
+      return 0;
+    }
+    return price;
   }
 
-  // 2. Stablecoins: USDC/USDT ≈ precio real, no asumimos 1
-  // EUR es fiat, siempre = 1
+  // 2. EUR siempre = 1
   if (symbol === 'EUR') return 1;
 
   // 3. Buscar coingecko_id
   const geckoId = coinGeckoIds.get(symbol);
   if (!geckoId) {
     console.warn(`[PRICES] Sin coingecko_id para ${symbol}, usando fallback 0`);
+    noPricePairs.add(key);
     return 0;
   }
 
-  // Si ya sabemos que CoinGecko no tiene datos de este símbolo, no reintentar
-  if (noPriceSymbols.has(symbol)) {
-    return 0;
-  }
-
-  // 4. Llamar a CoinGecko con rate limiting
+  // 4. Llamar a CoinGecko con rate limiting (cola serial)
   const price = await queue.enqueue(async () => {
     // Formato fecha CoinGecko: DD-MM-YYYY
     const geckoDate = formatGeckoDate(date);
@@ -134,13 +166,20 @@ export async function getHistoricalPriceEur(
       market_data?: { current_price?: { eur?: number } }
     };
 
-    const price = data?.market_data?.current_price?.eur;
-    if (!price) {
-      console.warn(`[PRICES] Sin precio EUR para ${symbol} @ ${dateStr} — marcando como sin datos`);
-      noPriceSymbols.add(symbol);
+    const p = data?.market_data?.current_price?.eur;
+    if (!p) {
+      console.warn(`[PRICES] Sin precio EUR para ${symbol} @ ${dateStr}`);
+      noPricePairs.add(key);
+      // Persistir sentinela en DB: evita re-consultar en próximas sesiones
+      await db.query(
+        `INSERT INTO price_cache (asset, price_eur, price_date, source)
+         VALUES ($1, -1, $2, 'no_data')
+         ON CONFLICT (asset, price_date) DO NOTHING`,
+        [symbol, dateStr]
+      );
       return 0;
     }
-    return price;
+    return p;
   });
 
   if (!price) return 0;
@@ -179,7 +218,6 @@ export async function getCurrentPricesEur(symbols: string[]): Promise<Map<string
       const price = data[geckoId]?.eur;
       if (price) {
         result.set(symbol, price);
-        // Cachear precio actual (sin price_date = precio live)
         await db.query(
           `INSERT INTO price_cache (asset, price_eur, source, fetched_at)
            VALUES ($1, $2, 'coingecko_live', NOW())
@@ -196,11 +234,9 @@ export async function getCurrentPricesEur(symbols: string[]): Promise<Map<string
 }
 
 // ── Precarga batch de precios históricos ──────────────────────────────────
-// Llama a esto ANTES de correr el motor FIFO para cachear todos los precios necesarios
 export async function prefetchHistoricalPrices(
   requiredPrices: Array<{ symbol: string; date: Date }>
 ): Promise<void> {
-  // Deduplicar por symbol+date
   const unique = new Map<string, Date>();
   for (const { symbol, date } of requiredPrices) {
     if (symbol === 'EUR') continue;
@@ -208,7 +244,6 @@ export async function prefetchHistoricalPrices(
     if (!unique.has(key)) unique.set(key, date);
   }
 
-  // Filtrar los que ya están en caché
   const toFetch: Array<{ symbol: string; date: Date }> = [];
   for (const [key, date] of unique) {
     const symbol = key.split('|')[0];
@@ -232,14 +267,25 @@ export async function prefetchHistoricalPrices(
 // Activos cuya búsqueda ya falló — evita reintentos infinitos en la misma sesión
 const failedSearches = new Set<string>();
 
-// Activos para los que CoinGecko no tiene precio histórico en ninguna fecha.
-// Si falla una vez, saltamos todas las fechas restantes de esa sesión.
-const noPriceSymbols = new Set<string>();
+// In-flight dedup para búsquedas de ID: evita N búsquedas paralelas para el mismo símbolo
+const inFlightSearches = new Map<string, Promise<string | null>>();
 
 export async function searchAndSaveCoinGeckoId(symbol: string): Promise<string | null> {
   if (failedSearches.has(symbol)) return null;
   if (coinGeckoIds.has(symbol)) return coinGeckoIds.get(symbol)!;
 
+  // Deduplicar búsquedas concurrentes del mismo símbolo
+  const existing = inFlightSearches.get(symbol);
+  if (existing) return existing;
+
+  const promise = _searchAndSaveCoinGeckoId(symbol).finally(() => {
+    inFlightSearches.delete(symbol);
+  });
+  inFlightSearches.set(symbol, promise);
+  return promise;
+}
+
+async function _searchAndSaveCoinGeckoId(symbol: string): Promise<string | null> {
   const url = `${BASE_URL}/search?query=${encodeURIComponent(symbol)}`;
 
   try {
@@ -249,7 +295,6 @@ export async function searchAndSaveCoinGeckoId(symbol: string): Promise<string |
       };
     });
 
-    // Coincidencia exacta de símbolo (case-insensitive)
     const matches = data.coins.filter(c => c.symbol.toUpperCase() === symbol.toUpperCase());
     if (matches.length === 0) {
       console.warn(`[PRICES] Sin coincidencia en CoinGecko para ${symbol}`);
@@ -257,7 +302,6 @@ export async function searchAndSaveCoinGeckoId(symbol: string): Promise<string |
       return null;
     }
 
-    // El de menor market_cap_rank es el más establecido (null = sin ranking, al final)
     matches.sort((a, b) => {
       if (a.market_cap_rank === null) return 1;
       if (b.market_cap_rank === null) return -1;
@@ -281,16 +325,12 @@ export async function searchAndSaveCoinGeckoId(symbol: string): Promise<string |
 }
 
 // ── Market chart bulk fetch ────────────────────────────────────────────────
-// Descarga todos los precios diarios de un activo para N días en UNA request.
-// CoinGecko devuelve datos diarios hasta 90 días, semanales para >90 días.
-// Almacena cada punto en price_cache para que quede disponible sin re-fetch.
 export async function fetchMarketChart(
   symbol: string,
   days: number
 ): Promise<Map<string, number>> {
   let geckoId = coinGeckoIds.get(symbol);
 
-  // Si no tenemos coingecko_id, intentar auto-detectarlo vía CoinGecko Search
   if (!geckoId) {
     const found = await searchAndSaveCoinGeckoId(symbol);
     if (!found) return new Map();
@@ -299,7 +339,6 @@ export async function fetchMarketChart(
 
   const result = new Map<string, number>();
 
-  // Comprobar cuántas fechas del rango ya están en caché
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
   const startStr = toDateStr(startDate);
@@ -307,7 +346,7 @@ export async function fetchMarketChart(
   const cached = await db.query(
     `SELECT price_date::text AS d, price_eur
      FROM price_cache
-     WHERE asset = $1 AND price_date >= $2
+     WHERE asset = $1 AND price_date >= $2 AND price_eur > 0
      ORDER BY price_date`,
     [symbol, startStr]
   );
@@ -315,14 +354,11 @@ export async function fetchMarketChart(
     result.set(row.d, parseFloat(row.price_eur));
   }
 
-  // Si ya tenemos datos suficientes, no re-fetch (>= 80% de los días esperados)
   const expectedDays = Math.min(days, 365);
   if (result.size >= expectedDays * 0.8) {
     return result;
   }
 
-  // Fetch bulk desde CoinGecko (sin interval=daily — parámetro de plan Pro)
-  // CoinGecko auto-selecciona granularidad: hourly ≤90d, daily >90d
   const data = await queue.enqueue(async () => {
     const url = `${BASE_URL}/coins/${geckoId}/market_chart?vs_currency=eur&days=${days}`;
     return await fetchWithRetry(url) as { prices: [number, number][] };
@@ -331,9 +367,8 @@ export async function fetchMarketChart(
     return null;
   });
 
-  if (!data?.prices) return result; // falló o sin datos — devolvemos lo que había en caché
+  if (!data?.prices) return result;
 
-  // Guardar cada punto en caché
   for (const [ts, price] of data.prices) {
     const date = new Date(ts);
     const dateStr = toDateStr(date);
@@ -351,12 +386,12 @@ export async function fetchMarketChart(
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function toDateStr(date: Date): string {
-  return date.toISOString().slice(0, 10); // YYYY-MM-DD
+  return date.toISOString().slice(0, 10);
 }
 
 function formatGeckoDate(date: Date): string {
   const d = date.getUTCDate().toString().padStart(2, '0');
   const m = (date.getUTCMonth() + 1).toString().padStart(2, '0');
   const y = date.getUTCFullYear();
-  return `${d}-${m}-${y}`; // DD-MM-YYYY
+  return `${d}-${m}-${y}`;
 }

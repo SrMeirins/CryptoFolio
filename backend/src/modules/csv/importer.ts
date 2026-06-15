@@ -339,9 +339,16 @@ export async function importCsvFile(
         const isLaunchpool = tx.operationType === 'LAUNCHPOOL_UNLOCK';
         const lockType  = isLaunchpool ? 'LAUNCHPOOL_LOCK'  : 'STAKING_LOCK';
         const unlockType = tx.operationType;
-        const lockLabel = isLaunchpool
-          ? tx.notes?.replace('Launchpool Redemption', 'Launchpool Subscription') ?? 'Launchpool Subscription'
-          : tx.notes?.replace('Staking Redemption', 'Staking Purchase') ?? 'Staking Purchase';
+        const UNLOCK_TO_LOCK_NOTE: Record<string, string> = {
+          'Staking Redemption':                'Staking Purchase',
+          'Simple Earn Locked Redemption':     'Simple Earn Locked Subscription',
+          'Simple Earn Flexible Redemption':   'Simple Earn Flexible Subscription',
+          'Launchpool Redemption':             'Launchpool Subscription',
+          'Launchpool Subscription/Redemption':'Launchpool Subscription/Redemption',
+        };
+        const lockLabel = tx.notes
+          ? (UNLOCK_TO_LOCK_NOTE[tx.notes] ?? tx.notes)
+          : (isLaunchpool ? 'Launchpool Subscription' : 'Staking Purchase');
         const matchRes = await client.query(
           `SELECT id FROM transactions
            WHERE operation_type = $1

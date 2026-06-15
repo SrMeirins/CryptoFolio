@@ -222,18 +222,24 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
     const toFetch = toFetchList.length;
 
     if (toFetch > 0) {
-      send('prices', `Cargando ${toFetch} precios históricos en paralelo...`, 0, toFetch);
+      send('prices', `Cargando ${toFetch} precios históricos...`, 0, toFetch);
 
-      const CONCURRENCY = 10;
+      // Concurrencia baja: CoinGecko tiene rate limit estricto (10-30 req/min).
+      // Con 3 en paralelo + la cola serial interna de coingecko.ts no saturamos la API.
+      const CONCURRENCY = 3;
       let done = 0;
       for (let i = 0; i < toFetchList.length; i += CONCURRENCY) {
         const batch = toFetchList.slice(i, i + CONCURRENCY);
         await Promise.allSettled(
           batch.map(async ({ symbol, date }) => {
+            const dateStr = date.toISOString().slice(0, 10);
             const { getHistoricalPriceEur } = await import('../modules/prices/binance');
-            await getHistoricalPriceEur(symbol, date).catch(() => {});
+            const price = await getHistoricalPriceEur(symbol, date).catch(() => 0);
             done++;
-            send('prices', `Precios: ${done}/${toFetchList.length}`, done, toFetchList.length);
+            const label = price > 0
+              ? `✓ ${symbol} @ ${dateStr}`
+              : `— ${symbol} @ ${dateStr} (sin precio)`;
+            send('prices', label, done, toFetchList.length);
           })
         );
       }

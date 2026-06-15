@@ -9,6 +9,33 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.0.7] - 2026-06-15
+
+### Corregido
+
+#### PostgreSQL — arranque robusto
+
+- **Eliminada la comprobación de grupo Administradores** — el check anterior bloqueaba a cualquier usuario miembro del grupo Administrators (la mayoría de PCs personales Windows). Se elimina esta guardia; PostgreSQL muestra su propio error si realmente se ejecuta elevado.
+- **"pre-existing shared memory block"** — al cerrar la app de forma abrupta, PostgreSQL deja un `postmaster.pid` con un PID ya inexistente. Al reiniciar detectaba el bloqueo de memoria compartida y fallaba con "Error desconocido". Ahora se verifica si el PID sigue vivo; si no, se elimina el archivo obsoleto y se reintenta automáticamente.
+
+#### Importación CSV — Binance Simple Earn
+
+- **Simple Earn Locked Subscription / Redemption** — antes se ignoraban por completo: los activos enviados a Earn Locked nunca aparecían bloqueados y la redención no los liberaba, generando saldos fantasma. Ahora se procesan como STAKING_LOCK / STAKING_UNLOCK igual que Staking Purchase / Redemption.
+- **Simple Earn Flexible Subscription / Redemption** — mismo problema. Ahora se rastrean correctamente: los activos se marcan como bloqueados al suscribir y se liberan al redimir.
+
+#### Portfolio — presentación de saldos
+
+- **Decimales de cantidades crypto** — `formatAmount` mostraba un máximo de 6 decimales para valores < 1, truncando activos como BTC (0,000764 en lugar de 0,00076421), SOL, ETH, USDC, etc. Ahora muestra hasta 8 decimales.
+- **Saldo EUR incorrecto** — el cálculo del balance fiat contaba los gastos en EUR solo desde la fecha del primer `DEPOSIT_FIAT` en el CSV. Si ese depósito no existía o era posterior a otras compras, los pagos con EUR anteriores no se descontaban (la app mostraba 0,61 € en lugar de 0,0086 €). Ahora se contabilizan todos los flujos EUR sin restricción de fecha, y las ventas de cripto que reciben EUR también se suman correctamente al saldo.
+
+#### Precios históricos — rendimiento
+
+- **Deduplicación de requests en vuelo** — si varias transacciones del mismo par (símbolo + fecha) se procesaban en paralelo, cada una lanzaba su propia llamada a CoinGecko. Ahora se comparten: N llamadas concurrentes para el mismo par resultan en 1 sola request.
+- **Cache "sin precio" por par** — antes, si un activo no tenía precio en CoinGecko, se marcaba el símbolo entero como sin precio para la sesión (ETHFI sin precio el 15-Mar-24 bloqueaba ETHFI en todas las fechas). Ahora el cache es por par símbolo+fecha.
+- **Persistencia de "sin precio" en DB** — el resultado "sin precio disponible" se guarda como sentinel (`-1`) en `price_cache` para no volver a consultar CoinGecko en sesiones futuras.
+- **Concurrencia reducida** — el import bajó de 10 a 3 peticiones en paralelo, evitando ráfagas que provocaban cascadas de 429 y esperas de 60 s.
+- **Log de progreso detallado** — la pantalla de importación ahora muestra cada precio obtenido (✓) o no encontrado (—) en tiempo real, con código de color.
+
 ## [0.0.6] - 2026-06-15
 
 ### Corregido

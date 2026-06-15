@@ -640,6 +640,76 @@ function interpretGroup(
     }];
   }
 
+  // Simple Earn Flexible Subscription → movimiento Spot→Earn Flexible (STAKING_LOCK, sin evento fiscal)
+  if (firstOp === 'Simple Earn Flexible Subscription') {
+    const outRow = group.find((r) => r.change < 0);
+    if (!outRow) return [];
+    return [{
+      operationType: 'STAKING_LOCK' as const,
+      timestamp:     outRow.time,
+      asset:         outRow.coin,
+      amount:        abs(outRow.change),
+      amountNet:     abs(outRow.change),
+      account:       outRow.account,
+      notes:         firstOp,
+      subTradeCount: group.length,
+      rawRowHashes:  group.map((r) => r.rowHash),
+    }];
+  }
+
+  // Simple Earn Flexible Redemption → movimiento Earn Flexible→Spot (STAKING_UNLOCK, sin evento fiscal)
+  if (firstOp === 'Simple Earn Flexible Redemption') {
+    const inRow = group.find((r) => r.change > 0);
+    if (!inRow) return [];
+    return [{
+      operationType: 'STAKING_UNLOCK' as const,
+      timestamp:     inRow.time,
+      asset:         inRow.coin,
+      amount:        abs(inRow.change),
+      amountNet:     abs(inRow.change),
+      account:       inRow.account,
+      notes:         firstOp,
+      subTradeCount: group.length,
+      rawRowHashes:  group.map((r) => r.rowHash),
+    }];
+  }
+
+  // Simple Earn Locked Subscription → equivalente a Staking Purchase (STAKING_LOCK)
+  // Fila única negativa. Los lotes permanecen en la wallet origen (no-op FIFO).
+  if (firstOp === 'Simple Earn Locked Subscription') {
+    const outRow = group.find((r) => r.change < 0);
+    if (!outRow) return [];
+    return [{
+      operationType: 'STAKING_LOCK' as const,
+      timestamp:     outRow.time,
+      asset:         outRow.coin,
+      amount:        abs(outRow.change),
+      amountNet:     abs(outRow.change),
+      account:       outRow.account,
+      notes:         firstOp,
+      subTradeCount: group.length,
+      rawRowHashes:  group.map((r) => r.rowHash),
+    }];
+  }
+
+  // Simple Earn Locked Redemption → equivalente a Staking Redemption (STAKING_UNLOCK)
+  // Fila única positiva. El importer enlaza con el STAKING_LOCK correspondiente.
+  if (firstOp === 'Simple Earn Locked Redemption') {
+    const inRow = group.find((r) => r.change > 0);
+    if (!inRow) return [];
+    return [{
+      operationType: 'STAKING_UNLOCK' as const,
+      timestamp:     inRow.time,
+      asset:         inRow.coin,
+      amount:        abs(inRow.change),
+      amountNet:     abs(inRow.change),
+      account:       inRow.account,
+      notes:         firstOp,
+      subTradeCount: group.length,
+      rawRowHashes:  group.map((r) => r.rowHash),
+    }];
+  }
+
   // Bloqueo de activo en Launchpool (cualquier activo — BNB, FDUSD, etc.)
   // Fila única negativa. Los lotes permanecen en el wallet (no-op FIFO).
   // "Launchpool Subscription/Redemption" es la nueva label combinada de Binance (2025+):

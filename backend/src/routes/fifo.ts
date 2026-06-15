@@ -62,34 +62,32 @@ router.get('/fiat-balances', async (_req, res) => {
   // Solo se consideran salidas de EUR desde la fecha del primer depósito registrado:
   // los gastos previos al CSV se financiaron con depósitos externos no rastreados.
   const result = await db.query(
-    `WITH first_deposit AS (
-       SELECT MIN(timestamp) AS ts
-       FROM transactions
-       WHERE operation_type = 'DEPOSIT_FIAT'
-         AND asset IN (${fiatClause})
-     ),
-     fiat_flows AS (
+    `WITH fiat_flows AS (
+       -- Flujos donde EUR es el activo directo (depósitos, retiradas, conversiones cripto→EUR)
        SELECT w.type AS wallet_kind, asset AS fiat_asset,
               CASE
                 WHEN operation_type = 'DEPOSIT_FIAT'  THEN  amount
                 WHEN operation_type = 'BUY'           THEN  amount_net
-                WHEN operation_type = 'SELL'          THEN -amount
                 WHEN operation_type = 'WITHDRAW_FIAT' THEN -amount
                 ELSE 0
               END AS flow
        FROM transactions t JOIN wallets w ON w.id = t.wallet_id
        WHERE asset IN (${fiatClause})
+         AND operation_type IN ('DEPOSIT_FIAT', 'BUY', 'WITHDRAW_FIAT')
 
        UNION ALL
 
+       -- Flujos donde EUR es el activo de coste (pagos con EUR para BUY, EUR recibido en SELL)
        SELECT w.type AS wallet_kind, cost_asset AS fiat_asset,
-              -COALESCE(cost_amount, 0) AS flow
+              CASE
+                WHEN operation_type IN ('BUY','BUY_FIAT','BUY_CRYPTO','FEE_EXCHANGE') THEN -COALESCE(cost_amount, 0)
+                WHEN operation_type IN ('SELL','SELL_FIAT')                           THEN  COALESCE(cost_amount, 0)
+                ELSE 0
+              END AS flow
        FROM transactions t
        JOIN wallets w ON w.id = t.wallet_id
-       CROSS JOIN first_deposit fd
        WHERE cost_asset IN (${fiatClause})
-         AND operation_type IN ('BUY','BUY_FIAT','BUY_CRYPTO','SELL_FIAT','FEE_EXCHANGE')
-         AND t.timestamp >= fd.ts
+         AND operation_type IN ('BUY','BUY_FIAT','BUY_CRYPTO','SELL','SELL_FIAT','FEE_EXCHANGE')
      ),
      wallet_rep AS (
        -- Wallet representante de cada tipo (la que tiene el depósito fiat = la principal)
