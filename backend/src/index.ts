@@ -13,6 +13,7 @@ import importsRouter from './routes/imports';
 import fifoRouter from './routes/fifo';
 import pricesRouter, { setupPricesWebSocket } from './routes/prices';
 import { startLivePrices } from './modules/prices/binance';
+import { repairMissingCoinGeckoIds } from './modules/prices/coingecko';
 import catalogRouter from './routes/catalog';
 import settingsRouter from './routes/settings';
 import transactionsRouter from './routes/transactions';
@@ -134,6 +135,11 @@ async function bootstrap() {
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`[SERVER] Listening on port ${PORT}`);
       startLivePrices();
+      // Reparar en background activos con price_source='coingecko' pero coingecko_id=NULL.
+      // No bloquea el arranque; usa la cola con rate limit de CoinGecko.
+      repairMissingCoinGeckoIds().catch(e =>
+        console.error('[STARTUP] Error reparando coingecko_ids:', e)
+      );
     });
   } catch (err) {
     console.error('[FATAL] Cannot connect to PostgreSQL:', err);

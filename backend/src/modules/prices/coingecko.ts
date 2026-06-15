@@ -13,6 +13,21 @@ export async function loadAssetMetadata(): Promise<void> {
   coinGeckoIds = new Map(res.rows.map((r: { symbol: string; coingecko_id: string }) => [r.symbol, r.coingecko_id]));
 }
 
+// Detecta activos configurados como CoinGecko pero sin coingecko_id en DB
+// (datos corruptos por el bug en upsertAssetMetadata que insertaba NULL).
+// Se llama al arrancar el servidor — corrige en background via la cola con rate limit.
+export async function repairMissingCoinGeckoIds(): Promise<void> {
+  const res = await db.query(
+    "SELECT symbol FROM asset_metadata WHERE price_source = 'coingecko' AND coingecko_id IS NULL"
+  );
+  if (res.rows.length === 0) return;
+  console.log(`[PRICES] Reparando ${res.rows.length} activo(s) sin coingecko_id: ${res.rows.map((r: { symbol: string }) => r.symbol).join(', ')}`);
+  for (const { symbol } of res.rows as { symbol: string }[]) {
+    await searchAndSaveCoinGeckoId(symbol); // cola con rate limit, no inunda CoinGecko
+  }
+  console.log('[PRICES] coingecko_id reparados.');
+}
+
 // Callback opcional para surfacear eventos de precios (rate limiting, etc.) al caller.
 let _statusCallback: ((msg: string) => void) | undefined;
 export function setCoinGeckoStatusCallback(cb: ((msg: string) => void) | undefined): void {
