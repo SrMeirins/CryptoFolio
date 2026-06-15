@@ -152,6 +152,11 @@ router.post('/assets/:symbol/detect', async (req: Request, res: Response) => {
   const symbol = validateSymbol(req.params.symbol);
   if (!symbol) { res.status(400).json({ error: 'Símbolo inválido' }); return; }
   try {
+    // Limpiar sentinelas de precio previos (-1) para que se reintente CoinGecko si aplica
+    await db.query(
+      "DELETE FROM price_cache WHERE asset = $1 AND price_eur < 0",
+      [symbol]
+    );
     await autoDetectPair(symbol);
     const result = await db.query(
       `SELECT symbol, name, is_stablecoin,

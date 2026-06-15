@@ -857,9 +857,10 @@ function interpretGroup(
           subTradeCount: 1,
           rawRowHashes:  [row.rowHash],
         });
-      } else if (firstOp === 'Asset Recovery') {
-        // Asset Recovery negativo: Binance reclamó el activo.
-        // Se registra como LOST para cerrar el lote FIFO a 0 proceeds.
+      } else if (firstOp === 'Asset Recovery' || firstOp === 'Token Swap - Distribution') {
+        // Cambio negativo en Asset Recovery o Token Swap Distribution:
+        // Binance retiró el activo de forma forzada (delisting, swap, confiscación).
+        // Se registra como LOST: cierra el lote FIFO a 0 proceeds → pérdida patrimonial.
         results.push({
           operationType: 'LOST' as const,
           timestamp:     row.time,
@@ -867,7 +868,7 @@ function interpretGroup(
           amount:        abs(row.change),
           amountNet:     abs(row.change),
           account:       row.account,
-          notes:         'Asset Recovery — activo reclamado por Binance',
+          notes:         `${firstOp} — activo retirado por Binance`,
           subTradeCount: 1,
           rawRowHashes:  [row.rowHash],
         });

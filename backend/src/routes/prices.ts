@@ -26,8 +26,9 @@ router.get('/live', async (_req: Request, res: Response) => {
       if (cgAssets.rows.length > 0) {
         const ids = cgAssets.rows.map((r: { coingecko_id: string }) => r.coingecko_id).join(',');
         const url = `${CG_BASE}/simple/price?ids=${ids}&vs_currencies=eur`;
-        const data = await fetch(url, { headers: { Accept: 'application/json' } })
-          .then(r => r.json()) as Record<string, { eur: number }>;
+        const cgRes = await fetch(url, { headers: { Accept: 'application/json' } });
+        if (!cgRes.ok) throw new Error(`CoinGecko ${cgRes.status}`);
+        const data = await cgRes.json() as Record<string, { eur: number }>;
         const cgPrices: Record<string, number> = {};
         for (const row of cgAssets.rows as { symbol: string; coingecko_id: string }[]) {
           const eur = data[row.coingecko_id]?.eur;

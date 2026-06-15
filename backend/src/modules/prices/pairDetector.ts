@@ -96,35 +96,37 @@ export async function autoDetectPair(symbol: string): Promise<AssetPairInfo> {
   }
 
   // Fallback a CoinGecko si no hay ningún par en Binance
+  let geckoId: string | null = null;
   if (info.priceSource === 'unknown') {
     const geckoInDb = await db.query(
       'SELECT coingecko_id FROM asset_metadata WHERE symbol = $1 AND coingecko_id IS NOT NULL',
       [symbol]
     );
-    const geckoId = geckoInDb.rows[0]?.coingecko_id ?? await searchAndSaveCoinGeckoId(symbol);
+    geckoId = geckoInDb.rows[0]?.coingecko_id ?? await searchAndSaveCoinGeckoId(symbol);
     if (geckoId) info.priceSource = 'coingecko';
   }
 
   // Guardar en DB y cache
-  await upsertAssetMetadata(info);
+  await upsertAssetMetadata(info, geckoId);
   pairCache.set(symbol, info);
 
   return info;
 }
 
-async function upsertAssetMetadata(info: AssetPairInfo): Promise<void> {
+async function upsertAssetMetadata(info: AssetPairInfo, geckoId: string | null = null): Promise<void> {
   await db.query(
     `INSERT INTO asset_metadata (
       symbol, name, coingecko_id, is_stablecoin,
       binance_eur_pair, binance_usdt_pair, binance_btc_pair, binance_eth_pair,
       price_source, auto_detected, last_price_check
-    ) VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, TRUE, NOW())
+    ) VALUES ($1, $2, $9, $3, $4, $5, $6, $7, $8, TRUE, NOW())
     ON CONFLICT (symbol) DO UPDATE SET
       binance_eur_pair  = EXCLUDED.binance_eur_pair,
       binance_usdt_pair = EXCLUDED.binance_usdt_pair,
       binance_btc_pair  = EXCLUDED.binance_btc_pair,
       binance_eth_pair  = EXCLUDED.binance_eth_pair,
       price_source      = EXCLUDED.price_source,
+      coingecko_id      = COALESCE(EXCLUDED.coingecko_id, asset_metadata.coingecko_id),
       auto_detected     = TRUE,
       last_price_check  = NOW()`,
     [
@@ -136,6 +138,7 @@ async function upsertAssetMetadata(info: AssetPairInfo): Promise<void> {
       info.binanceBtcPair,
       info.binanceEthPair,
       info.priceSource,
+      geckoId,
     ]
   );
 }

@@ -82,11 +82,11 @@ export const ALL_BINANCE_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Mission Reward Distribution',    internalType: 'CASHBACK',  status: 'supported' },
   { csvLabel: 'Crypto Box',                     internalType: 'CASHBACK',  status: 'supported' },
 
-  // Airdrops y distribuciones
-  { csvLabel: 'Airdrop Assets',                 internalType: 'AIRDROP',   status: 'supported' },
-  { csvLabel: 'Asset Recovery',                 internalType: 'AIRDROP',   status: 'supported' },
-  { csvLabel: 'Distribution',                   internalType: 'AIRDROP',   status: 'supported' },
-  { csvLabel: 'Token Swap - Distribution',      internalType: 'AIRDROP',   status: 'supported' },
+  // Airdrops y distribuciones / forced swaps
+  { csvLabel: 'Airdrop Assets',            internalType: 'AIRDROP', status: 'supported' },
+  { csvLabel: 'Asset Recovery',            internalType: 'AIRDROP', status: 'supported', notes: 'Positivo → AIRDROP; Negativo → LOST (Binance retira activo delistado)' },
+  { csvLabel: 'Distribution',              internalType: 'AIRDROP', status: 'supported' },
+  { csvLabel: 'Token Swap - Distribution', internalType: 'AIRDROP', status: 'supported', notes: 'Positivo → AIRDROP (compensación swap); Negativo → LOST (retiro forzado)' },
 
   // Fees
   { csvLabel: 'BNB Fee Deduction',              internalType: 'FEE_EXCHANGE', status: 'supported', notes: 'Fee de exchange pagada en BNB — evento imponible' },
