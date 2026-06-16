@@ -93,12 +93,12 @@ export const ALL_BINANCE_OPERATIONS: BinanceOperation[] = [
 
   // Margin
   { csvLabel: 'Margin Fee',                                              internalType: 'FEE_EXCHANGE', status: 'supported', notes: 'Interés de margen pagado en cripto' },
-  { csvLabel: 'Margin Loan',                                             internalType: 'IGNORED',      status: 'supported', notes: 'Préstamo recibido — no hecho imponible' },
-  { csvLabel: 'Margin Repayment',                                        internalType: 'FEE_EXCHANGE', status: 'supported', notes: 'Devolución préstamo' },
-  { csvLabel: 'Isolated Margin Loan',                                    internalType: 'IGNORED',      status: 'supported', notes: 'Préstamo recibido — no hecho imponible' },
-  { csvLabel: 'Isolated Margin Repayment',                               internalType: 'FEE_EXCHANGE', status: 'supported', notes: 'Devolución préstamo' },
+  { csvLabel: 'Margin Loan',                                             internalType: 'MARGIN_BORROW', status: 'supported', notes: 'Préstamo recibido — abre lote FIFO a precio de mercado' },
+  { csvLabel: 'Margin Repayment',                                        internalType: 'MARGIN_REPAY',  status: 'supported', notes: 'Devolución préstamo — cierra lote sin G/P (retorno de deuda, no disposición)' },
+  { csvLabel: 'Isolated Margin Loan',                                    internalType: 'MARGIN_BORROW', status: 'supported', notes: 'Préstamo recibido — abre lote FIFO a precio de mercado' },
+  { csvLabel: 'Isolated Margin Repayment',                               internalType: 'MARGIN_REPAY',  status: 'supported', notes: 'Devolución préstamo — cierra lote sin G/P (retorno de deuda, no disposición)' },
   { csvLabel: 'Isolated Margin Liquidation - Fee',                       internalType: 'FEE_EXCHANGE', status: 'supported', notes: 'Fee de liquidación — evento imponible' },
-  { csvLabel: 'Cross Margin Liquidation - Repayment',                    internalType: 'FEE_EXCHANGE', status: 'supported', notes: 'Repago de deuda' },
+  { csvLabel: 'Cross Margin Liquidation - Repayment',                    internalType: 'MARGIN_REPAY', status: 'supported', notes: 'Liquidación forzosa — repago del préstamo de margen (sin G/P, igual que Margin Repayment)' },
   { csvLabel: 'Cross Margin Liquidation - Small Assets Takeover',        internalType: 'SELL',         status: 'supported', notes: 'Venta forzosa de colateral' },
 
   // Ignoradas (asientos contables internos sin impacto fiscal)

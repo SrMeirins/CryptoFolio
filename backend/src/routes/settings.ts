@@ -340,6 +340,23 @@ router.delete('/price-cache', async (_req: Request, res: Response) => {
   res.json({ deleted: result.rows.length });
 });
 
+// ── DELETE /api/settings/price-cache/failed?asset=LUNC ────────────────────
+// Elimina solo los sentinels -1 (precios fallidos) de un activo o de todos.
+// Permite reintentar sin borrar los precios válidos existentes.
+router.delete('/price-cache/failed', async (req: Request, res: Response) => {
+  const { asset } = req.query;
+  let result;
+  if (asset && typeof asset === 'string') {
+    result = await db.query(
+      "DELETE FROM price_cache WHERE price_eur = -1 AND asset = $1 RETURNING id",
+      [asset.toUpperCase()]
+    );
+  } else {
+    result = await db.query("DELETE FROM price_cache WHERE price_eur = -1 RETURNING id");
+  }
+  res.json({ deleted: result.rows.length });
+});
+
 // ── GET /api/settings/notifications ───────────────────────────────────────
 // Recopila avisos del sistema clasificados por severidad
 router.get('/notifications', async (_req: Request, res: Response) => {

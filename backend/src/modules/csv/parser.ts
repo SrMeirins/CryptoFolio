@@ -243,17 +243,66 @@ export function parseBinanceCsv(fileContent: Buffer | string): CsvParseResult {
       // FIFO consuma los lotes propios (el exceso sobre el préstamo es una venta real)
     }
 
-    // Reemplazar operación de las filas Transaction Sold/Revenue/Fee en esos contextos
+    // Reemplazar operación de las filas Margin Loan/Transaction Sold/Revenue/Fee en esos contextos
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const ctxCoin = `${row.time.getTime()}|${row.account}|${row.coin}`;
       const ctxTs   = `${row.time.getTime()}|${row.account}`;
       const suppress =
+        (row.operation === 'Margin Loan'         && shortSaleCoinContexts.has(ctxCoin)) ||
         (row.operation === 'Transaction Sold'    && shortSaleCoinContexts.has(ctxCoin)) ||
         (row.operation === 'Transaction Revenue' && shortSaleTimestamps.has(ctxTs)) ||
         (row.operation === 'Transaction Fee'     && shortSaleTimestamps.has(ctxTs));
       if (suppress) {
         rows[i] = { ...row, operation: 'Margin Short Sale' };
+      }
+    }
+  }
+
+  // 3c. Normalizar timestamps de Transfer (Spot→Strategy) que llegan 1-5 segundos
+  //     DESPUÉS de un BUY en Strategy.
+  //     Binance Strategy ejecuta el trade a T y transfiere el funding a T+1..T+5;
+  //     la prioridad TRANSFER_INTERNAL (3) antes que BUY (4) solo funciona dentro
+  //     del mismo timestamp. Normalizamos el Spot-TRANSFER al timestamp del BUY.
+  //
+  //     Criterio de matching sin order ID (el CSV no lo contiene):
+  //     - Hay un BUY en Strategy a timestamp T que gasta la misma moneda (coin = costCoin)
+  //     - Hay un Transfer Spot→Strategy (Spot negativo) de esa misma moneda a T+1..T+5
+  //     → El Transfer se mueve a T para que TRANSFER_INTERNAL (3) corra antes que BUY (4).
+  {
+    const MAX_DELTA_MS = 5000;
+
+    // Mapa: "timestamp_ms|coin" → BUY timestamp para BUYs en Strategy que gastan esa coin
+    // Un BUY "gasta" el costAsset: la fila Transaction Spend indica la coin de coste.
+    const strategySpendAtTime = new Map<string, Date>(); // key = "coin|buyTimeMs"
+    for (const row of rows) {
+      if (row.operation === 'Transaction Spend' && row.account === 'Strategy') {
+        // coin es el activo que se gasta (p.ej. USDT), time es el timestamp del BUY
+        const key = `${row.coin}|${row.time.getTime()}`;
+        strategySpendAtTime.set(key, row.time);
+      }
+    }
+
+    // Para cada Transfer Spot→Strategy (Spot, negativo), buscar BUY a T-5s..T-1ms
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (
+        (row.operation === 'Transfer Between Spot and Strategy' ||
+         row.operation === 'Transfer Between Spot and Strategy Account') &&
+        row.account === 'Spot' &&
+        row.change < 0
+      ) {
+        const transferTs = row.time.getTime();
+        // Buscar si hay un BUY en Strategy que gastó esta misma coin en los 5s previos
+        for (const [key, buyTime] of strategySpendAtTime) {
+          const [spendCoin, buyTsStr] = key.split('|');
+          if (spendCoin !== row.coin) continue;
+          const delta = transferTs - parseInt(buyTsStr);
+          if (delta > 0 && delta <= MAX_DELTA_MS) {
+            rows[i] = { ...row, time: new Date(buyTime) };
+            break;
+          }
+        }
       }
     }
   }
@@ -481,32 +530,34 @@ function interpretGroup(
   }
 
   if (firstOp === 'Isolated Margin Loan') {
+    // Préstamo de margen aislado — abre lote al precio de mercado para poder rastrear
+    // el FIFO cuando el activo prestado se vende/transfiere posteriormente.
     return group.map((row) => ({
-      operationType: 'IGNORED' as const,
+      operationType: 'MARGIN_BORROW' as const,
       timestamp:     row.time,
       asset:         row.coin,
       amount:        abs(row.change),
       amountNet:     abs(row.change),
       account:       row.account,
-      notes:         'Isolated Margin Loan — préstamo recibido (no hecho imponible)',
+      notes:         'Isolated Margin Loan — préstamo (lote abierto a precio de mercado)',
       subTradeCount: 1,
       rawRowHashes:  [row.rowHash],
     }));
   }
 
   if (firstOp === 'Isolated Margin Repayment') {
-    const row = group[0];
-    return {
-      operationType: 'FEE_EXCHANGE',
-      timestamp,
-      asset:    row.coin,
-      amount:   abs(row.change),
-      amountNet:abs(row.change),
-      account,
-      notes:    'Isolated Margin Repayment — devolución de préstamo (disposición si hay lote)',
+    // Devolución de préstamo — consume el lote sin registrar G/P (retorno de deuda).
+    return group.map((row) => ({
+      operationType: 'MARGIN_REPAY' as const,
+      timestamp:     row.time,
+      asset:         row.coin,
+      amount:        abs(row.change),
+      amountNet:     abs(row.change),
+      account:       row.account,
+      notes:         'Isolated Margin Repayment — devolución de préstamo (sin impacto fiscal)',
       subTradeCount: 1,
-      rawRowHashes: hashes,
-    };
+      rawRowHashes:  [row.rowHash],
+    }));
   }
 
   if (ops.every((o) => o === 'Small Assets Exchange BNB')) {
@@ -524,39 +575,34 @@ function interpretGroup(
   // ── Liquidaciones de margen ────────────────────────────────────────────────
 
   if (firstOp === 'Margin Loan') {
-    // Préstamo recibido de Binance — no es ingreso ni hecho imponible.
-    // Sin lote FIFO (no se ha adquirido el activo, hay obligación de devolver).
-    // Se almacena en la DB como IGNORED para tracking contable.
+    // Préstamo de margen — abre lote a precio de mercado para rastrear FIFO
+    // cuando el activo prestado se vende o transfiere.
     return group.map((row) => ({
-      operationType: 'IGNORED' as const,
+      operationType: 'MARGIN_BORROW' as const,
       timestamp:     row.time,
       asset:         row.coin,
       amount:        abs(row.change),
       amountNet:     abs(row.change),
       account:       row.account,
-      notes:         'Margin Loan — préstamo recibido (no hecho imponible)',
+      notes:         'Margin Loan — préstamo (lote abierto a precio de mercado)',
       subTradeCount: 1,
       rawRowHashes:  [row.rowHash],
     }));
   }
 
   if (firstOp === 'Margin Repayment') {
-    // Devolución del préstamo de margen.
-    // España: si se devuelve el mismo activo prestado → no hay lote FIFO → G/P = 0.
-    // Si se devuelve con un activo propio (SOL, LUNC...) → consumeLots lo calcula.
-    // FEE_EXCHANGE cubre ambos casos correctamente sin código adicional.
-    const row = group[0];
-    return {
-      operationType: 'FEE_EXCHANGE',
-      timestamp,
-      asset:        row.coin,
-      amount:       abs(row.change),
-      amountNet:    abs(row.change),
-      account,
-      notes:        'Margin Repayment — devolución de préstamo (disposición patrimonial si hay lote)',
+    // Devolución del préstamo — consume lote sin registrar G/P (retorno de deuda).
+    return group.map((row) => ({
+      operationType: 'MARGIN_REPAY' as const,
+      timestamp:     row.time,
+      asset:         row.coin,
+      amount:        abs(row.change),
+      amountNet:     abs(row.change),
+      account:       row.account,
+      notes:         'Margin Repayment — devolución de préstamo (sin impacto fiscal)',
       subTradeCount: 1,
-      rawRowHashes: hashes,
-    };
+      rawRowHashes:  [row.rowHash],
+    }));
   }
 
   if (firstOp === 'Cross Margin Liquidation - Small Assets Takeover') {
@@ -587,22 +633,19 @@ function interpretGroup(
   }
 
   if (firstOp === 'Cross Margin Liquidation - Repayment') {
-    // Uso de activos para saldar la deuda con Binance.
-    // España: disposición patrimonial al precio de mercado del día.
-    // Si el activo era prestado (sin lote FIFO), consumeLots no actúa → G/P = 0 (correcto).
-    // Si era propio (tiene lote), consume al precio de mercado → G/P real (correcto).
-    const row = group[0];
-    return {
-      operationType: 'FEE_EXCHANGE',
-      timestamp,
-      asset:        row.coin,
-      amount:       abs(row.change),
-      amountNet:    abs(row.change),
-      account,
-      notes:        'Repago de préstamo de margen — disposición al precio de mercado',
+    // Repago forzoso del préstamo de margen vía liquidación automática de Binance.
+    // Económicamente idéntico a Margin Repayment: cierra el lote FIFO sin G/P.
+    return group.map((row) => ({
+      operationType: 'MARGIN_REPAY' as const,
+      timestamp:     row.time,
+      asset:         row.coin,
+      amount:        abs(row.change),
+      amountNet:     abs(row.change),
+      account:       row.account,
+      notes:         'Liquidación forzosa de margen — devolución de préstamo (sin impacto fiscal)',
       subTradeCount: 1,
-      rawRowHashes: hashes,
-    };
+      rawRowHashes:  [row.rowHash],
+    }));
   }
 
   // Bloqueo de fondos para staking (Staking Purchase)

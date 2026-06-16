@@ -3,6 +3,7 @@ import multer from 'multer';
 import { importCsvFile, previewCsvFile } from '../modules/csv/importer';
 import { runFifoEngine } from '../modules/fifo/engine';
 import { loadAssetMetadata, prefetchHistoricalPrices } from '../modules/prices/binance';
+import { setCoinGeckoStatusCallback, prefetchHistoricalPrices as prefetchCoinGeckoHistoricalPrices } from '../modules/prices/coingecko';
 import { db } from '../db/client';
 
 
@@ -244,7 +245,43 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
     const toFetch = toFetchList.length;
 
     if (toFetch > 0) {
-      send('prices', `Cargando ${toFetch} precios históricos...`, 0, toFetch);
+      send('prices', `Cargando ${toFetch} precios históricos (Binance → CoinGecko fallback)...`, 0, toFetch);
+
+      // Activar callback CoinGecko para que rate limits aparezcan en fase 'prices'
+      setCoinGeckoStatusCallback((msg) => send('prices', msg));
+
+      // Pre-warm CoinGecko solo para activos que dependen de CoinGecko (no Binance).
+      // BNB, USDT, DOGE, etc. tienen par Binance — van directo al bucle individual.
+      // Solo activos con price_source='coingecko' (ej: LUNC) van aquí.
+      // eur_direct / usdt_proxy / fiat ya tienen precio desde Binance — no necesitan CoinGecko.
+      const allSymbols = [...new Set(toFetchList.map(p => p.symbol))];
+      const geckoRes = await db.query(
+        `SELECT symbol FROM asset_metadata
+         WHERE symbol = ANY($1) AND coingecko_id IS NOT NULL
+           AND price_source NOT IN ('eur_direct', 'usdt_proxy', 'fiat')`,
+        [allSymbols]
+      );
+      const geckoSymbols = new Set(geckoRes.rows.map((r: { symbol: string }) => r.symbol));
+      const geckoToFetch = toFetchList.filter(p => geckoSymbols.has(p.symbol));
+
+      if (geckoToFetch.length > 0) {
+        const geckoAssets = [...new Set(geckoToFetch.map(p => p.symbol))];
+        send('prices', `🔄 Pre-cargando CoinGecko para: ${geckoAssets.join(', ')} (${geckoToFetch.length} fecha${geckoToFetch.length !== 1 ? 's' : ''})...`);
+        await prefetchCoinGeckoHistoricalPrices(geckoToFetch);
+
+        // Re-evaluar qué queda sin caché tras el prefetch
+        const warmCachedRes = await db.query(
+          `SELECT asset, price_date::text AS price_date FROM price_cache
+           WHERE asset = ANY($1) AND price_date::text = ANY($2)`,
+          [geckoAssets, [...new Set(geckoToFetch.map(p => p.date.toISOString().slice(0, 10)))]]
+        );
+        const warmCachedSet = new Set(
+          warmCachedRes.rows.map((r: { asset: string; price_date: string }) => `${r.asset}|${r.price_date}`)
+        );
+        toFetchList = toFetchList.filter(p =>
+          !geckoSymbols.has(p.symbol) || !warmCachedSet.has(`${p.symbol}|${p.date.toISOString().slice(0, 10)}`)
+        );
+      }
 
       // Concurrencia 10: Binance no tiene rate limit; CoinGecko está serializado
       // por su cola interna (6.5s entre llamadas) independientemente de cuántas
@@ -266,6 +303,8 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
           })
         );
       }
+
+      setCoinGeckoStatusCallback(undefined);
     } else {
       send('prices', '✓ Todos los precios históricos en caché');
     }
@@ -292,13 +331,23 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
     send('fifo', `✓ FIFO completado: ${fifoResult.lotsCreated} lotes, ${fifoResult.lotsConsumed} consumos`);
 
     if (fifoResult.errors.length > 0) {
-      const MAX_SHOW = 30;
-      send('fifo', `⚠ ${fifoResult.errors.length} advertencia${fifoResult.errors.length > 1 ? 's' : ''} en el cálculo FIFO:`);
-      for (const err of fifoResult.errors.slice(0, MAX_SHOW)) {
-        send('fifo', `  ⚠ ${err}`);
+      send('fifo', `⚠ ${fifoResult.errors.length} advertencia${fifoResult.errors.length > 1 ? 's' : ''} FIFO:`);
+      // Agrupar mensajes repetidos: "Sin lotes abiertos para USDT" × N
+      const grouped = new Map<string, number>();
+      for (const err of fifoResult.errors) {
+        // Normalizar: quitar wallet_id UUID para agrupar mejor
+        const key = err.replace(/\s+\([0-9a-f-]{36}\)/gi, '').replace(/wallet [0-9a-f-]{36}/gi, 'wallet');
+        grouped.set(key, (grouped.get(key) ?? 0) + 1);
       }
-      if (fifoResult.errors.length > MAX_SHOW) {
-        send('fifo', `  ... y ${fifoResult.errors.length - MAX_SHOW} más`);
+      const MAX_GROUPS = 20;
+      let shown = 0;
+      for (const [msg, count] of [...grouped.entries()].sort((a, b) => b[1] - a[1])) {
+        if (shown >= MAX_GROUPS) break;
+        send('fifo', count > 1 ? `  ⚠ ${msg} (×${count})` : `  ⚠ ${msg}`);
+        shown++;
+      }
+      if (grouped.size > MAX_GROUPS) {
+        send('fifo', `  ... y ${grouped.size - MAX_GROUPS} tipos más de advertencias`);
       }
     }
 

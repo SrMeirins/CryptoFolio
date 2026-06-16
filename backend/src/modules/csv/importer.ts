@@ -6,7 +6,7 @@ import { validateCsvStructure, ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
 import { ACCOUNT_TO_WALLET, TRANSFER_DESTINATIONS } from './binanceAccounts';
 import { getHistoricalPriceEur, refreshLivePrices } from '../prices/binance';
-import { setCoinGeckoStatusCallback } from '../prices/coingecko';
+import { setCoinGeckoStatusCallback, prefetchHistoricalPrices as prefetchCoinGeckoHistoricalPrices } from '../prices/coingecko';
 import { getOrDetectPairInfo } from '../prices/pairDetector';
 
 export interface ImportResult {
@@ -278,10 +278,33 @@ export async function importCsvFile(
     const uniquePairs = [...uniquePairsMap.values()];
 
     const totalPairs = uniquePairs.length;
-    onStatus?.(`Enriqueciendo ${incomeTxs.length} operaciones de rendimiento — ${totalPairs} pares únicos (concurrencia 10)`, 0, totalPairs);
 
-    // Enganchar el callback de CoinGecko para que rate limits aparezcan en el log
+    // Activar callback CoinGecko ANTES del prefetch para que rate limits y progreso
+    // aparezcan en el log de la UI desde el primer momento.
     setCoinGeckoStatusCallback(onStatus);
+
+    // Pre-warm precios CoinGecko via market_chart/range antes del loop de enriquecimiento.
+    // Solo para activos que genuinamente usan CoinGecko como fuente (price_source='coingecko'
+    // o sin price_source conocido). eur_direct/usdt_proxy/fiat tienen precio Binance → no tocar.
+    if (uniquePairs.length > 0) {
+      const uniqueAssets = [...new Set(uniquePairs.map(p => p.symbol))];
+      const geckoOnlyRes = await db.query(
+        `SELECT symbol FROM asset_metadata
+         WHERE symbol = ANY($1) AND coingecko_id IS NOT NULL
+           AND price_source NOT IN ('eur_direct', 'usdt_proxy', 'fiat')`,
+        [uniqueAssets]
+      );
+      const geckoOnlySymbols = new Set(geckoOnlyRes.rows.map((r: { symbol: string }) => r.symbol));
+      const geckoPairs = uniquePairs.filter(p => geckoOnlySymbols.has(p.symbol));
+      if (geckoPairs.length > 0) {
+        const geckoAssets = [...new Set(geckoPairs.map(p => p.symbol))];
+        onStatus?.(`🔄 Pre-cargando precios históricos CoinGecko para: ${geckoAssets.join(', ')} (${geckoPairs.length} fechas únicas, 1 llamada API por activo)...`);
+        await prefetchCoinGeckoHistoricalPrices(geckoPairs.map(p => ({ symbol: p.symbol, date: p.date })));
+        onStatus?.(`✓ Pre-carga CoinGecko completada para ${geckoAssets.length} activo${geckoAssets.length > 1 ? 's' : ''}`);
+      }
+    }
+
+    onStatus?.(`Enriqueciendo ${incomeTxs.length} operaciones de rendimiento — ${totalPairs} pares únicos (concurrencia 10)`, 0, totalPairs);
 
     // Concurrencia 10: Binance no tiene rate limit estricto, los pares que
     // recaigan en CoinGecko quedan serializados automáticamente por su cola.
@@ -318,6 +341,46 @@ export async function importCsvFile(
     onStatus?.(`Precios de rendimiento completados: ${totalPairs} pares procesados`);
   }
 
+  // Construir mapa de pares reales de transferencia interna.
+  // El parser solo emite la fila de SALIDA (change < 0) de cada par, pero el CSV
+  // contiene también la fila de ENTRADA (change > 0) que indica la cuenta destino real.
+  // El mapping estático TRANSFER_DESTINATIONS no cubre todos los casos
+  // (p.ej. Cross Margin → Isolated Margin) — aquí lo resolvemos desde los datos reales.
+  //
+  // Clave: hash de la fila de salida → wallet_id de la cuenta destino (obtenido de la fila de entrada).
+  const rawRecords: Record<string, string>[] = parse(fileBuffer, {
+    columns: true,
+    skip_empty_lines: true,
+    bom: true,
+    trim: true,
+  });
+  // Indexar todas las filas de entrada (change > 0) de operaciones de transferencia interna
+  // por el identificador que comparte con su fila de salida: time|operation|coin|absChange
+  const incomingByKey = new Map<string, string>(); // key → account name
+  for (const rec of rawRecords) {
+    const change = parseFloat(rec['Change'] ?? '0');
+    if (change > 0 && TRANSFER_DESTINATIONS[rec['Operation']]) {
+      const key = `${rec['Time']}|${rec['Operation']}|${rec['Coin']}|${rec['Change']}`;
+      incomingByKey.set(key, rec['Account']);
+    }
+  }
+  // Para cada fila de salida, calcular su hash (igual que el parser) y mapear al destino real
+  const transferDestByHash = new Map<string, string>(); // rowHash → account name del destino
+  for (const rec of rawRecords) {
+    const change = parseFloat(rec['Change'] ?? '0');
+    if (change < 0 && TRANSFER_DESTINATIONS[rec['Operation']]) {
+      const absChangeStr = rec['Change'].startsWith('-') ? rec['Change'].slice(1) : rec['Change'];
+      const key = `${rec['Time']}|${rec['Operation']}|${rec['Coin']}|${absChangeStr}`;
+      const incomingAccount = incomingByKey.get(key);
+      if (incomingAccount) {
+        const hash = createHash('sha256').update(
+          [rec['User ID'] ?? '', rec['Time'] ?? '', rec['Account'] ?? '', rec['Operation'] ?? '', rec['Coin'] ?? '', rec['Change'] ?? '', rec['Remark'] ?? ''].join('|')
+        ).digest('hex');
+        transferDestByHash.set(hash, incomingAccount);
+      }
+    }
+  }
+
   onStatus?.('Iniciando transacción en base de datos...');
   const result = await db.transaction(async (client) => {
     // Cargar todas las wallets de sistema para asignar wallet_id correctamente
@@ -338,9 +401,18 @@ export async function importCsvFile(
       return (name && walletIdByName[name]) ? walletIdByName[name] : fallbackWalletId;
     }
 
-    // Resuelve el wallet_id destino para una transferencia interna
-    function getDestinationWalletId(notes: string | undefined, account: string): string | null {
+    // Resuelve el wallet_id destino para una transferencia interna.
+    // Primero intenta el mapa dinámico (construido desde las filas de entrada del CSV),
+    // que cubre casos que el mapping estático no puede conocer (ej: Cross Margin → Isolated Margin).
+    function getDestinationWalletId(notes: string | undefined, account: string, rowHash?: string): string | null {
       if (!notes) return null;
+      if (rowHash) {
+        const incomingAccount = transferDestByHash.get(rowHash);
+        if (incomingAccount) {
+          const walletName = ACCOUNT_TO_WALLET[incomingAccount];
+          if (walletName && walletIdByName[walletName]) return walletIdByName[walletName];
+        }
+      }
       const destName = TRANSFER_DESTINATIONS[notes]?.[account];
       if (!destName) return null;
       return walletIdByName[destName] ?? null;
@@ -424,7 +496,7 @@ export async function importCsvFile(
       let effectiveOpType = tx.operationType;
 
       if (tx.operationType === 'TRANSFER_INTERNAL') {
-        destinationWalletId = getDestinationWalletId(tx.notes, tx.account);
+        destinationWalletId = getDestinationWalletId(tx.notes, tx.account, tx.rawRowHashes[0]);
       } else if (tx.operationType === 'WITHDRAW') {
         const txKey = tx.rawRowHashes[0] ?? tx.asset;
         const dest  = withdrawalDestinations[txKey] ?? withdrawalDestinations[tx.asset];

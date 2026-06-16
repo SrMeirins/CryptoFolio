@@ -9,6 +9,20 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.0.9] - 2026-06-16
+
+### Corregido
+
+#### Motor FIFO — lotes fantasma en Binance Cross Margin
+
+- **Phantom de USTC en Cross Margin por Margin Short Sale incompleto** — el parser suprimía las filas `Transaction Sold`, `Transaction Revenue` y `Transaction Fee` de una venta en corto, pero no suprimía la fila `Margin Loan` correspondiente. Esto dejaba un lote `MARGIN_BORROW` huérfano que el motor consumía con el primer `MARGIN_REPAY` disponible en lugar de con el SELL, inflando el lote de la compra posterior en la cantidad prestada. Corregido añadiendo `Margin Loan` a la condición de supresión cuando `vendido ≤ prestado`.
+
+#### Motor FIFO — lotes fantasma en Binance Strategy
+
+- **Phantom de USDT en Strategy por prioridad incorrecta de TRANSFER_INTERNAL** — `TRANSFER_INTERNAL` tenía la misma prioridad de ejecución que `BUY` (ambos en nivel 3/4). Cuando una transferencia Spot→Strategy y un BUY ocurrían en el mismo segundo, el BUY corría primero, no encontraba lotes de USDT, y creaba un lote sintético que quedaba como phantom. Se reordenaron las prioridades: `TRANSFER_INTERNAL` pasa a nivel 3 (antes de `BUY`, que pasa a nivel 4), `WITHDRAW` a nivel 5, `FEE` a nivel 6, `MARGIN_REPAY` a nivel 7.
+
+- **Phantom de USDT en Strategy por desfase de 1 segundo en funding de Binance** — Binance Strategy ejecuta el trade a `T` y transfiere el USDT de financiación desde Spot a `T+1` segundos (mismo order ID). Como son timestamps distintos, la prioridad no resuelve el orden. El parser ahora detecta transferencias Spot→Strategy (negativas en Spot) que llegan 1–5 segundos después de un `Transaction Spend` en Strategy de la misma moneda, y normaliza el timestamp del TRANSFER al del BUY. Esto permite que `TRANSFER_INTERNAL (3)` corra antes que `BUY (4)` dentro del mismo segundo lógico.
+
 ## [0.0.8] - 2026-06-15
 
 ### Añadido

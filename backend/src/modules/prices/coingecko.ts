@@ -97,7 +97,7 @@ async function fetchWithRetry(url: string, retries = 3): Promise<unknown> {
         const waitMs = retryAfter > 0 ? retryAfter * 1000 : attempt * 15000;
         const waitSec = Math.round(waitMs / 1000);
         console.warn(`[PRICES] Rate limit (429), esperando ${waitSec}s...`);
-        _statusCallback?.(`⚠ Rate limit CoinGecko 429 — esperando ${waitSec}s (intento ${attempt}/${retries})...`);
+        _statusCallback?.(`⏳ Rate limit CoinGecko 429 — esperando ${waitSec}s (intento ${attempt}/${retries})...`);
         await sleep(waitMs);
         continue;
       }
@@ -256,33 +256,114 @@ export async function getCurrentPricesEur(symbols: string[]): Promise<Map<string
   return result;
 }
 
-// ── Precarga batch de precios históricos ──────────────────────────────────
+// ── Precarga batch de precios históricos via market_chart/range ───────────
+// Para activos CoinGecko con múltiples fechas, una sola llamada range reemplaza
+// N llamadas individuales /history?date=, reduciendo el tiempo de 8×6.5s a 6.5s.
 export async function prefetchHistoricalPrices(
   requiredPrices: Array<{ symbol: string; date: Date }>
 ): Promise<void> {
-  const unique = new Map<string, Date>();
+  // Agrupar por símbolo todas las fechas únicas que faltan en caché
+  const bySymbol = new Map<string, Set<string>>();
+  const dateByKey = new Map<string, Date>();
+
   for (const { symbol, date } of requiredPrices) {
     if (symbol === 'EUR') continue;
-    const key = `${symbol}|${toDateStr(date)}`;
-    if (!unique.has(key)) unique.set(key, date);
+    const dateStr = toDateStr(date);
+    const key = `${symbol}|${dateStr}`;
+    if (!bySymbol.has(symbol)) bySymbol.set(symbol, new Set());
+    bySymbol.get(symbol)!.add(dateStr);
+    dateByKey.set(key, date);
   }
 
-  const toFetch: Array<{ symbol: string; date: Date }> = [];
-  for (const [key, date] of unique) {
-    const symbol = key.split('|')[0];
-    const cached = await db.query(
-      'SELECT id FROM price_cache WHERE asset = $1 AND price_date = $2',
-      [symbol, toDateStr(date)]
+  if (bySymbol.size === 0) return;
+
+  // Filtrar las que ya están en caché DB (incluye sentinels)
+  for (const [symbol, dateStrs] of bySymbol) {
+    const existing = await db.query(
+      'SELECT price_date::text FROM price_cache WHERE asset = $1 AND price_date = ANY($2)',
+      [symbol, [...dateStrs]]
     );
-    if (cached.rows.length === 0) {
-      toFetch.push({ symbol, date });
+    for (const row of existing.rows as { price_date: string }[]) {
+      dateStrs.delete(row.price_date);
     }
+    if (dateStrs.size === 0) bySymbol.delete(symbol);
   }
 
-  if (toFetch.length === 0) return;
+  if (bySymbol.size === 0) return;
 
-  for (const { symbol, date } of toFetch) {
-    await getHistoricalPriceEur(symbol, date);
+  // Para cada símbolo CoinGecko: una llamada range en lugar de N llamadas /history
+  for (const [symbol, dateStrs] of bySymbol) {
+    const geckoId = coinGeckoIds.get(symbol);
+    if (!geckoId) {
+      // Sin coingecko_id: fallback a llamadas individuales (la cache DB guardará el resultado)
+      for (const dateStr of dateStrs) {
+        await getHistoricalPriceEur(symbol, dateByKey.get(`${symbol}|${dateStr}`)!);
+      }
+      continue;
+    }
+
+    const dates = [...dateStrs].map(d => new Date(d + 'T00:00:00Z'));
+    const minTs = Math.min(...dates.map(d => d.getTime()));
+    const maxTs = Math.max(...dates.map(d => d.getTime()));
+
+    // Buffer de ±1 día para asegurar que los extremos quedan dentro del rango
+    const fromTs = Math.floor(minTs / 1000) - 86400;
+    const toTs   = Math.floor(maxTs / 1000) + 86400;
+
+    const datesNeeded = [...dateStrs];
+    _statusCallback?.(`🔄 ${symbol}: consultando ${datesNeeded.length} fecha${datesNeeded.length > 1 ? 's' : ''} via CoinGecko market_chart/range (1 llamada)...`);
+
+    const data = await queue.enqueue(async () => {
+      const url = `${BASE_URL}/coins/${geckoId}/market_chart/range?vs_currency=eur&from=${fromTs}&to=${toTs}`;
+      return await fetchWithRetry(url) as { prices: [number, number][] } | null;
+    }).catch((e: Error) => {
+      _statusCallback?.(`⚠ ${symbol}: fallo market_chart/range — ${e.message}`);
+      console.warn(`[PRICES] market_chart/range ${symbol}: ${e.message}`);
+      return null;
+    });
+
+    if (!data?.prices?.length) {
+      // Si falla el range, fallback a llamadas individuales
+      _statusCallback?.(`↩ ${symbol}: fallback a llamadas individuales /history (${datesNeeded.length} peticiones)`);
+      for (const dateStr of dateStrs) {
+        await getHistoricalPriceEur(symbol, dateByKey.get(`${symbol}|${dateStr}`)!);
+      }
+      continue;
+    }
+
+    // Construir mapa fecha → precio (tomar el último punto de cada día)
+    const priceMap = new Map<string, number>();
+    for (const [ts, price] of data.prices) {
+      if (price > 0) priceMap.set(toDateStr(new Date(ts)), price);
+    }
+
+    // Persistir en caché todos los precios del rango (y sentinels para los que fallen)
+    let found = 0;
+    for (const dateStr of datesNeeded) {
+      const price = priceMap.get(dateStr);
+      if (price && price > 0) {
+        await db.query(
+          `INSERT INTO price_cache (asset, price_eur, price_date, source)
+           VALUES ($1, $2, $3, 'coingecko_chart')
+           ON CONFLICT (asset, price_date) DO UPDATE SET price_eur = EXCLUDED.price_eur`,
+          [symbol, price, dateStr]
+        );
+        noPricePairs.delete(`${symbol}|${dateStr}`);
+        found++;
+        _statusCallback?.(`✓ ${symbol} @ ${dateStr} = ${price.toFixed(8)} EUR`);
+      } else {
+        await db.query(
+          `INSERT INTO price_cache (asset, price_eur, price_date, source)
+           VALUES ($1, -1, $2, 'no_data')
+           ON CONFLICT (asset, price_date) DO NOTHING`,
+          [symbol, dateStr]
+        );
+        noPricePairs.add(`${symbol}|${dateStr}`);
+        _statusCallback?.(`— ${symbol} @ ${dateStr}: sin datos en CoinGecko`);
+        console.warn(`[PRICES] — ${symbol} @ ${dateStr} sin datos en range`);
+      }
+    }
+    _statusCallback?.(`✓ ${symbol}: ${found}/${datesNeeded.length} precios obtenidos en 1 llamada API`);
   }
 }
 

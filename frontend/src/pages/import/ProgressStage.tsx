@@ -112,24 +112,33 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
         })}
       </div>
 
-      {!done && !isError && (
-        <div className="flex items-center gap-3 p-3 bg-background-tertiary rounded-xl">
-          <RefreshCw size={14} className="text-accent-blue animate-spin shrink-0" />
-          <span className="text-sm text-gray-300 truncate">
-            {log.length > 0 ? log[log.length - 1].message : 'Iniciando...'}
-          </span>
-          {latestImportingEvent && currentPhase === 'importing' && (
-            <span className="ml-auto text-xs text-gray-500 font-mono shrink-0">
-              {latestImportingEvent.progress}/{latestImportingEvent.total}
+      {!done && !isError && (() => {
+        const lastMsg = log.length > 0 ? log[log.length - 1].message : 'Iniciando...'
+        const isRateLimit = lastMsg.startsWith('⏳') || lastMsg.includes('Rate limit') || lastMsg.includes('429')
+        const isPrefetch  = lastMsg.startsWith('🔄')
+        return (
+          <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
+            isRateLimit ? 'bg-orange-950/40 border border-orange-500/30' :
+            isPrefetch  ? 'bg-purple-950/40 border border-purple-500/30' :
+            'bg-background-tertiary border border-transparent'
+          }`}>
+            <RefreshCw size={14} className={`shrink-0 animate-spin ${isRateLimit ? 'text-orange-400' : isPrefetch ? 'text-purple-400' : 'text-accent-blue'}`} />
+            <span className={`text-sm truncate ${isRateLimit ? 'text-orange-300' : isPrefetch ? 'text-purple-300' : 'text-gray-300'}`}>
+              {lastMsg}
             </span>
-          )}
-          {latestPricesEvent && currentPhase === 'prices' && (
-            <span className="ml-auto text-xs text-gray-500 font-mono shrink-0">
-              {latestPricesEvent.progress}/{latestPricesEvent.total}
-            </span>
-          )}
-        </div>
-      )}
+            {latestImportingEvent && currentPhase === 'importing' && (
+              <span className="ml-auto text-xs text-gray-500 font-mono shrink-0">
+                {latestImportingEvent.progress}/{latestImportingEvent.total}
+              </span>
+            )}
+            {latestPricesEvent && currentPhase === 'prices' && (
+              <span className="ml-auto text-xs text-gray-500 font-mono shrink-0">
+                {latestPricesEvent.progress}/{latestPricesEvent.total}
+              </span>
+            )}
+          </div>
+        )
+      })()}
 
       {isError && (
         <div className="flex items-start gap-3 p-4 bg-accent-red/5 border border-accent-red/30 rounded-xl">
@@ -153,29 +162,34 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
             <span className="text-gray-600">Esperando inicio...</span>
           )}
           {log.map((event, absIdx) => ({ event, absIdx })).slice(-300).map(({ event, absIdx }) => {
-            const isNoPrice        = event.phase === 'prices' && event.message.startsWith('—')
-            const isOkPrice        = event.phase === 'prices' && event.message.startsWith('✓')
-            const isImportOk       = event.phase === 'importing' && event.message.includes('✓')
-            const isImportNoPrice  = event.phase === 'importing' && event.message.startsWith('[') && event.message.includes('sin precio')
-            const isWarn           = event.message.includes('⚠')
-            const isImportProgress = event.phase === 'importing' && event.progress !== undefined
+            const msg = event.message
+            const isRateLimit      = msg.startsWith('⏳') || msg.includes('Rate limit') || msg.includes('429')
+            const isPrefetch       = msg.startsWith('🔄')
+            const isFallback       = msg.startsWith('↩')
+            const isOkPrice        = msg.startsWith('✓')
+            const isNoPrice        = msg.startsWith('—')
+            const isWarn           = msg.includes('⚠')
+            const isFifoError      = event.phase === 'fifo' && (isWarn || msg.startsWith('  ⚠'))
+            const isImportProgress = event.phase === 'importing' && event.progress !== undefined && !isOkPrice && !isNoPrice && !isWarn && !isPrefetch
             const color =
-              event.phase === 'error'  ? 'text-accent-red'    :
-              event.phase === 'done'   ? 'text-accent-green'  :
-              isWarn                   ? 'text-yellow-500'    :
-              isImportOk               ? 'text-accent-green'  :
-              isImportNoPrice          ? 'text-yellow-600'    :
-              event.phase === 'fifo'   ? 'text-accent-blue'   :
-              isNoPrice                ? 'text-yellow-600'    :
-              isOkPrice                ? 'text-gray-500'      :
-              event.phase === 'prices' ? 'text-gray-400'      :
-              isImportProgress         ? 'text-gray-500'      :
+              event.phase === 'error' ? 'text-accent-red'         :
+              event.phase === 'done'  ? 'text-accent-green'       :
+              isRateLimit             ? 'text-orange-400'         :
+              isPrefetch              ? 'text-purple-400'         :
+              isFallback              ? 'text-yellow-600'         :
+              isFifoError             ? 'text-yellow-500'         :
+              isWarn                  ? 'text-yellow-500'         :
+              isOkPrice               ? 'text-accent-green'       :
+              isNoPrice               ? 'text-yellow-600'         :
+              event.phase === 'fifo'  ? 'text-accent-blue'        :
+              isImportProgress        ? 'text-gray-500'           :
+              event.phase === 'prices'? 'text-gray-400'           :
               'text-gray-300'
             return (
               <div key={absIdx} className={color}>
                 {event.progress !== undefined && event.total !== undefined
-                  ? `[${event.progress}/${event.total}] ${event.message}`
-                  : event.message
+                  ? `[${event.progress}/${event.total}] ${msg}`
+                  : msg
                 }
               </div>
             )

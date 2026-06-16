@@ -37,6 +37,8 @@ export type OperationType =
   | 'FORK'
   | 'GIFT_SENT'
   | 'LOST'
+  | 'MARGIN_BORROW'
+  | 'MARGIN_REPAY'
   | 'IGNORED';
 
 export interface ParsedTransaction {
