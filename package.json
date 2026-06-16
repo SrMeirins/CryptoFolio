@@ -11,5 +11,5 @@
     "dist:mac": "npm run build && npm run dist:mac   --prefix electron",
     "dist:linux": "npm run build && npm run dist:linux --prefix electron"
   },
-  "version": "0.0.9"
+  "version": "0.0.10"
 }

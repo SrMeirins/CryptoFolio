@@ -38,6 +38,8 @@ ipcMain.handle('get-update-status', () => ({
 }));
 
 ipcMain.handle('download-and-install', async () => {
+  shuttingDown = true;
+  await shutdown().catch(() => {});
   if (updateDownloaded) {
     autoUpdater.quitAndInstall(false, true);
     return;
@@ -46,7 +48,9 @@ ipcMain.handle('download-and-install', async () => {
   autoUpdater.quitAndInstall(false, true);
 });
 
-ipcMain.on('install-update', () => {
+ipcMain.on('install-update', async () => {
+  shuttingDown = true;
+  await shutdown().catch(() => {});
   autoUpdater.quitAndInstall(false, true);
 });
 
@@ -108,6 +112,8 @@ async function checkForUpdateOnStartup(): Promise<void> {
       clearTimeout(timeout);
       cleanupListeners();
 
+      // El splash tiene alwaysOnTop — desactivarlo mientras el diálogo está abierto
+      splashWindow?.setAlwaysOnTop(false);
       const { response } = await dialog.showMessageBox({
         type: 'info',
         title: 'Actualización disponible',
@@ -117,6 +123,7 @@ async function checkForUpdateOnStartup(): Promise<void> {
         defaultId: 0,
         cancelId: 1,
       });
+      splashWindow?.setAlwaysOnTop(true);
 
       if (response === 0) {
         // Usuario acepta → descargar y reiniciar (sin arrancar postgres)
@@ -126,8 +133,13 @@ async function checkForUpdateOnStartup(): Promise<void> {
           setSplashStatus(`Descargando actualización... ${Math.round(p.percent)}%`);
         });
 
-        autoUpdater.once('update-downloaded', () => {
+        autoUpdater.once('update-downloaded', async () => {
           setSplashStatus('Instalando...');
+          // Parar postgres antes de que el instalador sustituya los binarios.
+          // Marcar shuttingDown=true para que before-quit no interfiera y permita
+          // que electron-updater complete su propio ciclo de quit → install → relaunch.
+          shuttingDown = true;
+          await shutdown().catch(() => {});
           autoUpdater.quitAndInstall(false, true);
         });
 
