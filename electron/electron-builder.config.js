@@ -108,7 +108,7 @@ module.exports = {
     provider: 'github',
     owner: 'SrMeirins',        // ← tu usuario de GitHub
     repo: 'CryptoFolio',
-    releaseType: 'draft',   // draft → revisa artefactos en GitHub antes de publicar
+    releaseType: 'release',
   },
 
   // Directorio de salida de los instaladores
