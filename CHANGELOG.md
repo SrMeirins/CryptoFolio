@@ -9,6 +9,26 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.0.11] - 2026-06-17
+
+### Añadido
+
+#### Portfolio — Break Even Price
+
+- **Columna "P. medio" restaurada en la tabla de activos** — muestra el precio medio de compra de todos los lotes abiertos de cada activo (coste base total ÷ cantidad total). Es el precio al que el activo debe llegar para recuperar exactamente lo invertido. Visible en la vista expandida (no compacta), ordenable como el resto de columnas.
+
+### Corregido
+
+#### Electron — icono en barra de tareas de Ubuntu
+
+- **Icono de engranaje en lugar del logo en GNOME** — en Ubuntu con GNOME, la barra de aplicaciones mostraba un icono genérico de engranaje gris en lugar del logo de CryptoFolio. Causa: Electron derivaba el `WM_CLASS` del campo `name` del `package.json` (`cryptofolio-desktop`), que no coincidía con `StartupWMClass=CryptoFolio` del fichero `.desktop`. Corregido llamando a `app.setName('CryptoFolio')` al inicio, forzando el `WM_CLASS` correcto.
+
+#### Auto-update — diálogo y relanzamiento (v0.0.10)
+
+- **Diálogo de actualización tapado por la splash screen** — la splash tenía `alwaysOnTop: true`; ahora se desactiva antes de mostrar el diálogo y se reactiva al cerrarlo.
+- **App no se relanzaba tras instalar la actualización** — el handler `before-quit` llamaba a `event.preventDefault()` bloqueando el mecanismo de reinicio de `electron-updater`. Corregido marcando `shuttingDown = true` y esperando el cierre limpio de PostgreSQL antes de llamar a `quitAndInstall(false, true)`.
+- **Race condition en publicación de releases** — con `releaseType: 'release'` la primera plataforma publicaba el release antes de que las otras subiesen sus assets, causando 404 en `latest-linux.yml`. Ahora los tres jobs de CI suben a draft y un job final `publish` convierte el draft a release solo cuando los tres han terminado.
+
 ## [0.0.9] - 2026-06-16
 
 ### Corregido

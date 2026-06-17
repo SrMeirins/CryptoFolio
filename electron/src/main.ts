@@ -6,6 +6,11 @@ import { BackendManager } from './backend-manager';
 
 const isDev = process.env.NODE_ENV === 'development';
 
+// On Linux/XWayland, Electron derives WM_CLASS from app.getName().
+// Without this the WM_CLASS would be 'cryptofolio-desktop' (the package name)
+// instead of 'CryptoFolio', breaking the StartupWMClass match in the .desktop file.
+app.setName('CryptoFolio');
+
 process.stdout.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });
 process.stderr.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });
 

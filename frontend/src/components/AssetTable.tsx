@@ -177,6 +177,7 @@ function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue,
     : null
 
   // Break-even: precio al que vendiendo todo recuperas exactamente lo invertido
+  const breakEvenPrice = row.totalQuantity > 0 ? row.totalCostBasis / row.totalQuantity : null
 
   // Peso sobre el portfolio total
   const portfolioWeight = hasPrice && totalPortfolioValue > 0
@@ -263,6 +264,13 @@ function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue,
         </td>
 
 
+        {/* Break-even — oculto en compacto */}
+        {!compact && (
+          <td className="px-4 py-3 text-right mono text-gray-400">
+            {breakEvenPrice !== null ? formatPrice(breakEvenPrice) : <span className="text-gray-600">—</span>}
+          </td>
+        )}
+
         {/* Valor EUR */}
         <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono font-medium`}>
           {hasPrice ? formatEur(row.value)
@@ -323,6 +331,7 @@ function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue,
               </td>
               <td className="px-4 py-2 text-right mono text-xs text-gray-400">{formatAmount(w.quantity)}</td>
               <td className="px-4 py-2 text-right mono text-xs text-gray-600">—</td>
+              {!compact && <td className="px-4 py-2 text-right mono text-xs text-gray-600">—</td>}
               <td className="px-4 py-2 text-right mono text-xs">
                 {hasPrice ? <span className="text-gray-300">{formatEur(wValue)}</span> : <span className="text-gray-600">—</span>}
               </td>
@@ -426,7 +435,7 @@ function FiatRowComponent({ row, totalPortfolioValue, compact = false }: { row: 
 
 const DUST_THRESHOLD = 1
 
-type SortKey = 'asset' | 'quantity' | 'price' | 'value' | 'cost' | 'pnl' | 'pnlpct' | 'weight'
+type SortKey = 'asset' | 'quantity' | 'price' | 'value' | 'cost' | 'pnl' | 'pnlpct' | 'weight' | 'breakeven'
 type SortDir = 'asc' | 'desc'
 
 function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices: Record<string, number>, total: number): UnifiedRow[] {
@@ -460,6 +469,9 @@ function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices: Record
     } else if (key === 'weight') {
       va = total > 0 ? (a.value / total) * 100 : 0
       vb = total > 0 ? (b.value / total) * 100 : 0
+    } else if (key === 'breakeven') {
+      va = a.kind === 'crypto' && a.totalQuantity > 0 ? a.totalCostBasis / a.totalQuantity : 0
+      vb = b.kind === 'crypto' && b.totalQuantity > 0 ? b.totalCostBasis / b.totalQuantity : 0
     }
     return dir === 'asc' ? va - vb : vb - va
   })
@@ -541,6 +553,7 @@ export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTablePr
         <SortTh label="Activo"     sk="asset"    right={false} />
         <SortTh label="Cantidad"   sk="quantity"  />
         <SortTh label="Precio"     sk="price"     />
+        {!compact && <SortTh label="P. medio" sk="breakeven" title="Precio medio de compra (break-even)" />}
         <SortTh label="Valor EUR"  sk="value"     />
         {!compact && <SortTh label="Coste base" sk="cost" />}
         {!compact && <SortTh label="P&L"        sk="pnl"  />}
