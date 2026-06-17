@@ -101,6 +101,12 @@ module.exports = {
     category: 'Finance',
     maintainer: 'CryptoFolio',
     description: 'Gestión de portfolio y fiscalidad crypto para España',
+    // Electron/Chromium reporta WM_CLASS = "cryptofolio" (productName en minúsculas).
+    // StartupWMClass debe coincidir exactamente (case-sensitive) para que GNOME
+    // asocie la ventana al .desktop y muestre el logo en el dock.
+    desktop: {
+      StartupWMClass: 'cryptofolio',
+    },
   },
 
   // ── Publicación en GitHub Releases ─────────────────────────────────────────

@@ -6,16 +6,6 @@ import { BackendManager } from './backend-manager';
 
 const isDev = process.env.NODE_ENV === 'development';
 
-// Linux icon/taskbar association:
-// - --class sets the X11 WM_CLASS (must match StartupWMClass in the .desktop file)
-// - setDesktopFileName tells GNOME Wayland which .desktop file owns this window
-// Both must be called before app.whenReady().
-// On Linux, force WM_CLASS to match StartupWMClass in the .desktop file.
-// Without this Electron reports 'cryptofolio' (lowercase) and GNOME can't
-// match it to the desktop entry, showing a generic gear icon instead.
-if (process.platform === 'linux') {
-  app.commandLine.appendSwitch('class', 'CryptoFolio');
-}
 app.setName('CryptoFolio');
 
 process.stdout.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });
