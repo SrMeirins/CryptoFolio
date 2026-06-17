@@ -11,9 +11,27 @@ permissions:
   contents: write
 
 jobs:
+  # ── Pre-crear el draft ANTES de que los 3 builders arranquen ─────────────
+  # Sin este job, cada builder intenta crear el draft al mismo tiempo y los
+  # que llegan tarde ven "release doesn't exist" y pierden el upload.
+  create-draft:
+    name: Create draft release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --draft \
+            --title "${{ github.ref_name }}" \
+            --notes "Building..." \
+            --repo "${{ github.repository }}"
+
   build:
     name: Build — ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    needs: create-draft          # espera a que el draft exista antes de subir
 
     strategy:
       fail-fast: false   # Si falla un OS, los otros siguen
@@ -49,8 +67,6 @@ jobs:
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
       # ── 4. Build frontend ─────────────────────────────────────────────────────
-      # Las variables VITE_* se declaran como env: para que funcionen en todos
-      # los runners (bash / PowerShell / cmd) sin cambiar la sintaxis del run.
       - name: Install & build frontend
         working-directory: frontend
         env:
@@ -73,7 +89,6 @@ jobs:
         run: npm ci
 
       # ── 7. Inyectar versión del tag en electron/package.json ─────────────────
-      # npm version falla si la versión ya coincide; npm pkg set siempre escribe.
       - name: Set version
         working-directory: electron
         run: npm pkg set version=${{ steps.version.outputs.VERSION }}
@@ -83,21 +98,11 @@ jobs:
         working-directory: electron
         run: npm run build
 
-      # ── 9. Empaquetar y publicar en GitHub Release ───────────────────────────
-      # El release se crea como DRAFT: puedes revisar los artefactos y añadir
-      # notas antes de publicarlo. Cambia releaseType a 'release' en
-      # electron-builder.config.js para publicar directamente.
+      # ── 9. Empaquetar y subir al draft ya existente ───────────────────────────
       - name: Package & publish
         working-directory: electron
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Firma de código Windows (descomenta cuando tengas certificado EV):
-          # CSC_LINK:          ${{ secrets.WIN_CSC_LINK }}
-          # CSC_KEY_PASSWORD:  ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-          # Notarización macOS (descomenta con cuenta Apple Developer):
-          # APPLE_ID:                    ${{ secrets.APPLE_ID }}
-          # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          # APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
         run: npm run dist:${{ matrix.platform }}
 
       # ── 10. Subir artefactos en caso de fallo (para diagnóstico) ─────────────
@@ -112,21 +117,17 @@ jobs:
   # ── Publicar el draft solo cuando los 3 plataformas han subido sus assets ──
   publish:
     name: Publish release
-    needs: build          # espera a que todos los jobs de la matrix terminen OK
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Extract release notes from CHANGELOG
-        id: notes
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          # Extrae el bloque entre ## [VERSION] y el siguiente ## [
-          NOTES=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
-          # Guarda en archivo para evitar problemas de escaping en variables de entorno
-          echo "$NOTES" > release_notes.md
+          awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md > release_notes.md
 
       - name: Publish draft → release
         env:
