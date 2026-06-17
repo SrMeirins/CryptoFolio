@@ -115,7 +115,24 @@ jobs:
     needs: build          # espera a que todos los jobs de la matrix terminen OK
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Extrae el bloque entre ## [VERSION] y el siguiente ## [
+          NOTES=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          # Guarda en archivo para evitar problemas de escaping en variables de entorno
+          echo "$NOTES" > release_notes.md
+
       - name: Publish draft → release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "${{ github.ref_name }}" --draft=false --repo "${{ github.repository }}"
+        run: |
+          gh release edit "${{ github.ref_name }}" \
+            --draft=false \
+            --notes-file release_notes.md \
+            --repo "${{ github.repository }}"
