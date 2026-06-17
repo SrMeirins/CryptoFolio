@@ -10,10 +10,11 @@ const isDev = process.env.NODE_ENV === 'development';
 // - --class sets the X11 WM_CLASS (must match StartupWMClass in the .desktop file)
 // - setDesktopFileName tells GNOME Wayland which .desktop file owns this window
 // Both must be called before app.whenReady().
+// On Linux, force WM_CLASS to match StartupWMClass in the .desktop file.
+// Without this Electron reports 'cryptofolio' (lowercase) and GNOME can't
+// match it to the desktop entry, showing a generic gear icon instead.
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('class', 'CryptoFolio');
-  // setDesktopFileName added in Electron 26; types may lag behind
-  (app as unknown as { setDesktopFileName(name: string): void }).setDesktopFileName('cryptofolio-desktop');
 }
 app.setName('CryptoFolio');
 

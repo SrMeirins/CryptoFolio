@@ -16,7 +16,7 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 #### Electron — icono en barra de tareas de Ubuntu (fix definitivo)
 
 - **WM_CLASS incorrecto en X11/XWayland** — `app.setName()` no afecta al `WM_CLASS` de X11. El WM_CLASS real que reportaba Electron era `cryptofolio` (todo minúsculas), mientras el fichero `.desktop` declara `StartupWMClass=CryptoFolio`. El matching de GNOME es case-sensitive. Corregido pasando `--class=CryptoFolio` a Chromium vía `app.commandLine.appendSwitch('class', 'CryptoFolio')`.
-- **Asociación en GNOME Wayland** — en modo Wayland GNOME no usa `WM_CLASS` sino el app-id de Wayland. Añadido `app.setDesktopFileName('cryptofolio-desktop')` para que GNOME asocie la ventana al fichero `.desktop` correcto y muestre el logo en el dock.
+- **Crash al arrancar en v0.0.12** — `app.setDesktopFileName()` no existe en la versión de Electron bundleada. Eliminado; el flag `--class` cubre el caso X11/XWayland que es el origen del problema.
 
 ## [0.0.11] - 2026-06-17
 
