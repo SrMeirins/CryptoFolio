@@ -186,7 +186,7 @@ async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<numbe
   // 3. Lanzar todos los pares de Binance en paralelo (no tienen rate limit propio).
   //    Preferencia EUR > USDT > BTC > ETH: usamos el de mayor prioridad que tenga dato.
   //    inFlightPrices deduplicará llamadas concurrentes al mismo (BTC/ETH, fecha).
-  let priceEur = 0;
+  let priceEur: number;
 
   const [eurR, usdtR, btcR, ethR] = await Promise.allSettled([
     info.binanceEurPair

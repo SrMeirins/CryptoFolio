@@ -299,10 +299,9 @@ router.get('/carryforward', async (_req: Request, res: Response) => {
     const gananciasPatrim  = netoGP > 0 ? netoGP : 0;
 
     // 1. Compensar pérdidas pendientes contra ganancias patrimoniales del año
-    let pendienteTotal = pendientes.reduce((s, p) => s + p.importe, 0);
-    const compensadoPatrim = Math.min(pendienteTotal, gananciasPatrim);
-    let restanteGanancias  = gananciasPatrim - compensadoPatrim;
-    pendienteTotal        -= compensadoPatrim;
+    const pendienteTotalPatrim = pendientes.reduce((s, p) => s + p.importe, 0);
+    const compensadoPatrim = Math.min(pendienteTotalPatrim, gananciasPatrim);
+    const restanteGanancias = gananciasPatrim - compensadoPatrim;
 
     // Aplicar consumo proporcional FIFO sobre los pendientes
     let aConsumir = compensadoPatrim;
@@ -316,9 +315,8 @@ router.get('/carryforward', async (_req: Request, res: Response) => {
 
     // 2. Compensar pérdidas pendientes restantes contra rendimientos (límite 25%)
     const limiteRendimientos = rendimientos > 0 ? rendimientos * 0.25 : 0;
-    pendienteTotal = pendientes.reduce((s, p) => s + p.importe, 0);
-    const compensadoRend = Math.min(pendienteTotal, limiteRendimientos);
-    pendienteTotal -= compensadoRend;
+    const pendienteTotalRend = pendientes.reduce((s, p) => s + p.importe, 0);
+    const compensadoRend = Math.min(pendienteTotalRend, limiteRendimientos);
 
     aConsumir = compensadoRend;
     for (const p of pendientes) {

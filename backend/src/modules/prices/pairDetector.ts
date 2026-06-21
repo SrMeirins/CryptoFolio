@@ -60,7 +60,7 @@ export async function autoDetectPair(symbol: string): Promise<AssetPairInfo> {
   const btcPair  = `${symbol}BTC`;
   const ethPair  = `${symbol}ETH`;
 
-  let info: AssetPairInfo = {
+  const info: AssetPairInfo = {
     symbol,
     binanceEurPair: null,
     binanceUsdtPair: null,

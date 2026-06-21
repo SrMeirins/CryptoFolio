@@ -11,13 +11,26 @@ permissions:
   contents: write
 
 jobs:
+  lint:
+    name: Lint & typecheck
+    uses: ./.github/workflows/_lint.yml
+
   # ── Pre-crear el draft ANTES de que los 3 builders arranquen ─────────────
   # Sin este job, cada builder intenta crear el draft al mismo tiempo y los
   # que llegan tarde ven "release doesn't exist" y pierden el upload.
   create-draft:
     name: Create draft release
+    needs: lint
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
     steps:
+      # Extraer versión del tag (v1.2.3 → 1.2.3) para inyectarla en electron/package.json
+      - name: Extract version
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
       - name: Create draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -29,8 +42,7 @@ jobs:
             --repo "${{ github.repository }}"
 
   build:
-    name: Build — ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Build — ${{ matrix.platform }}
     needs: create-draft          # espera a que el draft exista antes de subir
 
     strategy:
@@ -44,75 +56,13 @@ jobs:
           - os: windows-latest
             platform: win
 
-    steps:
-      # ── 1. Checkout ──────────────────────────────────────────────────────────
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # ── 2. Node.js 20 con caché de npm ───────────────────────────────────────
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: |
-            frontend/package-lock.json
-            backend/package-lock.json
-            electron/package-lock.json
-
-      # ── 3. Extraer versión del tag (v1.2.3 → 1.2.3) ─────────────────────────
-      - name: Extract version
-        id: version
-        shell: bash
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
-
-      # ── 4. Build frontend ─────────────────────────────────────────────────────
-      - name: Install & build frontend
-        working-directory: frontend
-        env:
-          VITE_API_URL: http://127.0.0.1:3001
-          VITE_WS_URL: ws://127.0.0.1:3001
-        run: |
-          npm ci
-          npm run build
-
-      # ── 5. Build backend ──────────────────────────────────────────────────────
-      - name: Install & build backend
-        working-directory: backend
-        run: |
-          npm ci
-          npm run build
-
-      # ── 6. Instalar dependencias de Electron ──────────────────────────────────
-      - name: Install Electron deps
-        working-directory: electron
-        run: npm ci
-
-      # ── 7. Inyectar versión del tag en electron/package.json ─────────────────
-      - name: Set version
-        working-directory: electron
-        run: npm pkg set version=${{ steps.version.outputs.VERSION }}
-
-      # ── 8. Compilar TypeScript del proceso principal ──────────────────────────
-      - name: Build Electron TS
-        working-directory: electron
-        run: npm run build
-
-      # ── 9. Empaquetar y subir al draft ya existente ───────────────────────────
-      - name: Package & publish
-        working-directory: electron
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run dist:${{ matrix.platform }}
-
-      # ── 10. Subir artefactos en caso de fallo (para diagnóstico) ─────────────
-      - name: Upload artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: releases-${{ matrix.os }}
-          path: releases/
-          retention-days: 7
+    uses: ./.github/workflows/_build.yml
+    with:
+      os: ${{ matrix.os }}
+      platform: ${{ matrix.platform }}
+      publish: true
+      version: ${{ needs.create-draft.outputs.version }}
+    secrets: inherit
 
   # ── Publicar el draft solo cuando los 3 plataformas han subido sus assets ──
   publish:
