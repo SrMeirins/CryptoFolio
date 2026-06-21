@@ -291,7 +291,7 @@ async function processTransaction(tx: Transaction, result: FifoRunResult, margin
 
 // ── BUY ───────────────────────────────────────────────────────────────────
 async function processBuy(tx: Transaction, result: FifoRunResult): Promise<void> {
-  let costBasisEur = 0;
+  let costBasisEur: number;
   let feeEur = 0;
 
   if (tx.cost_asset === 'EUR') {
@@ -402,7 +402,7 @@ async function processSell(tx: Transaction, result: FifoRunResult): Promise<void
     return;
   }
 
-  let proceedsEur = 0;
+  let proceedsEur: number;
 
   if (tx.cost_asset === 'EUR') {
     proceedsEur = tx.cost_amount ?? 0;

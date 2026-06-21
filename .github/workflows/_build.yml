@@ -1,0 +1,100 @@
+name: Build (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: "Runner (windows-latest, macos-latest, ubuntu-latest)"
+        required: true
+        type: string
+      platform:
+        description: "Plataforma electron-builder (win, mac, linux)"
+        required: true
+        type: string
+      publish:
+        description: "Si true, publica el instalador en el draft release (dist:<platform>). Si false, empaqueta sin publicar (dist:local) y sube un artefacto de prueba."
+        required: false
+        type: boolean
+        default: false
+      version:
+        description: "Versión a inyectar en electron/package.json (sin la 'v' inicial). Vacío = no se toca."
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  build:
+    name: Build — ${{ inputs.platform }}
+    runs-on: ${{ inputs.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+            electron/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_URL: http://127.0.0.1:3001
+          VITE_WS_URL: ws://127.0.0.1:3001
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build backend
+        working-directory: backend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install Electron deps
+        working-directory: electron
+        run: npm ci
+
+      - name: Set version
+        if: inputs.version != ''
+        working-directory: electron
+        run: npm pkg set version=${{ inputs.version }}
+
+      - name: Build Electron TS
+        working-directory: electron
+        run: npm run build
+
+      - name: Package (publicar)
+        if: inputs.publish == true
+        working-directory: electron
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run dist:${{ inputs.platform }}
+
+      - name: Package (sin publicar)
+        if: inputs.publish == false
+        working-directory: electron
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run dist:local
+
+      - name: Subir instalador de prueba como artefacto
+        if: inputs.publish == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: CryptoFolio-${{ inputs.platform }}-test-${{ github.sha }}
+          path: releases/*
+          retention-days: 7
+
+      - name: Subir artefactos en caso de fallo (para diagnóstico)
+        if: failure() && inputs.publish == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: releases-${{ inputs.os }}
+          path: releases/
+          retention-days: 7

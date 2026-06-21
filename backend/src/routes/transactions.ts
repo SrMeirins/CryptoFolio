@@ -70,9 +70,9 @@ router.post('/manual/preview', async (req: Request, res: Response) => {
   }
 
   let estimatedGainLoss: number | null = null;
-  let affectedLots: unknown[] = [];
+  const affectedLots: unknown[] = [];
   let newLot: unknown = null;
-  let transferLots: unknown[] = [];
+  const transferLots: unknown[] = [];
 
   // Preview de venta / consumo de lotes
   if (CONSUME_OPS.has(operationType) && resolvedAmount && wallet_id) {
