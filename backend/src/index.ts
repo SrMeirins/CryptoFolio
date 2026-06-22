@@ -7,8 +7,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import { db } from './db/client';
+import { db, pool } from './db/client';
 import { runMigrations } from './db/run-migrations';
+import { runStartupRepairs } from './db/repairs';
 import importsRouter from './routes/imports';
 import fifoRouter from './routes/fifo';
 import pricesRouter, { setupPricesWebSocket } from './routes/prices';
@@ -133,38 +134,15 @@ async function bootstrap() {
     }
     setupPricesWebSocket(server);
 
-    // Limpiar destination_pending=TRUE en transacciones que ya no son WITHDRAW
-    // (datos corruptos de ediciones previas o upgrades del importer)
-    const staleRes = await db.query(
-      `UPDATE transactions SET destination_pending = FALSE
-       WHERE destination_pending = TRUE AND operation_type != 'WITHDRAW'`
-    );
-    if (staleRes.rowCount && staleRes.rowCount > 0) {
-      console.log(`[STARTUP] Limpiados ${staleRes.rowCount} registros con destination_pending incorrecto`);
-    }
+    await runStartupRepairs();
 
-    // Convertir automáticamente WITHDRAW+destination_pending=TRUE que en el CSV
-    // original eran "Asset Recovery" o "Token Swap - Distribution" negativos.
-    // Binance fuerza estos retiros (delisting): no van a ninguna wallet, son LOST.
-    const forcedLostRes = await db.query(
-      `UPDATE transactions t
-       SET operation_type        = 'LOST'::operation_type,
-           destination_wallet_id = NULL,
-           destination_pending   = FALSE,
-           notes = COALESCE(t.notes, rt.operation || ' — activo retirado por Binance')
-       FROM raw_transactions rt
-       WHERE rt.transaction_id = t.id
-         AND t.operation_type = 'WITHDRAW'
-         AND t.destination_pending = TRUE
-         AND rt.operation IN ('Asset Recovery', 'Token Swap - Distribution')
-         AND rt.change < 0`
-    );
-    if (forcedLostRes.rowCount && forcedLostRes.rowCount > 0) {
-      console.log(`[STARTUP] Reclasificados ${forcedLostRes.rowCount} retiros forzados (Asset Recovery/Token Swap) → LOST`);
-    }
-
-    server.listen(PORT, '0.0.0.0', () => {
-      console.log(`[SERVER] Listening on port ${PORT}`);
+    // BACKEND_HOST lo fija electron/backend-manager.ts a '127.0.0.1' para no
+    // exponer el puerto a la LAN en la app de escritorio (app single-user, sin
+    // auth). En Docker no se define y cae a '0.0.0.0' (el host ya restringe el
+    // acceso vía el mapeo de puertos en docker-compose.yml).
+    const host = process.env.BACKEND_HOST || '0.0.0.0';
+    server.listen(PORT, host, () => {
+      console.log(`[SERVER] Listening on ${host}:${PORT}`);
       startLivePrices();
       // Reparar en background activos con price_source='coingecko' pero coingecko_id=NULL.
       // No bloquea el arranque; usa la cola con rate limit de CoinGecko.
@@ -179,3 +157,20 @@ async function bootstrap() {
 }
 
 bootstrap();
+
+// ── Graceful shutdown ───────────────────────────────────────────────────────
+// Docker manda SIGTERM en `down`/`restart`; sin esto el proceso se mata en
+// seco y el pool de Postgres queda colgado hasta que el OS limpia el socket.
+function shutdown(signal: string) {
+  console.log(`[SERVER] ${signal} recibido, cerrando...`);
+  server.close(() => {
+    pool.end()
+      .then(() => process.exit(0))
+      .catch(() => process.exit(1));
+  });
+  // Por si quedan conexiones WebSocket abiertas bloqueando el close, forzar salida.
+  setTimeout(() => process.exit(1), 10_000).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
