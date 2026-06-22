@@ -2,7 +2,6 @@ import { createServer } from 'http';
 import app from './app';
 import { db, pool } from './db/client';
 import { runMigrations } from './db/run-migrations';
-import { runStartupRepairs } from './db/repairs';
 import { setupPricesWebSocket } from './routes/prices';
 import { startLivePrices } from './modules/prices/binance';
 import { repairMissingCoinGeckoIds } from './modules/prices/coingecko';
@@ -20,8 +19,6 @@ async function bootstrap() {
       await runMigrations();
     }
     setupPricesWebSocket(server);
-
-    await runStartupRepairs();
 
     // BACKEND_HOST lo fija electron/backend-manager.ts a '127.0.0.1' para no
     // exponer el puerto a la LAN en la app de escritorio (app single-user, sin
