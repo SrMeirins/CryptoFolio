@@ -1,6 +1,7 @@
 -- ============================================================
 -- CryptoFolio — Schema PostgreSQL
--- Version: 3.0 — Wallets unificadas (FK, sin enum wallet_type)
+-- Version: 3.1 — Wallets unificadas (FK, sin enum wallet_type) +
+--                migraciones 002-009 horneadas (ver db/migrations/)
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -172,6 +173,9 @@ CREATE TABLE raw_transactions (
 
 CREATE INDEX idx_raw_transactions_time   ON raw_transactions(time);
 CREATE INDEX idx_raw_transactions_import ON raw_transactions(import_id);
+CREATE INDEX idx_raw_transactions_tx     ON raw_transactions(transaction_id);
+-- FK añadida tras crear `transactions` (más abajo en este archivo), no puede
+-- ser inline aquí porque `transactions` todavía no existe en este punto.
 
 -- ============================================================
 -- TABLA: transactions
@@ -210,6 +214,11 @@ CREATE INDEX idx_transactions_asset     ON transactions(asset);
 CREATE INDEX idx_transactions_type      ON transactions(operation_type);
 CREATE INDEX idx_transactions_wallet    ON transactions(wallet_id);
 CREATE INDEX idx_transactions_dest      ON transactions(destination_wallet_id);
+
+-- FK pendiente desde raw_transactions (creada antes que esta tabla más arriba)
+ALTER TABLE raw_transactions
+  ADD CONSTRAINT raw_transactions_transaction_id_fkey
+  FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL;
 
 -- ============================================================
 -- TABLA: fifo_lots
