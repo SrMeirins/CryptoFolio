@@ -1,8 +1,15 @@
--- Parche histórico de una sola vez: corrige datos creados por versiones
--- antiguas de la app, antes de que existieran las protecciones actuales
--- (el endpoint de edición ya limpia destination_pending al cambiar el tipo,
--- y el parser ya importa Asset Recovery/Token Swap negativos como LOST
--- directamente) — no es código que deba repetirse en cada arranque.
+-- ============================================================
+-- Migración 011_repair_legacy_data
+-- Qué: corrige 2 inconsistencias en transacciones ya importadas.
+-- Por qué: son parches de datos creados por versiones antiguas de la app,
+--          antes de que existieran las protecciones actuales — el endpoint
+--          de edición ya limpia destination_pending al cambiar el tipo
+--          (routes/transactions.ts), y el parser ya importa Asset
+--          Recovery/Token Swap negativos como LOST directamente
+--          (modules/csv/parser.ts). No puede repetirse con el código
+--          actual, por eso es una migración de una sola vez y no lógica de
+--          arranque recurrente.
+-- ============================================================
 
 -- Limpiar destination_pending=TRUE en transacciones que ya no son WITHDRAW
 -- (datos corruptos de ediciones hechas antes de que el endpoint de edición

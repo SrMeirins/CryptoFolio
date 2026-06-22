@@ -1,8 +1,14 @@
--- raw_transactions.transaction_id se usaba como FK de facto en varias queries
--- (db/repairs.ts, routes/settings.ts, modules/csv/importer.ts) pero sin
--- constraint ni índice. Al borrar una transacción importada, la referencia
--- quedaba colgante (apuntando a un id que ya no existe). ON DELETE SET NULL
--- limpia automáticamente la referencia en vez de dejarla huérfana.
+-- ============================================================
+-- Migración 010_raw_transactions_fk
+-- Qué: añade índice y FK (ON DELETE SET NULL) a
+--      raw_transactions.transaction_id.
+-- Por qué: esa columna se usaba como FK de facto en varias queries
+--          (routes/settings.ts, modules/csv/importer.ts) pero sin
+--          constraint ni índice. Al borrar una transacción importada
+--          (DELETE FROM transactions), la referencia quedaba colgante
+--          (apuntando a un id que ya no existe). ON DELETE SET NULL la
+--          limpia automáticamente en vez de dejarla huérfana.
+-- ============================================================
 CREATE INDEX IF NOT EXISTS idx_raw_transactions_tx ON raw_transactions(transaction_id);
 
 DO $$
