@@ -17,8 +17,7 @@ async function bootstrap() {
 
     // En modo Electron/standalone, aplicar schema y migraciones automáticamente
     if (process.env.ELECTRON_MODE === 'true') {
-      const dbUrl = process.env.DATABASE_URL!;
-      await runMigrations(dbUrl);
+      await runMigrations();
     }
     setupPricesWebSocket(server);
 
