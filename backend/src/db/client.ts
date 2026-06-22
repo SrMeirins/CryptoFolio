@@ -32,7 +32,9 @@ export const db = {
   },
 };
 
-// Log de errores del pool
+// Obligatorio, no solo logging: si una conexión idle del pool lanza un error
+// y nadie escucha este evento, node-postgres lo propaga como excepción no
+// capturada y mata el proceso entero. Este listener evita ese crash.
 pool.on('error', (err) => {
   console.error('[DB POOL ERROR]', err.message);
 });
