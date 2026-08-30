@@ -3,8 +3,10 @@
 import { registerProvider } from './registry';
 import { xrplProvider } from './xrplProvider';
 import { hederaProvider } from './hederaProvider';
+import { stellarProvider } from './stellarProvider';
 
 export function registerAllProviders(): void {
   registerProvider('XRP Ledger', xrplProvider);
   registerProvider('HBAR', hederaProvider);
+  registerProvider('Stellar', stellarProvider);
 }
