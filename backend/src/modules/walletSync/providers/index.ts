@@ -7,6 +7,7 @@ import { stellarProvider } from './stellarProvider';
 import { blockstreamProvider } from './blockstreamProvider';
 import { etherscanProvider } from './etherscanProvider';
 import { solanaProvider } from './solanaProvider';
+import { blockfrostProvider } from './blockfrostProvider';
 
 export function registerAllProviders(): void {
   registerProvider('XRP Ledger', xrplProvider);
@@ -15,4 +16,5 @@ export function registerAllProviders(): void {
   registerProvider('Bitcoin', blockstreamProvider);
   registerProvider('Ethereum', etherscanProvider);
   registerProvider('Solana', solanaProvider);
+  registerProvider('Cardano', blockfrostProvider);
 }
