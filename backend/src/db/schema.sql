@@ -122,6 +122,10 @@ INSERT INTO wallets (name, type, is_system, is_default, color) VALUES
   ('Binance Strategy',         'exchange', TRUE, FALSE, '#8B5CF6'),
   ('Binance Staking',          'exchange', TRUE, FALSE, '#f59e0b');
 
+-- Bitvavo: cuenta única, sin sub-cuentas (a diferencia de Binance).
+INSERT INTO wallets (name, type, is_system, is_default, color) VALUES
+  ('Bitvavo', 'exchange', TRUE, FALSE, '#273A75');
+
 -- ============================================================
 -- TABLA: wallet_addresses
 -- ============================================================
@@ -141,6 +145,32 @@ CREATE INDEX idx_wallet_addresses_wallet  ON wallet_addresses(wallet_id);
 CREATE INDEX idx_wallet_addresses_network ON wallet_addresses(network_id);
 
 -- ============================================================
+-- TABLA: network_api_keys
+-- ============================================================
+CREATE TABLE network_api_keys (
+  network_id         UUID PRIMARY KEY REFERENCES networks(id) ON DELETE CASCADE,
+  api_key_encrypted  BYTEA NOT NULL,
+  api_key_iv         BYTEA NOT NULL,
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+-- ============================================================
+-- TABLA: balance_sync_log
+-- ============================================================
+CREATE TABLE balance_sync_log (
+  id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  wallet_address_id  UUID NOT NULL REFERENCES wallet_addresses(id) ON DELETE CASCADE,
+  asset              TEXT NOT NULL,
+  checked_at         TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+  onchain_balance    NUMERIC,
+  expected_balance   NUMERIC,
+  discrepancy_pct    NUMERIC,
+  status             TEXT NOT NULL CHECK (status IN ('ok', 'discrepancy', 'error'))
+);
+
+CREATE INDEX idx_balance_sync_log_wallet_address ON balance_sync_log(wallet_address_id, checked_at DESC);
+
+-- ============================================================
 -- TABLA: csv_imports
 -- ============================================================
 CREATE TABLE csv_imports (
@@ -150,6 +180,7 @@ CREATE TABLE csv_imports (
   imported_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   row_count     INTEGER NOT NULL DEFAULT 0,
   skipped_count INTEGER NOT NULL DEFAULT 0,
+  exchange      TEXT NOT NULL DEFAULT 'binance',
   notes         TEXT
 );
 
@@ -237,7 +268,10 @@ CREATE TABLE fifo_lots (
   closed_at           TIMESTAMPTZ,
   is_closed           BOOLEAN NOT NULL DEFAULT FALSE,
   wallet_id           UUID NOT NULL REFERENCES wallets(id),
-  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  -- clock_timestamp() (no NOW()) — runFifoEngine corre en una única transacción,
+  -- y NOW() devolvería el mismo valor fijo para todos los lotes de una ejecución.
+  -- Se usa como desempate en getOpenLots cuando dos lotes comparten opened_at.
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 
 CREATE INDEX idx_fifo_lots_asset      ON fifo_lots(asset);
