@@ -8,6 +8,7 @@ import { blockstreamProvider } from './blockstreamProvider';
 import { etherscanProvider } from './etherscanProvider';
 import { solanaProvider } from './solanaProvider';
 import { blockfrostProvider } from './blockfrostProvider';
+import { subscanProvider } from './subscanProvider';
 
 export function registerAllProviders(): void {
   registerProvider('XRP Ledger', xrplProvider);
@@ -17,4 +18,5 @@ export function registerAllProviders(): void {
   registerProvider('Ethereum', etherscanProvider);
   registerProvider('Solana', solanaProvider);
   registerProvider('Cardano', blockfrostProvider);
+  registerProvider('Polkadot Asset Hub', subscanProvider);
 }
