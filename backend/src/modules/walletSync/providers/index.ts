@@ -4,9 +4,11 @@ import { registerProvider } from './registry';
 import { xrplProvider } from './xrplProvider';
 import { hederaProvider } from './hederaProvider';
 import { stellarProvider } from './stellarProvider';
+import { blockstreamProvider } from './blockstreamProvider';
 
 export function registerAllProviders(): void {
   registerProvider('XRP Ledger', xrplProvider);
   registerProvider('HBAR', hederaProvider);
   registerProvider('Stellar', stellarProvider);
+  registerProvider('Bitcoin', blockstreamProvider);
 }
