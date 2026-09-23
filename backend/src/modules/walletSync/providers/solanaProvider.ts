@@ -13,7 +13,7 @@ async function rpcCall(method: string, params: unknown[]): Promise<RpcResponse> 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
   });
-  return res.json();
+  return (await res.json()) as RpcResponse;
 }
 
 export const solanaProvider: BalanceProvider = {

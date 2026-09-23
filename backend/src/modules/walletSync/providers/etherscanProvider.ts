@@ -4,11 +4,18 @@ const BASE_URL = 'https://api.etherscan.io/v2/api';
 const CHAIN_ID = 1; // Ethereum mainnet
 const DECIMALS_SELECTOR = '0x313ce567'; // decimals()
 
+// Forma parcial de las respuestas de la API v2 de Etherscan (proxy/account)
+interface EtherscanResponse {
+  status?: string;
+  result?: string;
+  message?: string;
+}
+
 async function fetchDecimals(contractAddress: string, apiKey: string): Promise<number> {
   const url = `${BASE_URL}?chainid=${CHAIN_ID}&module=proxy&action=eth_call&to=${contractAddress}&data=${DECIMALS_SELECTOR}&tag=latest&apikey=${apiKey}`;
   const res = await fetchWithTimeout(url);
-  const data = await res.json();
-  return parseInt(data.result, 16);
+  const data = (await res.json()) as EtherscanResponse;
+  return parseInt(data.result as string, 16);
 }
 
 export const etherscanProvider: BalanceProvider = {
@@ -19,14 +26,14 @@ export const etherscanProvider: BalanceProvider = {
       if (!contractAddress) {
         const url = `${BASE_URL}?chainid=${CHAIN_ID}&module=account&action=balance&address=${address}&tag=latest&apikey=${apiKey}`;
         const res = await fetchWithTimeout(url);
-        const data = await res.json();
+        const data = (await res.json()) as EtherscanResponse;
         if (data.status !== '1') return { ok: false, error: data.result ?? 'fallo de Etherscan' };
         return { ok: true, balance: Number(data.result) / 1e18 };
       }
 
       const url = `${BASE_URL}?chainid=${CHAIN_ID}&module=account&action=tokenbalance&contractaddress=${contractAddress}&address=${address}&tag=latest&apikey=${apiKey}`;
       const res = await fetchWithTimeout(url);
-      const data = await res.json();
+      const data = (await res.json()) as EtherscanResponse;
       if (data.status !== '1') return { ok: false, error: data.result ?? 'fallo de Etherscan' };
       const decimals = await fetchDecimals(contractAddress, apiKey);
       return { ok: true, balance: Number(data.result) / 10 ** decimals };
