@@ -347,12 +347,16 @@ INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_u
   ('WIF',  'dogwifhat',    'dogwifcoin',       FALSE, 'WIFUSDT',  'usdt_proxy'),
   ('PYTH', 'Pyth Network', 'pyth-network',     FALSE, 'PYTHUSDT', 'usdt_proxy'),
   ('ONDO', 'Ondo Finance', 'ondo-finance',     FALSE, 'ONDOUSDT', 'usdt_proxy'),
-  ('USDC', 'USD Coin',     'usd-coin',         TRUE,  'USDCUSDT', 'usdt_proxy');
+  ('USDC', 'USD Coin',     'usd-coin',         TRUE,  'USDCUSDT', 'usdt_proxy'),
+  -- LUNC = Terra Luna CLASSIC (no la nueva LUNA 2.0). Binance la relistó como
+  -- LUNCUSDT (~ago 2022) y mantiene histórico diario para las fechas de este
+  -- catálogo. Antes se sembraba como 'coingecko' con id 'terra-luna' (que es la
+  -- nueva LUNA 2.0, precio ~1000x superior) → precio erróneo/sin dato.
+  ('LUNC', 'Terra Classic', NULL,               FALSE, 'LUNCUSDT', 'usdt_proxy');
 
 INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, price_source) VALUES
   ('EUR',  'Euro',   NULL,          TRUE,  'fiat'),
-  ('USDT', 'Tether', NULL,          TRUE,  'fiat'),
-  ('LUNC', 'Terra Classic', 'terra-luna', FALSE, 'coingecko');
+  ('USDT', 'Tether', NULL,          TRUE,  'fiat');
 
 INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_eth_pair, price_source) VALUES
   ('BETH', 'Binance ETH Staking', NULL, FALSE, 'BETHETH', 'eth_proxy');

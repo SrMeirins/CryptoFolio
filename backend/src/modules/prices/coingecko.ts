@@ -72,7 +72,9 @@ class RateLimitedQueue {
   }
 }
 
-const queue = new RateLimitedQueue(6500); // 6.5s entre llamadas, margen de seguridad
+// 6.5s entre llamadas, margen de seguridad. Configurable por env (por defecto igual)
+// para permitir tests deterministas sin penalizar el rate limit real en producción.
+const queue = new RateLimitedQueue(Number(process.env.COINGECKO_MIN_INTERVAL_MS ?? 6500));
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -323,10 +325,13 @@ export async function prefetchHistoricalPrices(
     });
 
     if (!data?.prices?.length) {
-      // Si falla el range, fallback a llamadas individuales
+      // Si falla el range (p. ej. 401/429/red), fallback a llamadas individuales /history.
+      // El .catch evita que un fallo puntual de CoinGecko aborte toda la fase de precios
+      // del import: se degrada con elegancia (fecha sin resolver, sin envenenar la caché)
+      // y se reintentará en la siguiente sesión.
       _statusCallback?.(`↩ ${symbol}: fallback a llamadas individuales /history (${datesNeeded.length} peticiones)`);
       for (const dateStr of dateStrs) {
-        await getHistoricalPriceEur(symbol, dateByKey.get(`${symbol}|${dateStr}`)!);
+        await getHistoricalPriceEur(symbol, dateByKey.get(`${symbol}|${dateStr}`)!).catch(() => 0);
       }
       continue;
     }
@@ -337,8 +342,14 @@ export async function prefetchHistoricalPrices(
       if (price > 0) priceMap.set(toDateStr(new Date(ts)), price);
     }
 
-    // Persistir en caché todos los precios del rango (y sentinels para los que fallen)
+    // Persistir los precios obtenidos del rango. Las fechas NO cubiertas por el rango
+    // NO se marcan como no_data: el market_chart/range puede no devolver un punto para
+    // una fecha concreta (granularidad diaria) o directamente omitir fechas antiguas por
+    // el límite histórico del plan gratuito (ej: LUNC en 2022). Etiquetarlas como -1 aquí
+    // envenenaría la caché para siempre. Caen al snapshot individual /history?date=, que
+    // sí resuelve fechas antiguas y solo persiste el sentinel -1 si confirma ausencia real.
     let found = 0;
+    const missingDates: string[] = [];
     for (const dateStr of datesNeeded) {
       const price = priceMap.get(dateStr);
       if (price && price > 0) {
@@ -352,16 +363,12 @@ export async function prefetchHistoricalPrices(
         found++;
         _statusCallback?.(`✓ ${symbol} @ ${dateStr} = ${price.toFixed(8)} EUR`);
       } else {
-        await db.query(
-          `INSERT INTO price_cache (asset, price_eur, price_date, source)
-           VALUES ($1, -1, $2, 'no_data')
-           ON CONFLICT (asset, price_date) DO NOTHING`,
-          [symbol, dateStr]
-        );
-        noPricePairs.add(`${symbol}|${dateStr}`);
-        _statusCallback?.(`— ${symbol} @ ${dateStr}: sin datos en CoinGecko`);
-        console.warn(`[PRICES] — ${symbol} @ ${dateStr} sin datos en range`);
+        missingDates.push(dateStr);
       }
+    }
+    for (const dateStr of missingDates) {
+      _statusCallback?.(`↩ ${symbol} @ ${dateStr}: fuera del rango, probando snapshot /history...`);
+      await getHistoricalPriceEur(symbol, dateByKey.get(`${symbol}|${dateStr}`)!).catch(() => 0);
     }
     _statusCallback?.(`✓ ${symbol}: ${found}/${datesNeeded.length} precios obtenidos en 1 llamada API`);
   }
