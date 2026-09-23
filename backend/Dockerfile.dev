@@ -1,0 +1,29 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Dockerfile.dev — imagen SOLO para el stack de desarrollo (docker compose)
+#
+# Diferencia con el Dockerfile de producción: NO ejecuta `npm run build` (tsc).
+# En dev el arranque es `ts-node-dev --transpile-only`, que compila sobre la
+# marcha y no necesita dist/, así que el type-check no debe bloquear el `make dev`.
+# La verificación de tipos sigue viva en producción (Dockerfile normal) y en CI
+# (`npm run typecheck` / `backend-test`).
+# ─────────────────────────────────────────────────────────────────────────────
+FROM node:20-alpine
+
+# wget lo usa el healthcheck de docker-compose
+RUN apk add --no-cache wget
+
+WORKDIR /app
+
+COPY package*.json ./
+# Instala también devDependencies (ts-node-dev vive ahí)
+RUN npm ci --prefer-offline
+
+# Solo el código fuente; sin build (hot-reload via bind-mount de ./src)
+COPY --chown=node:node . .
+
+USER node
+
+EXPOSE 3001
+
+# Se sobreescribe por el `command:` de docker-compose; CMD por defecto útil suelto
+CMD ["npx", "ts-node-dev", "--respawn", "--transpile-only", "--poll", "src/index.ts"]
