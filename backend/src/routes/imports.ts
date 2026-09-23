@@ -67,11 +67,23 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
   }
   res.flushHeaders();
 
+  // compresion/express pueden exponer flush() en la respuesta; se tipa una sola vez.
+  const flushable = res as Response & { flush?: () => void };
+
   function send(phase: string, message: string, progress?: number, total?: number) {
     const data = JSON.stringify({ phase, message, progress, total });
     res.write(`data: ${data}\n\n`);
-    (res as any).flush?.();
+    flushable.flush?.();
   }
+
+  // Keep-alive: durante la fase de precios el backend puede pasar más de un minuto
+  // bloqueado en el backoff 429 de CoinGecko sin emitir datos. Un stream SSE en silencio
+  // lo corta el proxy del dev (o el navegador) y el cliente lo reporta como "Error de
+  // conexión" aunque el servidor siga trabajando. Este comentario SSE periódico mantiene
+  // el socket vivo; el cliente ignora las líneas que no empiezan por "data: ".
+  const heartbeat = setInterval(() => {
+    try { res.write(': keepalive\n\n'); flushable.flush?.(); } catch { /* conexión ya cerrada */ }
+  }, 10000);
 
   try {
     // Validar magic bytes antes de parsear
@@ -363,6 +375,7 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
   } catch (err) {
     send('error', `Error: ${(err as Error).message}`);
   } finally {
+    clearInterval(heartbeat);
     res.end();
   }
 });
