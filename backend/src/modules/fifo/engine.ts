@@ -40,6 +40,23 @@ export interface FifoRunResult {
   pendingWithdrawals: number;
 }
 
+// Umbrales de tolerancia unificados (antes: 0.0001 / 1e-10 / 1e-6 repartidos por
+// el motor sin relación entre sí, dejando una zona gris entre "lote cerrado" y
+// "shortfall reportable").
+// - FIFO_DUST_EPSILON: por debajo de esto, un lote se considera agotado (polvo de
+//   redondeo, no cantidad real). Usado tanto para decidir is_closed como para el
+//   filtro de "lotes abiertos" — deben coincidir, o un lote podría quedar marcado
+//   is_closed=false pero excluido igualmente por el filtro de cantidad, o viceversa.
+// - FIFO_SHORTFALL_EPSILON: por encima de esto, un déficit al consumir lotes es un
+//   dato real incompleto (no redondeo) y se reporta como error en vez de ignorarse.
+export const FIFO_DUST_EPSILON = 1e-6;
+const FIFO_SHORTFALL_EPSILON = 1e-4;
+
+// Clave fija del advisory lock que serializa ejecuciones de runFifoEngine().
+// pg_advisory_xact_lock la libera automáticamente al COMMIT/ROLLBACK de la
+// transacción — no requiere unlock manual ni riesgo de dejarlo colgado.
+const FIFO_ENGINE_LOCK_KEY = `'cryptotracker:fifo_engine'`;
+
 export async function runFifoEngine(): Promise<FifoRunResult> {
   const result: FifoRunResult = {
     lotsCreated: 0,
@@ -50,13 +67,17 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
     pendingWithdrawals: 0,
   };
 
-  await db.transaction(async (client) => {
+  return db.transaction(async (client) => {
+    // Serializa ejecuciones concurrentes: una segunda llamada a runFifoEngine()
+    // espera aquí hasta que la primera haga COMMIT/ROLLBACK, en vez de
+    // entrelazar sus DELETE/INSERT sobre las mismas filas.
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext(${FIFO_ENGINE_LOCK_KEY}))`);
+
     await client.query('DELETE FROM fifo_lot_consumptions');
     await client.query('DELETE FROM fifo_lots');
-  });
 
-  const txRes = await db.query(
-    `SELECT id, operation_type, timestamp, asset, amount, amount_net,
+    const txRes = await client.query(
+      `SELECT id, operation_type, timestamp, asset, amount, amount_net,
             cost_asset, cost_amount, price_per_unit,
             fee_asset, fee_amount,
             wallet_id, destination_wallet_id, destination_pending
@@ -76,15 +97,16 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
          WHEN 'LENDING_INTEREST_LOCKED' THEN 1
          WHEN 'CASHBACK'        THEN 1
          WHEN 'FORK'            THEN 1
-         -- Prioridad 2: ventas → consumen lotes del activo vendido Y crean lotes del recibido (p.ej. USDT)
-         WHEN 'SELL'            THEN 2
-         WHEN 'SELL_FIAT'       THEN 2
-         WHEN 'SELL_CRYPTO'     THEN 2
-         WHEN 'GIFT_SENT'       THEN 2
-         WHEN 'LOST'            THEN 2
-         -- Prioridad 3: transferencias internas → mueven/crean lotes entre wallets antes que BUY los consuma
-         -- (p.ej. Spot→Strategy al mismo timestamp que un BUY en Strategy)
-         WHEN 'TRANSFER_INTERNAL' THEN 3
+         -- Prioridad 2: transferencias internas → mueven/crean lotes entre wallets ANTES de
+         -- que SELL o BUY intenten consumirlos (p.ej. Spot→Strategy al mismo timestamp que
+         -- una venta o compra en Strategy — antes solo se protegía el caso BUY, no SELL)
+         WHEN 'TRANSFER_INTERNAL' THEN 2
+         -- Prioridad 3: ventas → consumen lotes del activo vendido Y crean lotes del recibido (p.ej. USDT)
+         WHEN 'SELL'            THEN 3
+         WHEN 'SELL_FIAT'       THEN 3
+         WHEN 'SELL_CRYPTO'     THEN 3
+         WHEN 'GIFT_SENT'       THEN 3
+         WHEN 'LOST'            THEN 3
          -- Prioridad 4: compras → crean lote del activo recibido y consumen el cost_asset (p.ej. USDT)
          WHEN 'BUY'             THEN 4
          WHEN 'BUY_FIAT'        THEN 4
@@ -99,9 +121,9 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
          WHEN 'MARGIN_REPAY'    THEN 7
          ELSE 7
        END`
-  );
+    );
 
-  const transactions: Transaction[] = txRes.rows.map((r: Record<string, unknown>) => ({
+    const transactions: Transaction[] = txRes.rows.map((r: Record<string, unknown>) => ({
     id: r.id as string,
     operation_type: r.operation_type as string,
     timestamp: r.timestamp as Date,
@@ -131,15 +153,28 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
       sellsByKey.get(key)!.push(tx);
     }
   }
+  // Cada SELL solo puede emparejarse con UN MARGIN_BORROW (evita que dos préstamos
+  // distintos "roben" el mismo SELL). Se elige el SELL más cercano en el tiempo
+  // dentro de la ventana, no el primero encontrado — los MARGIN_BORROW se procesan
+  // en orden cronológico (orden natural de `transactions`), así que el préstamo más
+  // antiguo siempre tiene primera opción sobre los SELL disponibles.
+  const usedSells = new Set<string>();
   for (const tx of transactions) {
     if (tx.operation_type !== 'MARGIN_BORROW') continue;
     const sells = sellsByKey.get(`${tx.wallet_id}|${tx.asset}`) ?? [];
-    const pairedSell = sells.find(s =>
-      tx.timestamp.getTime() > s.timestamp.getTime() &&
-      tx.timestamp.getTime() - s.timestamp.getTime() <= 5000
-    );
-    if (pairedSell) {
-      tx.timestamp = new Date(pairedSell.timestamp.getTime() - 1);
+    let closestSell: Transaction | null = null;
+    let closestDiff = Infinity;
+    for (const s of sells) {
+      if (usedSells.has(s.id)) continue;
+      const diff = tx.timestamp.getTime() - s.timestamp.getTime();
+      if (diff > 0 && diff <= 5000 && diff < closestDiff) {
+        closestSell = s;
+        closestDiff = diff;
+      }
+    }
+    if (closestSell) {
+      usedSells.add(closestSell.id);
+      tx.timestamp = new Date(closestSell.timestamp.getTime() - 1);
     }
   }
   // Re-ordenar con los timestamps corregidos (estable: conserva el orden DB como desempate)
@@ -148,8 +183,8 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
       case 'MARGIN_BORROW': return 0;
       case 'AIRDROP': case 'DEPOSIT_CRYPTO': case 'STAKING_REWARD': case 'MINING_REWARD':
       case 'LENDING_INTEREST': case 'LENDING_INTEREST_LOCKED': case 'CASHBACK': case 'FORK': return 1;
-      case 'SELL': case 'SELL_FIAT': case 'SELL_CRYPTO': case 'GIFT_SENT': case 'LOST': return 2;
-      case 'TRANSFER_INTERNAL': return 3;
+      case 'TRANSFER_INTERNAL': return 2;
+      case 'SELL': case 'SELL_FIAT': case 'SELL_CRYPTO': case 'GIFT_SENT': case 'LOST': return 3;
       case 'BUY': case 'BUY_FIAT': case 'BUY_CRYPTO': return 4;
       case 'WITHDRAW': return 5;
       case 'FEE_EXCHANGE': case 'FEE': case 'FEE_NETWORK': return 6;
@@ -172,7 +207,7 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
   const processBorrow = async (tx: Transaction) => {
     const key = `${tx.asset}|${tx.wallet_id}`;
     marginDebt.set(key, (marginDebt.get(key) ?? 0) + tx.amount);
-    await processTransaction(tx, result, marginDebt);
+    await processTransaction(tx, result, marginDebt, client);
   };
 
   const processedIds = new Set<string>();
@@ -189,7 +224,7 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
         (tx.operation_type === 'BUY' || tx.operation_type === 'BUY_FIAT' || tx.operation_type === 'BUY_CRYPTO') &&
         tx.cost_asset && tx.cost_asset !== 'EUR' && tx.cost_amount
       ) {
-        const openLots = await getOpenLots(tx.cost_asset, tx.wallet_id);
+        const openLots = await getOpenLots(tx.cost_asset, tx.wallet_id, client);
         const available = openLots.reduce((sum, l) => sum + l.quantityRemaining, 0);
         if (available < tx.cost_amount) {
           const deadline = tx.timestamp.getTime() + 60_000;
@@ -212,7 +247,7 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
       if (tx.operation_type === 'MARGIN_BORROW') {
         await processBorrow(tx);
       } else {
-        await processTransaction(tx, result, marginDebt);
+        await processTransaction(tx, result, marginDebt, client);
       }
       processedIds.add(tx.id);
     } catch (e) {
@@ -222,21 +257,22 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
     }
   }
 
-  return result;
+    return result;
+  });
 }
 
-async function processTransaction(tx: Transaction, result: FifoRunResult, marginDebt: Map<string, number>): Promise<void> {
+async function processTransaction(tx: Transaction, result: FifoRunResult, marginDebt: Map<string, number>, client: PoolClient): Promise<void> {
   switch (tx.operation_type) {
     case 'BUY':
     case 'BUY_FIAT':
     case 'BUY_CRYPTO':
-      await processBuy(tx, result);
+      await processBuy(tx, result, client);
       break;
     case 'MARGIN_BORROW':
-      await processIncome(tx, result);
+      await processIncome(tx, result, client);
       break;
     case 'MARGIN_REPAY':
-      await processMarginRepay(tx, result, marginDebt);
+      await processMarginRepay(tx, result, marginDebt, client);
       break;
     case 'STAKING_REWARD':
     case 'MINING_REWARD':
@@ -244,23 +280,23 @@ async function processTransaction(tx: Transaction, result: FifoRunResult, margin
     case 'LENDING_INTEREST_LOCKED':
     case 'CASHBACK':
     case 'AIRDROP':
-      await processIncome(tx, result);
+      await processIncome(tx, result, client);
       break;
     case 'FORK':
-      await processFork(tx, result);
+      await processFork(tx, result, client);
       break;
     case 'SELL':
     case 'SELL_FIAT':
     case 'SELL_CRYPTO':
     case 'GIFT_SENT':
-      await processSell(tx, result);
+      await processSell(tx, result, client);
       break;
     case 'LOST':
-      await processLost(tx, result);
+      await processLost(tx, result, client);
       break;
     case 'TRANSFER_INTERNAL':
     case 'WITHDRAW':
-      await processTransfer(tx, result);
+      await processTransfer(tx, result, client);
       break;
     case 'STAKING_LOCK':
     case 'STAKING_UNLOCK':
@@ -270,12 +306,12 @@ async function processTransaction(tx: Transaction, result: FifoRunResult, margin
     case 'FEE':
     case 'FEE_NETWORK':
     case 'FEE_EXCHANGE':
-      await processFee(tx, result);
+      await processFee(tx, result, client);
       break;
     case 'DEPOSIT_CRYPTO':
       // Abre lote al precio de mercado en la fecha del depósito.
       // No es un evento fiscal de income — el coste de adquisición viene de la wallet origen.
-      await processIncome(tx, result);
+      await processIncome(tx, result, client);
       break;
     case 'DEPOSIT_FIAT':
     case 'WITHDRAW_FIAT':   // Retiro a banco — no hay lote que mover
@@ -290,7 +326,7 @@ async function processTransaction(tx: Transaction, result: FifoRunResult, margin
 }
 
 // ── BUY ───────────────────────────────────────────────────────────────────
-async function processBuy(tx: Transaction, result: FifoRunResult): Promise<void> {
+async function processBuy(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
   let costBasisEur: number;
   let feeEur = 0;
 
@@ -320,7 +356,7 @@ async function processBuy(tx: Transaction, result: FifoRunResult): Promise<void>
       // (es una disposición patrimonial imponible, igual que vender BNB).
       const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
       feeEur = tx.fee_amount * feePrice;
-      await consumeLots(tx.id, tx.fee_asset, tx.wallet_id, tx.fee_amount, feeEur, tx.timestamp, result);
+      await consumeLots(tx.id, tx.fee_asset, tx.wallet_id, tx.fee_amount, feeEur, tx.timestamp, result, client);
     }
     costBasisEur += feeEur;
   }
@@ -332,13 +368,13 @@ async function processBuy(tx: Transaction, result: FifoRunResult): Promise<void>
   if (quantity <= 0 || tx.asset === 'EUR') {
     // Permuta cripto→EUR: consumir lotes del activo pagado aunque no abramos lote de EUR
     if (tx.asset === 'EUR' && tx.cost_asset && tx.cost_asset !== 'EUR' && tx.cost_amount) {
-      await consumeLots(tx.id, tx.cost_asset, tx.wallet_id, tx.cost_amount, costBasisEur, tx.timestamp, result);
+      await consumeLots(tx.id, tx.cost_asset, tx.wallet_id, tx.cost_amount, costBasisEur, tx.timestamp, result, client);
     }
     return;
   }
 
   const pricePerUnitEur = quantity > 0 ? costBasisEur / quantity : 0;
-  await openLot(tx.asset, quantity, costBasisEur, pricePerUnitEur, feeEur, tx.id, tx.timestamp, tx.wallet_id);
+  await openLot(tx.asset, quantity, costBasisEur, pricePerUnitEur, feeEur, tx.id, tx.timestamp, tx.wallet_id, client);
   result.lotsCreated++;
 
   // Permuta: si se pagó con otra cripto, consumir esos lotes
@@ -346,23 +382,31 @@ async function processBuy(tx: Transaction, result: FifoRunResult): Promise<void>
     // Si no existe ningún lote previo para este activo en esta wallet, el saldo viene de antes
     // del inicio de la importación. Creamos un lote sintético al precio de mercado para
     // que el coste de adquisición quede registrado y la cadena FIFO continúe sin ruido.
-    const openLots = await getOpenLots(tx.cost_asset, tx.wallet_id);
+    const openLots = await getOpenLots(tx.cost_asset, tx.wallet_id, client);
     if (openLots.length === 0) {
-      const priorHistory = await db.query(
+      const priorHistory = await client.query(
         `SELECT 1 FROM fifo_lots WHERE asset = $1 AND wallet_id = $2 LIMIT 1`,
         [tx.cost_asset, tx.wallet_id]
       );
       if (priorHistory.rows.length === 0) {
         const syntheticPrice = await getHistoricalPriceEur(tx.cost_asset, tx.timestamp);
-        await openLot(tx.cost_asset, tx.cost_amount, tx.cost_amount * syntheticPrice, syntheticPrice, 0, tx.id, tx.timestamp, tx.wallet_id);
+        await openLot(tx.cost_asset, tx.cost_amount, tx.cost_amount * syntheticPrice, syntheticPrice, 0, tx.id, tx.timestamp, tx.wallet_id, client);
+        // Aviso visible (no bloqueante): este saldo puede ser legítimo (previo al inicio
+        // de la importación) o una transferencia interna que falte en los datos — merece
+        // revisión manual, no debe resolverse en silencio sin dejar rastro.
+        result.errors.push(
+          `Aviso: lote sintético creado para ${tx.cost_asset} en wallet ${tx.wallet_id} ` +
+          `(tx ${tx.id}, ${tx.timestamp.toISOString()}) — sin lotes previos de ese activo en ` +
+          `esta wallet, se asumió precio de mercado. Verifica que no falte una transferencia interna.`
+        );
       }
     }
-    await consumeLots(tx.id, tx.cost_asset, tx.wallet_id, tx.cost_amount, costBasisEur, tx.timestamp, result);
+    await consumeLots(tx.id, tx.cost_asset, tx.wallet_id, tx.cost_amount, costBasisEur, tx.timestamp, result, client);
   }
 }
 
 // ── INCOME ────────────────────────────────────────────────────────────────
-async function processIncome(tx: Transaction, result: FifoRunResult): Promise<void> {
+async function processIncome(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
   if (tx.asset === 'EUR') return;
   const quantity = tx.amount_net;
   if (quantity <= 0) return;
@@ -375,29 +419,48 @@ async function processIncome(tx: Transaction, result: FifoRunResult): Promise<vo
   }
 
   const costBasisEur = quantity * pricePerUnitEur;
-  await openLot(tx.asset, quantity, costBasisEur, pricePerUnitEur, 0, tx.id, tx.timestamp, tx.wallet_id);
+  await openLot(tx.asset, quantity, costBasisEur, pricePerUnitEur, 0, tx.id, tx.timestamp, tx.wallet_id, client);
   result.lotsCreated++;
 }
 
 // ── FORK ──────────────────────────────────────────────────────────────────
-async function processFork(tx: Transaction, result: FifoRunResult): Promise<void> {
+async function processFork(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
   if (tx.asset === 'EUR') return;
   const quantity = tx.amount_net;
   if (quantity <= 0) return;
 
-  await openLot(tx.asset, quantity, 0, 0, 0, tx.id, tx.timestamp, tx.wallet_id);
+  await openLot(tx.asset, quantity, 0, 0, 0, tx.id, tx.timestamp, tx.wallet_id, client);
   result.lotsCreated++;
 }
 
 // ── SELL ──────────────────────────────────────────────────────────────────
-async function processSell(tx: Transaction, result: FifoRunResult): Promise<void> {
+async function processSell(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
   // Venta de fiat (EUR→cripto): no hay lotes que consumir, solo abrir lote del activo recibido
   if (FIAT_NO_LOT.has(tx.asset)) {
     if (tx.cost_asset && !FIAT_NO_LOT.has(tx.cost_asset) && tx.cost_amount && tx.cost_amount > 0) {
-      const costBasisEur = tx.amount;
-      const pricePerUnit = costBasisEur / tx.cost_amount;
-      await openLot(tx.cost_asset, tx.cost_amount, costBasisEur, pricePerUnit, 0, tx.id, tx.timestamp, tx.wallet_id);
-      result.lotsCreated++;
+      let costBasisEur = tx.amount;
+      let netReceived = tx.cost_amount;
+
+      if (tx.fee_asset && tx.fee_amount) {
+        if (tx.fee_asset === tx.cost_asset) {
+          // Fee en el activo recibido: llega menos cantidad neta de la que figura en cost_amount.
+          netReceived = tx.cost_amount - tx.fee_amount;
+        } else if (tx.fee_asset === tx.asset) {
+          // Fee en el propio fiat: coste total mayor (mismo criterio que processBuy).
+          costBasisEur += tx.fee_amount;
+        } else {
+          // Fee en un tercer activo: disposición patrimonial propia, se consume aparte.
+          const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
+          const feeProceedsEur = tx.fee_amount * feePrice;
+          await consumeLots(tx.id, tx.fee_asset, tx.wallet_id, tx.fee_amount, feeProceedsEur, tx.timestamp, result, client);
+        }
+      }
+
+      if (netReceived > 0) {
+        const pricePerUnit = costBasisEur / netReceived;
+        await openLot(tx.cost_asset, netReceived, costBasisEur, pricePerUnit, 0, tx.id, tx.timestamp, tx.wallet_id, client);
+        result.lotsCreated++;
+      }
     }
     return;
   }
@@ -415,11 +478,23 @@ async function processSell(tx: Transaction, result: FifoRunResult): Promise<void
   }
 
   if (tx.fee_asset && tx.fee_amount) {
-    const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
-    proceedsEur -= tx.fee_amount * feePrice;
+    if (tx.fee_asset === tx.asset || tx.fee_asset === tx.cost_asset) {
+      // Fee en el activo vendido o en el recibido: reduce los proceeds de ESTA
+      // venta (ya sea porque una parte de lo vendido nunca generó cash, o porque
+      // llega menos del activo recibido — ese ajuste ya lo hace netReceived más abajo).
+      const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
+      proceedsEur -= tx.fee_amount * feePrice;
+    } else {
+      // Fee en un tercer activo (ej. BNB): no tiene relación con los proceeds de
+      // esta venta. Es una disposición patrimonial propia — se consumen sus lotes
+      // por separado, igual que ya hace processBuy con el fee de activo distinto.
+      const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
+      const feeProceedsEur = tx.fee_amount * feePrice;
+      await consumeLots(tx.id, tx.fee_asset, tx.wallet_id, tx.fee_amount, feeProceedsEur, tx.timestamp, result, client);
+    }
   }
 
-  await consumeLots(tx.id, tx.asset, tx.wallet_id, tx.amount, proceedsEur, tx.timestamp, result);
+  await consumeLots(tx.id, tx.asset, tx.wallet_id, tx.amount, proceedsEur, tx.timestamp, result, client);
 
   // Abrir lote para el activo recibido si no es fiat (SELL_CRYPTO y SELL cripto→cripto/stablecoin).
   // USDT es cripto en la legislación española, igual que cualquier otro token.
@@ -432,15 +507,15 @@ async function processSell(tx: Transaction, result: FifoRunResult): Promise<void
       : tx.cost_amount;
     if (netReceived > 0) {
       const pricePerUnit = proceedsEur / netReceived;
-      await openLot(tx.cost_asset, netReceived, proceedsEur, pricePerUnit, 0, tx.id, tx.timestamp, tx.wallet_id);
+      await openLot(tx.cost_asset, netReceived, proceedsEur, pricePerUnit, 0, tx.id, tx.timestamp, tx.wallet_id, client);
       result.lotsCreated++;
     }
   }
 }
 
 // ── LOST ──────────────────────────────────────────────────────────────────
-async function processLost(tx: Transaction, result: FifoRunResult): Promise<void> {
-  await consumeLots(tx.id, tx.asset, tx.wallet_id, tx.amount, 0, tx.timestamp, result);
+async function processLost(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
+  await consumeLots(tx.id, tx.asset, tx.wallet_id, tx.amount, 0, tx.timestamp, result, client);
 }
 
 // ── MARGIN_REPAY ──────────────────────────────────────────────────────────
@@ -451,9 +526,9 @@ async function processLost(tx: Transaction, result: FifoRunResult): Promise<void
 // La deuda pendiente se rastrea en `marginDebt` (mapa en memoria mantenido
 // por runFifoEngine) para que la distinción principal/interés sea exacta
 // independientemente de qué lote FIFO se consuma en cada momento.
-async function processMarginRepay(tx: Transaction, result: FifoRunResult, marginDebt: Map<string, number>): Promise<void> {
+async function processMarginRepay(tx: Transaction, result: FifoRunResult, marginDebt: Map<string, number>, client: PoolClient): Promise<void> {
   if (FIAT_NO_LOT.has(tx.asset)) return;
-  const lots = await getOpenLots(tx.asset, tx.wallet_id);
+  const lots = await getOpenLots(tx.asset, tx.wallet_id, client);
   if (lots.length === 0) return; // Sin lotes — silencioso
 
   const key = `${tx.asset}|${tx.wallet_id}`;
@@ -468,67 +543,65 @@ async function processMarginRepay(tx: Transaction, result: FifoRunResult, margin
 
   let remaining = tx.amount;
 
-  await db.transaction(async (client) => {
-    for (const lot of lots) {
-      if (remaining <= 0) break;
+  for (const lot of lots) {
+    if (remaining <= 0) break;
 
-      const consumed = Math.min(lot.quantityRemaining, remaining);
-      const proportion = consumed / lot.quantityRemaining;
-      const costConsumed = lot.costBasisEur * proportion;
+    const consumed = Math.min(lot.quantityRemaining, remaining);
+    const proportion = consumed / lot.quantityRemaining;
+    const costConsumed = lot.costBasisEur * proportion;
 
-      // Calcular cuánto de este consumo es principal y cuánto interés
-      const consumedAsPrincipal = Math.min(consumed, principalLeft);
-      const consumedAsInterest  = consumed - consumedAsPrincipal;
-      principalLeft -= consumedAsPrincipal;
+    // Calcular cuánto de este consumo es principal y cuánto interés
+    const consumedAsPrincipal = Math.min(consumed, principalLeft);
+    const consumedAsInterest  = consumed - consumedAsPrincipal;
+    principalLeft -= consumedAsPrincipal;
 
-      if (consumedAsInterest === 0) {
-        // Todo principal: sin impacto fiscal
-        await client.query(
-          `INSERT INTO fifo_lot_consumptions (
-            lot_id, consuming_transaction_id,
-            quantity_consumed, cost_basis_consumed_eur,
-            proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
-          ) VALUES ($1, $2, $3, $4, $4, 0, 'NONE', $5)`,
-          [lot.id, tx.id, consumed, costConsumed, tx.timestamp]
-        );
-      } else if (consumedAsPrincipal === 0) {
-        // Todo interés: pérdida deducible
-        await client.query(
-          `INSERT INTO fifo_lot_consumptions (
-            lot_id, consuming_transaction_id,
-            quantity_consumed, cost_basis_consumed_eur,
-            proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
-          ) VALUES ($1, $2, $3, $4, 0, $5, 'LOSS', $6)`,
-          [lot.id, tx.id, consumed, costConsumed, -costConsumed, tx.timestamp]
-        );
-      } else {
-        // Lote mixto: dividir en dos registros (principal → NONE, interés → LOSS)
-        const costPrincipal = costConsumed * (consumedAsPrincipal / consumed);
-        const costInterest  = costConsumed - costPrincipal;
-        await client.query(
-          `INSERT INTO fifo_lot_consumptions (
-            lot_id, consuming_transaction_id,
-            quantity_consumed, cost_basis_consumed_eur,
-            proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
-          ) VALUES ($1, $2, $3, $4, $4, 0, 'NONE', $5)`,
-          [lot.id, tx.id, consumedAsPrincipal, costPrincipal, tx.timestamp]
-        );
-        await client.query(
-          `INSERT INTO fifo_lot_consumptions (
-            lot_id, consuming_transaction_id,
-            quantity_consumed, cost_basis_consumed_eur,
-            proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
-          ) VALUES ($1, $2, $3, $4, 0, $5, 'LOSS', $6)`,
-          [lot.id, tx.id, consumedAsInterest, costInterest, -costInterest, tx.timestamp]
-        );
-      }
-
-      await updateLot(client, lot.id, lot.quantityRemaining - consumed, lot.costBasisEur - costConsumed);
-      result.lotsConsumed++;
-      remaining -= consumed;
-      interestLeft -= consumedAsInterest;
+    if (consumedAsInterest === 0) {
+      // Todo principal: sin impacto fiscal
+      await client.query(
+        `INSERT INTO fifo_lot_consumptions (
+          lot_id, consuming_transaction_id,
+          quantity_consumed, cost_basis_consumed_eur,
+          proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
+        ) VALUES ($1, $2, $3, $4, $4, 0, 'NONE', $5)`,
+        [lot.id, tx.id, consumed, costConsumed, tx.timestamp]
+      );
+    } else if (consumedAsPrincipal === 0) {
+      // Todo interés: pérdida deducible
+      await client.query(
+        `INSERT INTO fifo_lot_consumptions (
+          lot_id, consuming_transaction_id,
+          quantity_consumed, cost_basis_consumed_eur,
+          proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
+        ) VALUES ($1, $2, $3, $4, 0, $5, 'LOSS', $6)`,
+        [lot.id, tx.id, consumed, costConsumed, -costConsumed, tx.timestamp]
+      );
+    } else {
+      // Lote mixto: dividir en dos registros (principal → NONE, interés → LOSS)
+      const costPrincipal = costConsumed * (consumedAsPrincipal / consumed);
+      const costInterest  = costConsumed - costPrincipal;
+      await client.query(
+        `INSERT INTO fifo_lot_consumptions (
+          lot_id, consuming_transaction_id,
+          quantity_consumed, cost_basis_consumed_eur,
+          proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
+        ) VALUES ($1, $2, $3, $4, $4, 0, 'NONE', $5)`,
+        [lot.id, tx.id, consumedAsPrincipal, costPrincipal, tx.timestamp]
+      );
+      await client.query(
+        `INSERT INTO fifo_lot_consumptions (
+          lot_id, consuming_transaction_id,
+          quantity_consumed, cost_basis_consumed_eur,
+          proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
+        ) VALUES ($1, $2, $3, $4, 0, $5, 'LOSS', $6)`,
+        [lot.id, tx.id, consumedAsInterest, costInterest, -costInterest, tx.timestamp]
+      );
     }
-  });
+
+    await updateLot(client, lot.id, lot.quantityRemaining - consumed, lot.costBasisEur - costConsumed);
+    result.lotsConsumed++;
+    remaining -= consumed;
+    interestLeft -= consumedAsInterest;
+  }
 }
 
 // Activos fiat: nunca tienen lotes FIFO, las transferencias internas son no-ops silenciosas
@@ -537,7 +610,7 @@ const FIAT_NO_LOT = new Set(['EUR', 'USD', 'GBP', 'CHF', 'BRL', 'ARS']);
 // ── TRANSFER / WITHDRAW ───────────────────────────────────────────────────
 // Si destination_pending=true o no hay destination_wallet_id, los lotes se
 // quedan en el wallet origen hasta que el usuario asigne el destino.
-async function processTransfer(tx: Transaction, result: FifoRunResult): Promise<void> {
+async function processTransfer(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
   // Transferencia interna de fiat entre sub-cuentas: sin lotes que mover, sin ruido
   if (FIAT_NO_LOT.has(tx.asset)) return;
 
@@ -546,53 +619,62 @@ async function processTransfer(tx: Transaction, result: FifoRunResult): Promise<
     return;
   }
 
+  // Fee de retiro cobrada en el mismo activo (ej. fee de red al retirar a wallet externa):
+  // es una disposición patrimonial real — parte del activo nunca llega a la wallet destino,
+  // se "vende" a precio de mercado para pagar la red. Se consume ANTES de mover el resto,
+  // igual que el fee-en-activo-distinto de processBuy. tx.amount ya viene neto de fee
+  // (ver parser Bitvavo/Binance), así que aquí solo consumimos y contabilizamos el G/P.
+  if (tx.operation_type === 'WITHDRAW' && tx.fee_asset === tx.asset && tx.fee_amount) {
+    const feePrice = await getHistoricalPriceEur(tx.asset, tx.timestamp);
+    const feeProceedsEur = tx.fee_amount * feePrice;
+    await consumeLots(tx.id, tx.asset, tx.wallet_id, tx.fee_amount, feeProceedsEur, tx.timestamp, result, client);
+  }
+
   const toWalletId = tx.destination_wallet_id;
   let quantityToMove = tx.amount;
-  const lots = await getOpenLots(tx.asset, tx.wallet_id);
+  const lots = await getOpenLots(tx.asset, tx.wallet_id, client);
 
-  await db.transaction(async (client) => {
-    for (const lot of lots) {
-      if (quantityToMove <= 0) break;
+  for (const lot of lots) {
+    if (quantityToMove <= 0) break;
 
-      const consumed = Math.min(lot.quantityRemaining, quantityToMove);
-      const proportion = consumed / lot.quantityRemaining;
-      const costMoved = lot.costBasisEur * proportion;
+    const consumed = Math.min(lot.quantityRemaining, quantityToMove);
+    const proportion = consumed / lot.quantityRemaining;
+    const costMoved = lot.costBasisEur * proportion;
 
-      await updateLot(client, lot.id, lot.quantityRemaining - consumed, lot.costBasisEur - costMoved);
+    await updateLot(client, lot.id, lot.quantityRemaining - consumed, lot.costBasisEur - costMoved);
 
-      // Registrar como consumo NONE para reconstrucción histórica correcta
-      await client.query(
-        `INSERT INTO fifo_lot_consumptions (
-          lot_id, consuming_transaction_id,
-          quantity_consumed, cost_basis_consumed_eur,
-          proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
-        ) VALUES ($1, $2, $3, $4, $4, 0, 'NONE', $5)`,
-        [lot.id, tx.id, consumed, costMoved, tx.timestamp]
-      );
+    // Registrar como consumo NONE para reconstrucción histórica correcta
+    await client.query(
+      `INSERT INTO fifo_lot_consumptions (
+        lot_id, consuming_transaction_id,
+        quantity_consumed, cost_basis_consumed_eur,
+        proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
+      ) VALUES ($1, $2, $3, $4, $4, 0, 'NONE', $5)`,
+      [lot.id, tx.id, consumed, costMoved, tx.timestamp]
+    );
 
-      await client.query(
-        `INSERT INTO fifo_lots (
-          asset, quantity_original, quantity_remaining,
-          cost_basis_eur, price_per_unit_eur, fee_eur,
-          open_transaction_id, opened_at, wallet_id
-        ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8)`,
-        [tx.asset, consumed, consumed, costMoved, lot.pricePerUnitEur, tx.id, lot.openedAt, toWalletId]
-      );
+    await client.query(
+      `INSERT INTO fifo_lots (
+        asset, quantity_original, quantity_remaining,
+        cost_basis_eur, price_per_unit_eur, fee_eur,
+        open_transaction_id, opened_at, wallet_id
+      ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8)`,
+      [tx.asset, consumed, consumed, costMoved, lot.pricePerUnitEur, tx.id, lot.openedAt, toWalletId]
+    );
 
-      quantityToMove -= consumed;
-    }
+    quantityToMove -= consumed;
+  }
 
-    // WITHDRAW externo: cualquier shortfall es un error real (el dinero salió y los lotes deben existir).
-    // TRANSFER_INTERNAL: sin impacto fiscal — el shortfall puede deberse a saldo pre-importación
-    // o a artefactos de ordering; no afecta al cálculo de G/P.
-    if (quantityToMove > 0.0001 && tx.operation_type === 'WITHDRAW') {
-      result.errors.push(`TRANSFER sin lotes suficientes para ${tx.asset} tx=${tx.id} (faltan ${quantityToMove.toFixed(6)})`);
-    }
-  });
+  // WITHDRAW externo: cualquier shortfall es un error real (el dinero salió y los lotes deben existir).
+  // TRANSFER_INTERNAL: sin impacto fiscal — el shortfall puede deberse a saldo pre-importación
+  // o a artefactos de ordering; no afecta al cálculo de G/P.
+  if (quantityToMove > FIFO_SHORTFALL_EPSILON && tx.operation_type === 'WITHDRAW') {
+    result.errors.push(`TRANSFER sin lotes suficientes para ${tx.asset} tx=${tx.id} (faltan ${quantityToMove.toFixed(6)})`);
+  }
 }
 
 // ── FEE ───────────────────────────────────────────────────────────────────
-async function processFee(tx: Transaction, result: FifoRunResult): Promise<void> {
+async function processFee(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
   const feeAsset = tx.fee_asset ?? tx.asset;
   const feeAmount = tx.fee_amount ?? tx.amount;
 
@@ -601,7 +683,7 @@ async function processFee(tx: Transaction, result: FifoRunResult): Promise<void>
   const priceEur = await getHistoricalPriceEur(feeAsset, tx.timestamp);
   const proceedsEur = feeAmount * priceEur;
 
-  await consumeLots(tx.id, feeAsset, tx.wallet_id, feeAmount, proceedsEur, tx.timestamp, result);
+  await consumeLots(tx.id, feeAsset, tx.wallet_id, feeAmount, proceedsEur, tx.timestamp, result, client);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -613,9 +695,10 @@ async function openLot(
   feeEur: number,
   txId: string,
   timestamp: Date,
-  walletId: string
+  walletId: string,
+  client: PoolClient
 ): Promise<void> {
-  await db.query(
+  await client.query(
     `INSERT INTO fifo_lots (
       asset, quantity_original, quantity_remaining,
       cost_basis_eur, price_per_unit_eur, fee_eur,
@@ -632,9 +715,10 @@ async function consumeLots(
   quantityToConsume: number,
   totalProceedsEur: number,
   timestamp: Date,
-  result: FifoRunResult
+  result: FifoRunResult,
+  client: PoolClient
 ): Promise<void> {
-  const lots = await getOpenLots(asset, walletId);
+  const lots = await getOpenLots(asset, walletId, client);
 
   if (lots.length === 0) {
     result.errors.push(`Sin lotes abiertos para ${asset} en wallet ${walletId} (tx ${txId})`);
@@ -644,51 +728,60 @@ async function consumeLots(
   let remaining = quantityToConsume;
   const proceedsPerUnit = totalProceedsEur / quantityToConsume;
 
-  await db.transaction(async (client) => {
-    for (const lot of lots) {
-      if (remaining <= 0) break;
+  for (const lot of lots) {
+    if (remaining <= 0) break;
 
-      const consumed = Math.min(lot.quantityRemaining, remaining);
-      const proportion = consumed / lot.quantityRemaining;
-      const costConsumed = lot.costBasisEur * proportion;
-      const proceedsConsumed = consumed * proceedsPerUnit;
-      const gainLoss = proceedsConsumed - costConsumed;
+    const consumed = Math.min(lot.quantityRemaining, remaining);
+    const proportion = consumed / lot.quantityRemaining;
+    const costConsumed = lot.costBasisEur * proportion;
+    const proceedsConsumed = consumed * proceedsPerUnit;
+    const gainLoss = proceedsConsumed - costConsumed;
 
-      await client.query(
-        `INSERT INTO fifo_lot_consumptions (
-          lot_id, consuming_transaction_id,
-          quantity_consumed, cost_basis_consumed_eur,
-          proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7::fiscal_event_type, $8)`,
-        [
-          lot.id, txId, consumed, costConsumed,
-          proceedsConsumed, gainLoss,
-          gainLoss >= 0 ? 'GAIN' : 'LOSS',
-          timestamp,
-        ]
-      );
+    await client.query(
+      `INSERT INTO fifo_lot_consumptions (
+        lot_id, consuming_transaction_id,
+        quantity_consumed, cost_basis_consumed_eur,
+        proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7::fiscal_event_type, $8)`,
+      [
+        lot.id, txId, consumed, costConsumed,
+        proceedsConsumed, gainLoss,
+        gainLoss >= 0 ? 'GAIN' : 'LOSS',
+        timestamp,
+      ]
+    );
 
-      await updateLot(client, lot.id, lot.quantityRemaining - consumed, lot.costBasisEur - costConsumed);
+    await updateLot(client, lot.id, lot.quantityRemaining - consumed, lot.costBasisEur - costConsumed);
 
-      if (gainLoss >= 0) result.totalGainEur += gainLoss;
-      else result.totalLossEur += gainLoss;
+    if (gainLoss >= 0) result.totalGainEur += gainLoss;
+    else result.totalLossEur += gainLoss;
 
-      result.lotsConsumed++;
-      remaining -= consumed;
-    }
-  });
+    result.lotsConsumed++;
+    remaining -= consumed;
+  }
+
+  // Igual que el shortfall de WITHDRAW en processTransfer: si tras consumir todos
+  // los lotes disponibles queda cantidad sin cubrir, es una señal real de datos
+  // incompletos (venta/permuta/fee mayor que lo que la app cree que posees) —
+  // se reporta en vez de desaparecer en silencio.
+  if (remaining > FIFO_SHORTFALL_EPSILON) {
+    result.errors.push(
+      `Lotes insuficientes para ${asset} en wallet ${walletId} (tx ${txId}): ` +
+      `faltan ${remaining.toFixed(6)} de ${quantityToConsume.toFixed(6)} solicitados`
+    );
+  }
 }
 
-async function getOpenLots(asset: string, walletId: string): Promise<FifoLot[]> {
-  const res = await db.query(
+export async function getOpenLots(asset: string, walletId: string, client: PoolClient): Promise<FifoLot[]> {
+  const res = await client.query(
     `SELECT id, asset, quantity_original, quantity_remaining,
             cost_basis_eur, price_per_unit_eur, opened_at, wallet_id, open_transaction_id
      FROM fifo_lots
      WHERE asset = $1
        AND wallet_id = $2
        AND is_closed = FALSE
-       AND quantity_remaining > 0.0000000001
-     ORDER BY opened_at ASC`,
+       AND quantity_remaining > ${FIFO_DUST_EPSILON}
+     ORDER BY opened_at ASC, created_at ASC`,
     [asset, walletId]
   );
   return res.rows.map((r: Record<string, unknown>) => ({
@@ -705,7 +798,7 @@ async function getOpenLots(asset: string, walletId: string): Promise<FifoLot[]> 
 }
 
 async function updateLot(client: PoolClient, lotId: string, newRemaining: number, newCostBasis: number): Promise<void> {
-  const isClosed = newRemaining <= 0.000001;
+  const isClosed = newRemaining <= FIFO_DUST_EPSILON;
   await client.query(
     `UPDATE fifo_lots
      SET quantity_remaining = $1,

@@ -7,7 +7,11 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
-      '/api': { target: 'http://backend:3001', changeOrigin: true },
+      // timeout/proxyTimeout a 0: el import de CSV responde con un stream SSE que puede
+      // durar varios minutos (precios históricos con backoff de CoinGecko). Sin esto, el
+      // http-proxy del dev corta la conexión por inactividad y el frontend lo pinta como
+      // "Error de conexión" aunque el backend siga procesando.
+      '/api': { target: 'http://backend:3001', changeOrigin: true, timeout: 0, proxyTimeout: 0 },
       '/ws':  { target: 'ws://backend:3001',  ws: true },
     },
   },

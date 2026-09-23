@@ -1,170 +1,32 @@
-import 'express-async-errors';
-import express from 'express';
 import { createServer } from 'http';
-import path from 'path';
-import fs from 'fs';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
-import { db } from './db/client';
+import app from './app';
+import { db, pool } from './db/client';
 import { runMigrations } from './db/run-migrations';
-import importsRouter from './routes/imports';
-import fifoRouter from './routes/fifo';
-import pricesRouter, { setupPricesWebSocket } from './routes/prices';
+import { setupPricesWebSocket } from './routes/prices';
 import { startLivePrices } from './modules/prices/binance';
 import { repairMissingCoinGeckoIds } from './modules/prices/coingecko';
-import catalogRouter from './routes/catalog';
-import settingsRouter from './routes/settings';
-import transactionsRouter from './routes/transactions';
-import fiscalRouter from './routes/fiscal';
-import walletsRouter from './routes/wallets';
 
-const app = express();
 const server = createServer(app);
 const PORT = parseInt(process.env.BACKEND_PORT || '3001', 10);
-
-// ── Security headers ───────────────────────────────────────────────────────
-app.use(helmet({
-  crossOriginEmbedderPolicy: false,
-  referrerPolicy: { policy: 'no-referrer' },
-  permittedCrossDomainPolicies: { permittedPolicies: 'none' },
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc:      ["'self'"],
-      scriptSrc:       ["'self'"],
-      styleSrc:        ["'self'", "'unsafe-inline'"],
-      imgSrc:          ["'self'", 'data:'],
-      // Restringir connectSrc a los dominios reales usados por la app
-      connectSrc:      [
-        "'self'",
-        'wss://stream.binance.com:9443',
-        'https://api.binance.com',
-        'https://api.coingecko.com',
-        // WebSocket local (dev y Electron)
-        'ws://localhost:*',
-        'wss://localhost:*',
-      ],
-      frameAncestors:  ["'none'"],
-      formAction:      ["'self'"],
-      upgradeInsecureRequests: [],
-    },
-  },
-}));
-
-// ── CORS ───────────────────────────────────────────────────────────────────
-// En modo Electron el frontend carga desde file://, que envía Origin: null.
-// El backend solo escucha en 127.0.0.1, así que permitir null es seguro.
-const corsOrigin = process.env.ELECTRON_MODE === 'true'
-  ? (origin: string | undefined, cb: (e: Error | null, allow?: boolean) => void) => cb(null, true)
-  : process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
-    : ['http://localhost:5173', 'http://127.0.0.1:5173'];
-
-app.use(cors({ origin: corsOrigin, credentials: true }));
-
-// ── Logging (structured, sin datos sensibles) ──────────────────────────────
-app.use(morgan('combined'));
-
-// ── Rate limiting ──────────────────────────────────────────────────────────
-// El backend escucha en 127.0.0.1 para un único usuario local (Electron).
-// El globalLimiter previene loops accidentales; no es un límite de seguridad
-// frente a terceros (no hay acceso externo).
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5000,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later.' },
-});
-
-app.use(globalLimiter);
-
-// ── Body parsing ───────────────────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
-
-// ── Health check (sin datos internos sensibles) ────────────────────────────
-app.get('/health', async (_req, res) => {
-  try {
-    await db.query('SELECT 1');
-    res.json({ status: 'ok' });
-  } catch {
-    res.status(503).json({ status: 'error' });
-  }
-});
-
-app.use('/api/imports', importsRouter);
-app.use('/api/fifo', fifoRouter);
-app.use('/api/prices', pricesRouter);
-app.use('/api/catalog', catalogRouter);
-app.use('/api/settings', settingsRouter);
-app.use('/api/transactions', transactionsRouter);
-app.use('/api/fiscal', fiscalRouter);
-app.use('/api/wallets', walletsRouter);
-
-// ── Frontend estático (solo en modo Electron) ──────────────────────────────
-// El frontend se sirve desde el mismo origen que el backend (127.0.0.1:3001),
-// eliminando CORS completamente. El catch-all envía index.html para React Router.
-if (process.env.ELECTRON_MODE === 'true') {
-  const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
-  if (fs.existsSync(frontendDist)) {
-    app.use(express.static(frontendDist));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.join(frontendDist, 'index.html'));
-    });
-  }
-}
-
-// ── Error handler — nunca filtra detalles internos al cliente ─────────────
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error('[ERROR]', err.stack ?? err.message);
-  res.status(500).json({ error: 'Internal server error' });
-});
 
 async function bootstrap() {
   try {
     await db.query('SELECT NOW()');
     console.log('[DB] Connected');
 
-    // En modo Electron/standalone, aplicar schema y migraciones automáticamente
-    if (process.env.ELECTRON_MODE === 'true') {
-      const dbUrl = process.env.DATABASE_URL!;
-      await runMigrations(dbUrl);
-    }
+    // Aplicar schema y migraciones automáticamente en cada arranque — tanto en
+    // Docker como en Electron. Idempotente (runMigrations solo aplica lo pendiente,
+    // registrado en schema_migrations), así que es seguro correrlo siempre.
+    await runMigrations();
     setupPricesWebSocket(server);
 
-    // Limpiar destination_pending=TRUE en transacciones que ya no son WITHDRAW
-    // (datos corruptos de ediciones previas o upgrades del importer)
-    const staleRes = await db.query(
-      `UPDATE transactions SET destination_pending = FALSE
-       WHERE destination_pending = TRUE AND operation_type != 'WITHDRAW'`
-    );
-    if (staleRes.rowCount && staleRes.rowCount > 0) {
-      console.log(`[STARTUP] Limpiados ${staleRes.rowCount} registros con destination_pending incorrecto`);
-    }
-
-    // Convertir automáticamente WITHDRAW+destination_pending=TRUE que en el CSV
-    // original eran "Asset Recovery" o "Token Swap - Distribution" negativos.
-    // Binance fuerza estos retiros (delisting): no van a ninguna wallet, son LOST.
-    const forcedLostRes = await db.query(
-      `UPDATE transactions t
-       SET operation_type        = 'LOST'::operation_type,
-           destination_wallet_id = NULL,
-           destination_pending   = FALSE,
-           notes = COALESCE(t.notes, rt.operation || ' — activo retirado por Binance')
-       FROM raw_transactions rt
-       WHERE rt.transaction_id = t.id
-         AND t.operation_type = 'WITHDRAW'
-         AND t.destination_pending = TRUE
-         AND rt.operation IN ('Asset Recovery', 'Token Swap - Distribution')
-         AND rt.change < 0`
-    );
-    if (forcedLostRes.rowCount && forcedLostRes.rowCount > 0) {
-      console.log(`[STARTUP] Reclasificados ${forcedLostRes.rowCount} retiros forzados (Asset Recovery/Token Swap) → LOST`);
-    }
-
-    server.listen(PORT, '0.0.0.0', () => {
-      console.log(`[SERVER] Listening on port ${PORT}`);
+    // BACKEND_HOST lo fija electron/backend-manager.ts a '127.0.0.1' para no
+    // exponer el puerto a la LAN en la app de escritorio (app single-user, sin
+    // auth). En Docker no se define y cae a '0.0.0.0' (el host ya restringe el
+    // acceso vía el mapeo de puertos en docker-compose.yml).
+    const host = process.env.BACKEND_HOST || '0.0.0.0';
+    server.listen(PORT, host, () => {
+      console.log(`[SERVER] Listening on ${host}:${PORT}`);
       startLivePrices();
       // Reparar en background activos con price_source='coingecko' pero coingecko_id=NULL.
       // No bloquea el arranque; usa la cola con rate limit de CoinGecko.
@@ -179,3 +41,20 @@ async function bootstrap() {
 }
 
 bootstrap();
+
+// ── Graceful shutdown ───────────────────────────────────────────────────────
+// Docker manda SIGTERM en `down`/`restart`; sin esto el proceso se mata en
+// seco y el pool de Postgres queda colgado hasta que el OS limpia el socket.
+function shutdown(signal: string) {
+  console.log(`[SERVER] ${signal} recibido, cerrando...`);
+  server.close(() => {
+    pool.end()
+      .then(() => process.exit(0))
+      .catch(() => process.exit(1));
+  });
+  // Por si quedan conexiones WebSocket abiertas bloqueando el close, forzar salida.
+  setTimeout(() => process.exit(1), 10_000).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

@@ -1,5 +1,12 @@
--- Añadir UNIQUE constraint en wallets.name si no existe
--- (necesaria para el ON CONFLICT de abajo y para bases de datos anteriores)
+-- ============================================================
+-- Migración 005_binance_staking_wallet
+-- Qué: añade la sub-cuenta de sistema "Binance Staking" a wallets, y de paso
+--      el constraint UNIQUE en wallets.name si la BD es anterior a tenerlo.
+-- Por qué: Binance reporta el staking en una sub-cuenta propia en el CSV
+--          exportado; sin esta wallet predefinida, esas transacciones no
+--          tenían dónde clasificarse igual que las demás sub-cuentas de
+--          Binance (Spot, Funding, Margin...).
+-- ============================================================
 DO $$
 BEGIN
   IF NOT EXISTS (

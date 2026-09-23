@@ -91,6 +91,7 @@ export const ACCOUNT_COLORS: Record<string, string> = {
   'Cross Margin':     '#f59e0b',
   'Isolated Margin':  '#e74c3c',
   'Futures':          '#e74c3c',
+  'Bitvavo':          '#273A75',
 }
 
 export { type WizardResult }

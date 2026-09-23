@@ -1,22 +1,40 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CryptoFolio — stack de desarrollo Dockerizado
+#
+# Diseño anti-colisión (para convivir con otras apps dockerizadas):
+#   • Nombre de proyecto aislado (COMPOSE_PROJECT_NAME) → redes y volúmenes
+#     namespaced; nunca chocan con otros stacks.
+#   • SIN container_name → Docker asigna <proyecto>_<servicio>_1; permite varios
+#     entornos y no secuestra nombres globales.
+#   • Puertos host en rango poco transitado (4xxxx), SIEMPRE ligados a 127.0.0.1
+#     (nunca a la LAN) y sobreescribibles vía variables *_HOST_PORT.
+#   • Los puertos INTERNOS de cada servicio son fijos: es lo que usa la red de
+#     compose (p. ej. el proxy de Vite apunta a backend:3001).
+#
+# Arranque recomendado: `make dev` (BBDD con datos) o `make dev-clean` (BBDD vacía).
+# El Makefile genera un `.env.dev` (gitignoreado) con secretos aleatorios y
+# puertos libres auto-detectados; por eso aquí no hay credenciales fijas reales.
+# ─────────────────────────────────────────────────────────────────────────────
+name: ${COMPOSE_PROJECT_NAME:-cryptofolio}
+
 services:
   # ── PostgreSQL ─────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
-    container_name: cryptotracker_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-cryptotracker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_local}
+      POSTGRES_DB: ${POSTGRES_DB:-cryptotracker}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # Schema inicial se ejecuta automáticamente al crear el contenedor
+      # Schema inicial se ejecuta SOLO al crear el volumen (arranque limpio)
       - ./backend/src/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
     ports:
-      # Solo expuesto localmente para poder conectar con DBeaver/psql si necesitas
-      - "127.0.0.1:5433:5432"
+      # Host: puerto alto y poco común, ligado a loopback. Interno fijo 5432.
+      - "127.0.0.1:${PG_HOST_PORT:-45432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cryptotracker} -d ${POSTGRES_DB:-cryptotracker}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -26,20 +44,24 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
-    container_name: cryptotracker_backend
+      dockerfile: Dockerfile.dev
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: ${DATABASE_URL}
-      BACKEND_PORT: ${BACKEND_PORT:-3001}
-      COINGECKO_BASE_URL: ${COINGECKO_BASE_URL}
+      # DATABASE_URL se deriva del servicio postgres (red interna 5432), así el
+      # host mapeado da igual y nunca hay descuadre usuario/clave/db.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-cryptotracker}:${POSTGRES_PASSWORD:-dev_password_local}@postgres:5432/${POSTGRES_DB:-cryptotracker}}
+      # Interno FIJO a 3001: lo consumen el proxy de Vite (backend:3001) y el
+      # healthcheck. Para cambiar el acceso desde el host usa BACKEND_HOST_PORT.
+      BACKEND_PORT: "3001"
+      COINGECKO_BASE_URL: ${COINGECKO_BASE_URL:-https://api.coingecko.com/api/v3}
       COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
       PRICE_REFRESH_INTERVAL_MS: ${PRICE_REFRESH_INTERVAL_MS:-60000}
-      JWT_SECRET: ${JWT_SECRET}
+      # Fallback SOLO-dev (loopback). `make dev` inyecta uno aleatorio vía .env.dev.
+      JWT_SECRET: ${JWT_SECRET:-dev_only_insecure_secret_change_me_0123456789}
     command: ["npx", "ts-node-dev", "--respawn", "--transpile-only", "--poll", "src/index.ts"]
     volumes:
       # Hot reload: ts-node-dev lee directamente src/ (no usa dist/)
@@ -47,7 +69,7 @@ services:
       # Carpeta para subida de CSVs (persiste entre reinicios)
       - csv_uploads:/app/uploads
     ports:
-      - "127.0.0.1:${BACKEND_PORT:-3001}:3001"
+      - "127.0.0.1:${BACKEND_HOST_PORT:-43001}:3001"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
       interval: 10s
@@ -55,38 +77,32 @@ services:
       retries: 5
       start_period: 15s
 
-  # ── Frontend React ─────────────────────────────────────────────────────────
+  # ── Frontend React (Vite) ──────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: cryptotracker_frontend
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
-    environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
-      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:3001}
     volumes:
       # Hot reload: montar src del host para que Vite sirva siempre el código actual
       - ./frontend/src:/app/src
     ports:
-      - "127.0.0.1:5173:5173"
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-45173}:5173"
 
-  # ── pgAdmin (opcional, para inspeccionar la DB visualmente) ───────────────
+  # ── pgAdmin (opcional: make tools / docker compose --profile tools up) ──────
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: cryptotracker_pgadmin
     restart: unless-stopped
     profiles:
-      # Solo arranca si haces: docker compose --profile tools up
       - tools
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@cryptotracker.local
-      PGADMIN_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD}
+      PGADMIN_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_local}
     ports:
-      - "127.0.0.1:5050:80"
+      - "127.0.0.1:${PGADMIN_HOST_PORT:-45050}:80"
     depends_on:
       postgres:
         condition: service_healthy

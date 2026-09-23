@@ -15,6 +15,20 @@ import type { PreviewResult, ProgressEvent, WizardResult } from './import/types'
 
 const SETUP_KEY = 'cflio_setup_seen'
 
+// Comprueba si una importación quedó registrada pese a haberse perdido el stream.
+// El backend inserta la fila en csv_imports dentro de la misma transacción que las
+// transacciones, así que verla aparecerer (con un count mayor) confirma el commit.
+async function waitForImportCommit(prevCount: number, attempts = 8, delayMs = 3000): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    await new Promise(r => setTimeout(r, delayMs))
+    try {
+      const list = await portfolioApi.getImports()
+      if (list.length > prevCount) return true
+    } catch { /* reintenta */ }
+  }
+  return false
+}
+
 export function ImportPage() {
   const queryClient = useQueryClient()
   const navigate    = useNavigate()
@@ -23,6 +37,7 @@ export function ImportPage() {
 
   const [setupSeen, setSetupSeen] = useState(() => localStorage.getItem(SETUP_KEY) === 'true')
   const [stage, setStage] = useState<'upload' | 'preview' | 'catalog' | 'progress' | 'done'>('upload')
+  const [exchange, setExchange] = useState<'binance' | 'bitvavo'>('binance')
   const [dragOver, setDragOver] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState<string | null>(null)
@@ -68,6 +83,7 @@ export function ImportPage() {
     try {
       const form = new FormData()
       form.append('file', file)
+      form.append('exchange', exchange)
       const res  = await fetch('/api/imports/preview', { method: 'POST', body: form })
       const data: PreviewResult = await res.json()
 
@@ -106,12 +122,16 @@ export function ImportPage() {
 
     const form = new FormData()
     form.append('file', fileBufferRef.current)
+    form.append('exchange', exchange)
     if (Object.keys(resolvedOps).length > 0)
       form.append('resolvedOperations', JSON.stringify(resolvedOps))
     if (Object.keys(withdrawalDestinations).length > 0)
       form.append('withdrawalDestinations', JSON.stringify(withdrawalDestinations))
     if (Object.keys(depositCosts).length > 0)
       form.append('depositCosts', JSON.stringify(depositCosts))
+
+    const prevImportCount = imports.length
+    let sawTerminal = false
 
     try {
       const res = await fetch('/api/imports/confirm', { method: 'POST', body: form })
@@ -138,7 +158,10 @@ export function ImportPage() {
             const event: ProgressEvent = JSON.parse(line.slice(6))
             setProgressLog(prev => [...prev, event])
 
+            if (event.phase === 'error') sawTerminal = true
+
             if (event.phase === 'done') {
+              sawTerminal = true
               setStage('done')
               queryClient.invalidateQueries({ queryKey: ['imports'] })
               queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
@@ -153,7 +176,33 @@ export function ImportPage() {
         }
       }
     } catch {
-      setProgressLog(prev => [...prev, { phase: 'error', message: 'Error de conexion' }])
+      // El stream se cortó sin emitir done/error. No asumimos fallo: el backend puede
+      // haber terminado igualmente (la importación y el FIFO se comitean en servidor).
+      // Se confirma consultando si la importación quedó registrada.
+    }
+
+    if (!sawTerminal) {
+      const commitado = await waitForImportCommit(prevImportCount)
+      if (commitado) {
+        setStage('done')
+        queryClient.invalidateQueries({ queryKey: ['imports'] })
+        queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
+        queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
+        queryClient.invalidateQueries({ queryKey: ['transactions'] })
+        try {
+          sessionStorage.removeItem('import_withdrawal_dest')
+          sessionStorage.removeItem('import_deposit_costs')
+        } catch { /* ignorar */ }
+        setProgressLog(prev => [...prev, {
+          phase: 'done',
+          message: 'Importación completada. La conexión con el navegador se perdió durante el cálculo de precios, pero las transacciones se guardaron correctamente. Recarga la vista para ver el resultado.'
+        }])
+      } else {
+        setProgressLog(prev => [...prev, {
+          phase: 'error',
+          message: 'Error de conexión: no se ha podido confirmar la importación. Revisa la lista de importaciones antes de reintentar.'
+        }])
+      }
     }
   }
 
@@ -234,6 +283,8 @@ export function ImportPage() {
           loading={loading}
           error={error}
           fileRef={fileRef}
+          exchange={exchange}
+          onExchangeChange={setExchange}
           onDragOver={setDragOver}
           onFile={handleFile}
         />

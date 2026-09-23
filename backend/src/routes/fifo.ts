@@ -69,11 +69,12 @@ router.get('/fiat-balances', async (_req, res) => {
                 WHEN operation_type = 'DEPOSIT_FIAT'  THEN  amount
                 WHEN operation_type = 'BUY'           THEN  amount_net
                 WHEN operation_type = 'WITHDRAW_FIAT' THEN -amount
+                WHEN operation_type = 'CASHBACK'      THEN  amount_net
                 ELSE 0
               END AS flow
        FROM transactions t JOIN wallets w ON w.id = t.wallet_id
        WHERE asset IN (${fiatClause})
-         AND operation_type IN ('DEPOSIT_FIAT', 'BUY', 'WITHDRAW_FIAT')
+         AND operation_type IN ('DEPOSIT_FIAT', 'BUY', 'WITHDRAW_FIAT', 'CASHBACK')
 
        UNION ALL
 

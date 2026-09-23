@@ -1,6 +1,7 @@
 -- ============================================================
 -- CryptoFolio — Schema PostgreSQL
--- Version: 3.0 — Wallets unificadas (FK, sin enum wallet_type)
+-- Version: 3.1 — Wallets unificadas (FK, sin enum wallet_type) +
+--                migraciones 002-009 horneadas (ver db/migrations/)
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -121,6 +122,10 @@ INSERT INTO wallets (name, type, is_system, is_default, color) VALUES
   ('Binance Strategy',         'exchange', TRUE, FALSE, '#8B5CF6'),
   ('Binance Staking',          'exchange', TRUE, FALSE, '#f59e0b');
 
+-- Bitvavo: cuenta única, sin sub-cuentas (a diferencia de Binance).
+INSERT INTO wallets (name, type, is_system, is_default, color) VALUES
+  ('Bitvavo', 'exchange', TRUE, FALSE, '#273A75');
+
 -- ============================================================
 -- TABLA: wallet_addresses
 -- ============================================================
@@ -140,6 +145,32 @@ CREATE INDEX idx_wallet_addresses_wallet  ON wallet_addresses(wallet_id);
 CREATE INDEX idx_wallet_addresses_network ON wallet_addresses(network_id);
 
 -- ============================================================
+-- TABLA: network_api_keys
+-- ============================================================
+CREATE TABLE network_api_keys (
+  network_id         UUID PRIMARY KEY REFERENCES networks(id) ON DELETE CASCADE,
+  api_key_encrypted  BYTEA NOT NULL,
+  api_key_iv         BYTEA NOT NULL,
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+-- ============================================================
+-- TABLA: balance_sync_log
+-- ============================================================
+CREATE TABLE balance_sync_log (
+  id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  wallet_address_id  UUID NOT NULL REFERENCES wallet_addresses(id) ON DELETE CASCADE,
+  asset              TEXT NOT NULL,
+  checked_at         TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+  onchain_balance    NUMERIC,
+  expected_balance   NUMERIC,
+  discrepancy_pct    NUMERIC,
+  status             TEXT NOT NULL CHECK (status IN ('ok', 'discrepancy', 'error'))
+);
+
+CREATE INDEX idx_balance_sync_log_wallet_address ON balance_sync_log(wallet_address_id, checked_at DESC);
+
+-- ============================================================
 -- TABLA: csv_imports
 -- ============================================================
 CREATE TABLE csv_imports (
@@ -149,6 +180,7 @@ CREATE TABLE csv_imports (
   imported_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   row_count     INTEGER NOT NULL DEFAULT 0,
   skipped_count INTEGER NOT NULL DEFAULT 0,
+  exchange      TEXT NOT NULL DEFAULT 'binance',
   notes         TEXT
 );
 
@@ -172,6 +204,9 @@ CREATE TABLE raw_transactions (
 
 CREATE INDEX idx_raw_transactions_time   ON raw_transactions(time);
 CREATE INDEX idx_raw_transactions_import ON raw_transactions(import_id);
+CREATE INDEX idx_raw_transactions_tx     ON raw_transactions(transaction_id);
+-- FK añadida tras crear `transactions` (más abajo en este archivo), no puede
+-- ser inline aquí porque `transactions` todavía no existe en este punto.
 
 -- ============================================================
 -- TABLA: transactions
@@ -211,6 +246,11 @@ CREATE INDEX idx_transactions_type      ON transactions(operation_type);
 CREATE INDEX idx_transactions_wallet    ON transactions(wallet_id);
 CREATE INDEX idx_transactions_dest      ON transactions(destination_wallet_id);
 
+-- FK pendiente desde raw_transactions (creada antes que esta tabla más arriba)
+ALTER TABLE raw_transactions
+  ADD CONSTRAINT raw_transactions_transaction_id_fkey
+  FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL;
+
 -- ============================================================
 -- TABLA: fifo_lots
 -- wallet_id referencia la tabla wallets
@@ -228,7 +268,10 @@ CREATE TABLE fifo_lots (
   closed_at           TIMESTAMPTZ,
   is_closed           BOOLEAN NOT NULL DEFAULT FALSE,
   wallet_id           UUID NOT NULL REFERENCES wallets(id),
-  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  -- clock_timestamp() (no NOW()) — runFifoEngine corre en una única transacción,
+  -- y NOW() devolvería el mismo valor fijo para todos los lotes de una ejecución.
+  -- Se usa como desempate en getOpenLots cuando dos lotes comparten opened_at.
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 
 CREATE INDEX idx_fifo_lots_asset      ON fifo_lots(asset);
@@ -304,12 +347,16 @@ INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_u
   ('WIF',  'dogwifhat',    'dogwifcoin',       FALSE, 'WIFUSDT',  'usdt_proxy'),
   ('PYTH', 'Pyth Network', 'pyth-network',     FALSE, 'PYTHUSDT', 'usdt_proxy'),
   ('ONDO', 'Ondo Finance', 'ondo-finance',     FALSE, 'ONDOUSDT', 'usdt_proxy'),
-  ('USDC', 'USD Coin',     'usd-coin',         TRUE,  'USDCUSDT', 'usdt_proxy');
+  ('USDC', 'USD Coin',     'usd-coin',         TRUE,  'USDCUSDT', 'usdt_proxy'),
+  -- LUNC = Terra Luna CLASSIC (no la nueva LUNA 2.0). Binance la relistó como
+  -- LUNCUSDT (~ago 2022) y mantiene histórico diario para las fechas de este
+  -- catálogo. Antes se sembraba como 'coingecko' con id 'terra-luna' (que es la
+  -- nueva LUNA 2.0, precio ~1000x superior) → precio erróneo/sin dato.
+  ('LUNC', 'Terra Classic', NULL,               FALSE, 'LUNCUSDT', 'usdt_proxy');
 
 INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, price_source) VALUES
   ('EUR',  'Euro',   NULL,          TRUE,  'fiat'),
-  ('USDT', 'Tether', NULL,          TRUE,  'fiat'),
-  ('LUNC', 'Terra Classic', 'terra-luna', FALSE, 'coingecko');
+  ('USDT', 'Tether', NULL,          TRUE,  'fiat');
 
 INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_eth_pair, price_source) VALUES
   ('BETH', 'Binance ETH Staking', NULL, FALSE, 'BETHETH', 'eth_proxy');

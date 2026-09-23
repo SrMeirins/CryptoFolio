@@ -21,6 +21,7 @@ const INTERNAL_TRANSFER_OPS = new Set([
   'Transfer Between Main Account/Futures and Margin Account',
   'Transfer Between Spot and Strategy Account',
   'Transfer Between Spot and Strategy',
+  'Inter-Wallet Transfer',
 ]);
 
 // Fiat real — depósitos/retiros de estas monedas no tienen lote FIFO
@@ -185,81 +186,7 @@ export function parseBinanceCsv(fileContent: Buffer | string): CsvParseResult {
     }
   }
 
-  // 3b. Detectar "margin short sales": Margin Loan + Transaction Sold del MISMO activo
-  //     en el MISMO timestamp y cuenta → la venta es de ACTIVO PRESTADO, no propio.
-  //
-  //     IMPORTANTE: solo se ignora si el total vendido ≤ total prestado (con tolerancia).
-  //     Si se vende MÁS de lo prestado, el exceso es una venta real del activo propio.
-  //
-  //     Ejemplo correcto (XRP):  préstamo 508.5 = vendido 508.5 → TODO ignorado
-  //     Ejemplo con exceso (LUNC): préstamo 4M < vendido 5M → NO ignorar nada
-  //       (el 1M extra es LUNC propio que se vendió junto al short)
-  {
-    // Calcular totales de Margin Loan por "timestamp|account|asset"
-    const loanTotals = new Map<string, number>();
-    for (const row of rows) {
-      if (row.operation === 'Margin Loan') {
-        const key = `${row.time.getTime()}|${row.account}|${row.coin}`;
-        loanTotals.set(key, (loanTotals.get(key) ?? 0) + abs(row.change));
-      }
-    }
-
-    // Calcular totales de Transaction Sold por "timestamp|account|asset"
-    const soldTotals = new Map<string, number>();
-    for (const row of rows) {
-      if (row.operation === 'Transaction Sold') {
-        const key = `${row.time.getTime()}|${row.account}|${row.coin}`;
-        soldTotals.set(key, (soldTotals.get(key) ?? 0) + abs(row.change));
-      }
-    }
-
-    // Contextos donde sold ≤ loan → short sale puro, ignorar.
-    //
-    // IMPORTANTE: solo se crea contexto si hay un Transaction Sold real (soldAmt > 0).
-    // Un Margin Loan sin Transaction Sold correspondiente es una compra apalancada
-    // (loan USDT para comprar cripto), NO un short sale — no se debe suprimir nada.
-    //
-    // Usamos comparación estricta (sold ≤ loan, sin tolerancia):
-    //   - sold ≤ loan: short sale puro → ignorar todo
-    //   - sold > loan: hay activo propio mezclado (aunque sea 0.003 de diferencia)
-    //     → procesar como SELL real. El FIFO consumirá los lotes propios disponibles
-    //     y logueará "insuficiente" para la parte prestada (que no tiene lotes).
-    //
-    // shortSaleCoinContexts → clave ts|account|coin: para Transaction Sold (mismo activo)
-    // shortSaleTimestamps   → clave ts|account:       para Transaction Revenue y Fee
-    //                         (pueden estar en activo distinto al prestado)
-    const shortSaleCoinContexts = new Set<string>();
-    const shortSaleTimestamps   = new Set<string>();
-    for (const [key, loanAmt] of loanTotals) {
-      const soldAmt = soldTotals.get(key) ?? 0;
-      if (soldAmt === 0) continue; // Sin Transaction Sold → no hay short sale
-      if (soldAmt <= loanAmt) {
-        // Short sale puro: todo lo vendido estaba prestado → ignorar
-        shortSaleCoinContexts.add(key); // ts|account|coin
-        const [ts, account] = key.split('|');
-        shortSaleTimestamps.add(`${ts}|${account}`);
-      }
-      // Si sold > loan: activo propio mezclado → dejar como SELL normal para que el
-      // FIFO consuma los lotes propios (el exceso sobre el préstamo es una venta real)
-    }
-
-    // Reemplazar operación de las filas Margin Loan/Transaction Sold/Revenue/Fee en esos contextos
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const ctxCoin = `${row.time.getTime()}|${row.account}|${row.coin}`;
-      const ctxTs   = `${row.time.getTime()}|${row.account}`;
-      const suppress =
-        (row.operation === 'Margin Loan'         && shortSaleCoinContexts.has(ctxCoin)) ||
-        (row.operation === 'Transaction Sold'    && shortSaleCoinContexts.has(ctxCoin)) ||
-        (row.operation === 'Transaction Revenue' && shortSaleTimestamps.has(ctxTs)) ||
-        (row.operation === 'Transaction Fee'     && shortSaleTimestamps.has(ctxTs));
-      if (suppress) {
-        rows[i] = { ...row, operation: 'Margin Short Sale' };
-      }
-    }
-  }
-
-  // 3c. Normalizar timestamps de Transfer (Spot→Strategy) que llegan 1-5 segundos
+  // 3b. Normalizar timestamps de Transfer (Spot→Strategy) que llegan 1-5 segundos
   //     DESPUÉS de un BUY en Strategy.
   //     Binance Strategy ejecuta el trade a T y transfiere el funding a T+1..T+5;
   //     la prioridad TRANSFER_INTERNAL (3) antes que BUY (4) solo funciona dentro
@@ -310,13 +237,10 @@ export function parseBinanceCsv(fileContent: Buffer | string): CsvParseResult {
   // 4. Separar ignoradas de activas.
   //    Las filas en IGNORED_OPERATIONS generan ParsedTransactions de tipo IGNORED
   //    (se insertan en la BD y aparecen en historial) pero el motor FIFO las salta.
-  //    Las reclasificadas como 'Margin Short Sale' sí se descartan por completo.
   const activeRows: RawCsvRow[] = [];
   const preIgnoredTxs: ParsedTransaction[] = [];
   for (const row of rows) {
-    if (row.operation === 'Margin Short Sale') {
-      ignoredRows.push(row);  // reclasificación interna — no insertar
-    } else if (IGNORED_OPERATIONS.has(row.operation)) {
+    if (IGNORED_OPERATIONS.has(row.operation)) {
       ignoredRows.push(row);  // para stats
       preIgnoredTxs.push({
         operationType: 'IGNORED',
