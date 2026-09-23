@@ -40,7 +40,7 @@ export function validateBitvavoCsvStructure(fileBuffer: Buffer): ValidationResul
     dateRange: null,
   };
 
-  const content = fileBuffer.toString('utf-8').replace(/^﻿/, '');
+  const content = fileBuffer.toString('utf-8').replace(/^\uFEFF/, '');
   const lines = content.split('\n').filter((l) => l.trim().length > 0);
 
   if (lines.length < 2) {
