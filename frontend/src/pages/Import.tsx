@@ -15,6 +15,20 @@ import type { PreviewResult, ProgressEvent, WizardResult } from './import/types'
 
 const SETUP_KEY = 'cflio_setup_seen'
 
+// Comprueba si una importación quedó registrada pese a haberse perdido el stream.
+// El backend inserta la fila en csv_imports dentro de la misma transacción que las
+// transacciones, así que verla aparecerer (con un count mayor) confirma el commit.
+async function waitForImportCommit(prevCount: number, attempts = 8, delayMs = 3000): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    await new Promise(r => setTimeout(r, delayMs))
+    try {
+      const list = await portfolioApi.getImports()
+      if (list.length > prevCount) return true
+    } catch { /* reintenta */ }
+  }
+  return false
+}
+
 export function ImportPage() {
   const queryClient = useQueryClient()
   const navigate    = useNavigate()
@@ -116,6 +130,9 @@ export function ImportPage() {
     if (Object.keys(depositCosts).length > 0)
       form.append('depositCosts', JSON.stringify(depositCosts))
 
+    const prevImportCount = imports.length
+    let sawTerminal = false
+
     try {
       const res = await fetch('/api/imports/confirm', { method: 'POST', body: form })
 
@@ -141,7 +158,10 @@ export function ImportPage() {
             const event: ProgressEvent = JSON.parse(line.slice(6))
             setProgressLog(prev => [...prev, event])
 
+            if (event.phase === 'error') sawTerminal = true
+
             if (event.phase === 'done') {
+              sawTerminal = true
               setStage('done')
               queryClient.invalidateQueries({ queryKey: ['imports'] })
               queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
@@ -156,7 +176,33 @@ export function ImportPage() {
         }
       }
     } catch {
-      setProgressLog(prev => [...prev, { phase: 'error', message: 'Error de conexion' }])
+      // El stream se cortó sin emitir done/error. No asumimos fallo: el backend puede
+      // haber terminado igualmente (la importación y el FIFO se comitean en servidor).
+      // Se confirma consultando si la importación quedó registrada.
+    }
+
+    if (!sawTerminal) {
+      const commitado = await waitForImportCommit(prevImportCount)
+      if (commitado) {
+        setStage('done')
+        queryClient.invalidateQueries({ queryKey: ['imports'] })
+        queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
+        queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
+        queryClient.invalidateQueries({ queryKey: ['transactions'] })
+        try {
+          sessionStorage.removeItem('import_withdrawal_dest')
+          sessionStorage.removeItem('import_deposit_costs')
+        } catch { /* ignorar */ }
+        setProgressLog(prev => [...prev, {
+          phase: 'done',
+          message: 'Importación completada. La conexión con el navegador se perdió durante el cálculo de precios, pero las transacciones se guardaron correctamente. Recarga la vista para ver el resultado.'
+        }])
+      } else {
+        setProgressLog(prev => [...prev, {
+          phase: 'error',
+          message: 'Error de conexión: no se ha podido confirmar la importación. Revisa la lista de importaciones antes de reintentar.'
+        }])
+      }
     }
   }
 
