@@ -42,19 +42,17 @@ otra) es implementar un nuevo `BalanceProvider` y registrarlo — sin tocar el r
 
 ## Modelo de datos
 
-### Cambios en `wallet_addresses`
-```sql
-ALTER TABLE wallet_addresses
-  ADD COLUMN contract_address TEXT,  -- NULL = activo nativo de la red; valor = token (ej. LINK sobre Ethereum)
-  ADD COLUMN symbol TEXT;            -- símbolo del activo verificado en esta fila (XRP, ETH, LINK...)
-```
-Permite varias filas por dirección: una para el activo nativo, una por cada token adicional en esa
-misma dirección (ej. una dirección Ethereum puede tener una fila para ETH y otra para LINK).
+`wallet_addresses` no cambia. El esquema ya modela tokens sobre una red mediante la tabla
+`network_assets` (`network_id`, `asset`, `contract_address`), pre-cargada con LINK/USDC/ONDO
+sobre Ethereum y WIF/PYTH sobre Solana — se reutiliza tal cual: por cada `wallet_addresses` con
+`network_id` dado, el motor de sync verifica el activo nativo de esa red (`networks.native_asset`)
+y, además, cada fila de `network_assets` asociada a ese mismo `network_id` (misma dirección,
+verificación del contrato del token).
 
 ### Nueva tabla `network_api_keys`
 ```sql
 CREATE TABLE network_api_keys (
-  network_id INTEGER PRIMARY KEY REFERENCES networks(id),
+  network_id UUID PRIMARY KEY REFERENCES networks(id),
   api_key_encrypted BYTEA NOT NULL,
   api_key_iv BYTEA NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
@@ -66,8 +64,9 @@ correspondiente (`ETHERSCAN_API_KEY`, `BLOCKFROST_API_KEY`, `SUBSCAN_API_KEY`) c
 ### Nueva tabla `balance_sync_log`
 ```sql
 CREATE TABLE balance_sync_log (
-  id SERIAL PRIMARY KEY,
-  wallet_address_id INTEGER NOT NULL REFERENCES wallet_addresses(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  wallet_address_id UUID NOT NULL REFERENCES wallet_addresses(id) ON DELETE CASCADE,
+  asset TEXT NOT NULL,              -- activo verificado en esta fila (nativo o token, ej. XRP, LINK)
   checked_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
   onchain_balance NUMERIC,
   expected_balance NUMERIC,
@@ -76,8 +75,9 @@ CREATE TABLE balance_sync_log (
 );
 CREATE INDEX idx_balance_sync_log_wallet_address ON balance_sync_log(wallet_address_id, checked_at DESC);
 ```
-Histórico de cada verificación (automática o manual). Retención: se purgan filas con más de 90
-días de antigüedad al final de cada ejecución del job diario (no hay cron independiente para esto).
+Histórico de cada verificación (automática o manual), una fila por `(wallet_address_id, asset)`
+comprobado. Retención: se purgan filas con más de 90 días de antigüedad al final de cada
+ejecución del job diario (no hay cron independiente para esto).
 
 ## Seguridad
 
@@ -104,35 +104,42 @@ días de antigüedad al final de cada ejecución del job diario (no hay cron ind
 
 ```ts
 interface BalanceProvider {
-  networkCode: string;
   requiresApiKey: boolean;
   getBalance(address: string, contractAddress?: string): Promise<number>;
 }
 ```
 Un archivo por red (`backend/src/modules/walletSync/providers/xrplProvider.ts`,
 `etherscanProvider.ts`, `hederaProvider.ts`, `stellarProvider.ts`, `blockstreamProvider.ts`,
-`solanaProvider.ts`, `blockfrostProvider.ts`, `subscanProvider.ts`), registrado en un
-`Map<string, BalanceProvider>` en `providers/registry.ts` keyed por `network_code`. Añadir una
-red nueva = un archivo nuevo + una línea de registro.
+`solanaProvider.ts`, `blockfrostProvider.ts`, `subscanProvider.ts`), registrado en
+`providers/registry.ts` mediante un `Record<string, BalanceProvider>` **keyed por
+`networks.name`** (no hay columna `code` en `networks`; el nombre ya es `UNIQUE` y estable —
+'XRP Ledger', 'Ethereum', 'Solana', 'Cardano', 'HBAR', 'Stellar', 'Polkadot Asset Hub',
+'Bitcoin'). Añadir una red nueva = un archivo nuevo + una línea de registro con su nombre exacto.
 
 ## Motor de sincronización
 
 `backend/src/modules/walletSync/walletSync.ts`:
 
-1. Por cada fila de `wallet_addresses`: resuelve el `BalanceProvider` por `network_id`.
-2. Llama `getBalance(address, contract_address)` con timeout + circuit breaker.
-3. Calcula el saldo esperado: suma de `fifo_lots` abiertos filtrados por `wallet_id` (el mismo
-   `wallet_id` vinculado a esa dirección) y activo (`symbol`).
+1. Por cada fila de `wallet_addresses` (con `address` no nulo): resuelve el `BalanceProvider` por
+   `networks.name`. Si no hay proveedor registrado para esa red (red personalizada del usuario),
+   se omite sin error.
+2. Llama `getBalance(address)` para el activo nativo, y `getBalance(address, contract_address)`
+   por cada fila de `network_assets` de esa misma red — con timeout + circuit breaker.
+3. Calcula el saldo esperado, por cada activo (`asset`): suma de `fifo_lots` abiertos filtrados
+   por `wallet_id` (el mismo `wallet_id` vinculado a esa dirección) y ese activo.
 4. Compara: si `|onchain - expected| / expected > 0.5%` → `status='discrepancy'`; si falla la
    llamada → `status='error'`; si no → `status='ok'`.
-5. Escribe en `balance_sync_log`, actualiza `wallet_addresses.last_known_balance` /
-   `last_sync_at`.
+5. Escribe una fila en `balance_sync_log` por `(wallet_address_id, asset)`. Además, actualiza
+   `wallet_addresses.last_known_balance` / `last_sync_at` con el resultado del **activo nativo**
+   de la red (es el que ya sirve `GET /api/wallets`; el detalle por token queda en
+   `balance_sync_log`, consultado aparte por la UI para pintar el badge).
 6. Al final, purga `balance_sync_log` de filas >90 días.
 
 **Disparo**: `node-cron` diario dentro del proceso backend (consistente con cómo ya arranca
 `runMigrations()` al boot, sin infraestructura nueva). Adicionalmente, un endpoint
-`POST /api/wallets/:id/sync` para el botón manual "Verificar ahora" por fila, que ejecuta el
-mismo flujo de un solo `wallet_address_id`.
+`POST /api/wallets/:walletId/addresses/:addressId/sync` para el botón manual "Verificar ahora"
+por fila, que ejecuta el mismo flujo (activo nativo + todos los tokens de esa red) para una sola
+`wallet_address_id` y devuelve el array de resultados.
 
 ## UI/UX
 

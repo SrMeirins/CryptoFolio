@@ -57,14 +57,33 @@ export async function runMigrations(): Promise<void> {
     const count = parseInt(rows[0].count, 10);
 
     if (count === 0) {
-      const schemaPath = path.join(dbDir, 'schema.sql');
-      if (!fs.existsSync(schemaPath)) {
-        throw new Error(`schema.sql no encontrado en ${schemaPath}`);
+      // ¿Ya existen las tablas? En Docker, schema.sql ya se aplicó una vez vía
+      // docker-entrypoint-initdb.d al crear el volumen — schema_migrations es nueva
+      // (primera vez que corre este runner ahí), pero los datos ya están. schema.sql
+      // NO es idempotente (CREATE TABLE sin IF NOT EXISTS), así que NUNCA se
+      // re-ejecuta si el esquema ya existe — solo se registra como aplicado.
+      const { rows: existsRows } = await client.query(`
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.tables WHERE table_name = 'transactions'
+        )
+      `);
+      const schemaAlreadyExists = existsRows[0].exists;
+
+      if (schemaAlreadyExists) {
+        console.log('[migrations] Esquema ya existente (Docker) — registrando schema base sin reaplicar.');
+        await client.query(
+          `INSERT INTO schema_migrations (version) VALUES ('000_schema_base') ON CONFLICT DO NOTHING`
+        );
+      } else {
+        const schemaPath = path.join(dbDir, 'schema.sql');
+        if (!fs.existsSync(schemaPath)) {
+          throw new Error(`schema.sql no encontrado en ${schemaPath}`);
+        }
+        const schema = fs.readFileSync(schemaPath, 'utf8');
+        console.log('[migrations] Aplicando schema base...');
+        await applyAtomically(client, '000_schema_base', schema);
+        console.log('[migrations] Schema base aplicado.');
       }
-      const schema = fs.readFileSync(schemaPath, 'utf8');
-      console.log('[migrations] Aplicando schema base...');
-      await applyAtomically(client, '000_schema_base', schema);
-      console.log('[migrations] Schema base aplicado.');
     }
 
     // 3. Buscar y aplicar migraciones pendientes en orden

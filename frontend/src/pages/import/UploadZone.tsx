@@ -12,29 +12,68 @@ export function AccountChip({ account, colors }: { account: string; colors: Reco
   )
 }
 
-export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFile }: {
+const EXCHANGE_HELP: Record<'binance' | 'bitvavo', { title: string; steps: string[]; note: string }> = {
+  binance: {
+    title: 'Como exportar tu historial de Binance',
+    steps: [
+      'Ve a Binance > Orders > Transaction History',
+      'Pulsa el icono de exportar en la esquina superior derecha',
+      'Selecciona Export Transaction Records',
+      'Elige el rango de fechas y formato CSV',
+      'Espera a que se genere y descargalo',
+    ],
+    note: 'Soportamos exportaciones en ingles y espanol.',
+  },
+  bitvavo: {
+    title: 'Como exportar tu historial de Bitvavo',
+    steps: [
+      'Ve a Bitvavo > Account > Order History / Transaction History',
+      'Pulsa el icono de exportar / descargar CSV',
+      'Selecciona el historial completo',
+      'Espera a que se genere y descargalo',
+    ],
+    note: 'Soportamos el formato de exportacion estandar de Bitvavo (Timezone, Type, Currency...).',
+  },
+}
+
+export function UploadZone({ dragOver, loading, error, fileRef, exchange, onExchangeChange, onDragOver, onFile }: {
   dragOver: boolean
   loading: boolean
   error: string | null
   fileRef: React.RefObject<HTMLInputElement>
+  exchange: 'binance' | 'bitvavo'
+  onExchangeChange: (e: 'binance' | 'bitvavo') => void
   onDragOver: (v: boolean) => void
   onFile: (f: File) => void
 }) {
+  const help = EXCHANGE_HELP[exchange]
   return (
     <div className="space-y-4">
+      <div className="inline-flex rounded-lg border border-border p-1 gap-1">
+        {(['binance', 'bitvavo'] as const).map(ex => (
+          <button
+            key={ex}
+            type="button"
+            onClick={() => onExchangeChange(ex)}
+            disabled={loading}
+            className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors capitalize
+              ${exchange === ex ? 'bg-accent-blue/15 text-accent-blue' : 'text-gray-400 hover:text-gray-200'}
+            `}
+          >
+            {ex}
+          </button>
+        ))}
+      </div>
+
       <div className="card bg-accent-blue/5 border-accent-blue/20 p-4">
         <div className="flex items-start gap-3">
           <Info size={16} className="text-accent-blue shrink-0 mt-0.5" />
           <div className="text-xs space-y-1">
-            <p className="font-medium text-accent-blue">Como exportar tu historial de Binance</p>
+            <p className="font-medium text-accent-blue">{help.title}</p>
             <ol className="text-gray-400 space-y-0.5 list-decimal list-inside">
-              <li>Ve a <span className="text-white">Binance &gt; Orders &gt; Transaction History</span></li>
-              <li>Pulsa el icono de exportar en la esquina superior derecha</li>
-              <li>Selecciona <span className="text-white">Export Transaction Records</span></li>
-              <li>Elige el rango de fechas y formato <span className="text-white">CSV</span></li>
-              <li>Espera a que se genere y descargalo</li>
+              {help.steps.map(step => <li key={step}>{step}</li>)}
             </ol>
-            <p className="text-gray-600 mt-1">Soportamos exportaciones en ingles y espanol.</p>
+            <p className="text-gray-600 mt-1">{help.note}</p>
           </div>
         </div>
       </div>
@@ -62,7 +101,7 @@ export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFi
         ) : (
           <>
             <Upload size={32} className="mx-auto text-gray-500 mb-3" />
-            <p className="text-gray-300 font-medium">Arrastra tu CSV de Binance aquí</p>
+            <p className="text-gray-300 font-medium capitalize">Arrastra tu CSV de {exchange} aquí</p>
             <p className="text-gray-600 text-sm mt-1">o haz click para seleccionar</p>
             <div className="flex items-center justify-center gap-3 mt-3 text-xs text-gray-700">
               <span>Transaction History export</span>

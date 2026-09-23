@@ -1,10 +1,10 @@
 import { createHash, randomUUID } from 'crypto';
 import { parse } from 'csv-parse/sync';
 import { db } from '../../db/client';
-import { parseBinanceCsv } from './parser';
-import { validateCsvStructure, ValidationResult } from './validator';
+import { ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
 import { ACCOUNT_TO_WALLET, TRANSFER_DESTINATIONS } from './binanceAccounts';
+import { Exchange, parseExchangeCsv, validateExchangeCsv } from './exchanges';
 import { getHistoricalPriceEur, refreshLivePrices } from '../prices/binance';
 import { setCoinGeckoStatusCallback, prefetchHistoricalPrices as prefetchCoinGeckoHistoricalPrices } from '../prices/coingecko';
 import { getOrDetectPairInfo } from '../prices/pairDetector';
@@ -46,8 +46,8 @@ export interface PreviewResult {
   depositReviews: DepositReview[];  // depósitos externos que necesitan coste
 }
 
-export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult> {
-  const validation = validateCsvStructure(fileBuffer);
+export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'binance'): Promise<PreviewResult> {
+  const validation = validateExchangeCsv(exchange, fileBuffer);
 
   if (!validation.valid) {
     return {
@@ -61,12 +61,13 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
     };
   }
 
-  const parseResult = parseBinanceCsv(fileBuffer);
+  const parseResult = parseExchangeCsv(exchange, fileBuffer);
 
-  // Construir muestras de operaciones desconocidas
+  // Construir muestras de operaciones desconocidas (solo aplica a Binance:
+  // Bitvavo aborta directamente en el validator si encuentra un Type desconocido)
   const unknownOperationSamples: Record<string, UnknownOperationSample> = {};
 
-  if (validation.unknownOperations.length > 0) {
+  if (exchange === 'binance' && validation.unknownOperations.length > 0) {
     const rawRecords: Record<string, string>[] = parse(fileBuffer, {
       columns: true,
       skip_empty_lines: true,
@@ -105,11 +106,13 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
   if (incomeOpsCount > 0) {
     validation.info.push(
       `${incomeOpsCount} operaciones de rendimiento (staking, interés, airdrop) necesitan precio histórico. ` +
-      `Se consultará la API de Binance al confirmar — puede tardar unos segundos adicionales.`
+      `Se consultará la API al confirmar — puede tardar unos segundos adicionales.`
     );
   }
 
-  // Detectar gaps y solapamientos con imports existentes
+  // Detectar gaps y solapamientos con imports existentes DEL MISMO EXCHANGE
+  // (Binance y Bitvavo son historiales independientes — comparar fechas entre
+  // ambos generaría falsos "gap sin datos" sin sentido)
   if (validation.dateRange) {
     const newFrom = new Date(validation.dateRange.from);
     const newTo = new Date(validation.dateRange.to);
@@ -121,8 +124,10 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
          MAX(t.timestamp)::date AS date_to
        FROM csv_imports ci
        JOIN transactions t ON t.import_id = ci.id
+       WHERE ci.exchange = $1
        GROUP BY ci.id, ci.filename
-       ORDER BY MIN(t.timestamp)`
+       ORDER BY MIN(t.timestamp)`,
+      [exchange]
     );
 
     for (const range of existingRanges.rows) {
@@ -138,7 +143,7 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
         validation.warnings.push(
           `Gap de ${daysBetween} dias sin datos: "${range.filename}" cubre hasta ${range.date_to} ` +
           `y este CSV empieza el ${validation.dateRange.from}. ` +
-          `Considera exportar ese periodo desde Binance.`
+          `Considera exportar ese periodo desde ${exchange === 'binance' ? 'Binance' : 'Bitvavo'}.`
         );
       }
 
@@ -151,7 +156,7 @@ export async function previewCsvFile(fileBuffer: Buffer): Promise<PreviewResult>
         validation.warnings.push(
           `Gap de ${daysBetweenInverse} dias sin datos: este CSV cubre hasta ${validation.dateRange.to} ` +
           `y "${range.filename}" empieza el ${range.date_from}. ` +
-          `Considera exportar ese periodo desde Binance.`
+          `Considera exportar ese periodo desde ${exchange === 'binance' ? 'Binance' : 'Bitvavo'}.`
         );
       }
     }
@@ -226,15 +231,16 @@ export async function importCsvFile(
   depositCosts: Record<string, number> = {},
   onProgress?: (done: number, total: number, asset?: string, operation?: string) => void,
   onStatus?: (message: string, progress?: number, total?: number) => void,
+  exchange: Exchange = 'binance',
 ): Promise<ImportResult> {
-  const validation = validateCsvStructure(fileBuffer);
+  const validation = validateExchangeCsv(exchange, fileBuffer);
   if (!validation.valid) {
     throw new Error(validation.errors.join(' | '));
   }
 
   onStatus?.('Parseando CSV...');
   const fileHash = createHash('sha256').update(fileBuffer).digest('hex');
-  const parseResult = parseBinanceCsv(fileBuffer);
+  const parseResult = parseExchangeCsv(exchange, fileBuffer);
 
   if (parseResult.errors.length > 0) {
     throw new Error(
@@ -341,42 +347,45 @@ export async function importCsvFile(
     onStatus?.(`Precios de rendimiento completados: ${totalPairs} pares procesados`);
   }
 
-  // Construir mapa de pares reales de transferencia interna.
+  // Construir mapa de pares reales de transferencia interna. Solo aplica a Binance:
+  // es el único exchange con TRANSFER_INTERNAL (Bitvavo es cuenta única, sin sub-wallets).
   // El parser solo emite la fila de SALIDA (change < 0) de cada par, pero el CSV
   // contiene también la fila de ENTRADA (change > 0) que indica la cuenta destino real.
   // El mapping estático TRANSFER_DESTINATIONS no cubre todos los casos
   // (p.ej. Cross Margin → Isolated Margin) — aquí lo resolvemos desde los datos reales.
   //
   // Clave: hash de la fila de salida → wallet_id de la cuenta destino (obtenido de la fila de entrada).
-  const rawRecords: Record<string, string>[] = parse(fileBuffer, {
-    columns: true,
-    skip_empty_lines: true,
-    bom: true,
-    trim: true,
-  });
-  // Indexar todas las filas de entrada (change > 0) de operaciones de transferencia interna
-  // por el identificador que comparte con su fila de salida: time|operation|coin|absChange
   const incomingByKey = new Map<string, string>(); // key → account name
-  for (const rec of rawRecords) {
-    const change = parseFloat(rec['Change'] ?? '0');
-    if (change > 0 && TRANSFER_DESTINATIONS[rec['Operation']]) {
-      const key = `${rec['Time']}|${rec['Operation']}|${rec['Coin']}|${rec['Change']}`;
-      incomingByKey.set(key, rec['Account']);
-    }
-  }
-  // Para cada fila de salida, calcular su hash (igual que el parser) y mapear al destino real
   const transferDestByHash = new Map<string, string>(); // rowHash → account name del destino
-  for (const rec of rawRecords) {
-    const change = parseFloat(rec['Change'] ?? '0');
-    if (change < 0 && TRANSFER_DESTINATIONS[rec['Operation']]) {
-      const absChangeStr = rec['Change'].startsWith('-') ? rec['Change'].slice(1) : rec['Change'];
-      const key = `${rec['Time']}|${rec['Operation']}|${rec['Coin']}|${absChangeStr}`;
-      const incomingAccount = incomingByKey.get(key);
-      if (incomingAccount) {
-        const hash = createHash('sha256').update(
-          [rec['User ID'] ?? '', rec['Time'] ?? '', rec['Account'] ?? '', rec['Operation'] ?? '', rec['Coin'] ?? '', rec['Change'] ?? '', rec['Remark'] ?? ''].join('|')
-        ).digest('hex');
-        transferDestByHash.set(hash, incomingAccount);
+  if (exchange === 'binance') {
+    const rawRecords: Record<string, string>[] = parse(fileBuffer, {
+      columns: true,
+      skip_empty_lines: true,
+      bom: true,
+      trim: true,
+    });
+    // Indexar todas las filas de entrada (change > 0) de operaciones de transferencia interna
+    // por el identificador que comparte con su fila de salida: time|operation|coin|absChange
+    for (const rec of rawRecords) {
+      const change = parseFloat(rec['Change'] ?? '0');
+      if (change > 0 && TRANSFER_DESTINATIONS[rec['Operation']]) {
+        const key = `${rec['Time']}|${rec['Operation']}|${rec['Coin']}|${rec['Change']}`;
+        incomingByKey.set(key, rec['Account']);
+      }
+    }
+    // Para cada fila de salida, calcular su hash (igual que el parser) y mapear al destino real
+    for (const rec of rawRecords) {
+      const change = parseFloat(rec['Change'] ?? '0');
+      if (change < 0 && TRANSFER_DESTINATIONS[rec['Operation']]) {
+        const absChangeStr = rec['Change'].startsWith('-') ? rec['Change'].slice(1) : rec['Change'];
+        const key = `${rec['Time']}|${rec['Operation']}|${rec['Coin']}|${absChangeStr}`;
+        const incomingAccount = incomingByKey.get(key);
+        if (incomingAccount) {
+          const hash = createHash('sha256').update(
+            [rec['User ID'] ?? '', rec['Time'] ?? '', rec['Account'] ?? '', rec['Operation'] ?? '', rec['Coin'] ?? '', rec['Change'] ?? '', rec['Remark'] ?? ''].join('|')
+          ).digest('hex');
+          transferDestByHash.set(hash, incomingAccount);
+        }
       }
     }
   }
@@ -395,10 +404,12 @@ export async function importCsvFile(
     }
     const fallbackWalletId = walletsRes.rows[0].id;
 
-    // Resuelve el wallet_id para una cuenta CSV ('Spot', 'Funding', etc.)
+    // Resuelve el wallet_id para una cuenta CSV. Binance usa ACCOUNT_TO_WALLET
+    // ('Spot' → 'Binance Spot', etc.); Bitvavo no tiene sub-cuentas, así que el
+    // parser ya emite el nombre de wallet literal ('Bitvavo') como account.
     function getWalletId(account: string): string {
-      const name = ACCOUNT_TO_WALLET[account];
-      return (name && walletIdByName[name]) ? walletIdByName[name] : fallbackWalletId;
+      const name = ACCOUNT_TO_WALLET[account] ?? account;
+      return walletIdByName[name] ?? fallbackWalletId;
     }
 
     // Resuelve el wallet_id destino para una transferencia interna.
@@ -419,10 +430,10 @@ export async function importCsvFile(
     }
 
     const importRes = await client.query(
-      `INSERT INTO csv_imports (filename, file_hash, row_count, skipped_count)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO csv_imports (filename, file_hash, row_count, skipped_count, exchange)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING id`,
-      [filename, fileHash, parseResult.stats.totalRows, parseResult.stats.ignoredRows]
+      [filename, fileHash, parseResult.stats.totalRows, parseResult.stats.ignoredRows, exchange]
     );
     const importId: string = importRes.rows[0].id;
 

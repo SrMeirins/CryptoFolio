@@ -46,6 +46,7 @@ export const ALL_BINANCE_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Transfer Between Spot and Strategy Account',               internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Spot↔Strategy' },
   { csvLabel: 'Transfer Between Spot and Strategy',                       internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Alias nuevo de Transfer Between Spot and Strategy Account' },
   { csvLabel: 'Transfer Between Main Account/Futures and Margin Account', internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Spot↔Margin' },
+  { csvLabel: 'Inter-Wallet Transfer',                                    internalType: 'TRANSFER_INTERNAL', status: 'supported', notes: 'Label genérico nuevo de Binance — origen/destino puede ser cualquier cuenta interna, resuelto dinámicamente en importer.ts' },
 
   // Staking
   { csvLabel: 'Staking Purchase',              internalType: 'STAKING_LOCK',          status: 'supported', notes: 'Bloqueo para staking' },
@@ -146,13 +147,19 @@ export const TRANSFER_DESTINATIONS: Record<string, Record<string, string>> = {
     'Funding':          'Binance Cross Margin',
     'Isolated Margin':  'Binance Spot',
   },
+  // Label genérico nuevo de Binance: origen/destino pueden ser CUALQUIER cuenta
+  // interna (Spot, Funding, Cross Margin, Isolated Margin, Strategy...), a diferencia
+  // de los tipos anteriores que solo cubrían un par fijo. No hay mapeo estático posible
+  // por par de cuentas — el destino real se resuelve dinámicamente en importer.ts
+  // emparejando la fila de salida (Change < 0) con su fila de entrada (Change > 0) real
+  // del CSV. Este objeto vacío solo actúa de "gate" para que importer.ts indexe sus filas.
+  'Inter-Wallet Transfer': {},
 };
 
 // ── Exports para compatibilidad con validator, parser e importer ───────────
-export const ALL_KNOWN_OPERATIONS = new Set([
-  ...ALL_BINANCE_OPERATIONS.map(op => op.csvLabel),
-  'Margin Short Sale',
-]);
+export const ALL_KNOWN_OPERATIONS = new Set(
+  ALL_BINANCE_OPERATIONS.map(op => op.csvLabel)
+);
 
 export const ALL_IGNORED_OPERATIONS = new Set(
   ALL_BINANCE_OPERATIONS.filter(op => op.status === 'ignored').map(op => op.csvLabel)

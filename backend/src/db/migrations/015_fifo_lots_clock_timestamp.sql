@@ -1,0 +1,13 @@
+-- ============================================================
+-- Migración 015_fifo_lots_clock_timestamp
+-- Qué: cambia el DEFAULT de fifo_lots.created_at de NOW() a clock_timestamp().
+-- Por qué: desde que runFifoEngine() corre en una única transacción SQL,
+--          NOW() (= transaction_timestamp()) devuelve el mismo valor fijo para
+--          TODOS los lotes creados en la misma ejecución del motor — inútil
+--          como desempate de orden real de inserción. clock_timestamp() sí
+--          avanza en tiempo real dentro de la transacción, permitiendo usar
+--          created_at como segundo criterio de ORDER BY en getOpenLots cuando
+--          dos lotes comparten el mismo opened_at exacto (pasa con fills
+--          parciales del mismo segundo — confirmado en 21 casos reales).
+-- ============================================================
+ALTER TABLE fifo_lots ALTER COLUMN created_at SET DEFAULT clock_timestamp();

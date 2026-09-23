@@ -23,6 +23,7 @@ export function ImportPage() {
 
   const [setupSeen, setSetupSeen] = useState(() => localStorage.getItem(SETUP_KEY) === 'true')
   const [stage, setStage] = useState<'upload' | 'preview' | 'catalog' | 'progress' | 'done'>('upload')
+  const [exchange, setExchange] = useState<'binance' | 'bitvavo'>('binance')
   const [dragOver, setDragOver] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState<string | null>(null)
@@ -68,6 +69,7 @@ export function ImportPage() {
     try {
       const form = new FormData()
       form.append('file', file)
+      form.append('exchange', exchange)
       const res  = await fetch('/api/imports/preview', { method: 'POST', body: form })
       const data: PreviewResult = await res.json()
 
@@ -106,6 +108,7 @@ export function ImportPage() {
 
     const form = new FormData()
     form.append('file', fileBufferRef.current)
+    form.append('exchange', exchange)
     if (Object.keys(resolvedOps).length > 0)
       form.append('resolvedOperations', JSON.stringify(resolvedOps))
     if (Object.keys(withdrawalDestinations).length > 0)
@@ -234,6 +237,8 @@ export function ImportPage() {
           loading={loading}
           error={error}
           fileRef={fileRef}
+          exchange={exchange}
+          onExchangeChange={setExchange}
           onDragOver={setDragOver}
           onFile={handleFile}
         />

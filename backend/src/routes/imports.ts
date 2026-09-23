@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { importCsvFile, previewCsvFile } from '../modules/csv/importer';
+import { Exchange, isExchange, parseExchangeCsv } from '../modules/csv/exchanges';
 import { runFifoEngine } from '../modules/fifo/engine';
 import { loadAssetMetadata, prefetchHistoricalPrices } from '../modules/prices/binance';
 import { setCoinGeckoStatusCallback, prefetchHistoricalPrices as prefetchCoinGeckoHistoricalPrices } from '../modules/prices/coingecko';
@@ -39,8 +40,9 @@ const upload = multer({
 // POST /api/imports/preview
 router.post('/preview', upload.single('file'), async (req: Request, res: Response) => {
   if (!req.file) { res.status(400).json({ error: 'No se recibió ningún archivo' }); return; }
+  const exchange: Exchange = isExchange(req.body.exchange) ? req.body.exchange : 'binance';
   try {
-    const result = await previewCsvFile(req.file.buffer);
+    const result = await previewCsvFile(req.file.buffer, exchange);
     res.json(result);
   } catch (err) {
     res.status(422).json({ error: (err as Error).message });
@@ -50,6 +52,7 @@ router.post('/preview', upload.single('file'), async (req: Request, res: Respons
 // POST /api/imports/confirm — Import + FIFO con SSE
 router.post('/confirm', upload.single('file'), async (req: Request, res: Response) => {
   if (!req.file) { res.status(400).json({ error: 'No se recibió ningún archivo' }); return; }
+  const exchange: Exchange = isExchange(req.body.exchange) ? req.body.exchange : 'binance';
 
   // Configurar SSE
   res.setHeader('Content-Type', 'text/event-stream');
@@ -103,8 +106,7 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
 
     // ── GATE 0: comprobar depósitos externos ANTES de importar nada ──────────
     // 1. Depósitos en el CSV con needsCostReview
-    const { parseBinanceCsv } = await import('../modules/csv/parser');
-    const preparse = parseBinanceCsv(req.file.buffer);
+    const preparse = parseExchangeCsv(exchange, req.file.buffer);
     const csvExternalDeposits = preparse.transactions.filter(tx => tx.needsCostReview);
 
     // ¿Cuáles de ellos son YA duplicados (ya en DB)?
@@ -187,7 +189,8 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
       },
       (message, progress, total) => {
         send('importing', message, progress, total);
-      }
+      },
+      exchange
     );
     send('importing', `✓ ${importResult.newTransactions} transacciones nuevas importadas (${importResult.duplicateRows} duplicadas ignoradas)`);
 
@@ -367,8 +370,9 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
 // POST /api/imports
 router.post('/', upload.single('file'), async (req: Request, res: Response) => {
   if (!req.file) { res.status(400).json({ error: 'No se recibió ningún archivo' }); return; }
+  const exchange: Exchange = isExchange(req.body.exchange) ? req.body.exchange : 'binance';
   try {
-    const result = await importCsvFile(req.file.buffer, req.file.originalname);
+    const result = await importCsvFile(req.file.buffer, req.file.originalname, {}, {}, undefined, undefined, exchange);
     res.status(201).json({ success: true, ...result });
   } catch (err) {
     const message = (err as Error).message;
@@ -386,6 +390,7 @@ router.get('/', async (_req: Request, res: Response) => {
        ci.imported_at,
        ci.row_count,
        ci.skipped_count,
+       ci.exchange,
        COUNT(t.id) AS transaction_count,
        MIN(t.timestamp) AS date_from,
        MAX(t.timestamp) AS date_to,
@@ -431,10 +436,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await client.query('DELETE FROM csv_imports WHERE id = $1', [id]);
   });
 
-  // Recalcular FIFO y esperar resultado antes de responder
+  // Recalcular FIFO y esperar resultado antes de responder. Si falla, no se traga el
+  // error: express-async-errors lo propaga al handler global y el DELETE no responde
+  // "success" sobre un recálculo que en realidad no se completó.
   const remaining = await db.query('SELECT COUNT(*) FROM csv_imports');
   if (parseInt(remaining.rows[0].count) > 0) {
-    await runFifoEngine().catch(() => {});
+    await runFifoEngine();
   }
 
   res.json({ success: true });

@@ -14,10 +14,10 @@ async function bootstrap() {
     await db.query('SELECT NOW()');
     console.log('[DB] Connected');
 
-    // En modo Electron/standalone, aplicar schema y migraciones automáticamente
-    if (process.env.ELECTRON_MODE === 'true') {
-      await runMigrations();
-    }
+    // Aplicar schema y migraciones automáticamente en cada arranque — tanto en
+    // Docker como en Electron. Idempotente (runMigrations solo aplica lo pendiente,
+    // registrado en schema_migrations), así que es seguro correrlo siempre.
+    await runMigrations();
     setupPricesWebSocket(server);
 
     // BACKEND_HOST lo fija electron/backend-manager.ts a '127.0.0.1' para no
