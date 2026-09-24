@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/client';
+import { syncWalletAddress } from '../modules/walletSync/walletSync';
+import { encryptApiKey } from '../modules/walletSync/apiKeyCrypto';
 
 const router = Router();
 
@@ -19,7 +21,33 @@ router.get('/', async (_req: Request, res: Response) => {
             'custom_network',      wa.custom_network,
             'address',             wa.address,
             'last_sync_at',        wa.last_sync_at,
-            'last_known_balance',  wa.last_known_balance
+            'last_known_balance',  wa.last_known_balance,
+            'sync_status', (
+              SELECT CASE
+                WHEN bool_or(status = 'discrepancy') THEN 'discrepancy'
+                WHEN bool_or(status = 'error') THEN 'error'
+                WHEN COUNT(*) > 0 THEN 'ok'
+                ELSE 'pending'
+              END
+              FROM (
+                SELECT DISTINCT ON (asset) asset, status
+                FROM balance_sync_log
+                WHERE wallet_address_id = wa.id
+                ORDER BY asset, checked_at DESC
+              ) latest
+            ),
+            'sync_details', (
+              SELECT COALESCE(json_agg(json_build_object(
+                'asset', asset, 'onchain_balance', onchain_balance,
+                'expected_balance', expected_balance, 'checked_at', checked_at, 'status', status
+              )), '[]')
+              FROM (
+                SELECT DISTINCT ON (asset) asset, onchain_balance, expected_balance, checked_at, status
+                FROM balance_sync_log
+                WHERE wallet_address_id = wa.id
+                ORDER BY asset, checked_at DESC
+              ) latest
+            )
           ) ORDER BY n.name
         ) FILTER (WHERE wa.id IS NOT NULL),
         '[]'
@@ -219,6 +247,52 @@ router.post('/networks', async (req: Request, res: Response) => {
     [name, native_asset, explorer_url ?? null, explorer_tx_url ?? null]
   );
   res.status(201).json(result.rows[0]);
+});
+
+// ── POST /api/wallets/:walletId/addresses/:addressId/sync ─────────────────
+router.post('/:walletId/addresses/:addressId/sync', async (req: Request, res: Response) => {
+  const { addressId } = req.params;
+  const results = await syncWalletAddress(addressId);
+  res.json(results);
+});
+
+// ── GET /api/wallets/networks/:networkId/api-key ───────────────────────────
+router.get('/networks/:networkId/api-key', async (req: Request, res: Response) => {
+  const { networkId } = req.params;
+  const result = await db.query(
+    `SELECT updated_at FROM network_api_keys WHERE network_id = $1`,
+    [networkId]
+  );
+  res.json({
+    network_id: networkId,
+    has_key: result.rows.length > 0,
+    updated_at: result.rows[0]?.updated_at ?? null,
+  });
+});
+
+// ── PUT /api/wallets/networks/:networkId/api-key ────────────────────────────
+router.put('/networks/:networkId/api-key', async (req: Request, res: Response) => {
+  const { networkId } = req.params;
+  const { api_key } = req.body;
+  if (!api_key || typeof api_key !== 'string') {
+    res.status(400).json({ error: 'api_key es requerida' });
+    return;
+  }
+  const { encrypted, iv } = encryptApiKey(api_key);
+  await db.query(
+    `INSERT INTO network_api_keys (network_id, api_key_encrypted, api_key_iv, updated_at)
+     VALUES ($1, $2, $3, clock_timestamp())
+     ON CONFLICT (network_id) DO UPDATE SET api_key_encrypted = $2, api_key_iv = $3, updated_at = clock_timestamp()`,
+    [networkId, encrypted, iv]
+  );
+  res.json({ success: true });
+});
+
+// ── DELETE /api/wallets/networks/:networkId/api-key ─────────────────────────
+router.delete('/networks/:networkId/api-key', async (req: Request, res: Response) => {
+  const { networkId } = req.params;
+  await db.query(`DELETE FROM network_api_keys WHERE network_id = $1`, [networkId]);
+  res.json({ success: true });
 });
 
 export default router;

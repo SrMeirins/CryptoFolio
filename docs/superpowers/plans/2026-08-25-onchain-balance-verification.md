@@ -34,7 +34,7 @@
 **Interfaces:**
 - Produces: tablas `network_api_keys(network_id UUID PK, api_key_encrypted BYTEA, api_key_iv BYTEA, updated_at TIMESTAMPTZ)` y `balance_sync_log(id UUID PK, wallet_address_id UUID, asset TEXT, checked_at TIMESTAMPTZ, onchain_balance NUMERIC, expected_balance NUMERIC, discrepancy_pct NUMERIC, status TEXT)`.
 
-- [ ] **Step 1: Escribir el test que verifica el esquema (falla porque las tablas no existen)**
+- [x] **Step 1: Escribir el test que verifica el esquema (falla porque las tablas no existen)**
 
 ```ts
 // backend/src/modules/walletSync/schema.test.ts
@@ -76,12 +76,12 @@ describe('esquema — network_api_keys y balance_sync_log', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que falla**
+- [x] **Step 2: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/schema.test.ts`
 Expected: FAIL — `relation "network_api_keys" does not exist`
 
-- [ ] **Step 3: Escribir la migración**
+- [x] **Step 3: Escribir la migración**
 
 ```sql
 -- backend/src/db/migrations/016_wallet_sync.sql
@@ -116,7 +116,7 @@ CREATE INDEX IF NOT EXISTS idx_balance_sync_log_wallet_address
   ON balance_sync_log(wallet_address_id, checked_at DESC);
 ```
 
-- [ ] **Step 4: Hornear el mismo cambio en `schema.sql`**
+- [x] **Step 4: Hornear el mismo cambio en `schema.sql`**
 
 En `backend/src/db/schema.sql`, justo después del bloque `CREATE INDEX idx_wallet_addresses_network ...` (línea ~145) e inmediatamente antes de `-- TABLA: csv_imports`, añadir:
 
@@ -148,12 +148,12 @@ CREATE TABLE balance_sync_log (
 CREATE INDEX idx_balance_sync_log_wallet_address ON balance_sync_log(wallet_address_id, checked_at DESC);
 ```
 
-- [ ] **Step 5: Ejecutar el test y verificar que pasa**
+- [x] **Step 5: Ejecutar el test y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/schema.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/src/db/migrations/016_wallet_sync.sql backend/src/db/schema.sql backend/src/modules/walletSync/schema.test.ts
@@ -176,7 +176,7 @@ git commit -m "feat(db): añadir network_api_keys y balance_sync_log"
   ```
   Ambas leen `process.env.WALLET_SYNC_ENCRYPTION_KEY` (base64, 32 bytes) en cada llamada — lanzan si falta o tiene longitud incorrecta.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 ```ts
 // backend/src/modules/walletSync/apiKeyCrypto.test.ts
@@ -218,12 +218,12 @@ describe('apiKeyCrypto', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que falla**
+- [x] **Step 2: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/apiKeyCrypto.test.ts`
 Expected: FAIL — módulo `./apiKeyCrypto` no existe
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```ts
 // backend/src/modules/walletSync/apiKeyCrypto.ts
@@ -267,12 +267,12 @@ export function decryptApiKey(encrypted: Buffer, iv: Buffer): string {
 }
 ```
 
-- [ ] **Step 4: Ejecutar y verificar que pasa**
+- [x] **Step 4: Ejecutar y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/apiKeyCrypto.test.ts`
 Expected: PASS (4 tests)
 
-- [ ] **Step 5: Añadir la variable a `.env.example`**
+- [x] **Step 5: Añadir la variable a `.env.example`**
 
 En `.env.example`, dentro de la sección `# ── Seguridad ──`, después de `JWT_SECRET`:
 
@@ -282,7 +282,7 @@ En `.env.example`, dentro de la sección `# ── Seguridad ──`, después d
 WALLET_SYNC_ENCRYPTION_KEY=cambia_esto                # ← cambia esto
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/src/modules/walletSync/apiKeyCrypto.ts backend/src/modules/walletSync/apiKeyCrypto.test.ts .env.example
@@ -312,7 +312,7 @@ git commit -m "feat(walletSync): cifrado AES-256-GCM de API keys de proveedores"
   export function registerProvider(networkName: string, provider: BalanceProvider): void; // usado por tests
   ```
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 ```ts
 // backend/src/modules/walletSync/providers/registry.test.ts
@@ -333,12 +333,12 @@ describe('providers/registry', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que falla**
+- [x] **Step 2: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/registry.test.ts`
 Expected: FAIL — módulos no existen
 
-- [ ] **Step 3: Implementar `types.ts`**
+- [x] **Step 3: Implementar `types.ts`**
 
 ```ts
 // backend/src/modules/walletSync/providers/types.ts
@@ -364,7 +364,7 @@ export async function fetchWithTimeout(url: string, init?: RequestInit): Promise
 }
 ```
 
-- [ ] **Step 4: Implementar `registry.ts` (registro vacío por ahora, los providers reales se añaden en las tareas 4-11)**
+- [x] **Step 4: Implementar `registry.ts` (registro vacío por ahora, los providers reales se añaden en las tareas 4-11)**
 
 ```ts
 // backend/src/modules/walletSync/providers/registry.ts
@@ -381,12 +381,12 @@ export function getProviderForNetwork(networkName: string): BalanceProvider | un
 }
 ```
 
-- [ ] **Step 5: Ejecutar y verificar que pasa**
+- [x] **Step 5: Ejecutar y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/registry.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/src/modules/walletSync/providers/types.ts backend/src/modules/walletSync/providers/registry.ts backend/src/modules/walletSync/providers/registry.test.ts
@@ -408,7 +408,7 @@ git commit -m "feat(walletSync): interfaz BalanceProvider y registro por red"
 
 Usa el JSON-RPC público de rippled (`xrplcluster.com`, sin API key), método `account_info`, que devuelve el balance en drops (`1 XRP = 1,000,000 drops`).
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 ```ts
 // backend/src/modules/walletSync/providers/xrplProvider.test.ts
@@ -448,12 +448,12 @@ describe('xrplProvider', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que falla**
+- [x] **Step 2: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/xrplProvider.test.ts`
 Expected: FAIL — módulo no existe
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```ts
 // backend/src/modules/walletSync/providers/xrplProvider.ts
@@ -486,7 +486,7 @@ export const xrplProvider: BalanceProvider = {
 };
 ```
 
-- [ ] **Step 4: Crear el índice de registro de proveedores**
+- [x] **Step 4: Crear el índice de registro de proveedores**
 
 ```ts
 // backend/src/modules/walletSync/providers/index.ts
@@ -500,12 +500,12 @@ export function registerAllProviders(): void {
 }
 ```
 
-- [ ] **Step 5: Ejecutar y verificar que pasa**
+- [x] **Step 5: Ejecutar y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/xrplProvider.test.ts`
 Expected: PASS (3 tests)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/src/modules/walletSync/providers/xrplProvider.ts backend/src/modules/walletSync/providers/xrplProvider.test.ts backend/src/modules/walletSync/providers/index.ts
@@ -526,7 +526,7 @@ git commit -m "feat(walletSync): proveedor de saldo XRP Ledger"
 
 Usa el Mirror Node público de Hedera (sin API key): `GET /api/v1/accounts/{accountId}`. Balance en tinybars (`1 HBAR = 100,000,000 tinybars`).
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 ```ts
 // backend/src/modules/walletSync/providers/hederaProvider.test.ts
@@ -554,12 +554,12 @@ describe('hederaProvider', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que falla**
+- [x] **Step 2: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/hederaProvider.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```ts
 // backend/src/modules/walletSync/providers/hederaProvider.ts
@@ -584,7 +584,7 @@ export const hederaProvider: BalanceProvider = {
 };
 ```
 
-- [ ] **Step 4: Registrar en el índice**
+- [x] **Step 4: Registrar en el índice**
 
 En `backend/src/modules/walletSync/providers/index.ts`, añadir el import y la línea de registro:
 
@@ -594,12 +594,12 @@ import { hederaProvider } from './hederaProvider';
 registerProvider('HBAR', hederaProvider);
 ```
 
-- [ ] **Step 5: Ejecutar y verificar que pasa**
+- [x] **Step 5: Ejecutar y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/hederaProvider.test.ts`
 Expected: PASS (2 tests)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/src/modules/walletSync/providers/hederaProvider.ts backend/src/modules/walletSync/providers/hederaProvider.test.ts backend/src/modules/walletSync/providers/index.ts
@@ -620,7 +620,7 @@ git commit -m "feat(walletSync): proveedor de saldo Hedera (HBAR)"
 
 Usa Horizon público (sin API key): `GET /accounts/{account}`. `balances[]` incluye una entrada con `asset_type: 'native'` cuyo campo `balance` ya es un string decimal en XLM.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 ```ts
 // backend/src/modules/walletSync/providers/stellarProvider.test.ts
@@ -653,12 +653,12 @@ describe('stellarProvider', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que falla**
+- [x] **Step 2: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/stellarProvider.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```ts
 // backend/src/modules/walletSync/providers/stellarProvider.ts
@@ -683,7 +683,7 @@ export const stellarProvider: BalanceProvider = {
 };
 ```
 
-- [ ] **Step 4: Registrar en el índice**
+- [x] **Step 4: Registrar en el índice**
 
 ```ts
 import { stellarProvider } from './stellarProvider';
@@ -691,12 +691,12 @@ import { stellarProvider } from './stellarProvider';
 registerProvider('Stellar', stellarProvider);
 ```
 
-- [ ] **Step 5: Ejecutar y verificar que pasa**
+- [x] **Step 5: Ejecutar y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/stellarProvider.test.ts`
 Expected: PASS (2 tests)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/src/modules/walletSync/providers/stellarProvider.ts backend/src/modules/walletSync/providers/stellarProvider.test.ts backend/src/modules/walletSync/providers/index.ts
@@ -717,7 +717,7 @@ git commit -m "feat(walletSync): proveedor de saldo Stellar (XLM)"
 
 Usa la Esplora API pública de Blockstream (sin API key): `GET /api/address/{address}`. Balance en satoshis = `chain_stats.funded_txo_sum - chain_stats.spent_txo_sum` (UTXOs confirmados; se ignora mempool_stats para evitar contar fondos no confirmados).
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 ```ts
 // backend/src/modules/walletSync/providers/blockstreamProvider.test.ts
@@ -747,12 +747,12 @@ describe('blockstreamProvider', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que falla**
+- [x] **Step 2: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/blockstreamProvider.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```ts
 // backend/src/modules/walletSync/providers/blockstreamProvider.ts
@@ -776,7 +776,7 @@ export const blockstreamProvider: BalanceProvider = {
 };
 ```
 
-- [ ] **Step 4: Registrar en el índice**
+- [x] **Step 4: Registrar en el índice**
 
 ```ts
 import { blockstreamProvider } from './blockstreamProvider';
@@ -784,12 +784,12 @@ import { blockstreamProvider } from './blockstreamProvider';
 registerProvider('Bitcoin', blockstreamProvider);
 ```
 
-- [ ] **Step 5: Ejecutar y verificar que pasa**
+- [x] **Step 5: Ejecutar y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/blockstreamProvider.test.ts`
 Expected: PASS (2 tests)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/src/modules/walletSync/providers/blockstreamProvider.ts backend/src/modules/walletSync/providers/blockstreamProvider.test.ts backend/src/modules/walletSync/providers/index.ts
@@ -811,7 +811,7 @@ git commit -m "feat(walletSync): proveedor de saldo Bitcoin"
 
 Usa Etherscan API v2 (requiere key): balance nativo con `action=balance` (wei, `/1e18`); balance de token con `action=tokenbalance&contractaddress=...` (unidad mínima del token). Como los decimales varían por token (LINK=18, pero USDC=6), se consultan on-chain vía `action=eth_call` al selector `decimals()` (`0x313ce567`) en vez de asumir 18 — evita el error clásico de asumir 18 decimales para tokens como USDC.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 ```ts
 // backend/src/modules/walletSync/providers/etherscanProvider.test.ts
@@ -874,12 +874,12 @@ describe('etherscanProvider', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que falla**
+- [x] **Step 2: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/etherscanProvider.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```ts
 // backend/src/modules/walletSync/providers/etherscanProvider.ts
@@ -922,7 +922,7 @@ export const etherscanProvider: BalanceProvider = {
 };
 ```
 
-- [ ] **Step 4: Registrar en el índice**
+- [x] **Step 4: Registrar en el índice**
 
 ```ts
 import { etherscanProvider } from './etherscanProvider';
@@ -930,7 +930,7 @@ import { etherscanProvider } from './etherscanProvider';
 registerProvider('Ethereum', etherscanProvider);
 ```
 
-- [ ] **Step 5: Añadir la variable de entorno**
+- [x] **Step 5: Añadir la variable de entorno**
 
 En `.env.example`, nueva sección tras `# ── Precios ──`:
 
@@ -940,12 +940,12 @@ En `.env.example`, nueva sección tras `# ── Precios ──`:
 ETHERSCAN_API_KEY=
 ```
 
-- [ ] **Step 6: Ejecutar y verificar que pasa**
+- [x] **Step 6: Ejecutar y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/etherscanProvider.test.ts`
 Expected: PASS (5 tests)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/src/modules/walletSync/providers/etherscanProvider.ts backend/src/modules/walletSync/providers/etherscanProvider.test.ts backend/src/modules/walletSync/providers/index.ts .env.example
@@ -966,7 +966,7 @@ git commit -m "feat(walletSync): proveedor de saldo Ethereum (nativo + ERC-20)"
 
 Usa JSON-RPC público de Solana (`api.mainnet-beta.solana.com`). Nativo: `getBalance` (lamports, `/1e9`). Token SPL: `getTokenAccountsByOwner` con `{mint: contractAddress}` y `encoding: 'jsonParsed'` — el RPC ya devuelve `uiAmount` con los decimales aplicados, sin necesidad de consultarlos aparte.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 ```ts
 // backend/src/modules/walletSync/providers/solanaProvider.test.ts
@@ -1017,12 +1017,12 @@ describe('solanaProvider', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que falla**
+- [x] **Step 2: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/solanaProvider.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```ts
 // backend/src/modules/walletSync/providers/solanaProvider.ts
@@ -1069,7 +1069,7 @@ export const solanaProvider: BalanceProvider = {
 };
 ```
 
-- [ ] **Step 4: Registrar en el índice**
+- [x] **Step 4: Registrar en el índice**
 
 ```ts
 import { solanaProvider } from './solanaProvider';
@@ -1077,12 +1077,12 @@ import { solanaProvider } from './solanaProvider';
 registerProvider('Solana', solanaProvider);
 ```
 
-- [ ] **Step 5: Ejecutar y verificar que pasa**
+- [x] **Step 5: Ejecutar y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/solanaProvider.test.ts`
 Expected: PASS (4 tests)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/src/modules/walletSync/providers/solanaProvider.ts backend/src/modules/walletSync/providers/solanaProvider.test.ts backend/src/modules/walletSync/providers/index.ts
@@ -1104,7 +1104,7 @@ git commit -m "feat(walletSync): proveedor de saldo Solana (nativo + SPL)"
 
 Usa Blockfrost (requiere `project_id` como header, key gratuita): `GET /addresses/{address}`. `amount[]` incluye `{unit: 'lovelace', quantity: '...'}`; `1 ADA = 1,000,000 lovelace`.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 ```ts
 // backend/src/modules/walletSync/providers/blockfrostProvider.test.ts
@@ -1137,12 +1137,12 @@ describe('blockfrostProvider', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que falla**
+- [x] **Step 2: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/blockfrostProvider.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```ts
 // backend/src/modules/walletSync/providers/blockfrostProvider.ts
@@ -1170,7 +1170,7 @@ export const blockfrostProvider: BalanceProvider = {
 };
 ```
 
-- [ ] **Step 4: Registrar en el índice**
+- [x] **Step 4: Registrar en el índice**
 
 ```ts
 import { blockfrostProvider } from './blockfrostProvider';
@@ -1178,7 +1178,7 @@ import { blockfrostProvider } from './blockfrostProvider';
 registerProvider('Cardano', blockfrostProvider);
 ```
 
-- [ ] **Step 5: Añadir la variable de entorno**
+- [x] **Step 5: Añadir la variable de entorno**
 
 En `.env.example`, dentro de la sección añadida en la Tarea 8:
 
@@ -1187,12 +1187,12 @@ En `.env.example`, dentro de la sección añadida en la Tarea 8:
 BLOCKFROST_API_KEY=
 ```
 
-- [ ] **Step 6: Ejecutar y verificar que pasa**
+- [x] **Step 6: Ejecutar y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/blockfrostProvider.test.ts`
 Expected: PASS (3 tests)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/src/modules/walletSync/providers/blockfrostProvider.ts backend/src/modules/walletSync/providers/blockfrostProvider.test.ts backend/src/modules/walletSync/providers/index.ts .env.example
@@ -1214,7 +1214,7 @@ git commit -m "feat(walletSync): proveedor de saldo Cardano"
 
 Usa Subscan API v2 para Asset Hub (requiere `X-API-Key`): `POST /api/v2/scan/account` con body `{key: address}`. `data.account.balance` ya viene como string decimal en DOT.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 ```ts
 // backend/src/modules/walletSync/providers/subscanProvider.test.ts
@@ -1250,12 +1250,12 @@ describe('subscanProvider', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que falla**
+- [x] **Step 2: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/subscanProvider.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```ts
 // backend/src/modules/walletSync/providers/subscanProvider.ts
@@ -1285,7 +1285,7 @@ export const subscanProvider: BalanceProvider = {
 };
 ```
 
-- [ ] **Step 4: Registrar en el índice**
+- [x] **Step 4: Registrar en el índice**
 
 ```ts
 import { subscanProvider } from './subscanProvider';
@@ -1293,19 +1293,19 @@ import { subscanProvider } from './subscanProvider';
 registerProvider('Polkadot Asset Hub', subscanProvider);
 ```
 
-- [ ] **Step 5: Añadir la variable de entorno**
+- [x] **Step 5: Añadir la variable de entorno**
 
 ```
 # Subscan (Polkadot Asset Hub): https://pro.subscan.io — free plan, requiere API key desde 2026
 SUBSCAN_API_KEY=
 ```
 
-- [ ] **Step 6: Ejecutar y verificar que pasa**
+- [x] **Step 6: Ejecutar y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/providers/subscanProvider.test.ts`
 Expected: PASS (3 tests)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/src/modules/walletSync/providers/subscanProvider.ts backend/src/modules/walletSync/providers/subscanProvider.test.ts backend/src/modules/walletSync/providers/index.ts .env.example
@@ -1322,7 +1322,7 @@ git commit -m "feat(walletSync): proveedor de saldo Polkadot Asset Hub"
 **Interfaces:**
 - Produces: `export async function getOpenLots(...)`, `export const FIFO_DUST_EPSILON`. Sin cambio de comportamiento — solo visibilidad, para que `walletSync.ts` (Tarea 13) calcule el saldo esperado reutilizando la misma consulta que ya usa el motor, sin duplicarla.
 
-- [ ] **Step 1: Cambiar la visibilidad**
+- [x] **Step 1: Cambiar la visibilidad**
 
 En `backend/src/modules/fifo/engine.ts`, línea 52, cambiar:
 ```ts
@@ -1342,12 +1342,12 @@ a:
 export async function getOpenLots(asset: string, walletId: string, client: PoolClient): Promise<FifoLot[]> {
 ```
 
-- [ ] **Step 2: Ejecutar la suite completa del motor para confirmar que no rompe nada**
+- [x] **Step 2: Ejecutar la suite completa del motor para confirmar que no rompe nada**
 
 Run: `cd backend && npx vitest run src/modules/fifo/engine.test.ts`
 Expected: PASS (los 19 tests existentes, sin cambios de comportamiento)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add backend/src/modules/fifo/engine.ts
@@ -1373,7 +1373,7 @@ git commit -m "refactor(fifo): exportar getOpenLots y FIFO_DUST_EPSILON para reu
 
 Umbral y circuit breaker según Global Constraints. Este test usa `createTestDatabase()` (integración real contra Postgres) con un `BalanceProvider` fake inyectado vía `registerProvider`, siguiendo el patrón ya usado por `engine.test.ts`.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 ```ts
 // backend/src/modules/walletSync/walletSync.test.ts
@@ -1527,12 +1527,12 @@ describe('walletSync', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que falla**
+- [x] **Step 2: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/walletSync.test.ts`
 Expected: FAIL — módulo no existe
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```ts
 // backend/src/modules/walletSync/walletSync.ts
@@ -1679,12 +1679,12 @@ export async function syncAllWalletAddresses(): Promise<void> {
 }
 ```
 
-- [ ] **Step 4: Ejecutar y verificar que pasa**
+- [x] **Step 4: Ejecutar y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/walletSync.test.ts`
 Expected: PASS (5 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/src/modules/walletSync/walletSync.ts backend/src/modules/walletSync/walletSync.test.ts
@@ -1705,11 +1705,11 @@ git commit -m "feat(walletSync): motor de sincronización de saldos on-chain"
 - Consumes: `syncAllWalletAddresses` (Tarea 13), `registerAllProviders` (Tarea 4).
 - Produces: `export function scheduleWalletSync(): void` — programa el cron diario a las 03:00 y registra los proveedores una vez al arrancar.
 
-- [ ] **Step 1: Instalar la dependencia**
+- [x] **Step 1: Instalar la dependencia**
 
 Run: `cd backend && npm install node-cron`
 
-- [ ] **Step 2: Escribir el test que falla**
+- [x] **Step 2: Escribir el test que falla**
 
 ```ts
 // backend/src/modules/walletSync/scheduler.test.ts
@@ -1727,12 +1727,12 @@ describe('scheduler', () => {
 });
 ```
 
-- [ ] **Step 3: Ejecutar y verificar que falla**
+- [x] **Step 3: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/scheduler.test.ts`
 Expected: FAIL — módulo no existe
 
-- [ ] **Step 4: Implementar**
+- [x] **Step 4: Implementar**
 
 ```ts
 // backend/src/modules/walletSync/scheduler.ts
@@ -1753,12 +1753,12 @@ export function scheduleWalletSync(): void {
 }
 ```
 
-- [ ] **Step 5: Ejecutar y verificar que pasa**
+- [x] **Step 5: Ejecutar y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/modules/walletSync/scheduler.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: Conectar en el arranque del backend**
+- [x] **Step 6: Conectar en el arranque del backend**
 
 En `backend/src/index.ts`, añadir el import junto a los demás módulos:
 
@@ -1773,12 +1773,12 @@ Y dentro de `bootstrap()`, justo después de `setupPricesWebSocket(server);`:
     scheduleWalletSync();
 ```
 
-- [ ] **Step 7: Verificar manualmente que el backend arranca sin error**
+- [x] **Step 7: Verificar manualmente que el backend arranca sin error**
 
 Run: `cd backend && npm run build && npm start` (o `npm run dev`), confirmar en el log que no hay excepciones al arrancar.
 Expected: `[SERVER] Listening on ...` sin errores relacionados con `walletSync` o `node-cron`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add backend/package.json backend/package-lock.json backend/src/modules/walletSync/scheduler.ts backend/src/modules/walletSync/scheduler.test.ts backend/src/index.ts
@@ -1801,7 +1801,7 @@ git commit -m "feat(walletSync): programar sincronización diaria con node-cron"
   - `DELETE /api/wallets/networks/:networkId/api-key` → `{success: true}`
   - `GET /api/wallets` (existente) se extiende: cada elemento de `addresses[]` gana `sync_status: 'ok' | 'discrepancy' | 'error' | 'pending'` y `sync_details: Array<{asset, onchain_balance, expected_balance, checked_at, status}>` — el peor estado entre los activos verificados de esa dirección (`discrepancy` > `error` > `ok` > `pending`).
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 ```ts
 // backend/src/routes/wallets.test.ts
@@ -1900,16 +1900,16 @@ describe('routes/wallets — sync y api-key', () => {
 });
 ```
 
-- [ ] **Step 2: Verificar que `supertest` está disponible (dependencia de test ya usada por otros routes.test.ts o hay que añadirla)**
+- [x] **Step 2: Verificar que `supertest` está disponible (dependencia de test ya usada por otros routes.test.ts o hay que añadirla)**
 
 Run: `cd backend && grep -r supertest package.json || npm install -D supertest @types/supertest`
 
-- [ ] **Step 3: Ejecutar y verificar que falla**
+- [x] **Step 3: Ejecutar y verificar que falla**
 
 Run: `cd backend && npx vitest run src/routes/wallets.test.ts`
 Expected: FAIL — endpoints no existen
 
-- [ ] **Step 4: Implementar los endpoints nuevos en `backend/src/routes/wallets.ts`**
+- [x] **Step 4: Implementar los endpoints nuevos en `backend/src/routes/wallets.ts`**
 
 Añadir estos imports al principio del archivo:
 
@@ -1968,7 +1968,7 @@ router.delete('/networks/:networkId/api-key', async (req: Request, res: Response
 });
 ```
 
-- [ ] **Step 5: Extender `GET /api/wallets` con `sync_status`/`sync_details`**
+- [x] **Step 5: Extender `GET /api/wallets` con `sync_status`/`sync_details`**
 
 En la query de `router.get('/', ...)`, dentro del `json_build_object` de cada dirección (línea ~13-23), añadir dos campos calculados con una subconsulta correlacionada. Reemplazar el bloque completo de la query por:
 
@@ -2032,17 +2032,17 @@ router.get('/', async (_req: Request, res: Response) => {
 });
 ```
 
-- [ ] **Step 6: Ejecutar y verificar que pasa**
+- [x] **Step 6: Ejecutar y verificar que pasa**
 
 Run: `cd backend && npx vitest run src/routes/wallets.test.ts`
 Expected: PASS (3 tests)
 
-- [ ] **Step 7: Ejecutar toda la suite del backend para confirmar que nada se rompió**
+- [x] **Step 7: Ejecutar toda la suite del backend para confirmar que nada se rompió**
 
 Run: `cd backend && npm test`
 Expected: PASS (todos los tests, incluidos los del motor FIFO y los routes existentes)
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add backend/src/routes/wallets.ts backend/src/routes/wallets.test.ts backend/package.json backend/package-lock.json
@@ -2062,7 +2062,7 @@ git commit -m "feat(api): endpoints de sync manual y gestión de API keys de pro
 
 Sin test automatizado de UI en este plan (el proyecto no tiene suite de tests de frontend) — verificación manual en el navegador, siguiendo la norma del proyecto para cambios de frontend.
 
-- [ ] **Step 1: Añadir los métodos de API en `frontend/src/api/portfolio.ts`**
+- [x] **Step 1: Añadir los métodos de API en `frontend/src/api/portfolio.ts`**
 
 Junto a `deleteAddress` (línea 176):
 
@@ -2079,7 +2079,7 @@ Junto a `deleteAddress` (línea 176):
     api.delete<{ success: boolean }>(`/wallets/networks/${networkId}/api-key`),
 ```
 
-- [ ] **Step 2: Añadir tipos y el componente de badge en `WalletsSection.tsx`**
+- [x] **Step 2: Añadir tipos y el componente de badge en `WalletsSection.tsx`**
 
 Extender `AddressData` (línea 10-17) con:
 
@@ -2148,7 +2148,7 @@ function SyncBadge({ addr, onSync, syncing }: { addr: AddressData; onSync: () =>
 }
 ```
 
-- [ ] **Step 3: Integrar el badge en la fila de dirección**
+- [x] **Step 3: Integrar el badge en la fila de dirección**
 
 Dentro de `WalletsSection`, añadir el estado de sincronización en curso (junto a los demás `useState`, línea ~307-315):
 
@@ -2178,7 +2178,7 @@ En el `return` de cada dirección (dentro de `wallet.addresses.map(addr => ...)`
                           )}
 ```
 
-- [ ] **Step 4: Añadir el formulario de API key en `AddAddressForm` (solo redes que la requieren)**
+- [x] **Step 4: Añadir el formulario de API key en `AddAddressForm` (solo redes que la requieren)**
 
 En `AddAddressForm` (línea 176-245), tras el bloque de selección de red y antes del campo de dirección, añadir un componente `NetworkApiKeyField` que solo se renderiza para las redes conocidas que la necesitan:
 
@@ -2232,14 +2232,14 @@ Necesita `useEffect` — añadir al import de React en la línea 1: `import { us
 
 Insertar `<NetworkApiKeyField networkId={selected} networkName={selectedNetwork?.name ?? ''} />` dentro de `AddAddressForm`, justo después del bloque `{explorerHref && (...)}` (línea 209-214), condicionado a `!isCustom && selected`.
 
-- [ ] **Step 5: Verificación manual en navegador**
+- [x] **Step 5: Verificación manual en navegador**
 
 Run: `docker compose up -d` (o el flujo de dev habitual), abrir Ajustes → Wallets:
 - Confirmar que una dirección sin verificar muestra el badge "Pendiente".
 - Pulsar "Verificar ahora" en la wallet fría de XRP (dirección real ya guardada) y confirmar que el badge pasa a "Verificado" con el saldo correcto.
 - Añadir una red que requiera API key (Ethereum) y confirmar que aparece el campo, que guardar la key no la muestra en ningún response de red (inspeccionar Network tab), y que tras guardarla aparece "Configurada ✓".
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/pages/settings/WalletsSection.tsx frontend/src/api/portfolio.ts

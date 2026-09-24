@@ -5,6 +5,7 @@ import { runMigrations } from './db/run-migrations';
 import { setupPricesWebSocket } from './routes/prices';
 import { startLivePrices } from './modules/prices/binance';
 import { repairMissingCoinGeckoIds } from './modules/prices/coingecko';
+import { scheduleWalletSync } from './modules/walletSync/scheduler';
 
 const server = createServer(app);
 const PORT = parseInt(process.env.BACKEND_PORT || '3001', 10);
@@ -19,6 +20,7 @@ async function bootstrap() {
     // registrado en schema_migrations), así que es seguro correrlo siempre.
     await runMigrations();
     setupPricesWebSocket(server);
+    scheduleWalletSync();
 
     // BACKEND_HOST lo fija electron/backend-manager.ts a '127.0.0.1' para no
     // exponer el puerto a la LAN en la app de escritorio (app single-user, sin
