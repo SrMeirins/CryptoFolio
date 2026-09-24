@@ -174,6 +174,16 @@ export const portfolioApi = {
   createAddress: (walletId: string, data: Record<string, unknown>) => api.post<{ id: string }>(`/wallets/${walletId}/addresses`, data),
   updateAddress: (walletId: string, addressId: string, data: Record<string, unknown>) => api.put<{ success: boolean }>(`/wallets/${walletId}/addresses/${addressId}`, data),
   deleteAddress: (walletId: string, addressId: string) => api.delete<{ success: boolean }>(`/wallets/${walletId}/addresses/${addressId}`),
+  syncAddress: (walletId: string, addressId: string) =>
+    api.post<Array<{ asset: string; status: string; onchainBalance: number | null; expectedBalance: number; discrepancyPct: number | null }>>(
+      `/wallets/${walletId}/addresses/${addressId}/sync`, {}
+    ),
+  getNetworkApiKeyStatus: (networkId: string) =>
+    api.get<{ network_id: string; has_key: boolean; updated_at: string | null }>(`/wallets/networks/${networkId}/api-key`),
+  setNetworkApiKey: (networkId: string, apiKey: string) =>
+    api.put<{ success: boolean }>(`/wallets/networks/${networkId}/api-key`, { api_key: apiKey }),
+  deleteNetworkApiKey: (networkId: string) =>
+    api.delete<{ success: boolean }>(`/wallets/networks/${networkId}/api-key`),
   exportBackup: () => api.get<Record<string, unknown>>('/settings/backup'),
   getConfig: () => api.get<Record<string, string>>('/settings/config'),
   setConfig: (key: string, value: string) => api.put<{ success: boolean }>('/settings/config', { key, value }),

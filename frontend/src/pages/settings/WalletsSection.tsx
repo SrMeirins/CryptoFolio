@@ -1,11 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
 import {
   Plus, Search, Check, X, ExternalLink, Trash2,
-  ChevronDown, Building2, Shield, Smartphone, Landmark, Copy,
+  ChevronDown, Building2, Shield, Smartphone, Landmark, Copy, RefreshCw,
 } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+
+interface SyncDetail {
+  asset: string
+  onchain_balance: number | null
+  expected_balance: number
+  checked_at: string
+  status: 'ok' | 'discrepancy' | 'error'
+}
 
 interface AddressData {
   id: string
@@ -14,6 +22,8 @@ interface AddressData {
   custom_network: string | null
   address: string | null
   explorer_url: string | null
+  sync_status: 'ok' | 'discrepancy' | 'error' | 'pending'
+  sync_details: SyncDetail[]
 }
 
 interface WalletData {
@@ -61,6 +71,88 @@ function CopyButton({ text }: { text: string }) {
     >
       {copied ? <Check size={11} className="text-accent-green" /> : <Copy size={11} />}
     </button>
+  )
+}
+
+const SYNC_BADGE: Record<AddressData['sync_status'], { label: string; className: string }> = {
+  ok:          { label: 'Verificado', className: 'bg-accent-green/15 text-accent-green' },
+  discrepancy: { label: 'Revisar',    className: 'bg-accent-amber/15 text-accent-amber' },
+  error:       { label: 'Sin conexión', className: 'bg-accent-red/15 text-accent-red' },
+  pending:     { label: 'Pendiente',  className: 'bg-gray-700/30 text-gray-500' },
+}
+
+function SyncBadge({ addr, onSync, syncing }: { addr: AddressData; onSync: () => void; syncing: boolean }) {
+  const [showDetail, setShowDetail] = useState(false)
+  const meta = SYNC_BADGE[addr.sync_status]
+
+  return (
+    <div className="relative flex items-center gap-1">
+      <button onClick={() => setShowDetail(v => !v)}
+        className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${meta.className}`}>
+        {meta.label}
+      </button>
+      <button onClick={onSync} disabled={syncing}
+        title="Verificar ahora"
+        className="p-1 text-gray-600 hover:text-accent-blue disabled:opacity-40 transition-colors">
+        <RefreshCw size={11} className={syncing ? 'animate-spin' : ''} />
+      </button>
+      {showDetail && addr.sync_details.length > 0 && (
+        <div className="absolute top-6 left-0 z-10 w-64 rounded-lg border border-border bg-background-card p-2.5 shadow-lg space-y-1">
+          {addr.sync_details.map(d => (
+            <p key={d.asset} className="text-[11px] text-gray-400">
+              <span className="font-medium text-gray-300">{d.asset}</span> — Real: {d.onchain_balance ?? '—'} · App: {d.expected_balance}
+              {d.status === 'discrepancy' && d.onchain_balance !== null && (
+                <span className="text-accent-amber"> · Diferencia: {(d.onchain_balance - d.expected_balance).toFixed(6)}</span>
+              )}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const NETWORKS_REQUIRING_KEY = ['Ethereum', 'Cardano', 'Polkadot Asset Hub']
+
+function NetworkApiKeyField({ networkId, networkName }: { networkId: string; networkName: string }) {
+  const [status, setStatus] = useState<{ has_key: boolean } | null>(null)
+  const [value, setValue]   = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    portfolioApi.getNetworkApiKeyStatus(networkId).then(setStatus)
+  }, [networkId])
+
+  if (!NETWORKS_REQUIRING_KEY.includes(networkName)) return null
+
+  async function handleSave() {
+    if (!value) return
+    setSaving(true)
+    try {
+      await portfolioApi.setNetworkApiKey(networkId, value)
+      setStatus({ has_key: true })
+      setValue('')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-1 pt-1">
+      <label className="text-xs text-gray-500">
+        API key de verificación on-chain (opcional)
+        {status?.has_key && <span className="ml-1.5 text-accent-green">Configurada ✓</span>}
+      </label>
+      <div className="flex gap-1.5">
+        <input type="password" value={value} onChange={e => setValue(e.target.value)}
+          placeholder={status?.has_key ? 'Ya configurada — pega una nueva para reemplazarla' : 'Sin esta clave, esta red no se puede verificar automáticamente'}
+          className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-xs placeholder-gray-600 focus:outline-none focus:border-accent-blue" />
+        <button onClick={handleSave} disabled={!value || saving}
+          className="px-3 py-2 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors">
+          Guardar
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -212,6 +304,7 @@ function AddAddressForm({ networks, onSave, onCancel }: {
             <ExternalLink size={11} /> Verificar en el explorador
           </a>
         )}
+        {!isCustom && selected && <NetworkApiKeyField networkId={selected} networkName={selectedNetwork?.name ?? ''} />}
       </div>
       {isCustom && (
         <>
@@ -313,6 +406,7 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
   const [editingWalletId, setEditingWalletId]     = useState<string | null>(null)
   const [editName, setEditName]                   = useState('')
   const [editColor, setEditColor]                 = useState('')
+  const [syncingAddressId, setSyncingAddressId]   = useState<string | null>(null)
 
   const { data: wallets = [] } = useQuery<WalletData[]>({
     queryKey: ['wallets'],
@@ -359,6 +453,16 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
   async function handleDeleteAddress(walletId: string, addressId: string) {
     await portfolioApi.deleteAddress(walletId, addressId)
     queryClient.invalidateQueries({ queryKey: ['wallets'] })
+  }
+
+  async function handleSyncAddress(walletId: string, addressId: string) {
+    setSyncingAddressId(addressId)
+    try {
+      await portfolioApi.syncAddress(walletId, addressId)
+      queryClient.invalidateQueries({ queryKey: ['wallets'] })
+    } finally {
+      setSyncingAddressId(null)
+    }
   }
 
   function toggleNets(walletId: string) {
@@ -516,6 +620,13 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                                 : <span className="text-xs text-gray-700">Sin dirección</span>
                               }
                             </div>
+                          )}
+                          {!isEditingAddr && addr.address && (
+                            <SyncBadge
+                              addr={addr}
+                              syncing={syncingAddressId === addr.id}
+                              onSync={() => handleSyncAddress(wallet.id, addr.id)}
+                            />
                           )}
                           {!isEditingAddr && (
                             <div className="flex items-center gap-0.5 opacity-0 group-hover/addr:opacity-100 transition-opacity">
