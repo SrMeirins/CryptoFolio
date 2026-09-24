@@ -104,6 +104,12 @@ JWT_SECRET="$(pick_secret JWT_SECRET "$PREV_JWT")";                   [[ -z "$JW
 COINGECKO_BASE_URL="$(read_key "$ENV_USER" COINGECKO_BASE_URL || true)"; COINGECKO_BASE_URL="${COINGECKO_BASE_URL:-https://api.coingecko.com/api/v3}"
 COINGECKO_API_KEY="$(read_key "$ENV_USER" COINGECKO_API_KEY || true)"
 
+PREV_WALLET_SYNC_KEY="$(read_key "$ENV_DEV" WALLET_SYNC_ENCRYPTION_KEY || true)"
+WALLET_SYNC_ENCRYPTION_KEY="$(pick_secret WALLET_SYNC_ENCRYPTION_KEY "$PREV_WALLET_SYNC_KEY")"; [[ -z "$WALLET_SYNC_ENCRYPTION_KEY" ]] && WALLET_SYNC_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+ETHERSCAN_API_KEY="$(read_key "$ENV_USER" ETHERSCAN_API_KEY || true)"
+BLOCKFROST_API_KEY="$(read_key "$ENV_USER" BLOCKFROST_API_KEY || true)"
+SUBSCAN_API_KEY="$(read_key "$ENV_USER" SUBSCAN_API_KEY || true)"
+
 # ── Puertos host libres ───────────────────────────────────────────────────────
 log "Asignando puertos host libres..."
 FRONTEND_HOST_PORT="$(pick_free_port "$BASE_FRONTEND")"
@@ -128,6 +134,12 @@ JWT_SECRET=${JWT_SECRET}
 
 COINGECKO_BASE_URL=${COINGECKO_BASE_URL}
 COINGECKO_API_KEY=${COINGECKO_API_KEY}
+
+# Verificación de saldos on-chain (ver backend/src/modules/walletSync)
+WALLET_SYNC_ENCRYPTION_KEY=${WALLET_SYNC_ENCRYPTION_KEY}
+ETHERSCAN_API_KEY=${ETHERSCAN_API_KEY}
+BLOCKFROST_API_KEY=${BLOCKFROST_API_KEY}
+SUBSCAN_API_KEY=${SUBSCAN_API_KEY}
 
 # Puertos host (loopback) auto-asignados
 FRONTEND_HOST_PORT=${FRONTEND_HOST_PORT}

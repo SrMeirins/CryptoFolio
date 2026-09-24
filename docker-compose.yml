@@ -59,6 +59,12 @@ services:
       BACKEND_PORT: "3001"
       COINGECKO_BASE_URL: ${COINGECKO_BASE_URL:-https://api.coingecko.com/api/v3}
       COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
+      # Verificación de saldos on-chain (backend/src/modules/walletSync) — todas
+      # opcionales; sin ellas, esas redes concretas simplemente no se verifican.
+      WALLET_SYNC_ENCRYPTION_KEY: ${WALLET_SYNC_ENCRYPTION_KEY:-}
+      ETHERSCAN_API_KEY: ${ETHERSCAN_API_KEY:-}
+      BLOCKFROST_API_KEY: ${BLOCKFROST_API_KEY:-}
+      SUBSCAN_API_KEY: ${SUBSCAN_API_KEY:-}
       PRICE_REFRESH_INTERVAL_MS: ${PRICE_REFRESH_INTERVAL_MS:-60000}
       # Fallback SOLO-dev (loopback). `make dev` inyecta uno aleatorio vía .env.dev.
       JWT_SECRET: ${JWT_SECRET:-dev_only_insecure_secret_change_me_0123456789}
