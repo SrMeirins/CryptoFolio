@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { etherscanProvider } from './etherscanProvider';
+import { etherscanProvider, resetThrottleState } from './etherscanProvider';
 
 function mockFetchSequence(responses: unknown[]) {
   let call = 0;
@@ -53,5 +53,33 @@ describe('etherscanProvider', () => {
   it('devuelve ok:false si no hay API key disponible', async () => {
     const result = await etherscanProvider.getBalance('0x71C7656EC7ab88b098defB751B7401B5f6d8976F', undefined);
     expect(result).toEqual({ ok: false, error: 'falta API key para Ethereum (Etherscan)' });
+  });
+
+  it('deja margen entre la llamada de tokenbalance y la de decimals() para no chocar con el rate limit real observado (~3/seg)', async () => {
+    resetThrottleState();
+    vi.useFakeTimers();
+    try {
+      mockFetchSequence([
+        { status: '1', result: '10000000000000000000' },
+        { status: '1', result: '0x12' },
+      ]);
+
+      const promise = etherscanProvider.getBalance(
+        '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', 'FAKEKEY', '0x514910771AF9Ca656af840dff83E8264EcF986CA'
+      );
+
+      // Sin avanzar el reloj, el margen entre llamadas no ha pasado — la
+      // segunda petición (decimals) todavía no debería haberse disparado.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vi.mocked(fetch).mock.calls.length).toBe(1);
+
+      await vi.advanceTimersByTimeAsync(600);
+      const result = await promise;
+      expect(result).toEqual({ ok: true, balance: 10 });
+      expect(vi.mocked(fetch).mock.calls.length).toBe(2);
+    } finally {
+      vi.useRealTimers();
+      resetThrottleState();
+    }
   });
 });
