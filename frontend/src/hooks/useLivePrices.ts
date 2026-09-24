@@ -22,7 +22,12 @@ export function useLivePrices() {
     let reconnectTimer: ReturnType<typeof setTimeout>
 
     function connect() {
-      const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3001'
+      // Mismo origen que la página (protocolo+host actuales), nunca un puerto
+      // hardcodeado: en Docker el backend solo es alcanzable como backend:3001
+      // dentro de la red interna — el proxy de Vite ('/ws' en vite.config.ts)
+      // o un reverse proxy en producción son quienes redirigen esta ruta.
+      const wsUrl = import.meta.env.VITE_WS_URL
+        || `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`
       ws = new WebSocket(`${wsUrl}/ws/prices`)
 
       ws.onopen = () => {
