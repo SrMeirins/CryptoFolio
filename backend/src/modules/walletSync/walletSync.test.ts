@@ -53,6 +53,9 @@ describe('walletSync', () => {
     await pool.query('DELETE FROM balance_sync_log');
     await pool.query('DELETE FROM fifo_lots');
     await pool.query('DELETE FROM transactions');
+    await pool.query(`DELETE FROM network_assets WHERE asset = 'SINCONTRATO'`);
+    const { resetCircuitBreakerState } = await loadWalletSyncWithTestDb();
+    resetCircuitBreakerState();
   });
 
   it('status ok cuando la diferencia está por debajo del 0.5%', async () => {
@@ -111,6 +114,37 @@ describe('walletSync', () => {
     expect(results[0].status).toBe('error');
   });
 
+  it('circuit breaker: tras abrirse, se autorrecupera y vuelve a intentarlo en la siguiente llamada', async () => {
+    const { syncWalletAddress } = await loadWalletSyncWithTestDb();
+
+    const addrRes = await pool.query(
+      `INSERT INTO wallet_addresses (wallet_id, network_id, address) VALUES ($1, $2, 'rTestBreaker') RETURNING id`,
+      [walletId, networkId]
+    );
+    const addressId = addrRes.rows[0].id;
+    await insertOpenLot('XRP', 123, 60);
+
+    const failing: BalanceProvider = { requiresApiKey: false, getBalance: async () => ({ ok: false, error: 'caído' }) };
+    registerProvider('XRP Ledger', failing);
+
+    // 3 fallos reales consecutivos abren el breaker.
+    await syncWalletAddress(addressId);
+    await syncWalletAddress(addressId);
+    await syncWalletAddress(addressId);
+
+    const breakerOpen = await syncWalletAddress(addressId);
+    expect(breakerOpen[0].error).toMatch(/circuit breaker/);
+
+    // El proveedor se recupera (ej. se configuró la API key que faltaba) —
+    // la siguiente llamada debe reintentar de verdad, no seguir bloqueada.
+    const recovered: BalanceProvider = { requiresApiKey: false, getBalance: async () => ({ ok: true, balance: 123 }) };
+    registerProvider('XRP Ledger', recovered);
+
+    const results = await syncWalletAddress(addressId);
+    expect(results[0].status).toBe('ok');
+    expect(results[0].onchainBalance).toBe(123);
+  });
+
   it('escribe el resultado en balance_sync_log y actualiza last_known_balance/last_sync_at del activo nativo', async () => {
     const { syncWalletAddress } = await loadWalletSyncWithTestDb();
 
@@ -132,6 +166,32 @@ describe('walletSync', () => {
     const addr = await pool.query(`SELECT last_known_balance, last_sync_at FROM wallet_addresses WHERE id = $1`, [addressId]);
     expect(Number(addr.rows[0].last_known_balance)).toBe(42);
     expect(addr.rows[0].last_sync_at).not.toBeNull();
+  });
+
+  it('token de network_assets sin contract_address: error explícito, nunca se confunde con el saldo nativo', async () => {
+    const { syncWalletAddress } = await loadWalletSyncWithTestDb();
+
+    const addrRes = await pool.query(
+      `INSERT INTO wallet_addresses (wallet_id, network_id, address) VALUES ($1, $2, 'rTest6') RETURNING id`,
+      [walletId, networkId]
+    );
+    const addressId = addrRes.rows[0].id;
+
+    // Token del catálogo sin contract_address rellenado (caso real encontrado:
+    // WIF/PYTH sobre Solana nacieron así en el seed inicial).
+    await pool.query(
+      `INSERT INTO network_assets (network_id, asset, contract_address, is_predefined) VALUES ($1, 'SINCONTRATO', NULL, TRUE)`,
+      [networkId]
+    );
+
+    const fake: BalanceProvider = { requiresApiKey: false, getBalance: async () => ({ ok: true, balance: 999 }) };
+    registerProvider('XRP Ledger', fake);
+
+    const results = await syncWalletAddress(addressId);
+    const tokenResult = results.find(r => r.asset === 'SINCONTRATO')!;
+    expect(tokenResult.status).toBe('error');
+    expect(tokenResult.onchainBalance).toBeNull();
+    expect(tokenResult.error).toMatch(/contract_address/);
   });
 
   it('sin lotes abiertos (expected=0): cualquier saldo on-chain por encima del polvo cuenta como discrepancia', async () => {

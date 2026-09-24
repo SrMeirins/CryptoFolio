@@ -90,9 +90,9 @@ SELECT id, 'USDC', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', TRUE FROM netwo
 INSERT INTO network_assets (network_id, asset, contract_address, is_predefined)
 SELECT id, 'ONDO', '0xfAbA6f8e4a5E8Ab82F62fe7C39859FA577269BE3', TRUE FROM networks WHERE name = 'Ethereum';
 INSERT INTO network_assets (network_id, asset, contract_address, is_predefined)
-SELECT id, 'WIF',  NULL, TRUE FROM networks WHERE name = 'Solana';
+SELECT id, 'WIF',  'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm', TRUE FROM networks WHERE name = 'Solana';
 INSERT INTO network_assets (network_id, asset, contract_address, is_predefined)
-SELECT id, 'PYTH', NULL, TRUE FROM networks WHERE name = 'Solana';
+SELECT id, 'PYTH', 'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3', TRUE FROM networks WHERE name = 'Solana';
 
 -- ============================================================
 -- TABLA: wallets

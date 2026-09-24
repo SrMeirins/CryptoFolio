@@ -26,6 +26,13 @@ const ENV_KEY_BY_NETWORK: Record<string, string> = {
 // señal razonable para volver a intentar).
 const consecutiveFailures = new Map<string, number>();
 
+// Solo para tests: aísla el estado del breaker entre casos (el Map es a
+// nivel de módulo, y sin esto un test que abre el breaker contamina los
+// siguientes en el mismo archivo).
+export function resetCircuitBreakerState(): void {
+  consecutiveFailures.clear();
+}
+
 async function resolveApiKey(networkId: string, networkName: string, client: PoolClient): Promise<string | undefined> {
   const row = await client.query(
     `SELECT api_key_encrypted, api_key_iv FROM network_api_keys WHERE network_id = $1`,
@@ -64,8 +71,13 @@ async function syncOneAsset(
 ): Promise<Omit<SyncResult, 'asset'>> {
   const failures = consecutiveFailures.get(providerName) ?? 0;
   if (failures >= CIRCUIT_BREAKER_THRESHOLD) {
+    // Se salta ESTE intento, pero resetea el contador para que el siguiente
+    // vuelva a intentarlo de verdad — sin esto, un proveedor que se recupera
+    // (ej. se configura la API key que faltaba) queda bloqueado para
+    // siempre, porque solo un intento real puede resetear el contador a 0.
+    consecutiveFailures.set(providerName, 0);
     const expectedBalance = await getExpectedBalance(asset, walletId, client);
-    return { status: 'error', onchainBalance: null, expectedBalance, discrepancyPct: null, error: 'circuit breaker abierto (proveedor con fallos repetidos)' };
+    return { status: 'error', onchainBalance: null, expectedBalance, discrepancyPct: null, error: 'circuit breaker abierto (proveedor con fallos repetidos) — se reintentará en la próxima sincronización' };
   }
 
   const provider = getProviderForNetwork(providerName);
@@ -104,6 +116,18 @@ export async function syncWalletAddress(walletAddressId: string): Promise<SyncRe
 
     const tokens = await client.query(`SELECT asset, contract_address FROM network_assets WHERE network_id = $1`, [networkId]);
     for (const token of tokens.rows) {
+      if (!token.contract_address) {
+        // Sin contract_address no hay forma de consultar el saldo de este
+        // token — nunca se debe caer al saldo nativo por error (pasar
+        // contractAddress=undefined a un provider es la señal de "activo
+        // nativo", así que aquí hay que cortar explícitamente antes).
+        const expectedBalance = await getExpectedBalance(token.asset, walletId, client);
+        results.push({
+          asset: token.asset, status: 'error', onchainBalance: null, expectedBalance, discrepancyPct: null,
+          error: 'sin contract_address configurado para este token — no se puede verificar',
+        });
+        continue;
+      }
       const outcome = await syncOneAsset(token.asset, address, walletId, token.contract_address, networkName, apiKey, client);
       results.push({ asset: token.asset, ...outcome });
     }
