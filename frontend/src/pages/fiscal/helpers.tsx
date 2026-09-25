@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
 import { formatEur } from '../../utils/format'
+import type { CarryforwardDetalle } from './types'
 
 export const PNL_THRESHOLD = 0.005
 
@@ -108,4 +109,17 @@ export function ChartTooltip({ active, payload, label }: {
       ))}
     </div>
   )
+}
+
+// Base para la tarjeta de Tramos IRPF, YA compensada con pérdidas arrastradas
+// de años anteriores (art. 49 LIRPF) — no el neto bruto del año. Reutiliza el
+// mismo cálculo que ya hace /api/fiscal/carryforward (tarjeta de Compensación
+// de Pérdidas) en vez de duplicarlo con una segunda fuente de verdad.
+export function baseTramosCompensada(
+  cfYear: CarryforwardDetalle | undefined,
+  netoPatrimonialBruto: number,
+  totalRendimientos: number
+): number {
+  if (!cfYear) return netoPatrimonialBruto + totalRendimientos
+  return cfYear.netoDespues + (cfYear.rendimientos - cfYear.compensadoRend)
 }
