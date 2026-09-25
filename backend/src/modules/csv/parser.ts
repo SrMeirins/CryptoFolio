@@ -69,7 +69,13 @@ function parseDate(raw: string): Date {
   return d;
 }
 
-function rowHash(row: Record<string, string>): string {
+// occurrenceIndex: cuántas veces ha aparecido esta misma tupla ANTES en el
+// CSV (en orden de lectura). Binance no da más resolución que el segundo ni
+// un ID de orden en el export estándar — dos operaciones REALMENTE distintas
+// con los mismos valores en el mismo segundo (confirmado en datos reales del
+// usuario) colisionarían sin esto. Es estable entre reimports del mismo
+// archivo: el mismo CSV produce siempre el mismo orden de filas.
+function rowHash(row: Record<string, string>, occurrenceIndex: number): string {
   const key = [
     row['User ID'] ?? '',
     row['Time'] ?? '',
@@ -78,6 +84,7 @@ function rowHash(row: Record<string, string>): string {
     row['Coin'] ?? '',
     row['Change'] ?? '',
     row['Remark'] ?? '',
+    String(occurrenceIndex),
   ].join('|');
   return createHash('sha256').update(key).digest('hex');
 }
@@ -167,8 +174,16 @@ export async function parseBinanceCsv(fileContent: Buffer | string): Promise<Csv
 
   // 3. Normalizar filas
   const rows: RawCsvRow[] = [];
+  const tupleOccurrences = new Map<string, number>();
   for (const record of records) {
     try {
+      const tupleKey = [
+        record['User ID'], record['Time'], record['Account'], record['Operation'],
+        record['Coin'], record['Change'], record['Remark'],
+      ].join('|');
+      const occurrenceIndex = tupleOccurrences.get(tupleKey) ?? 0;
+      tupleOccurrences.set(tupleKey, occurrenceIndex + 1);
+
       rows.push({
         userId:    record['User ID'] ?? '',
         time:      parseDate(record['Time']),
@@ -177,7 +192,7 @@ export async function parseBinanceCsv(fileContent: Buffer | string): Promise<Csv
         coin:      record['Coin'] ?? '',
         change:    parseFloat(record['Change'] ?? '0'),
         remark:    record['Remark'] ?? '',
-        rowHash:   rowHash(record),
+        rowHash:   rowHash(record, occurrenceIndex),
       });
     } catch (e) {
       errors.push({
