@@ -205,6 +205,13 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
       exchange
     );
     send('importing', `✓ ${importResult.newTransactions} transacciones nuevas importadas (${importResult.duplicateRows} duplicadas ignoradas)`);
+    if (importResult.errors.length > 0) {
+      send(
+        'importing',
+        `⚠ ${importResult.errors.length} fila(s) con operación desconocida excluidas del import — revisa manualmente: ` +
+        importResult.errors.join(' | ')
+      );
+    }
 
     // FASE 2: Precios históricos
     send('prices', 'Detectando precios históricos necesarios...');

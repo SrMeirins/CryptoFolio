@@ -242,10 +242,13 @@ export async function importCsvFile(
   const fileHash = createHash('sha256').update(fileBuffer).digest('hex');
   const parseResult = await parseExchangeCsv(exchange, fileBuffer);
 
+  // Modo degradado: un grupo no reconocido (ej. Binance renombra una
+  // operación) no debe bloquear el CSV entero — se importa lo que sí se
+  // reconoce y se reporta el resto como error visible en el resultado, en
+  // vez de descartar también las transacciones ya correctamente parseadas.
   if (parseResult.errors.length > 0) {
-    throw new Error(
-      `El CSV contiene ${parseResult.errors.length} errores de parseo: ` +
-      parseResult.errors.map((e) => e.message).join(' | ')
+    onStatus?.(
+      `⚠ ${parseResult.errors.length} fila(s) con operación no reconocida — se excluyen, el resto del CSV se importa igualmente.`
     );
   }
 
@@ -678,7 +681,7 @@ export async function importCsvFile(
       newTransactions,
       duplicateRows,
       ignoredRows: parseResult.stats.ignoredRows,
-      errors: [],
+      errors: parseResult.errors.map((e) => e.message),
       warnings: validation.warnings,
       validation,
     };
