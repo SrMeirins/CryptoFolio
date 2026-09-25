@@ -75,6 +75,13 @@ function parseDate(raw: string): Date {
 // con los mismos valores en el mismo segundo (confirmado en datos reales del
 // usuario) colisionarían sin esto. Es estable entre reimports del mismo
 // archivo: el mismo CSV produce siempre el mismo orden de filas.
+//
+// Remark NO participa en el hash a propósito: Binance puede reformatear ese
+// texto retroactivamente para operaciones históricas — si formara parte del
+// hash, un reexport del mismo periodo generaría un hash distinto para la
+// MISMA operación real y la duplicaría en un reimport. El índice de
+// aparición ya protege contra colisiones sin necesitar el contenido de
+// Remark para desambiguar.
 function rowHash(row: Record<string, string>, occurrenceIndex: number): string {
   const key = [
     row['User ID'] ?? '',
@@ -83,7 +90,6 @@ function rowHash(row: Record<string, string>, occurrenceIndex: number): string {
     row['Operation'] ?? '',
     row['Coin'] ?? '',
     row['Change'] ?? '',
-    row['Remark'] ?? '',
     String(occurrenceIndex),
   ].join('|');
   return createHash('sha256').update(key).digest('hex');
@@ -179,7 +185,7 @@ export async function parseBinanceCsv(fileContent: Buffer | string): Promise<Csv
     try {
       const tupleKey = [
         record['User ID'], record['Time'], record['Account'], record['Operation'],
-        record['Coin'], record['Change'], record['Remark'],
+        record['Coin'], record['Change'],
       ].join('|');
       const occurrenceIndex = tupleOccurrences.get(tupleKey) ?? 0;
       tupleOccurrences.set(tupleKey, occurrenceIndex + 1);

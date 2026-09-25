@@ -48,6 +48,22 @@ describe('parseBinanceCsv — colisión de hash entre filas idénticas en el mis
     const unique = new Set(result.rowHashes);
     expect(unique.size).toBe(3);
   });
+
+  // Hallazgo relacionado: si Binance cambia retroactivamente el Remark de una
+  // operación ya importada (documentado como riesgo real por Binance), un
+  // reexport del mismo periodo generaría un hash distinto para la MISMA
+  // operación real → se reimportaría como transacción nueva, duplicando el
+  // histórico. El Remark ya no participa en el hash — solo el índice de
+  // aparición de la tupla estable (User ID/Time/Account/Operation/Coin/Change).
+  it('un cambio retroactivo de Remark no cambia el hash de la misma operación real', async () => {
+    const before = await getRowHashes(csv([
+      '84158159,2024-03-18 12:19:11,Spot,Transaction Buy,AMP,689,Texto original',
+    ]));
+    const after = await getRowHashes(csv([
+      '84158159,2024-03-18 12:19:11,Spot,Transaction Buy,AMP,689,Binance reformateó este texto',
+    ]));
+    expect(before.rowHashes).toEqual(after.rowHashes);
+  });
 });
 
 // El row_hash vive dentro de ParsedTransaction.rawRowHashes tras el
