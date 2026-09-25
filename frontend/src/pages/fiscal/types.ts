@@ -56,6 +56,7 @@ export interface Modelo721 {
   fecha: string
   activos: Modelo721Activo[]
   totalValor: number
+  totalValorCustodia: number
   superaUmbral: boolean
   umbral: number
   aviso: string
