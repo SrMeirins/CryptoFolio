@@ -34,6 +34,18 @@ interface BitvavoRow {
 // de Binance, que ya exporta en UTC. No usa una librería nueva: Node trae ICU
 // completo de serie y Intl.DateTimeFormat resuelve el offset correcto para
 // cualquier fecha/timezone IANA sin tablas de offsets hardcodeadas.
+//
+// Ambigüedad irreducible (cambio de horario de octubre): en la madrugada del
+// último domingo de octubre, la franja local 02:00-02:59 ocurre dos veces
+// (primero como CEST +02:00, después como CET +01:00 tras el cambio). El CSV
+// de Bitvavo solo da la hora local con el nombre de zona IANA, sin offset UTC
+// ni indicador de cuál de las dos ocurrencias es — no hay forma de
+// desambiguar con el dato de origen disponible. Convención de este algoritmo,
+// verificada y documentada explícitamente (no es aleatoria): resuelve siempre
+// a CET, la SEGUNDA ocurrencia (hora estándar, tras el cambio). Una operación
+// real en la primera ocurrencia (CEST) quedaría registrada hasta 1 hora más
+// tarde de lo real. Caso extremo (1 hora al año); sin impacto conocido en el
+// histórico real de este usuario (sin actividad de Bitvavo en octubre).
 function toUtcDate(dateStr: string, timeStr: string, timezone: string): Date {
   const [hms, msRaw] = timeStr.split('.');
   const naiveIso = `${dateStr}T${hms}`;
