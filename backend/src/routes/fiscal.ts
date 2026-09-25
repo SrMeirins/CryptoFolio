@@ -459,8 +459,11 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
   const dec31 = esAnioEnCurso ? new Date() : new Date(`${year}-12-31T23:59:59Z`);
   const lotes = await getLotesAFecha(dec31);
 
+  // Modelo 721: solo cuenta la custodia de terceros (exchanges); la
+  // autocustodia (hardware/software) no se declara en este modelo.
   let valorTotal721 = 0;
   for (const lot of lotes) {
+    if (lot.wallet_kind !== 'exchange') continue;
     try {
       const price = await getHistoricalPriceEur(lot.asset, dec31);
       valorTotal721 += parseFloat(lot.quantity) * price;
@@ -534,6 +537,10 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
   );
 
   const totalValor = activos.reduce((sum, a) => sum + a.valorEur, 0);
+  // Solo la custodia de terceros computa para el umbral del 721.
+  const totalValorCustodia = activos
+    .filter(a => a.wallet_kind === 'exchange')
+    .reduce((sum, a) => sum + a.valorEur, 0);
 
   res.json({
     year,
@@ -541,9 +548,10 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
     fecha:        dec31.toISOString().slice(0, 10),
     activos,
     totalValor,
-    superaUmbral: totalValor > umbral,
+    totalValorCustodia,
+    superaUmbral: totalValorCustodia > umbral,
     umbral,
-    aviso: 'El Modelo 721 aplica a criptoactivos custodiados en exchanges extranjeros. Consulta con tu asesor fiscal sobre la aplicabilidad a wallets de autocustodia.',
+    aviso: 'El Modelo 721 aplica a criptoactivos cuya custodia está en manos de un tercero situado en el extranjero (exchanges). Se cuentan todos los exchanges registrados; confirma con tu asesor fiscal cuáles son entidades extranjeras. La autocustodia no computa.',
   });
 });
 

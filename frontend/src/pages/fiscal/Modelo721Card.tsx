@@ -9,7 +9,7 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
   const currentYear = new Date().getFullYear()
   const deadline    = `31 mar ${activeYear + 1}`
   const vencido     = !data.esAnioEnCurso && activeYear < currentYear
-  const pctUmbral   = Math.min((data.totalValor / data.umbral) * 100, 100)
+  const pctUmbral   = Math.min((data.totalValorCustodia / data.umbral) * 100, 100)
 
   return (
     <div className={`bg-background-card border rounded-2xl overflow-hidden ${
@@ -54,9 +54,12 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
         <div className="flex items-center gap-5">
           <div className="text-right">
             <div className={`text-lg font-bold mono ${data.superaUmbral ? 'text-accent-red' : 'text-white'}`}>
-              {formatEur(data.totalValor)}
+              {formatEur(data.totalValorCustodia)}
             </div>
-            <div className="text-[10px] text-gray-500">umbral {formatEur(data.umbral)}</div>
+            <div className="text-[10px] text-gray-500">custodia de terceros · umbral {formatEur(data.umbral)}</div>
+            {data.totalValor - data.totalValorCustodia > 0.01 && (
+              <div className="text-[10px] text-gray-600">+ {formatEur(data.totalValor - data.totalValorCustodia)} en autocustodia (no computa)</div>
+            )}
           </div>
           {expanded ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
         </div>
