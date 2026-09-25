@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { calcularIrpfAhorro, parseTiposConfig } from '../modules/fiscal/irpf';
+import { getContrapartidaClave } from '../modules/fiscal/contrapartida';
 import { db } from '../db/client';
 import { getHistoricalPriceEur } from '../modules/prices/binance';
 import PDFDocument from 'pdfkit';
@@ -13,19 +14,10 @@ async function getUmbral721(): Promise<number> {
   return res.rows.length > 0 ? (parseInt(res.rows[0].value) || 50000) : 50000;
 }
 
-const FIAT_ASSETS = new Set(['EUR', 'USD', 'GBP', 'CHF', 'BRL', 'ARS', 'USDT', 'USDC', 'BUSD', 'DAI']);
-
 function parseYear(raw: string): number | null {
   const y = parseInt(raw, 10);
   if (isNaN(y) || y < 2009 || y > 2100) return null; // Bitcoin nació en 2009
   return y;
-}
-
-// Claves oficiales AEAT: D=Dinero, V=Valores/cripto, I=Inmueble, O=Otros/sin contrapartida
-function getContrapartidaClave(activoRecibido: string | null): { clave: string; descripcion: string } {
-  if (!activoRecibido)                      return { clave: 'O', descripcion: 'Sin contrapartida directa (comision/perdida)' };
-  if (FIAT_ASSETS.has(activoRecibido))      return { clave: 'D', descripcion: `Moneda de curso legal (${activoRecibido})` };
-  return { clave: 'V', descripcion: `Otra moneda virtual (${activoRecibido})` };
 }
 
 function getTipoRendimiento(operationType: string): string {
