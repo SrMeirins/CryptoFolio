@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { calcularIrpfAhorro, parseTiposConfig } from '../modules/fiscal/irpf';
 import { db } from '../db/client';
 import { getHistoricalPriceEur } from '../modules/prices/binance';
 import PDFDocument from 'pdfkit';
@@ -1074,30 +1075,12 @@ router.post('/simulate-sale', async (req: Request, res: Response) => {
 
   const netGainLoss = totalGain + totalLoss;
 
-  // Estimación IRPF (solo sobre ganancias netas; no considera otras rentas del año)
-  // Tramos de la base del ahorro vigentes desde 2025 (Ley 7/2024) — el último
-  // tramo subió del 28% al 30%. Verifica el tramo vigente cada año en
-  // Ajustes → Fiscal, donde puedes personalizarlo sin tocar código.
-  const TRAMOS = [
-    { hasta: 6_000,    tipo: 0.19 },
-    { hasta: 50_000,   tipo: 0.21 },
-    { hasta: 200_000,  tipo: 0.23 },
-    { hasta: 300_000,  tipo: 0.27 },
-    { hasta: Infinity, tipo: 0.30 },
-  ];
-
-  let irpfEstimate = 0;
-  if (netGainLoss > 0) {
-    let base = netGainLoss;
-    let anterior = 0;
-    for (const t of TRAMOS) {
-      if (base <= 0) break;
-      const tramo = Math.min(base, t.hasta - anterior);
-      irpfEstimate += tramo * t.tipo;
-      base    -= tramo;
-      anterior = t.hasta;
-    }
-  }
+  // Estimación IRPF (solo sobre ganancias netas; no considera otras rentas del año).
+  // Lee los porcentajes de Ajustes → Fiscal, misma fuente que el frontend.
+  const tiposRes = await db.query("SELECT value FROM app_config WHERE key = 'irpf_tramos_tipos'");
+  const irpfEstimate = netGainLoss > 0
+    ? calcularIrpfAhorro(netGainLoss, parseTiposConfig(tiposRes.rows[0]?.value))
+    : 0;
 
   res.json({
     asset:         asset.toUpperCase(),

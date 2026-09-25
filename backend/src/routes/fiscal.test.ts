@@ -53,4 +53,19 @@ describe('POST /api/fiscal/simulate-sale — tramo IRPF > 300.000€', () => {
     // (con el bug del 28%, el resultado sería 74680)
     expect(res.body.irpfEstimate).toBeCloseTo(74880, 2);
   });
+
+  it('aplica los porcentajes personalizados de app_config (irpf_tramos_tipos)', async () => {
+    // Todos los tramos al 10%: 310.000€ de ganancia → 31.000€ de IRPF.
+    await pool.query(
+      `INSERT INTO app_config (key, value) VALUES ('irpf_tramos_tipos', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [JSON.stringify([10, 10, 10, 10, 10])]
+    );
+    const res = await request(app)
+      .post('/api/fiscal/simulate-sale')
+      .send({ asset: 'BTC', quantity: 1, priceEur: 310_000 });
+    expect(res.status).toBe(200);
+    expect(res.body.irpfEstimate).toBeCloseTo(31_000, 2);
+    await pool.query(`DELETE FROM app_config WHERE key = 'irpf_tramos_tipos'`);
+  });
 });
