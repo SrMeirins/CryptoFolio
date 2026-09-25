@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { FileText, Info, Calendar, AlertTriangle } from 'lucide-react'
 import { formatEur, pnlColor } from '../utils/format'
-import { pnlBg } from './fiscal/helpers'
+import { pnlBg, baseTramosCompensada } from './fiscal/helpers'
 import { ComparativaAnual, EvolucionMensual, DesglosePorActivo } from './fiscal/Charts'
 import { TramosIRPF, CompensacionPerdidas } from './fiscal/TaxCards'
 import { Modelo721Card } from './fiscal/Modelo721Card'
@@ -206,12 +206,17 @@ export function Fiscal() {
           )}
 
           {breakdown.length > 0 && <DesglosePorActivo data={breakdown} />}
-          {summary.netoPatrimonial > 0 && (
-            <TramosIRPF
-              base={summary.netoPatrimonial + summary.totalRendimientos}
-              label={`Tramos IRPF — estimación ${activeYear}`}
-            />
-          )}
+          {(() => {
+            const cfYear = carryforward?.detalle.find(d => d.year === activeYear)
+            const baseCompensada = baseTramosCompensada(cfYear, summary.netoPatrimonial, summary.totalRendimientos)
+            const huboCompensacion = !!cfYear && cfYear.compensado > 0.01
+            return baseCompensada > 0 && (
+              <TramosIRPF
+                base={baseCompensada}
+                label={`Tramos IRPF — estimación ${activeYear}${huboCompensacion ? ' (tras compensar pérdidas)' : ''}`}
+              />
+            )
+          })()}
 
           {carryforward && <CompensacionPerdidas data={carryforward} />}
 
