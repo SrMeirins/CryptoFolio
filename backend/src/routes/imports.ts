@@ -118,7 +118,7 @@ router.post('/confirm', upload.single('file'), async (req: Request, res: Respons
 
     // ── GATE 0: comprobar depósitos externos ANTES de importar nada ──────────
     // 1. Depósitos en el CSV con needsCostReview
-    const preparse = parseExchangeCsv(exchange, req.file.buffer);
+    const preparse = await parseExchangeCsv(exchange, req.file.buffer);
     const csvExternalDeposits = preparse.transactions.filter(tx => tx.needsCostReview);
 
     // ¿Cuáles de ellos son YA duplicados (ya en DB)?

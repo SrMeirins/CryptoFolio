@@ -27,7 +27,9 @@ if (!CSV_PATH) {
 }
 
 const content = readFileSync(CSV_PATH);
-const result = parseBinanceCsv(content);
+
+(async () => {
+const result = await parseBinanceCsv(content);
 
 console.log('\n=== RESULTADO DEL PARSER ===\n');
 console.log(`Total filas CSV:       ${result.stats.totalRows}`);
@@ -84,3 +86,4 @@ if (result.errors.length === 0) {
   console.log(`\n✗ ${result.errors.length} errores encontrados. Revisar antes de continuar.`);
   process.exit(1);
 }
+})();

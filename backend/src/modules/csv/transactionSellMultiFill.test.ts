@@ -23,7 +23,7 @@ describe('parseBinanceCsv — Transaction Sell con múltiples fills', () => {
   // independiente, una transacción por fila, nunca sumada ni embebida en el
   // SELL. El hallazgo de la auditoría original asumía que la fee sí se
   // embebía; verificado contra el código real, no es así.
-  it('suma todos los fills de venta y de contrapartida recibida, no solo el primero', () => {
+  it('suma todos los fills de venta y de contrapartida recibida, no solo el primero', async () => {
     // Binance divide una venta grande en 3 fills al mismo segundo — cada uno
     // con su propia fila de venta y de contrapartida recibida.
     const rows = [
@@ -35,7 +35,7 @@ describe('parseBinanceCsv — Transaction Sell con múltiples fills', () => {
       '123,2024-05-10 10:00:00,Spot,Transaction Sell,USDT,8000,',
     ];
 
-    const result = parseBinanceCsv(csv(rows));
+    const result = await parseBinanceCsv(csv(rows));
     expect(result.errors).toEqual([]);
 
     const sell = result.transactions.find(t => t.operationType === 'SELL');
@@ -46,7 +46,7 @@ describe('parseBinanceCsv — Transaction Sell con múltiples fills', () => {
     expect(sell!.costAmount).toBeCloseTo(40000, 8); // 20000+12000+8000, no solo 20000
   });
 
-  it('la fee, aunque presente en el mismo timestamp, sale como FEE_EXCHANGE independiente por cada fila (no se embebe ni se suma en el SELL)', () => {
+  it('la fee, aunque presente en el mismo timestamp, sale como FEE_EXCHANGE independiente por cada fila (no se embebe ni se suma en el SELL)', async () => {
     const rows = [
       '123,2024-05-10 10:00:00,Spot,Transaction Sell,BTC,-0.5,',
       '123,2024-05-10 10:00:00,Spot,Transaction Sell,BTC,-0.3,',
@@ -56,7 +56,7 @@ describe('parseBinanceCsv — Transaction Sell con múltiples fills', () => {
       '123,2024-05-10 10:00:00,Spot,Transaction Fee,USDT,-12,',
     ];
 
-    const result = parseBinanceCsv(csv(rows));
+    const result = await parseBinanceCsv(csv(rows));
     expect(result.errors).toEqual([]);
 
     const sell = result.transactions.find(t => t.operationType === 'SELL');
@@ -68,13 +68,13 @@ describe('parseBinanceCsv — Transaction Sell con múltiples fills', () => {
     expect(fees.reduce((s, f) => s + f.amount, 0)).toBeCloseTo(32, 8);
   });
 
-  it('un único fill (caso normal) sigue funcionando igual que antes', () => {
+  it('un único fill (caso normal) sigue funcionando igual que antes', async () => {
     const rows = [
       '123,2024-05-10 10:00:00,Spot,Transaction Sell,BTC,-0.5,',
       '123,2024-05-10 10:00:00,Spot,Transaction Sell,USDT,20000,',
     ];
 
-    const result = parseBinanceCsv(csv(rows));
+    const result = await parseBinanceCsv(csv(rows));
     expect(result.errors).toEqual([]);
 
     const sell = result.transactions.find(t => t.operationType === 'SELL');
