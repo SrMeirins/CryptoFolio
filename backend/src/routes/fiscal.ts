@@ -1067,12 +1067,15 @@ router.post('/simulate-sale', async (req: Request, res: Response) => {
   const netGainLoss = totalGain + totalLoss;
 
   // Estimación IRPF (solo sobre ganancias netas; no considera otras rentas del año)
+  // Tramos de la base del ahorro vigentes desde 2025 (Ley 7/2024) — el último
+  // tramo subió del 28% al 30%. Verifica el tramo vigente cada año en
+  // Ajustes → Fiscal, donde puedes personalizarlo sin tocar código.
   const TRAMOS = [
     { hasta: 6_000,    tipo: 0.19 },
     { hasta: 50_000,   tipo: 0.21 },
     { hasta: 200_000,  tipo: 0.23 },
     { hasta: 300_000,  tipo: 0.27 },
-    { hasta: Infinity, tipo: 0.28 },
+    { hasta: Infinity, tipo: 0.30 },
   ];
 
   let irpfEstimate = 0;

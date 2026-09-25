@@ -13,13 +13,15 @@ export function pnlBg(val: number) {
 
 export interface Tramo { hasta: number; tipo: number; label: string }
 
-// Tramos por defecto — IRPF 2024 (base del ahorro)
+// Tramos por defecto — base del ahorro, vigentes desde 2025 (Ley 7/2024).
+// El último tramo subió del 28% al 30%. Verifica el tramo vigente cada año;
+// puedes personalizarlo sin tocar código en Ajustes → Fiscal.
 export const TRAMOS_DEFAULT: Tramo[] = [
   { hasta: 6_000,    tipo: 19, label: '0 – 6.000 €' },
   { hasta: 50_000,   tipo: 21, label: '6.001 – 50.000 €' },
   { hasta: 200_000,  tipo: 23, label: '50.001 – 200.000 €' },
   { hasta: 300_000,  tipo: 27, label: '200.001 – 300.000 €' },
-  { hasta: Infinity, tipo: 28, label: '> 300.000 €' },
+  { hasta: Infinity, tipo: 30, label: '> 300.000 €' },
 ]
 
 // Alias para compatibilidad con código existente
