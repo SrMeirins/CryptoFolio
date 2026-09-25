@@ -1241,27 +1241,38 @@ function interpretMultiAssetBuy(
 function interpretTransactionSell(
   group: RawCsvRow[], hashes: string[], timestamp: Date, account: string
 ): ParsedTransaction {
-  const sellRow    = group.find((r) => r.operation === 'Transaction Sell' && r.change < 0);
-  const receiveRow = group.find((r) => r.change > 0 && r.operation !== 'Transaction Fee');
-  const feeRow     = group.find((r) => r.operation === 'Transaction Fee');
+  // Binance puede dividir una venta grande en varios fills al mismo segundo —
+  // sumar todas las filas de venta y de contrapartida, igual que ya hace
+  // interpretSoldRevenue para Transaction Sold/Revenue, en vez de tomar solo
+  // la primera con find(). La fee (si aparece) nunca co-agrupa aquí por cómo
+  // clasifica mainOpType() — sale siempre como FEE_EXCHANGE independiente.
+  const sellRows    = group.filter((r) => r.operation === 'Transaction Sell' && r.change < 0);
+  const receiveRows = group.filter((r) => r.change > 0 && r.operation !== 'Transaction Fee');
+  const feeRow      = group.find((r) => r.operation === 'Transaction Fee');
 
-  if (!sellRow) {
+  if (sellRows.length === 0) {
     throw new Error(`Transaction Sell sin fila de venta en ${timestamp.toISOString()}`);
   }
+
+  const soldAsset = sellRows[0].coin;
+  const totalSold = sellRows.reduce((s, r) => s + abs(r.change), 0);
+  const receiveAsset  = receiveRows[0]?.coin;
+  const totalReceived = receiveRows.length > 0 ? receiveRows.reduce((s, r) => s + abs(r.change), 0) : undefined;
 
   return {
     operationType: 'SELL',
     timestamp,
-    asset: sellRow.coin,
-    amount: abs(sellRow.change),
-    amountNet: abs(sellRow.change),
-    costAsset:  receiveRow?.coin,
-    costAmount: receiveRow ? abs(receiveRow.change) : undefined,
+    asset: soldAsset,
+    amount: totalSold,
+    amountNet: totalSold,
+    costAsset:  receiveAsset,
+    costAmount: totalReceived,
     feeAsset:  feeRow?.coin,
     feeAmount: feeRow ? abs(feeRow.change) : undefined,
 
     account,
-    subTradeCount: 1,
+    notes: sellRows.length > 1 ? `${sellRows.length} fills parciales` : undefined,
+    subTradeCount: sellRows.length,
     rawRowHashes: hashes,
   };
 }
