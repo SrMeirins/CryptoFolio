@@ -3,8 +3,8 @@ import { AlertTriangle, Check, Zap, RefreshCw, ChevronRight } from 'lucide-react
 import { Play } from 'lucide-react'
 import type { DepositReview, PreviewTransaction } from './types'
 
-// Botón auto-fetch precio histórico
-export function HistoricalPriceButton({ asset, timestamp, onPrice, label = 'Precio histórico' }: {
+// Botón auto-fetch precio de mercado (estimación, no necesariamente el coste real pagado)
+export function HistoricalPriceButton({ asset, timestamp, onPrice, label = 'Precio de mercado (estimación)' }: {
   asset: string
   timestamp: string
   onPrice: (p: number) => void
@@ -36,6 +36,7 @@ export function HistoricalPriceButton({ asset, timestamp, onPrice, label = 'Prec
 
   return (
     <button onClick={fetch_} disabled={state === 'loading'}
+      title="Precio de mercado en esa fecha — puede no coincidir con lo que pagaste realmente en el exchange de origen. Corrígelo si sabes tu coste real."
       className="text-[10px] px-2 py-1 rounded-md border border-accent-blue/30 text-accent-blue bg-accent-blue/5 hover:bg-accent-blue/15 transition-colors disabled:opacity-50 flex items-center gap-1">
       {state === 'loading' ? <RefreshCw size={9} className="animate-spin" /> : <Zap size={9} />}
       {label}
@@ -165,7 +166,7 @@ export function DepositAssetGroup({ asset, deposits, depositCosts, onSetCost }: 
 
         {hasMany && (
           <div className="flex items-center gap-1.5">
-            <HistoricalPriceButton asset={asset} timestamp={deposits[0].timestamp} onPrice={applyAll} label="Hist. a todos" />
+            <HistoricalPriceButton asset={asset} timestamp={deposits[0].timestamp} onPrice={applyAll} label="Mercado (est.) a todos" />
             <button onClick={() => applyAll(0)}
               className="text-[10px] px-2 py-1 rounded-md border border-border text-gray-500 hover:text-white hover:border-gray-500 bg-background-card transition-colors">
               Gratis a todos
@@ -234,7 +235,7 @@ export function DepositSection({ deposits, depositCosts, onSetCost, allReviewed,
             {reviewedCount}/{deposits.length}
           </span>
         </div>
-        <p className="text-[11px] text-gray-600">Activos recibidos desde fuera de Binance</p>
+        <p className="text-[11px] text-gray-600">Activos recibidos desde fuera de Binance — el precio de mercado es una estimación, indica tu coste real si lo conoces</p>
       </div>
 
       {Object.entries(byAsset).map(([asset, deps]) => (

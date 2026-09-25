@@ -134,9 +134,10 @@ export function PendingDepositsPanel({ deposits }: { deposits: PendingDeposit[] 
                     {dep.historicalPrice != null && (
                       <button
                         onClick={() => setLocalCosts(prev => ({ ...prev, [dep.id]: dep.historicalPrice! }))}
+                        title="Precio de mercado en esa fecha — puede no coincidir con lo que pagaste realmente. Corrígelo si sabes tu coste real."
                         className="text-xs px-3 py-1.5 bg-accent-blue/10 hover:bg-accent-blue/20 border border-accent-blue/30 text-accent-blue rounded-lg transition-colors whitespace-nowrap"
                       >
-                        {dep.historicalPrice.toLocaleString('es-ES', { maximumFractionDigits: 4 })} € (histórico)
+                        {dep.historicalPrice.toLocaleString('es-ES', { maximumFractionDigits: 4 })} € (mercado, estimación)
                       </button>
                     )}
                     <button
