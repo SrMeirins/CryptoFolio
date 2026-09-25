@@ -12,7 +12,7 @@ export function isExchange(value: unknown): value is Exchange {
   return typeof value === 'string' && (SUPPORTED_EXCHANGES as string[]).includes(value);
 }
 
-export function parseExchangeCsv(exchange: Exchange, fileBuffer: Buffer): CsvParseResult {
+export async function parseExchangeCsv(exchange: Exchange, fileBuffer: Buffer): Promise<CsvParseResult> {
   switch (exchange) {
     case 'binance': return parseBinanceCsv(fileBuffer);
     case 'bitvavo': return parseBitvavoCsv(fileBuffer);

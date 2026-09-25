@@ -8,7 +8,7 @@ function csv(rows: string[]): string {
 }
 
 describe('parseBinanceCsv — venta en corto de margin (Margin Loan + Transaction Sold)', () => {
-  it('short puro (vendido = prestado): el préstamo se registra como MARGIN_BORROW y la venta como SELL, no se descarta nada', () => {
+  it('short puro (vendido = prestado): el préstamo se registra como MARGIN_BORROW y la venta como SELL, no se descarta nada', async () => {
     // Réplica mínima del caso real (23-dic-2023, USTC): pides prestados 100 USTC,
     // los vendes enteros, recibes USDT.
     const rows = [
@@ -20,7 +20,7 @@ describe('parseBinanceCsv — venta en corto de margin (Margin Loan + Transactio
       '123,2023-12-23 06:26:48,Cross Margin,Margin Loan,USTC,100,',
     ];
 
-    const result = parseBinanceCsv(csv(rows));
+    const result = await parseBinanceCsv(csv(rows));
 
     expect(result.errors).toEqual([]);
 
@@ -49,14 +49,14 @@ describe('parseBinanceCsv — venta en corto de margin (Margin Loan + Transactio
     expect(result.transactions.some(t => t.operationType === 'IGNORED')).toBe(false);
   });
 
-  it('short mixto (vendido > prestado): sigue funcionando igual que antes (caso ya soportado)', () => {
+  it('short mixto (vendido > prestado): sigue funcionando igual que antes (caso ya soportado)', async () => {
     const rows = [
       '123,2023-12-23 06:26:48,Cross Margin,Transaction Sold,USTC,-150,',
       '123,2023-12-23 06:26:48,Cross Margin,Transaction Revenue,USDT,7.50,',
       '123,2023-12-23 06:26:48,Cross Margin,Margin Loan,USTC,100,',
     ];
 
-    const result = parseBinanceCsv(csv(rows));
+    const result = await parseBinanceCsv(csv(rows));
 
     expect(result.errors).toEqual([]);
     const borrow = result.transactions.find(t => t.operationType === 'MARGIN_BORROW');

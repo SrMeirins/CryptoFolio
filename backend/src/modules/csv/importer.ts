@@ -61,7 +61,7 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
     };
   }
 
-  const parseResult = parseExchangeCsv(exchange, fileBuffer);
+  const parseResult = await parseExchangeCsv(exchange, fileBuffer);
 
   // Construir muestras de operaciones desconocidas (solo aplica a Binance:
   // Bitvavo aborta directamente en el validator si encuentra un Type desconocido)
@@ -240,7 +240,7 @@ export async function importCsvFile(
 
   onStatus?.('Parseando CSV...');
   const fileHash = createHash('sha256').update(fileBuffer).digest('hex');
-  const parseResult = parseExchangeCsv(exchange, fileBuffer);
+  const parseResult = await parseExchangeCsv(exchange, fileBuffer);
 
   if (parseResult.errors.length > 0) {
     throw new Error(

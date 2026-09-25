@@ -9,6 +9,7 @@ import {
 import { preprocess } from './preprocessor';
 import { detectLanguage, normalizeHeaders } from './languages';
 import { ALL_IGNORED_OPERATIONS } from './binanceAccounts';
+import { getHistoricalPriceEur } from '../prices/binance';
 
 // Importado desde binanceAccounts.ts — fuente de verdad única
 const IGNORED_OPERATIONS = ALL_IGNORED_OPERATIONS;
@@ -129,7 +130,7 @@ function mainOpType(operation: string): string {
 }
 
 // ── Parser principal ───────────────────────────────────────────────────────
-export function parseBinanceCsv(fileContent: Buffer | string): CsvParseResult {
+export async function parseBinanceCsv(fileContent: Buffer | string): Promise<CsvParseResult> {
   const errors: ParseError[] = [];
   const ignoredRows: RawCsvRow[] = [];
 
@@ -273,7 +274,7 @@ export function parseBinanceCsv(fileContent: Buffer | string): CsvParseResult {
 
   for (const [, group] of groups) {
     try {
-      const parsed = interpretGroup(group, fundingDepositKeys);
+      const parsed = await interpretGroup(group, fundingDepositKeys);
       if (parsed) {
         if (Array.isArray(parsed)) {
           transactions.push(...parsed);
@@ -310,10 +311,10 @@ export function parseBinanceCsv(fileContent: Buffer | string): CsvParseResult {
 }
 
 // ── Interpretación de grupos ───────────────────────────────────────────────
-function interpretGroup(
+async function interpretGroup(
   group: RawCsvRow[],
   fundingDepositKeys: Set<string>
-): ParsedTransaction | ParsedTransaction[] | null {
+): Promise<ParsedTransaction | ParsedTransaction[] | null> {
   const ops = group.map((r) => r.operation);
   const firstOp = ops[0];
   const hashes = group.map((r) => r.rowHash);
@@ -489,7 +490,7 @@ function interpretGroup(
   }
 
   if (ops.some((o) => o === 'Transaction Buy')) {
-    return interpretTransactionBuy(group, hashes, timestamp, account);
+    return await interpretTransactionBuy(group, hashes, timestamp, account);
   }
 
   if (ops.some((o) => o === 'Transaction Sell')) {
@@ -1089,9 +1090,9 @@ function interpretSmallAssetsExchange(
   return results;
 }
 
-function interpretTransactionBuy(
+async function interpretTransactionBuy(
   group: RawCsvRow[], hashes: string[], timestamp: Date, account: string
-): ParsedTransaction | ParsedTransaction[] {
+): Promise<ParsedTransaction | ParsedTransaction[]> {
   const buyRows   = group.filter((r) => r.operation === 'Transaction Buy');
   const spendRows = group.filter((r) => r.operation === 'Transaction Spend');
   const feeRows   = group.filter((r) => r.operation === 'Transaction Fee');
@@ -1133,7 +1134,7 @@ function interpretTransactionBuy(
   }
 
   if (buyAssets.length > 1) {
-    return interpretMultiAssetBuy(group, timestamp, account);
+    return await interpretMultiAssetBuy(group, timestamp, account);
   }
 
   const asset     = buyAssets[0];
@@ -1191,9 +1192,9 @@ function interpretTransactionBuy(
   return buyTx;
 }
 
-function interpretMultiAssetBuy(
+async function interpretMultiAssetBuy(
   group: RawCsvRow[], timestamp: Date, account: string
-): ParsedTransaction[] {
+): Promise<ParsedTransaction[]> {
   const buyRows   = group.filter((r) => r.operation === 'Transaction Buy');
   const spendRows = group.filter((r) => r.operation === 'Transaction Spend');
   const feeRows   = group.filter((r) => r.operation === 'Transaction Fee');
@@ -1204,14 +1205,30 @@ function interpretMultiAssetBuy(
     byAsset.get(row.coin)!.push(row);
   }
 
-  const totalSpent       = spendRows.reduce((s, r) => s + abs(r.change), 0);
-  const totalBoughtValue = buyRows.reduce((s, r) => s + abs(r.change), 0);
-  const costAsset        = spendRows[0]?.coin ?? 'USDC';
-  const feeOtherRows     = feeRows.filter((r) => !byAsset.has(r.coin));
+  const totalSpent   = spendRows.reduce((s, r) => s + abs(r.change), 0);
+  const costAsset     = spendRows[0]?.coin ?? 'USDC';
+  const feeOtherRows  = feeRows.filter((r) => !byAsset.has(r.coin));
 
-  return [...byAsset.entries()].map(([asset, rows]) => {
-    const assetTotal       = rows.reduce((s, r) => s + abs(r.change), 0);
-    const proportion       = assetTotal / totalBoughtValue;
+  // Reparto por VALOR real (cantidad × precio de mercado en el momento de la
+  // operación), no por cantidad bruta — sumar 0.01 BTC + 500 XRP como si
+  // fueran unidades comparables no tiene significado económico. Un precio
+  // histórico por activo distinto en el grupo (típicamente 2, nunca decenas).
+  const assetQuantities = [...byAsset.entries()].map(([asset, rows]) => ({
+    asset,
+    rows,
+    quantity: rows.reduce((s, r) => s + abs(r.change), 0),
+  }));
+  const priceByAsset = new Map<string, number>();
+  for (const { asset } of assetQuantities) {
+    priceByAsset.set(asset, await getHistoricalPriceEur(asset, timestamp));
+  }
+  const totalValueEur = assetQuantities.reduce(
+    (s, a) => s + a.quantity * priceByAsset.get(a.asset)!, 0
+  );
+
+  return assetQuantities.map(({ asset, rows, quantity: assetTotal }) => {
+    const assetValueEur     = assetTotal * priceByAsset.get(asset)!;
+    const proportion        = totalValueEur > 0 ? assetValueEur / totalValueEur : 0;
     const proportionalSpend = totalSpent * proportion;
 
     const feesInAsset  = feeRows.filter((r) => r.coin === asset);
