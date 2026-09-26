@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { calcularIrpfAhorro, parseTiposConfig } from '../modules/fiscal/irpf';
 import { getContrapartidaClave } from '../modules/fiscal/contrapartida';
+import { hayRecompra, type Adquisicion } from '../modules/fiscal/antiRecompra';
 import { db } from '../db/client';
 import { getHistoricalPriceEur } from '../modules/prices/binance';
 import PDFDocument from 'pdfkit';
@@ -81,6 +82,7 @@ async function getEventosAnio(year: number) {
   const gpRows = await db.query(`
     SELECT
       flc.consumed_at             AS fecha,
+      flc.lot_id,
       t.operation_type,
       fl.asset                    AS activo_transmitido,
       t.asset                     AS tx_asset,
@@ -102,6 +104,20 @@ async function getEventosAnio(year: number) {
       AND flc.fiscal_event_type != 'NONE'
     ORDER BY flc.consumed_at ASC
   `, [year]);
+
+  // Adquisiciones reales de la ventana (año ± 2 meses) para el aviso anti-recompra.
+  // Se excluyen lotes abiertos por movimientos propios (no son compras).
+  const adqRes = await db.query(`
+    SELECT fl.asset, fl.opened_at AS fecha, fl.id AS lot_id
+    FROM fifo_lots fl
+    JOIN transactions t ON t.id = fl.open_transaction_id
+    WHERE t.operation_type NOT IN ('TRANSFER_INTERNAL', 'WITHDRAW', 'DEPOSIT_CRYPTO', 'MARGIN_BORROW')
+      AND fl.opened_at >= make_date($1, 1, 1) - INTERVAL '2 months'
+      AND fl.opened_at <  make_date($1 + 1, 1, 1) + INTERVAL '2 months'
+  `, [year]);
+  const adquisiciones: Adquisicion[] = adqRes.rows.map((r: Record<string, unknown>) => ({
+    asset: r.asset as string, fecha: new Date(r.fecha as string), lotId: r.lot_id as string,
+  }));
 
   const FEE_OR_LOSS_OPS = new Set(['FEE_EXCHANGE', 'FEE_NETWORK', 'FEE', 'LOST', 'GIFT_SENT']);
 
@@ -155,6 +171,9 @@ async function getEventosAnio(year: number) {
         gananciaPerdidaEur:       parseFloat(row.gain_loss_eur as string),
         wallet:                   row.wallet as string,
         txId:                     row.tx_id as string,
+        // Aviso, no bloqueo: pérdida con recompra del mismo activo en ±2 meses.
+        posiblePerdidaDiferida:   parseFloat(row.gain_loss_eur as string) < 0 &&
+          hayRecompra(asset, new Date(row.fecha as string), row.lot_id as string, adquisiciones),
       };
     })
   );
