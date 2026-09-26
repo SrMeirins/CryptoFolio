@@ -172,6 +172,9 @@ async function getEventosAnio(year: number) {
         gananciaPerdidaEur:       parseFloat(row.gain_loss_eur as string),
         wallet:                   row.wallet as string,
         txId:                     row.tx_id as string,
+        // Aviso, no bloqueo: el wrap ETH↔BETH de staking se trata como permuta
+        // imponible (criterio conservador; sin doctrina DGT específica).
+        permutaWrapStaking:       String(row.tx_notes ?? '').startsWith('ETH 2.0 Staking'),
         // Aviso, no bloqueo: un LOST sin motivo anotado se computa 100% deducible,
         // pero la deducibilidad real depende del motivo (estafa, insolvencia, clave perdida...).
         lostSinMotivo:            opType === 'LOST' && !String(row.tx_notes ?? '').trim(),
