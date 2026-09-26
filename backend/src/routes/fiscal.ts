@@ -95,7 +95,8 @@ async function getEventosAnio(year: number) {
       w.name                      AS wallet,
       t.id                        AS tx_id,
       t.fee_asset,
-      t.fee_amount
+      t.fee_amount,
+      t.notes                     AS tx_notes
     FROM fifo_lot_consumptions flc
     JOIN fifo_lots    fl ON fl.id = flc.lot_id
     JOIN transactions t  ON t.id  = flc.consuming_transaction_id
@@ -171,6 +172,9 @@ async function getEventosAnio(year: number) {
         gananciaPerdidaEur:       parseFloat(row.gain_loss_eur as string),
         wallet:                   row.wallet as string,
         txId:                     row.tx_id as string,
+        // Aviso, no bloqueo: un LOST sin motivo anotado se computa 100% deducible,
+        // pero la deducibilidad real depende del motivo (estafa, insolvencia, clave perdida...).
+        lostSinMotivo:            opType === 'LOST' && !String(row.tx_notes ?? '').trim(),
         // Aviso, no bloqueo: pérdida con recompra del mismo activo en ±2 meses.
         posiblePerdidaDiferida:   parseFloat(row.gain_loss_eur as string) < 0 &&
           hayRecompra(asset, new Date(row.fecha as string), row.lot_id as string, adquisiciones),

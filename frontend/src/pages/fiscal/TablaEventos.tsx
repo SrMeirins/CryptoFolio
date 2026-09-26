@@ -211,6 +211,14 @@ export function TablaEventos({ events, summary, year: _year }: { events: FiscalE
                         ) : null}
                       </div>
                       <div className="text-[10px] text-gray-600 mt-0.5">{e.wallet}</div>
+                      {e.lostSinMotivo && (
+                        <div
+                          className="mt-0.5 inline-block text-[10px] bg-accent-amber/10 text-accent-amber px-1.5 py-0.5 rounded"
+                          title="Esta pérdida se computa como 100% deducible, pero su deducibilidad real depende del motivo (estafa, exchange insolvente, clave perdida...). Añade el motivo en las notas de la transacción y valídalo con tu asesor."
+                        >
+                          ⚠ pérdida sin motivo anotado — deducibilidad por validar
+                        </div>
+                      )}
                       {e.posiblePerdidaDiferida && (
                         <div
                           className="mt-0.5 inline-block text-[10px] bg-accent-amber/10 text-accent-amber px-1.5 py-0.5 rounded"
