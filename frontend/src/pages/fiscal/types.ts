@@ -28,6 +28,7 @@ export interface FiscalEvent {
   wallet: string
   txId: string
   posiblePerdidaDiferida?: boolean
+  lostSinMotivo?: boolean
 }
 
 export interface RendimientoEvent {
