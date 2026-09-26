@@ -211,6 +211,14 @@ export function TablaEventos({ events, summary, year: _year }: { events: FiscalE
                         ) : null}
                       </div>
                       <div className="text-[10px] text-gray-600 mt-0.5">{e.wallet}</div>
+                      {e.permutaWrapStaking && (
+                        <div
+                          className="mt-0.5 inline-block text-[10px] bg-accent-amber/10 text-accent-amber px-1.5 py-0.5 rounded"
+                          title="El wrap/unwrap de ETH↔BETH (staking de ETH 2.0) se trata como permuta imponible: criterio conservador, sin doctrina de la DGT específica. Algunos asesores lo consideran no imponible al ser 1:1 sobre el mismo derecho. Valídalo con tu asesor."
+                        >
+                          ⚠ wrap de staking tratado como permuta imponible — criterio por validar
+                        </div>
+                      )}
                       {e.lostSinMotivo && (
                         <div
                           className="mt-0.5 inline-block text-[10px] bg-accent-amber/10 text-accent-amber px-1.5 py-0.5 rounded"

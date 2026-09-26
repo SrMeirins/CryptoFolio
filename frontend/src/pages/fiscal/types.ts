@@ -29,6 +29,7 @@ export interface FiscalEvent {
   txId: string
   posiblePerdidaDiferida?: boolean
   lostSinMotivo?: boolean
+  permutaWrapStaking?: boolean
 }
 
 export interface RendimientoEvent {
