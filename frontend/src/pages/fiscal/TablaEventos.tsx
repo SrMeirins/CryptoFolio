@@ -211,6 +211,14 @@ export function TablaEventos({ events, summary, year: _year }: { events: FiscalE
                         ) : null}
                       </div>
                       <div className="text-[10px] text-gray-600 mt-0.5">{e.wallet}</div>
+                      {e.posiblePerdidaDiferida && (
+                        <div
+                          className="mt-0.5 inline-block text-[10px] bg-accent-amber/10 text-accent-amber px-1.5 py-0.5 rounded"
+                          title="Recompraste este activo en los 2 meses anteriores o posteriores a la venta con pérdida. Art. 33.5 LIRPF: la pérdida podría no ser computable ahora (aplicación a cripto no pacífica). Consúltalo con tu asesor."
+                        >
+                          ⚠ posible pérdida diferida (recompra ±2 meses)
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-right mono text-[11px] text-gray-500">
                       {qty >= 0.01

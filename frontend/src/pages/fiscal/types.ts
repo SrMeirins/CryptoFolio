@@ -27,6 +27,7 @@ export interface FiscalEvent {
   gananciaPerdidaEur: number
   wallet: string
   txId: string
+  posiblePerdidaDiferida?: boolean
 }
 
 export interface RendimientoEvent {
