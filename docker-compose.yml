@@ -11,6 +11,14 @@
 #   • Los puertos INTERNOS de cada servicio son fijos: es lo que usa la red de
 #     compose (p. ej. el proxy de Vite apunta a backend:3001).
 #
+# Endurecimiento (defensa en profundidad, aunque todo esté en 127.0.0.1):
+#   • Redes segmentadas: backend-net (postgres/backend/db-backup/pgadmin) y
+#     frontend-net (frontend/backend) — el frontend nunca puede alcanzar
+#     Postgres directamente, solo al backend.
+#   • cap_drop: ALL + no-new-privileges en todos los servicios (mínimo
+#     privilegio de kernel; ninguno necesita capabilities especiales salvo
+#     Postgres, que las añade explícitamente para su chown inicial de datos).
+#
 # Arranque recomendado: `make dev` (BBDD con datos) o `make dev-clean` (BBDD vacía).
 # El Makefile genera un `.env.dev` (gitignoreado) con secretos aleatorios y
 # puertos libres auto-detectados; por eso aquí no hay credenciales fijas reales.
@@ -39,6 +47,22 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    networks:
+      - backend-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # El entrypoint oficial arranca como root y hace chown/chmod del volumen de
+    # datos antes de bajar privilegios a "postgres" (vía gosu/setuid) — sin estas
+    # 3 capabilities concretas, initdb falla (verificado: falla real con solo
+    # cap_drop: ALL). El resto del proceso postgres corre sin privilegios.
+    cap_add:
+      - CHOWN
+      - FOWNER
+      - DAC_OVERRIDE
+      - SETUID
+      - SETGID
 
   # ── Backend Node.js ────────────────────────────────────────────────────────
   backend:
@@ -82,6 +106,13 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    networks:
+      - backend-net
+      - frontend-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   # ── Frontend React (Vite) ──────────────────────────────────────────────────
   frontend:
@@ -97,6 +128,12 @@ services:
       - ./frontend/src:/app/src
     ports:
       - "127.0.0.1:${FRONTEND_HOST_PORT:-45173}:5173"
+    networks:
+      - frontend-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   # ── Backup automático de PostgreSQL ─────────────────────────────────────────
   # pg_dump comprimido a diario mientras el stack esté levantado, con retención
@@ -118,24 +155,64 @@ services:
       - ./backups:/backups
       - ./scripts/backup-loop.sh:/backup-loop.sh:ro
     entrypoint: ["/bin/sh", "/backup-loop.sh"]
+    networks:
+      - backend-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   # ── pgAdmin (opcional: make tools / docker compose --profile tools up) ──────
   pgadmin:
-    image: dpage/pgadmin4:latest
+    # Tag fijo (no :latest): make dev/tools siempre reproducible, sin sorpresas
+    # de una actualización silenciosa de pgAdmin entre arranques.
+    image: dpage/pgadmin4:9.18.0
     restart: unless-stopped
     profiles:
       - tools
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@cryptotracker.local
-      PGADMIN_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_local}
+      # ".local" es un TLD de uso especial que el validador de email de pgAdmin
+      # 9.x rechaza (verificado: con :latest quedó cacheada antes una versión
+      # menos estricta que no lo comprobaba). ".app" es un gTLD real y pasa la
+      # validación sin necesidad de que el dominio exista de verdad.
+      PGADMIN_DEFAULT_EMAIL: admin@cryptofolio.app
+      # Password PROPIO de pgAdmin, independiente del de Postgres (antes
+      # reutilizaba POSTGRES_PASSWORD: comprometer uno comprometía el otro).
+      # Generado por scripts/dev-env.sh junto al resto de secretos de .env.dev.
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-dev_password_local}
     ports:
-      - "127.0.0.1:${PGADMIN_HOST_PORT:-45050}:80"
+      # Puerto interno 8080, no 80: con cap_drop: ALL, pgAdmin no tiene
+      # NET_BIND_SERVICE para bindear el 80 y cae automáticamente al 8080
+      # (lo señaliza como "Restricted security context detected" en el log).
+      - "127.0.0.1:${PGADMIN_HOST_PORT:-45050}:8080"
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - backend-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
 volumes:
   postgres_data:
     driver: local
   csv_uploads:
     driver: local
+
+networks:
+  # Subredes FIJAS (no delegadas al pool por defecto de Docker): en máquinas
+  # con muchos stacks Docker el pool de direcciones se agota ("all predefined
+  # address pools have been fully subnetted"). 10.250.x.0/24 es un rango alto
+  # sin uso conocido en este host — cambia si colisiona con otra red tuya.
+  # Solo el backend puede hablar con Postgres/pgAdmin/el sidecar de backup.
+  backend-net:
+    ipam:
+      config:
+        - subnet: 10.250.10.0/24
+  # El frontend solo puede hablar con el backend (nunca con Postgres directo).
+  frontend-net:
+    ipam:
+      config:
+        - subnet: 10.250.11.0/24

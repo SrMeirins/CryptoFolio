@@ -96,11 +96,15 @@ pick_secret() { # pick_secret <clave> <fallback_previo>
 
 PREV_PG_PASS="$(read_key "$ENV_DEV" POSTGRES_PASSWORD || true)"
 PREV_JWT="$(read_key "$ENV_DEV" JWT_SECRET || true)"
+PREV_PGADMIN_PASS="$(read_key "$ENV_DEV" PGADMIN_PASSWORD || true)"
 
 POSTGRES_USER="$(read_key "$ENV_USER" POSTGRES_USER || true)";        POSTGRES_USER="${POSTGRES_USER:-cryptotracker}"
 POSTGRES_DB="$(read_key "$ENV_USER" POSTGRES_DB || true)";            POSTGRES_DB="${POSTGRES_DB:-cryptotracker}"
 POSTGRES_PASSWORD="$(pick_secret POSTGRES_PASSWORD "$PREV_PG_PASS")"; [[ -z "$POSTGRES_PASSWORD" ]] && POSTGRES_PASSWORD="$(rand_hex 16)"
 JWT_SECRET="$(pick_secret JWT_SECRET "$PREV_JWT")";                   [[ -z "$JWT_SECRET" ]] && JWT_SECRET="$(rand_hex 32)"
+# Password de pgAdmin: independiente del de Postgres (antes se reutilizaba
+# POSTGRES_PASSWORD, comprometer uno comprometía el otro).
+PGADMIN_PASSWORD="$(pick_secret PGADMIN_PASSWORD "$PREV_PGADMIN_PASS")"; [[ -z "$PGADMIN_PASSWORD" ]] && PGADMIN_PASSWORD="$(rand_hex 16)"
 COINGECKO_BASE_URL="$(read_key "$ENV_USER" COINGECKO_BASE_URL || true)"; COINGECKO_BASE_URL="${COINGECKO_BASE_URL:-https://api.coingecko.com/api/v3}"
 COINGECKO_API_KEY="$(read_key "$ENV_USER" COINGECKO_API_KEY || true)"
 
@@ -131,6 +135,9 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=${POSTGRES_DB}
 
 JWT_SECRET=${JWT_SECRET}
+
+# Password de login de pgAdmin (perfil 'tools'), propio y distinto del de Postgres
+PGADMIN_PASSWORD=${PGADMIN_PASSWORD}
 
 COINGECKO_BASE_URL=${COINGECKO_BASE_URL}
 COINGECKO_API_KEY=${COINGECKO_API_KEY}
