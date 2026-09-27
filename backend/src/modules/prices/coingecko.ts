@@ -244,9 +244,9 @@ export async function getCurrentPricesEur(symbols: string[]): Promise<Map<string
       if (price) {
         result.set(symbol, price);
         await db.query(
-          `INSERT INTO price_cache (asset, price_eur, source, fetched_at)
-           VALUES ($1, $2, 'coingecko_live', NOW())
-           ON CONFLICT (asset, price_date) DO NOTHING`,
+          `INSERT INTO price_cache (asset, price_eur, source, fetched_at, price_date)
+           VALUES ($1, $2, 'coingecko_live', NOW(), CURRENT_DATE)
+           ON CONFLICT (asset, price_date) DO UPDATE SET price_eur = EXCLUDED.price_eur, fetched_at = NOW()`,
           [symbol, price]
         );
       }
