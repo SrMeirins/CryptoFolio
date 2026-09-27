@@ -220,14 +220,14 @@ CREATE TABLE transactions (
   operation_type        operation_type NOT NULL,
   timestamp             TIMESTAMPTZ NOT NULL,
   asset                 TEXT NOT NULL,
-  amount                NUMERIC(38, 18) NOT NULL,
-  amount_net            NUMERIC(38, 18) NOT NULL,
+  amount                NUMERIC(38, 18) NOT NULL CHECK (amount >= 0),
+  amount_net            NUMERIC(38, 18) NOT NULL CHECK (amount_net >= 0),
   cost_asset            TEXT,
-  cost_amount           NUMERIC(38, 18),
+  cost_amount           NUMERIC(38, 18) CHECK (cost_amount IS NULL OR cost_amount >= 0),
   price_per_unit        NUMERIC(38, 18),
   price_eur             NUMERIC(38, 18),
   fee_asset             TEXT,
-  fee_amount            NUMERIC(38, 18),
+  fee_amount            NUMERIC(38, 18) CHECK (fee_amount IS NULL OR fee_amount >= 0),
   fee_eur               NUMERIC(38, 18),
   wallet_id             UUID NOT NULL REFERENCES wallets(id),
   account               TEXT,
@@ -258,11 +258,11 @@ ALTER TABLE raw_transactions
 CREATE TABLE fifo_lots (
   id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   asset               TEXT NOT NULL,
-  quantity_original   NUMERIC(38, 18) NOT NULL,
-  quantity_remaining  NUMERIC(38, 18) NOT NULL,
-  cost_basis_eur      NUMERIC(38, 18) NOT NULL,
-  price_per_unit_eur  NUMERIC(38, 18) NOT NULL,
-  fee_eur             NUMERIC(38, 18) NOT NULL DEFAULT 0,
+  quantity_original   NUMERIC(38, 18) NOT NULL CHECK (quantity_original >= 0),
+  quantity_remaining  NUMERIC(38, 18) NOT NULL CHECK (quantity_remaining >= 0 AND quantity_remaining <= quantity_original),
+  cost_basis_eur      NUMERIC(38, 18) NOT NULL CHECK (cost_basis_eur >= 0),
+  price_per_unit_eur  NUMERIC(38, 18) NOT NULL CHECK (price_per_unit_eur >= 0),
+  fee_eur             NUMERIC(38, 18) NOT NULL DEFAULT 0 CHECK (fee_eur >= 0),
   open_transaction_id UUID NOT NULL REFERENCES transactions(id),
   opened_at           TIMESTAMPTZ NOT NULL,
   closed_at           TIMESTAMPTZ,
@@ -271,7 +271,10 @@ CREATE TABLE fifo_lots (
   -- clock_timestamp() (no NOW()) — runFifoEngine corre en una única transacción,
   -- y NOW() devolvería el mismo valor fijo para todos los lotes de una ejecución.
   -- Se usa como desempate en getOpenLots cuando dos lotes comparten opened_at.
-  created_at          TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+  -- Mismo umbral que FIFO_DUST_EPSILON del motor: un lote cerrado no puede
+  -- tener remanente relevante.
+  CONSTRAINT chk_fifo_lots_closed_no_remaining CHECK (NOT is_closed OR quantity_remaining <= 0.000001)
 );
 
 CREATE INDEX idx_fifo_lots_asset      ON fifo_lots(asset);
@@ -285,9 +288,9 @@ CREATE TABLE fifo_lot_consumptions (
   id                       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   lot_id                   UUID NOT NULL REFERENCES fifo_lots(id),
   consuming_transaction_id UUID NOT NULL REFERENCES transactions(id),
-  quantity_consumed        NUMERIC(38, 18) NOT NULL,
-  cost_basis_consumed_eur  NUMERIC(38, 18) NOT NULL,
-  proceeds_eur             NUMERIC(38, 18) NOT NULL,
+  quantity_consumed        NUMERIC(38, 18) NOT NULL CHECK (quantity_consumed >= 0),
+  cost_basis_consumed_eur  NUMERIC(38, 18) NOT NULL CHECK (cost_basis_consumed_eur >= 0),
+  proceeds_eur             NUMERIC(38, 18) NOT NULL CHECK (proceeds_eur >= 0),
   gain_loss_eur            NUMERIC(38, 18) NOT NULL,
   fiscal_event_type        fiscal_event_type NOT NULL,
   consumed_at              TIMESTAMPTZ NOT NULL,
