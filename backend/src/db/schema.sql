@@ -263,7 +263,7 @@ CREATE TABLE fifo_lots (
   cost_basis_eur      NUMERIC(38, 18) NOT NULL CHECK (cost_basis_eur >= 0),
   price_per_unit_eur  NUMERIC(38, 18) NOT NULL CHECK (price_per_unit_eur >= 0),
   fee_eur             NUMERIC(38, 18) NOT NULL DEFAULT 0 CHECK (fee_eur >= 0),
-  open_transaction_id UUID NOT NULL REFERENCES transactions(id),
+  open_transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE RESTRICT,
   opened_at           TIMESTAMPTZ NOT NULL,
   closed_at           TIMESTAMPTZ,
   is_closed           BOOLEAN NOT NULL DEFAULT FALSE,
@@ -286,8 +286,8 @@ CREATE INDEX idx_fifo_lots_wallet     ON fifo_lots(wallet_id);
 -- ============================================================
 CREATE TABLE fifo_lot_consumptions (
   id                       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  lot_id                   UUID NOT NULL REFERENCES fifo_lots(id),
-  consuming_transaction_id UUID NOT NULL REFERENCES transactions(id),
+  lot_id                   UUID NOT NULL REFERENCES fifo_lots(id) ON DELETE RESTRICT,
+  consuming_transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE RESTRICT,
   quantity_consumed        NUMERIC(38, 18) NOT NULL CHECK (quantity_consumed >= 0),
   cost_basis_consumed_eur  NUMERIC(38, 18) NOT NULL CHECK (cost_basis_consumed_eur >= 0),
   proceeds_eur             NUMERIC(38, 18) NOT NULL CHECK (proceeds_eur >= 0),
