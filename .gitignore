@@ -75,3 +75,5 @@ xl/
 
 # ── Electron instaladores / output del packaging ───────────────────────────
 releases/
+backups/*
+!backups/.gitkeep

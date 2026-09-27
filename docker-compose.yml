@@ -98,6 +98,27 @@ services:
     ports:
       - "127.0.0.1:${FRONTEND_HOST_PORT:-45173}:5173"
 
+  # ── Backup automático de PostgreSQL ─────────────────────────────────────────
+  # pg_dump comprimido a diario mientras el stack esté levantado, con retención
+  # por cantidad de ficheros. Ver scripts/backup-loop.sh. `make backup` hace un
+  # dump manual inmediato sin depender de este servicio.
+  db-backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-cryptotracker}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-dev_password_local}
+      PGDATABASE: ${POSTGRES_DB:-cryptotracker}
+      BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-14}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup-loop.sh:/backup-loop.sh:ro
+    entrypoint: ["/bin/sh", "/backup-loop.sh"]
+
   # ── pgAdmin (opcional: make tools / docker compose --profile tools up) ──────
   pgadmin:
     image: dpage/pgadmin4:latest
