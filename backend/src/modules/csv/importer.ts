@@ -405,14 +405,19 @@ export async function importCsvFile(
     for (const row of walletsRes.rows as { id: string; name: string }[]) {
       walletIdByName[row.name] = row.id;
     }
-    const fallbackWalletId = walletsRes.rows[0].id;
-
     // Resuelve el wallet_id para una cuenta CSV. Binance usa ACCOUNT_TO_WALLET
     // ('Spot' → 'Binance Spot', etc.); Bitvavo no tiene sub-cuentas, así que el
     // parser ya emite el nombre de wallet literal ('Bitvavo') como account.
     function getWalletId(account: string): string {
       const name = ACCOUNT_TO_WALLET[account] ?? account;
-      return walletIdByName[name] ?? fallbackWalletId;
+      const id = walletIdByName[name];
+      if (!id) {
+        throw new Error(
+          `Falta la wallet de sistema "${name}" (cuenta CSV "${account}"). ` +
+          `Puede que se haya borrado manualmente — créala de nuevo antes de reimportar.`
+        );
+      }
+      return id;
     }
 
     // Resuelve el wallet_id destino para una transferencia interna.
