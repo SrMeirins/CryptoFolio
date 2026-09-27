@@ -180,7 +180,7 @@ CREATE TABLE csv_imports (
   imported_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   row_count     INTEGER NOT NULL DEFAULT 0,
   skipped_count INTEGER NOT NULL DEFAULT 0,
-  exchange      TEXT NOT NULL DEFAULT 'binance',
+  exchange      TEXT NOT NULL DEFAULT 'binance' CHECK (exchange IN ('binance', 'bitvavo')),
   notes         TEXT
 );
 
