@@ -85,6 +85,23 @@ sh-backend: ## Shell dentro del contenedor del backend
 backend-test: ## Correr los tests del backend dentro del contenedor
 	@$(COMPOSE) exec backend npm test
 
+## ── Backup ───────────────────────────────────────────────────────────────────
+backup: ## Backup manual inmediato de Postgres (pg_dump comprimido en ./backups)
+	@mkdir -p backups
+	@ts=$$(date +%Y%m%d_%H%M%S); \
+	 file="backups/cryptotracker_manual_$$ts.sql.gz"; \
+	 $(COMPOSE) exec -T postgres sh -lc 'pg_dump -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' | gzip > "$$file"; \
+	 echo "Backup escrito en $$file ($$(du -h "$$file" | cut -f1))"
+
+restore: ## Restaurar un backup: make restore FILE=backups/cryptotracker_...sql.gz
+	@if [ -z "$(FILE)" ]; then echo "Uso: make restore FILE=backups/archivo.sql.gz"; exit 1; fi
+	@echo "⚠️  Esto SOBREESCRIBE la base de datos actual con $(FILE)."
+	@read -r -p "¿Continuar? [y/N] " r; \
+	 if [ "$$r" = "y" ] || [ "$$r" = "Y" ]; then \
+	   gunzip -c "$(FILE)" | $(COMPOSE) exec -T postgres sh -lc 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'; \
+	   echo "Restauración completada."; \
+	 else echo "Cancelado."; fi
+
 ## ── Limpieza ─────────────────────────────────────────────────────────────────
 clean: ## Bajar el stack y BORRAR volúmenes (datos). Conserva .env.dev
 	@$(COMPOSE) down -v --remove-orphans
