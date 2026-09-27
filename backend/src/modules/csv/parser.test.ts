@@ -8,8 +8,8 @@ import { createHash } from 'crypto';
 const CSV_PATH = process.env.TEST_CSV_PATH || '';
 
 function rawRowsFromCsv(content: Buffer) {
-  const records = parse(content, { columns: true, skip_empty_lines: true, bom: true, trim: true });
-  return records.map((r: Record<string, string>) => ({
+  const records: Record<string, string>[] = parse(content, { columns: true, skip_empty_lines: true, bom: true, trim: true });
+  return records.map((r) => ({
     userId: r['User ID'] ?? '',
     time: new Date('20' + r['Time'].trim().replace(' ', 'T') + 'Z'),
     account: r['Account'] ?? '',

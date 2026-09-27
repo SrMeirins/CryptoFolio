@@ -289,8 +289,11 @@ function RoutedContent() {
 export default function App() {
   useLivePrices()
 
+  // React Router v7: los future flags v7_startTransition/v7_relativeSplatPath
+  // ya eran el comportamiento activado en v6; en v7 son el único
+  // comportamiento y la prop future ya no existe en BrowserRouter.
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter>
       <ToastProvider>
       <div className="flex h-screen overflow-hidden">
         <Sidebar />
