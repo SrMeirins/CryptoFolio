@@ -47,10 +47,19 @@ app.use(helmet({
 }));
 
 // ── CORS ───────────────────────────────────────────────────────────────────
-// En modo Electron el frontend carga desde file://, que envía Origin: null.
-// El backend solo escucha en 127.0.0.1, así que permitir null es seguro.
+// En modo Electron la ventana SIEMPRE carga http://127.0.0.1:<BACKEND_PORT>
+// (nunca file:// — el backend sirve el frontend estático desde el mismo
+// origen, ver el bloque "Frontend estático" más abajo y electron/src/main.ts).
+// Es una petición same-origin real: el navegador puede omitir la cabecera
+// Origin, o enviar exactamente ese valor — nunca otro. Antes se aceptaba
+// cualquier origen sin comprobar nada (cb(null, true) incondicional), lo que
+// habría reflejado un origen arbitrario con credentials:true si el backend
+// llegara a ser alcanzable desde fuera de Electron.
 const corsOrigin = process.env.ELECTRON_MODE === 'true'
-  ? (origin: string | undefined, cb: (e: Error | null, allow?: boolean) => void) => cb(null, true)
+  ? (origin: string | undefined, cb: (e: Error | null, allow?: boolean) => void) => {
+      const ownOrigin = `http://127.0.0.1:${process.env.BACKEND_PORT ?? 3001}`;
+      cb(null, origin === undefined || origin === ownOrigin);
+    }
   : process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
     : ['http://localhost:5173', 'http://127.0.0.1:5173'];
