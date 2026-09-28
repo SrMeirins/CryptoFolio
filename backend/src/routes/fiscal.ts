@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { calcularIrpfAhorro, parseTiposConfig } from '../modules/fiscal/irpf';
 import { getContrapartidaClave } from '../modules/fiscal/contrapartida';
 import { hayRecompra, type Adquisicion } from '../modules/fiscal/antiRecompra';
+import { sanitizeCsvField } from '../modules/csv/csvSafety';
 import { db } from '../db/client';
 import { getHistoricalPriceEur } from '../modules/prices/binance';
 import PDFDocument from 'pdfkit';
@@ -591,12 +592,17 @@ router.get('/:year/export', async (req: Request, res: Response) => {
     lines.push('GANANCIAS Y PERDIDAS PATRIMONIALES - MODELO 100');
     lines.push('Fecha;Denominacion activo transmitido;Clave contrapartida;Descripcion contrapartida;Valor transmision EUR;Gastos transmision EUR;Valor adquisicion EUR;Gastos adquisicion EUR;Ganancia/Perdida EUR');
 
+    // activoTransmitido y contrapartidaDescripcion (esta última incrusta un
+    // símbolo de activo, ver contrapartida.ts) provienen en última instancia
+    // de la columna "Coin" de un CSV de exchange importado, sin whitelist —
+    // se sanean contra CSV Formula Injection antes de escribirlos (ver
+    // csvSafety.ts). El resto de campos son literales o números propios.
     for (const e of fiscalEvents) {
       lines.push([
         e.fecha,
-        e.activoTransmitido,
+        sanitizeCsvField(e.activoTransmitido),
         e.contrapartidaClave,
-        e.contrapartidaDescripcion,
+        sanitizeCsvField(e.contrapartidaDescripcion),
         e.valorTransmisionEur.toFixed(2),
         e.gastosTransmisionEur.toFixed(2),
         e.valorAdquisicionEur.toFixed(2),
@@ -609,7 +615,7 @@ router.get('/:year/export', async (req: Request, res: Response) => {
     lines.push('RENDIMIENTOS DEL CAPITAL MOBILIARIO');
     lines.push('Fecha;Tipo;Activo;Cantidad;Valor EUR');
     for (const r of rendimientos) {
-      lines.push([r.fecha, r.tipo, r.activo, r.cantidad.toFixed(8), r.valorEur.toFixed(2)].join(';'));
+      lines.push([r.fecha, r.tipo, sanitizeCsvField(r.activo), r.cantidad.toFixed(8), r.valorEur.toFixed(2)].join(';'));
     }
 
     res.send('﻿' + lines.join('\n'));
@@ -639,9 +645,9 @@ router.get('/:year/export', async (req: Request, res: Response) => {
       // Gastos adquisición = 0 porque cost_basis ya incluye las comisiones de compra
       lines.push([
         fmtDate(e.fecha),
-        e.activoTransmitido,
+        sanitizeCsvField(e.activoTransmitido),
         e.contrapartidaClave,
-        e.contrapartidaDescripcion,
+        sanitizeCsvField(e.contrapartidaDescripcion),
         eur(valorTxBruto),
         eur(e.gastosTransmisionEur),
         eur(e.valorAdquisicionEur),
