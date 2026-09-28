@@ -745,6 +745,12 @@ async function interpretGroup(
   // Tratamiento: swap/convert — se consume el lote de ETH y se abre lote de BETH
   // al precio de mercado del día. El G/P se calcula como en cualquier permuta cripto↔cripto.
   if (firstOp === 'ETH 2.0 Staking') {
+    // 1 fila de entrada + 1 de salida esperadas. Una 3ª (p. ej. fee) hoy se
+    // perdería/confundiría en silencio — se prefiere fallar explícito
+    // (mismo criterio que interpretConvert/interpretSmallAssetsExchange).
+    if (group.length > 2) {
+      throw new Error(`ETH 2.0 Staking con ${group.length} filas (esperadas 2) en ${timestamp.toISOString()} — revisión manual necesaria, posible fee no capturado`);
+    }
     const outRow = group.find(r => r.change < 0); // ETH saliente
     const inRow  = group.find(r => r.change > 0); // BETH entrante
     if (!outRow || !inRow) {
@@ -770,6 +776,9 @@ async function interpretGroup(
   // ETH 2.0 Staking Withdrawals: BETH → ETH (1:1, mismo timestamp)
   // Tratamiento: swap/convert inverso — se consumen lotes de BETH y se abre lote de ETH.
   if (firstOp === 'ETH 2.0 Staking Withdrawals') {
+    if (group.length > 2) {
+      throw new Error(`ETH 2.0 Staking Withdrawals con ${group.length} filas (esperadas 2) en ${timestamp.toISOString()} — revisión manual necesaria, posible fee no capturado`);
+    }
     const outRow = group.find(r => r.change < 0); // BETH saliente
     const inRow  = group.find(r => r.change > 0); // ETH entrante
     if (!outRow || !inRow) {
@@ -940,6 +949,14 @@ function interpretTransactionRelated(
 function interpretConvert(
   group: RawCsvRow[], hashes: string[], timestamp: Date, account: string
 ): ParsedTransaction {
+  // Se asume siempre 1 fila de entrada + 1 de salida. Si Binance añadiera una
+  // 3ª fila (p. ej. un fee en un activo aparte) hoy se perdería o confundiría
+  // en silencio — se prefiere fallar explícito y forzar revisión manual
+  // (no hay datos reales hoy que ejerciten este caso, ver auditoría).
+  if (group.length > 2) {
+    throw new Error(`Binance Convert con ${group.length} filas (esperadas 2) en ${timestamp.toISOString()} — revisión manual necesaria, posible fee no capturado`);
+  }
+
   const inRow  = group.find((r) => r.change > 0);
   const outRow = group.find((r) => r.change < 0);
 
@@ -1083,6 +1100,13 @@ function interpretSmallAssetsExchange(
   const results: ParsedTransaction[] = [];
 
   for (const [, rows] of byRemark) {
+    // Cada remark debe tener exactamente 1 fila de entrada + 1 de salida. Si
+    // hubiera una 3ª (p. ej. un fee), hoy se perdería/confundiría en silencio
+    // — se prefiere fallar explícito (ver interpretConvert, mismo criterio).
+    if (rows.length > 2) {
+      throw new Error(`Small Assets Exchange con ${rows.length} filas (esperadas 2) en ${timestamp.toISOString()} — revisión manual necesaria, posible fee no capturado`);
+    }
+
     const inRow  = rows.find((r) => r.change > 0);
     const outRow = rows.find((r) => r.change < 0);
 
