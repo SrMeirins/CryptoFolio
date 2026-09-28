@@ -254,26 +254,7 @@ Abre el archivo `.env` con cualquier editor de texto (Notepad, VSCode...) y camb
 # Elige una contraseña para la base de datos (sin espacios ni comillas)
 POSTGRES_PASSWORD=MiContraseñaSegura123
 DATABASE_URL=postgresql://cryptotracker:MiContraseñaSegura123@postgres:5432/cryptotracker
-
-# Genera una clave aleatoria para JWT (ver instrucciones abajo)
-JWT_SECRET=pega_aqui_la_clave_generada
 ```
-
-**Cómo generar el JWT_SECRET:**
-
-*macOS / Linux:*
-
-```bash
-openssl rand -hex 32
-```
-
-*Windows (PowerShell):*
-
-```powershell
-[System.Convert]::ToHexString([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLower()
-```
-
-Copia el resultado y pégalo como valor de `JWT_SECRET` en el `.env`.
 
 ---
 
@@ -335,7 +316,6 @@ Todas las opciones se configuran en el archivo `.env`:
 |---|---|---|
 | `POSTGRES_PASSWORD` | Contraseña de la base de datos | *(obligatorio cambiarlo)* |
 | `DATABASE_URL` | URL de conexión a PostgreSQL | *(debe coincidir con la contraseña)* |
-| `JWT_SECRET` | Clave de seguridad interna | *(obligatorio generarla)* |
 | `BACKEND_PORT` | Puerto del backend | `3001` |
 | `PRICE_REFRESH_INTERVAL_MS` | Intervalo de refresco de precios (ms) | `60000` (1 min) |
 | `COINGECKO_API_KEY` | API key de CoinGecko Pro (opcional) | vacío |
