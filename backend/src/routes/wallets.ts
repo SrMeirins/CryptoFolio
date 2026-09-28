@@ -1,10 +1,34 @@
 import { Router, Request, Response } from 'express';
+import { z, ZodError } from 'zod';
 import { db } from '../db/client';
 import { syncWalletAddress } from '../modules/walletSync/walletSync';
 import { encryptApiKey } from '../modules/walletSync/apiKeyCrypto';
 import { exceedsMaxLength, MAX_LENGTH_LONG, MAX_LENGTH_SHORT } from '../modules/validation/textLength';
 
 const router = Router();
+
+// Construye un mensaje 400 legible en castellano a partir de los issues de
+// Zod, sin filtrar detalles internos sensibles.
+function zodErrorMessage(error: ZodError): string {
+  return error.issues.map((issue) => `${issue.path.join('.') || 'body'}: ${issue.message}`).join('; ');
+}
+
+const walletIdParamSchema = z.object({
+  id: z.string().uuid('El id de la wallet debe ser un UUID válido'),
+});
+
+// POST /:id/addresses: formaliza con Zod las reglas ya existentes (network_id
+// o custom_network requeridos), valida custom_explorer_url como URL real, e
+// incorpora los mismos límites de longitud que el resto del fichero.
+const addressBodySchema = z.object({
+  network_id:          z.string().uuid('network_id debe ser un UUID válido').nullish(),
+  custom_network:      z.string().min(1).max(MAX_LENGTH_SHORT, `custom_network no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
+  custom_explorer_url: z.string().url('custom_explorer_url debe ser una URL válida').max(MAX_LENGTH_LONG, `custom_explorer_url no puede superar ${MAX_LENGTH_LONG} caracteres`).nullish(),
+  address:             z.string().nullish(),
+}).refine((data) => !!data.network_id || !!data.custom_network, {
+  message: 'network_id o custom_network son requeridos',
+  path: ['network_id'],
+});
 
 // ── GET /api/wallets ───────────────────────────────────────────────────────
 router.get('/', async (_req: Request, res: Response) => {
@@ -145,7 +169,12 @@ router.put('/:id', async (req: Request, res: Response) => {
 
 // ── DELETE /api/wallets/:id ────────────────────────────────────────────────
 router.delete('/:id', async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const paramsValidation = walletIdParamSchema.safeParse(req.params);
+  if (!paramsValidation.success) {
+    res.status(400).json({ error: `Datos inválidos: ${zodErrorMessage(paramsValidation.error)}` });
+    return;
+  }
+  const { id } = paramsValidation.data;
 
   const wallet = await db.query('SELECT is_system FROM wallets WHERE id = $1', [id]);
   if (wallet.rows.length === 0) {
@@ -164,20 +193,13 @@ router.delete('/:id', async (req: Request, res: Response) => {
 // ── POST /api/wallets/:id/addresses ───────────────────────────────────────
 router.post('/:id/addresses', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { network_id, custom_network, custom_explorer_url, address } = req.body;
 
-  if (!network_id && !custom_network) {
-    res.status(400).json({ error: 'network_id o custom_network son requeridos' });
+  const validation = addressBodySchema.safeParse(req.body);
+  if (!validation.success) {
+    res.status(400).json({ error: `Datos inválidos: ${zodErrorMessage(validation.error)}` });
     return;
   }
-  if (exceedsMaxLength(custom_network, MAX_LENGTH_SHORT)) {
-    res.status(400).json({ error: `custom_network no puede superar ${MAX_LENGTH_SHORT} caracteres` });
-    return;
-  }
-  if (exceedsMaxLength(custom_explorer_url, MAX_LENGTH_LONG)) {
-    res.status(400).json({ error: `custom_explorer_url no puede superar ${MAX_LENGTH_LONG} caracteres` });
-    return;
-  }
+  const { network_id, custom_network, custom_explorer_url, address } = validation.data;
 
   const result = await db.query(
     `INSERT INTO wallet_addresses (wallet_id, network_id, custom_network, custom_explorer_url, address)

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { z, ZodError } from 'zod';
 import { calcularIrpfAhorro, parseTiposConfig } from '../modules/fiscal/irpf';
 import { getContrapartidaClave } from '../modules/fiscal/contrapartida';
 import { hayRecompra, type Adquisicion } from '../modules/fiscal/antiRecompra';
@@ -9,6 +10,19 @@ import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
 
 const router = Router();
+
+// Construye un mensaje 400 legible en castellano a partir de los issues de
+// Zod, sin filtrar detalles internos sensibles.
+function zodErrorMessage(error: ZodError): string {
+  return error.issues.map((issue) => `${issue.path.join('.') || 'body'}: ${issue.message}`).join('; ');
+}
+
+// Schema equivalente a la validación manual `typeof` que sustituye.
+const simulateSaleSchema = z.object({
+  asset:    z.string().min(1, 'asset es requerido'),
+  quantity: z.number().positive('quantity debe ser un número mayor que 0'),
+  priceEur: z.number().nonnegative('priceEur debe ser un número mayor o igual que 0'),
+});
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 async function getUmbral721(): Promise<number> {
@@ -1007,16 +1021,12 @@ router.get('/:year/export', async (req: Request, res: Response) => {
 // Simulación pura FIFO: no escribe nada en DB. Devuelve impacto fiscal de una
 // venta hipotética. Usa los lotes abiertos ordenados FIFO (oldest first).
 router.post('/simulate-sale', async (req: Request, res: Response) => {
-  const { asset, quantity, priceEur } = req.body as {
-    asset?: string;
-    quantity?: number;
-    priceEur?: number;
-  };
-
-  if (!asset || typeof quantity !== 'number' || quantity <= 0 || typeof priceEur !== 'number' || priceEur < 0) {
-    res.status(400).json({ error: 'Se requieren: asset (string), quantity (number > 0), priceEur (number >= 0)' });
+  const validation = simulateSaleSchema.safeParse(req.body);
+  if (!validation.success) {
+    res.status(400).json({ error: `Datos inválidos: ${zodErrorMessage(validation.error)}` });
     return;
   }
+  const { asset, quantity, priceEur } = validation.data;
 
   const lotsRes = await db.query(
     `SELECT

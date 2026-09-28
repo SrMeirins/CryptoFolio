@@ -1,10 +1,43 @@
 import { Router, Request, Response } from 'express';
+import { z, ZodError } from 'zod';
 import { db } from '../db/client';
 import { runFifoEngine } from '../modules/fifo/engine';
 import { getHistoricalPriceEur } from '../modules/prices/binance';
-import { exceedsMaxLength, MAX_LENGTH_LONG } from '../modules/validation/textLength';
+import { MAX_LENGTH_LONG } from '../modules/validation/textLength';
 
 const router = Router();
+
+// Construye un mensaje 400 legible en castellano a partir de los issues de
+// Zod, sin filtrar detalles internos sensibles (solo nombres de campo y
+// mensajes de validación).
+function zodErrorMessage(error: ZodError): string {
+  return error.issues.map((issue) => `${issue.path.join('.') || 'body'}: ${issue.message}`).join('; ');
+}
+
+// Campos de entrada de una transacción manual (POST /manual y PUT /:id).
+// Los campos numéricos se coaccionan con z.coerce.number() para aceptar tanto
+// number como string numérico, pero RECHAZAN cualquier valor no numérico en
+// vez de convertirlo silenciosamente a 0 (bug detectado en auditoría).
+const transactionFieldsSchema = z.object({
+  operationType:        z.string().min(1, 'operationType es requerido'),
+  asset:                z.string().nullish(),
+  amount:               z.coerce.number().nullish(),
+  amountNet:            z.coerce.number().nullish(),
+  costAsset:            z.string().nullish(),
+  costAmount:           z.coerce.number().nullish(),
+  pricePerUnit:         z.coerce.number().nullish(),
+  feeAsset:             z.string().nullish(),
+  feeAmount:            z.coerce.number().nullish(),
+  wallet_id:            z.string().nullish(),
+  destinationWalletId:  z.string().nullish(),
+  timestamp:            z.string().min(1, 'timestamp es requerido'),
+  notes:                z.string().max(MAX_LENGTH_LONG, `notes no puede superar ${MAX_LENGTH_LONG} caracteres`).nullish(),
+});
+
+// PUT /:id exige wallet_id igual que antes.
+const transactionUpdateSchema = transactionFieldsSchema.extend({
+  wallet_id: z.string().min(1, 'wallet_id es requerido'),
+});
 
 // Ops que no generan precio histórico (coste 0 por ley)
 const ZERO_COST_OPS = new Set(['FORK']);
@@ -158,12 +191,17 @@ router.post('/manual/preview', async (req: Request, res: Response) => {
 
 // ── POST /api/transactions/manual ─────────────────────────────────────────
 router.post('/manual', async (req: Request, res: Response) => {
+  const validation = transactionFieldsSchema.safeParse(req.body);
+  if (!validation.success) {
+    res.status(400).json({ error: `Datos inválidos: ${zodErrorMessage(validation.error)}` });
+    return;
+  }
   const {
     operationType, asset, amount, amountNet,
     costAsset, costAmount, pricePerUnit,
     feeAsset, feeAmount,
     wallet_id, destinationWalletId, timestamp, notes,
-  } = req.body;
+  } = validation.data;
 
   const isFeeOp   = operationType === 'FEE_NETWORK' || operationType === 'FEE_EXCHANGE';
   const isIgnored = operationType === 'IGNORED';
@@ -183,10 +221,6 @@ router.post('/manual', async (req: Request, res: Response) => {
   }
   if (isFeeOp && !finalAsset) {
     res.status(400).json({ error: 'fee_asset es requerido para operaciones de fee' });
-    return;
-  }
-  if (exceedsMaxLength(notes, MAX_LENGTH_LONG)) {
-    res.status(400).json({ error: `notes no puede superar ${MAX_LENGTH_LONG} caracteres` });
     return;
   }
 
@@ -227,7 +261,10 @@ router.post('/manual', async (req: Request, res: Response) => {
   }
 
   // Precio histórico (FORK = 0 por ley AEAT)
-  let finalPricePerUnit: number | null = isFork ? 0 : (pricePerUnit ? parseFloat(pricePerUnit) : null);
+  // pricePerUnit/costAmount/amount ya llegan coaccionados a number|null por
+  // el schema de Zod (transactionFieldsSchema) — parseFloat ya no hace falta
+  // (y rompería el typecheck: espera string, no number).
+  let finalPricePerUnit: number | null = isFork ? 0 : (pricePerUnit ?? null);
   if (!isFork && !finalPricePerUnit && finalAsset) {
     try { finalPricePerUnit = await getHistoricalPriceEur(finalAsset, new Date(timestamp)); } catch { /* dejar null */ }
   }
@@ -238,14 +275,14 @@ router.post('/manual', async (req: Request, res: Response) => {
   );
 
   // costAmount: FORK = 0, resto normal
-  let finalCostAmount: number | null = isFork ? 0 : (costAmount ? parseFloat(costAmount) : null);
+  let finalCostAmount: number | null = isFork ? 0 : (costAmount ?? null);
   if (!isFork && !finalCostAmount && finalPricePerUnit && finalAmount) {
-    finalCostAmount = parseFloat(finalAmount) * finalPricePerUnit;
+    finalCostAmount = finalAmount * finalPricePerUnit;
   }
 
   const dbOperationType = mapCatalogTypeToDb(operationType);
   const dbAsset  = (finalAsset ?? 'OTHER').toString().toUpperCase();
-  const dbAmount = parseFloat(finalAmount ?? '0') || 0;
+  const dbAmount = finalAmount ?? 0;
 
   await db.query(
     `INSERT INTO transactions (
@@ -262,12 +299,12 @@ router.post('/manual', async (req: Request, res: Response) => {
     [
       dbOperationType, new Date(timestamp),
       dbAsset, dbAmount,
-      parseFloat(amountNet ?? finalAmount ?? '0') || 0,
+      amountNet ?? finalAmount ?? 0,
       resolvedCostAsset,
       finalCostAmount,
       finalPricePerUnit,
       feeAsset  ?? null,
-      feeAmount ? parseFloat(feeAmount) : null,
+      feeAmount ?? null,
       resolvedWalletId,
       destinationWalletId ?? null,
       notes ?? null,
@@ -286,12 +323,18 @@ router.post('/manual', async (req: Request, res: Response) => {
 // ── PUT /api/transactions/:id (editar transacción manual) ─────────────────
 router.put('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
+
+  const validation = transactionUpdateSchema.safeParse(req.body);
+  if (!validation.success) {
+    res.status(400).json({ error: `Datos inválidos: ${zodErrorMessage(validation.error)}` });
+    return;
+  }
   const {
     operationType, asset, amount, amountNet,
     costAsset, costAmount, pricePerUnit,
     feeAsset, feeAmount,
     wallet_id, destinationWalletId, timestamp, notes,
-  } = req.body;
+  } = validation.data;
 
   const tx = await db.query('SELECT id FROM transactions WHERE id = $1', [id]);
   if (tx.rows.length === 0) {
@@ -319,12 +362,10 @@ router.put('/:id', async (req: Request, res: Response) => {
     res.status(400).json({ error: 'fee_asset es requerido para operaciones de fee' });
     return;
   }
-  if (exceedsMaxLength(notes, MAX_LENGTH_LONG)) {
-    res.status(400).json({ error: `notes no puede superar ${MAX_LENGTH_LONG} caracteres` });
-    return;
-  }
 
-  let finalPricePerUnit: number | null = isFork ? 0 : (pricePerUnit ? parseFloat(pricePerUnit) : null);
+  // amount/costAmount/pricePerUnit ya llegan coaccionados a number|null por
+  // el schema de Zod — parseFloat ya no hace falta (rompería el typecheck).
+  let finalPricePerUnit: number | null = isFork ? 0 : (pricePerUnit ?? null);
   if (!isFork && !finalPricePerUnit && finalAsset) {
     try { finalPricePerUnit = await getHistoricalPriceEur(finalAsset, new Date(timestamp)); } catch { /* ignorar */ }
   }
@@ -332,9 +373,9 @@ router.put('/:id', async (req: Request, res: Response) => {
   const resolvedCostAsset = costAsset ?? (
     ['BUY_FIAT', 'SELL_FIAT', 'DEPOSIT_FIAT', 'WITHDRAW_FIAT'].includes(operationType) ? 'EUR' : null
   );
-  let finalCostAmount: number | null = isFork ? 0 : (costAmount ? parseFloat(costAmount) : null);
+  let finalCostAmount: number | null = isFork ? 0 : (costAmount ?? null);
   if (!isFork && !finalCostAmount && finalPricePerUnit) {
-    finalCostAmount = parseFloat(finalAmount) * finalPricePerUnit;
+    finalCostAmount = (finalAmount ?? 0) * finalPricePerUnit;
   }
 
   const dbOpType = mapCatalogTypeToDb(operationType);
@@ -362,11 +403,11 @@ router.put('/:id', async (req: Request, res: Response) => {
     [
       dbOpType, new Date(timestamp),
       finalAsset ? finalAsset.toUpperCase() : null,
-      finalAmount ? parseFloat(finalAmount) : null,
-      finalAmount ? parseFloat(amountNet ?? finalAmount) : null,
+      finalAmount ?? null,
+      finalAmount ? (amountNet ?? finalAmount) : null,
       resolvedCostAsset, finalCostAmount, finalPricePerUnit,
       feeAsset  ?? null,
-      feeAmount ? parseFloat(feeAmount) : null,
+      feeAmount ?? null,
       wallet_id,
       destinationWalletId ?? null,
       notes ?? null,
