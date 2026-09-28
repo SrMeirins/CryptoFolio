@@ -17,7 +17,7 @@ ENV_SH      := ./scripts/dev-env.sh
 COMPOSE     := docker compose --env-file $(DEV_ENV)
 
 .DEFAULT_GOAL := help
-.PHONY: help env dev dev-clean rebuild restart tools down ps logs logs-backend logs-frontend psql sh-backend backend-test urls clean nuke
+.PHONY: help env dev dev-clean rebuild restart tools prod down ps logs logs-backend logs-frontend psql sh-backend backend-test urls clean nuke
 
 ## ── Ayuda ────────────────────────────────────────────────────────────────────
 help: ## Mostrar esta ayuda
@@ -50,7 +50,12 @@ restart: ## Reiniciar contenedores (sin reconstruir ni tocar datos)
 tools: ## Añadir pgAdmin (perfil 'tools') al stack ya levantado
 	@$(ENV_SH)
 	@$(COMPOSE) --profile tools up -d
-	@echo "pgAdmin → http://$$( $(COMPOSE) --profile tools port pgadmin 80 2>/dev/null )  (email admin@cryptotracker.local)"
+	@echo "pgAdmin → http://$$( $(COMPOSE) --profile tools port pgadmin 8080 2>/dev/null )  (email admin@cryptofolio.app)"
+
+prod: ## Añadir el frontend en modo producción (perfil 'prod') al stack ya levantado
+	@$(ENV_SH)
+	@$(COMPOSE) --profile prod up -d --build
+	@echo "Frontend (prod) → http://$$( $(COMPOSE) --profile prod port frontend-prod 8080 2>/dev/null )"
 
 down: ## Parar el stack (conserva datos y .env.dev)
 	@$(COMPOSE) down
