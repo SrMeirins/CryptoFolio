@@ -28,6 +28,7 @@ FRESH=0
 
 # Bases de puertos en rango poco transitado (evita 3000/3001/5173/5432/8080/5050)
 BASE_FRONTEND=45173
+BASE_FRONTEND_PROD=45180
 BASE_BACKEND=43001
 BASE_PG=45432
 BASE_PGADMIN=45050
@@ -117,6 +118,7 @@ SUBSCAN_API_KEY="$(read_key "$ENV_USER" SUBSCAN_API_KEY || true)"
 # ── Puertos host libres ───────────────────────────────────────────────────────
 log "Asignando puertos host libres..."
 FRONTEND_HOST_PORT="$(pick_free_port "$BASE_FRONTEND")"
+FRONTEND_PROD_HOST_PORT="$(pick_free_port "$BASE_FRONTEND_PROD")"
 BACKEND_HOST_PORT="$(pick_free_port "$BASE_BACKEND")"
 PG_HOST_PORT="$(pick_free_port "$BASE_PG")"
 PGADMIN_HOST_PORT="$(pick_free_port "$BASE_PGADMIN")"
@@ -150,6 +152,7 @@ SUBSCAN_API_KEY=${SUBSCAN_API_KEY}
 
 # Puertos host (loopback) auto-asignados
 FRONTEND_HOST_PORT=${FRONTEND_HOST_PORT}
+FRONTEND_PROD_HOST_PORT=${FRONTEND_PROD_HOST_PORT}
 BACKEND_HOST_PORT=${BACKEND_HOST_PORT}
 PG_HOST_PORT=${PG_HOST_PORT}
 PGADMIN_HOST_PORT=${PGADMIN_HOST_PORT}

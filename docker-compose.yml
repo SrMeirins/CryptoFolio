@@ -135,6 +135,38 @@ services:
     cap_drop:
       - ALL
 
+  # ── Frontend en modo producción (opcional: docker compose --profile prod up) ─
+  # Build real con `vite build` servido estático por nginx — sin dev server
+  # expuesto. Alternativa a `frontend` para cuando el stack de Docker se
+  # despliega en un servidor accesible por red en vez de solo en local.
+  # No sustituye a `frontend`: conviven, cada uno con su puerto host.
+  frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    profiles:
+      - prod
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FRONTEND_PROD_HOST_PORT:-45180}:8080"
+    networks:
+      - frontend-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      # nginx necesita escribir su pid y cachés temporales de proxy/body;
+      # con la imagen no-root y rootfs de solo lectura, tmpfs es suficiente
+      # y evita dar escritura real en el sistema de ficheros de la imagen.
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+
   # ── Backup automático de PostgreSQL ─────────────────────────────────────────
   # pg_dump comprimido a diario mientras el stack esté levantado, con retención
   # por cantidad de ficheros. Ver scripts/backup-loop.sh. `make backup` hace un

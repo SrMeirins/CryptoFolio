@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Dockerfile.prod — build de producción del frontend (servicio opcional
+# frontend-prod, perfil 'prod' de docker-compose). Alternativa dura al
+# Dockerfile de desarrollo (Vite dev server): aquí se compila una vez con
+# `vite build` y se sirve estático con nginx, sin dev server expuesto.
+#
+# Nota: la distribución real de la app (Electron, ver electron-builder.config.js)
+# ya usaba este mismo build de producción (frontend/dist) sin depender de
+# Docker en absoluto. Este Dockerfile existe para el caso en que el stack de
+# Docker mismo se despliegue en un servidor y se acceda por navegador.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Etapa 1: build ───────────────────────────────────────────────────────────
+FROM node:20-alpine AS build
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# ── Etapa 2: servido estático ────────────────────────────────────────────────
+# nginx-unprivileged (mantenida por NGINX Inc.): corre como no-root de
+# fábrica (escucha en 8080, no en 80) — no necesita ningún cap_add para
+# arrancar, a diferencia de la imagen nginx oficial normal.
+FROM nginxinc/nginx-unprivileged:1.31.6-alpine3.24
+
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+# FUERA de conf.d/: nginx.conf de la imagen base ya incluye conf.d/*.conf
+# automáticamente — si este fichero viviera ahí, se cargaría dos veces
+# (una por el wildcard, otra por el include explícito de nginx.conf).
+COPY security-headers.conf /etc/nginx/security-headers.conf
+
+EXPOSE 8080
