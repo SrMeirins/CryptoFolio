@@ -13,6 +13,7 @@ import { ManualTxModal } from '../components/ManualTxModal'
 import { DateRangePicker } from '../components/DateRangePicker'
 import { formatEur, formatPrice } from '../utils/format'
 import { OP_META } from '../constants/operations'
+import { buildHistoryCsv } from './history/buildHistoryCsv'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 const CARD_META = {
@@ -708,18 +709,7 @@ export function History() {
   }
 
   function exportCsv() {
-    const rows = [
-      ['Fecha','Tipo','Activo','Importe','Coste','Activo coste','Precio unitario','Fee','Activo fee','Wallet','Cuenta','Manual','Notas'].join(';'),
-      ...transactions.map(tx => [
-        new Date(tx.timestamp).toISOString().slice(0, 16).replace('T', ' '),
-        tx.operation_type, tx.asset, tx.amount_net,
-        tx.cost_amount ?? '', tx.cost_asset ?? '', tx.price_per_unit ?? '',
-        tx.fee_amount ?? '', tx.fee_asset ?? '',
-        tx.wallet_name, tx.account ?? '',
-        tx.manually_added ? 'Sí' : 'No',
-        (tx.notes ?? '').replace(/;/g, ','),
-      ].join(';'))
-    ].join('\n')
+    const rows = buildHistoryCsv(transactions)
     const blob = new Blob(['﻿' + rows], { type: 'text/csv;charset=utf-8' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')

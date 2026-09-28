@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { db } from '../db/client';
 import { syncWalletAddress } from '../modules/walletSync/walletSync';
 import { encryptApiKey } from '../modules/walletSync/apiKeyCrypto';
+import { exceedsMaxLength, MAX_LENGTH_LONG, MAX_LENGTH_SHORT } from '../modules/validation/textLength';
 
 const router = Router();
 
@@ -98,6 +99,14 @@ router.post('/', async (req: Request, res: Response) => {
     res.status(400).json({ error: 'name y type son requeridos' });
     return;
   }
+  if (exceedsMaxLength(name, MAX_LENGTH_SHORT)) {
+    res.status(400).json({ error: `name no puede superar ${MAX_LENGTH_SHORT} caracteres` });
+    return;
+  }
+  if (exceedsMaxLength(notes, MAX_LENGTH_LONG)) {
+    res.status(400).json({ error: `notes no puede superar ${MAX_LENGTH_LONG} caracteres` });
+    return;
+  }
 
   const result = await db.query(
     `INSERT INTO wallets (name, type, color, notes)
@@ -116,6 +125,14 @@ router.put('/:id', async (req: Request, res: Response) => {
   const wallet = await db.query('SELECT is_system FROM wallets WHERE id = $1', [id]);
   if (wallet.rows.length === 0) {
     res.status(404).json({ error: 'Wallet no encontrada' });
+    return;
+  }
+  if (exceedsMaxLength(name, MAX_LENGTH_SHORT)) {
+    res.status(400).json({ error: `name no puede superar ${MAX_LENGTH_SHORT} caracteres` });
+    return;
+  }
+  if (exceedsMaxLength(notes, MAX_LENGTH_LONG)) {
+    res.status(400).json({ error: `notes no puede superar ${MAX_LENGTH_LONG} caracteres` });
     return;
   }
 
@@ -153,6 +170,14 @@ router.post('/:id/addresses', async (req: Request, res: Response) => {
     res.status(400).json({ error: 'network_id o custom_network son requeridos' });
     return;
   }
+  if (exceedsMaxLength(custom_network, MAX_LENGTH_SHORT)) {
+    res.status(400).json({ error: `custom_network no puede superar ${MAX_LENGTH_SHORT} caracteres` });
+    return;
+  }
+  if (exceedsMaxLength(custom_explorer_url, MAX_LENGTH_LONG)) {
+    res.status(400).json({ error: `custom_explorer_url no puede superar ${MAX_LENGTH_LONG} caracteres` });
+    return;
+  }
 
   const result = await db.query(
     `INSERT INTO wallet_addresses (wallet_id, network_id, custom_network, custom_explorer_url, address)
@@ -167,6 +192,15 @@ router.post('/:id/addresses', async (req: Request, res: Response) => {
 router.put('/:id/addresses/:addressId', async (req: Request, res: Response) => {
   const { addressId } = req.params;
   const { network_id, custom_network, custom_explorer_url, address } = req.body;
+
+  if (exceedsMaxLength(custom_network, MAX_LENGTH_SHORT)) {
+    res.status(400).json({ error: `custom_network no puede superar ${MAX_LENGTH_SHORT} caracteres` });
+    return;
+  }
+  if (exceedsMaxLength(custom_explorer_url, MAX_LENGTH_LONG)) {
+    res.status(400).json({ error: `custom_explorer_url no puede superar ${MAX_LENGTH_LONG} caracteres` });
+    return;
+  }
 
   await db.query(
     `UPDATE wallet_addresses
@@ -237,6 +271,10 @@ router.post('/networks', async (req: Request, res: Response) => {
 
   if (!name || !native_asset) {
     res.status(400).json({ error: 'name y native_asset son requeridos' });
+    return;
+  }
+  if (exceedsMaxLength(name, MAX_LENGTH_SHORT)) {
+    res.status(400).json({ error: `name no puede superar ${MAX_LENGTH_SHORT} caracteres` });
     return;
   }
 

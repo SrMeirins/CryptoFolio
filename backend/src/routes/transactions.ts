@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { db } from '../db/client';
 import { runFifoEngine } from '../modules/fifo/engine';
 import { getHistoricalPriceEur } from '../modules/prices/binance';
+import { exceedsMaxLength, MAX_LENGTH_LONG } from '../modules/validation/textLength';
 
 const router = Router();
 
@@ -184,6 +185,10 @@ router.post('/manual', async (req: Request, res: Response) => {
     res.status(400).json({ error: 'fee_asset es requerido para operaciones de fee' });
     return;
   }
+  if (exceedsMaxLength(notes, MAX_LENGTH_LONG)) {
+    res.status(400).json({ error: `notes no puede superar ${MAX_LENGTH_LONG} caracteres` });
+    return;
+  }
 
   // Resolver wallet_id
   let resolvedWalletId = wallet_id;
@@ -312,6 +317,10 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
   if (isFeeOp && !finalAsset) {
     res.status(400).json({ error: 'fee_asset es requerido para operaciones de fee' });
+    return;
+  }
+  if (exceedsMaxLength(notes, MAX_LENGTH_LONG)) {
+    res.status(400).json({ error: `notes no puede superar ${MAX_LENGTH_LONG} caracteres` });
     return;
   }
 
