@@ -180,7 +180,11 @@ router.post('/assets/:symbol/detect', async (req: Request, res: Response) => {
     }
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    // Nunca se filtra err.message al cliente (puede incluir detalles internos
+    // del driver de Postgres o del esquema) — se loguea completo en servidor,
+    // mismo criterio que el error handler global de app.ts.
+    console.error('[ERROR] /assets/:symbol/detect', (err as Error).stack ?? err);
+    res.status(500).json({ error: 'Error al detectar el activo' });
   }
 });
 
@@ -207,7 +211,8 @@ router.post('/transactions/fix-stale-withdrawals', async (_req: Request, res: Re
     );
     res.json({ fixed: result.rows.length, records: result.rows });
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    console.error('[ERROR] /transactions/fix-stale-withdrawals', (err as Error).stack ?? err);
+    res.status(500).json({ error: 'Error al corregir los retiros pendientes' });
   }
 });
 
@@ -226,7 +231,8 @@ router.get('/coingecko/search', async (req: Request, res: Response) => {
     }
     res.json({ found: true, coingecko_id: result.id, price_eur: result.price_eur });
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    console.error('[ERROR] /coingecko/search', (err as Error).stack ?? err);
+    res.status(500).json({ error: 'Error al buscar en CoinGecko' });
   }
 });
 
@@ -242,7 +248,8 @@ router.get('/coingecko/test', async (req: Request, res: Response) => {
     const price = await verifyCoinGeckoId(id);
     res.json({ id, price_eur: price, valid: price !== null });
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    console.error('[ERROR] /coingecko/test', (err as Error).stack ?? err);
+    res.status(500).json({ error: 'Error al verificar el coingecko_id' });
   }
 });
 
@@ -279,7 +286,8 @@ router.put('/assets/:symbol/coingecko-id', async (req: Request, res: Response) =
 
     res.json({ symbol, coingecko_id, price_eur: price });
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    console.error('[ERROR] /assets/:symbol/coingecko-id', (err as Error).stack ?? err);
+    res.status(500).json({ error: 'Error al guardar el coingecko_id' });
   }
 });
 
