@@ -90,8 +90,6 @@ services:
       BLOCKFROST_API_KEY: ${BLOCKFROST_API_KEY:-}
       SUBSCAN_API_KEY: ${SUBSCAN_API_KEY:-}
       PRICE_REFRESH_INTERVAL_MS: ${PRICE_REFRESH_INTERVAL_MS:-60000}
-      # Fallback SOLO-dev (loopback). `make dev` inyecta uno aleatorio vía .env.dev.
-      JWT_SECRET: ${JWT_SECRET:-dev_only_insecure_secret_change_me_0123456789}
     command: ["npx", "ts-node-dev", "--respawn", "--transpile-only", "--poll", "src/index.ts"]
     volumes:
       # Hot reload: ts-node-dev lee directamente src/ (no usa dist/)
