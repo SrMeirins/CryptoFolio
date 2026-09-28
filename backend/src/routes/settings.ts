@@ -4,6 +4,7 @@ import { autoDetectPair, testPair } from '../modules/prices/pairDetector';
 import { runFifoEngine } from '../modules/fifo/engine';
 import { getHistoricalPriceEur } from '../modules/prices/binance';
 import { updateCoinGeckoId, verifyCoinGeckoId } from '../modules/prices/coingecko';
+import { exceedsMaxLength, MAX_LENGTH_SHORT } from '../modules/validation/textLength';
 
 const router = Router();
 
@@ -32,6 +33,10 @@ router.post('/assets', async (req: Request, res: Response) => {
 
   if (!symbol) {
     res.status(400).json({ error: 'El simbolo es requerido' });
+    return;
+  }
+  if (exceedsMaxLength(name, MAX_LENGTH_SHORT)) {
+    res.status(400).json({ error: `name no puede superar ${MAX_LENGTH_SHORT} caracteres` });
     return;
   }
 
@@ -76,6 +81,11 @@ router.post('/assets', async (req: Request, res: Response) => {
 router.put('/assets/:symbol', async (req: Request, res: Response) => {
   const { symbol } = req.params;
   const { name, binanceEurPair, binanceUsdtPair, binanceBtcPair, isStablecoin } = req.body;
+
+  if (exceedsMaxLength(name, MAX_LENGTH_SHORT)) {
+    res.status(400).json({ error: `name no puede superar ${MAX_LENGTH_SHORT} caracteres` });
+    return;
+  }
 
   let priceSource = 'unknown';
   if (isStablecoin) priceSource = 'fiat';
