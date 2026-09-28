@@ -1,12 +1,39 @@
 import { Router, Request, Response } from 'express';
+import { z, ZodError } from 'zod';
 import { db } from '../db/client';
 import { autoDetectPair, testPair } from '../modules/prices/pairDetector';
 import { runFifoEngine } from '../modules/fifo/engine';
 import { getHistoricalPriceEur } from '../modules/prices/binance';
 import { updateCoinGeckoId, verifyCoinGeckoId } from '../modules/prices/coingecko';
-import { exceedsMaxLength, MAX_LENGTH_SHORT } from '../modules/validation/textLength';
+import { MAX_LENGTH_SHORT } from '../modules/validation/textLength';
 
 const router = Router();
+
+// Construye un mensaje 400 legible en castellano a partir de los issues de
+// Zod, sin filtrar detalles internos sensibles.
+function zodErrorMessage(error: ZodError): string {
+  return error.issues.map((issue) => `${issue.path.join('.') || 'body'}: ${issue.message}`).join('; ');
+}
+
+// Formaliza con Zod los 7 campos que antes solo validaban `symbol` con
+// SYMBOL_RE de forma manual; incorpora el límite de longitud de `name`.
+const createAssetSchema = z.object({
+  symbol:          z.string().min(1, 'El símbolo es requerido').max(20, 'El símbolo es demasiado largo'),
+  name:            z.string().max(MAX_LENGTH_SHORT, `name no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
+  binanceEurPair:  z.string().nullish(),
+  binanceUsdtPair: z.string().nullish(),
+  binanceBtcPair:  z.string().nullish(),
+  isStablecoin:    z.boolean().nullish(),
+  coingecko_id:    z.string().nullish(),
+});
+
+const updateAssetSchema = z.object({
+  name:            z.string().max(MAX_LENGTH_SHORT, `name no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
+  binanceEurPair:  z.string().nullish(),
+  binanceUsdtPair: z.string().nullish(),
+  binanceBtcPair:  z.string().nullish(),
+  isStablecoin:    z.boolean().nullish(),
+});
 
 // Formato válido para un símbolo de activo: 1-20 caracteres alfanuméricos
 const SYMBOL_RE = /^[A-Z0-9]{1,20}$/;
@@ -29,16 +56,12 @@ router.get('/assets', async (_req: Request, res: Response) => {
 
 // ── POST /api/settings/assets ──────────────────────────────────────────────
 router.post('/assets', async (req: Request, res: Response) => {
-  const { symbol, name, binanceEurPair, binanceUsdtPair, binanceBtcPair, isStablecoin, coingecko_id } = req.body;
-
-  if (!symbol) {
-    res.status(400).json({ error: 'El simbolo es requerido' });
+  const validation = createAssetSchema.safeParse(req.body);
+  if (!validation.success) {
+    res.status(400).json({ error: `Datos inválidos: ${zodErrorMessage(validation.error)}` });
     return;
   }
-  if (exceedsMaxLength(name, MAX_LENGTH_SHORT)) {
-    res.status(400).json({ error: `name no puede superar ${MAX_LENGTH_SHORT} caracteres` });
-    return;
-  }
+  const { symbol, name, binanceEurPair, binanceUsdtPair, binanceBtcPair, isStablecoin, coingecko_id } = validation.data;
 
   const upperSymbol = symbol.toUpperCase().trim();
 
@@ -80,12 +103,13 @@ router.post('/assets', async (req: Request, res: Response) => {
 // ── PUT /api/settings/assets/:symbol ──────────────────────────────────────
 router.put('/assets/:symbol', async (req: Request, res: Response) => {
   const { symbol } = req.params;
-  const { name, binanceEurPair, binanceUsdtPair, binanceBtcPair, isStablecoin } = req.body;
 
-  if (exceedsMaxLength(name, MAX_LENGTH_SHORT)) {
-    res.status(400).json({ error: `name no puede superar ${MAX_LENGTH_SHORT} caracteres` });
+  const validation = updateAssetSchema.safeParse(req.body);
+  if (!validation.success) {
+    res.status(400).json({ error: `Datos inválidos: ${zodErrorMessage(validation.error)}` });
     return;
   }
+  const { name, binanceEurPair, binanceUsdtPair, binanceBtcPair, isStablecoin } = validation.data;
 
   let priceSource = 'unknown';
   if (isStablecoin) priceSource = 'fiat';
