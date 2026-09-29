@@ -1,9 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
-import { autoUpdater } from 'electron-updater';
-import path from 'path';
+import { app, BrowserWindow, dialog, Menu } from 'electron';
 import { PostgresManager } from './postgres-manager';
 import { BackendManager } from './backend-manager';
 import { SecretsManager } from './secrets-manager';
+import { createSplash, setSplashStatus, closeSplash } from './splash';
+import { createWindow } from './window';
+import { registerUpdateIpcHandlers, checkForUpdateOnStartup, schedulePeriodicUpdateCheck, UpdaterDeps } from './updater';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -13,14 +14,8 @@ process.stdout.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'E
 process.stderr.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err; });
 
 let mainWindow:   BrowserWindow | null = null;
-let splashWindow: BrowserWindow | null = null;
 let postgresManager: PostgresManager;
 let backendManager:  BackendManager;
-
-// ── Estado de actualización ─────────────────────────────────────────────────
-// Persiste entre la comprobación inicial y la carga de la ventana principal
-let pendingUpdateVersion: string | null = null;
-let updateDownloaded = false;
 
 // ── Seguridad: un solo proceso ──────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
@@ -33,251 +28,28 @@ app.on('second-instance', () => {
   }
 });
 
-// ── IPC de actualización ────────────────────────────────────────────────────
-ipcMain.handle('get-update-status', () => ({
-  available:  pendingUpdateVersion !== null,
-  downloaded: updateDownloaded,
-  version:    pendingUpdateVersion,
-}));
+let shuttingDown = false;
+let handlingStartupError = false;
 
-ipcMain.handle('download-and-install', async () => {
-  shuttingDown = true;
-  await shutdown().catch(() => {});
-  if (updateDownloaded) {
-    autoUpdater.quitAndInstall(false, true);
-    return;
-  }
-  await autoUpdater.downloadUpdate();
-  autoUpdater.quitAndInstall(false, true);
-});
-
-ipcMain.on('install-update', async () => {
-  shuttingDown = true;
-  await shutdown().catch(() => {});
-  autoUpdater.quitAndInstall(false, true);
-});
-
-// ── Splash screen ───────────────────────────────────────────────────────────
-function createSplash(): void {
-  const splashPath = isDev
-    ? path.join(__dirname, '../assets/splash.html')
-    : path.join(process.resourcesPath, 'app', 'assets', 'splash.html');
-
-  splashWindow = new BrowserWindow({
-    width: 480,
-    height: 320,
-    frame: false,
-    resizable: false,
-    center: true,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    backgroundColor: '#0f0f1a',
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-
-  splashWindow.loadFile(splashPath, { query: { v: app.getVersion() } });
-  splashWindow.on('closed', () => { splashWindow = null; });
+async function shutdown(): Promise<void> {
+  console.log('[app] Cerrando...');
+  backendManager?.stop();
+  await postgresManager?.stop();
 }
 
-function setSplashStatus(text: string): void {
-  splashWindow?.webContents
-    .executeJavaScript(`document.getElementById('status').textContent = ${JSON.stringify(text)}`)
-    .catch(() => {});
-}
+// beforeInstall: parar backend/postgres antes de que el instalador de la
+// actualización sustituya los binarios, o de salir para instalar. Marca
+// shuttingDown=true para que before-quit no interfiera y deje que
+// electron-updater complete su propio ciclo de quit → install → relaunch.
+const updaterDeps: UpdaterDeps = {
+  getMainWindow: () => mainWindow,
+  beforeInstall: async () => {
+    shuttingDown = true;
+    await shutdown().catch(() => {});
+  },
+};
 
-// ── Comprobación de actualizaciones al arrancar ─────────────────────────────
-// Se ejecuta ANTES de levantar postgres — si hay update y el usuario acepta,
-// ni siquiera arrancamos la base de datos.
-async function checkForUpdateOnStartup(): Promise<void> {
-  if (isDev) return;
-
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
-
-  return new Promise<void>((resolve) => {
-    // Timeout: si en 6s no responde GitHub, continuamos el arranque normal
-    const timeout = setTimeout(() => {
-      cleanupListeners();
-      resolve();
-    }, 6000);
-
-    function cleanupListeners() {
-      autoUpdater.removeListener('update-available',     onAvailable);
-      autoUpdater.removeListener('update-not-available', onNotAvailable);
-      autoUpdater.removeListener('error',                onError);
-    }
-
-    async function onAvailable(info: { version: string }) {
-      clearTimeout(timeout);
-      cleanupListeners();
-
-      // El splash tiene alwaysOnTop — desactivarlo mientras el diálogo está abierto
-      splashWindow?.setAlwaysOnTop(false);
-      const { response } = await dialog.showMessageBox({
-        type: 'info',
-        title: 'Actualización disponible',
-        message: `Nueva versión ${info.version} disponible`,
-        detail: '¿Deseas descargar e instalar la actualización ahora?\nLa aplicación se reiniciará automáticamente.',
-        buttons: ['Actualizar ahora', 'Más tarde'],
-        defaultId: 0,
-        cancelId: 1,
-      });
-      splashWindow?.setAlwaysOnTop(true);
-
-      if (response === 0) {
-        // Usuario acepta → descargar y reiniciar (sin arrancar postgres)
-        setSplashStatus('Descargando actualización...');
-
-        autoUpdater.on('download-progress', (p) => {
-          setSplashStatus(`Descargando actualización... ${Math.round(p.percent)}%`);
-        });
-
-        autoUpdater.once('update-downloaded', async () => {
-          setSplashStatus('Instalando...');
-          // Parar postgres antes de que el instalador sustituya los binarios.
-          // Marcar shuttingDown=true para que before-quit no interfiera y permita
-          // que electron-updater complete su propio ciclo de quit → install → relaunch.
-          shuttingDown = true;
-          await shutdown().catch(() => {});
-          autoUpdater.quitAndInstall(false, true);
-        });
-
-        autoUpdater.downloadUpdate().catch(() => resolve());
-        // No llamamos resolve() aquí — la app se reiniciará sola
-      } else {
-        // Usuario pospone → guardar estado, iniciar descarga en segundo plano
-        pendingUpdateVersion = info.version;
-
-        autoUpdater.downloadUpdate().catch(() => {});
-
-        autoUpdater.once('update-downloaded', () => {
-          updateDownloaded = true;
-          mainWindow?.webContents.send('update-downloaded', { version: info.version });
-        });
-
-        resolve();
-      }
-    }
-
-    function onNotAvailable() {
-      clearTimeout(timeout);
-      cleanupListeners();
-      resolve();
-    }
-
-    function onError(err: Error) {
-      clearTimeout(timeout);
-      cleanupListeners();
-      console.warn('[updater] Error al comprobar actualizaciones:', err?.message ?? String(err));
-      resolve();
-    }
-
-    autoUpdater.on('update-available',     onAvailable);
-    autoUpdater.on('update-not-available', onNotAvailable);
-    autoUpdater.on('error',                onError);
-
-    autoUpdater.checkForUpdates().catch(() => {
-      clearTimeout(timeout);
-      cleanupListeners();
-      resolve();
-    });
-  });
-}
-
-// ── Comprobación periódica (cada hora, una vez la app está corriendo) ───────
-function schedulePeriodicUpdateCheck(): void {
-  if (isDev) return;
-
-  setInterval(async () => {
-    try {
-      const result = await autoUpdater.checkForUpdates();
-      if (!result) return;
-      // Si hay versión nueva y aún no la teníamos, notificar a la ventana
-      const newVersion = (result.updateInfo as { version: string }).version;
-      if (newVersion && newVersion !== app.getVersion() && !pendingUpdateVersion) {
-        pendingUpdateVersion = newVersion;
-        mainWindow?.webContents.send('update-available', { version: newVersion });
-        autoUpdater.downloadUpdate().catch(() => {});
-      }
-    } catch { /* silencioso */ }
-  }, 60 * 60 * 1000);
-}
-
-// ── Ventana principal ───────────────────────────────────────────────────────
-async function createWindow(): Promise<void> {
-  mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    minWidth: 1024,
-    minHeight: 600,
-    title: 'CryptoFolio',
-    icon: isDev
-      ? path.join(__dirname, '../assets/icon.png')
-      : path.join(process.resourcesPath, 'app', 'assets', 'icon.png'),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-      allowRunningInsecureContent: false,
-      navigateOnDragDrop: false,
-    },
-    backgroundColor: '#0f0f1a',
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    show: false,
-  });
-
-  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [
-          [
-            "default-src 'self'",
-            "script-src 'self'",
-            "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data:",
-            "connect-src 'self' https://api.binance.com wss://stream.binance.com:9443 https://api.coingecko.com",
-            "frame-ancestors 'none'",
-            "form-action 'self'",
-          ].join('; '),
-        ],
-      },
-    });
-  });
-
-  mainWindow.webContents.on('will-navigate', (event, url) => {
-    const allowed = isDev ? 'http://localhost:5173' : 'http://127.0.0.1:3001';
-    if (!url.startsWith(allowed)) {
-      event.preventDefault();
-      shell.openExternal(url);
-    }
-  });
-
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
-
-  if (isDev) {
-    await mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
-  } else {
-    await mainWindow.loadURL('http://127.0.0.1:3001');
-  }
-
-  mainWindow.once('ready-to-show', () => {
-    splashWindow?.close();
-    mainWindow?.show();
-  });
-
-  mainWindow.on('closed', () => { mainWindow = null; });
-}
+registerUpdateIpcHandlers(updaterDeps);
 
 // ── Startup ─────────────────────────────────────────────────────────────────
 async function startup(): Promise<void> {
@@ -315,42 +87,37 @@ async function startup(): Promise<void> {
   setSplashStatus('');
 }
 
-let shuttingDown = false;
-let handlingStartupError = false;
-
-async function shutdown(): Promise<void> {
-  console.log('[app] Cerrando...');
-  backendManager?.stop();
-  await postgresManager?.stop();
-}
-
 // ── Ciclo de vida ───────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
   if (!isDev) Menu.setApplicationMenu(null);
 
-  createSplash();
+  createSplash(isDev);
 
   try {
     // 1. Comprobar actualizaciones antes de levantar postgres
     setSplashStatus('Comprobando actualizaciones...');
-    await checkForUpdateOnStartup();
+    await checkForUpdateOnStartup(isDev, updaterDeps);
     setSplashStatus('');
 
     // 2. Levantar postgres + backend
     await startup();
 
     // 3. Crear ventana principal
-    await createWindow();
+    mainWindow = await createWindow(
+      isDev,
+      () => closeSplash(),
+      () => { mainWindow = null; },
+    );
 
     // 4. Iniciar comprobaciones periódicas en segundo plano
-    schedulePeriodicUpdateCheck();
+    schedulePeriodicUpdateCheck(isDev, updaterDeps);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err ?? 'Error desconocido');
     console.error('[app] Error fatal en startup:', message);
     // Cerrar el splash ANTES del diálogo: el splash tiene alwaysOnTop y lo taparía.
     // El flag evita que window-all-closed dispare app.quit() mientras esperamos al usuario.
     handlingStartupError = true;
-    splashWindow?.close();
+    closeSplash();
     await dialog.showMessageBox({
       type: 'error',
       title: 'Error al iniciar CryptoFolio',
@@ -367,7 +134,13 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow(
+      isDev,
+      () => closeSplash(),
+      () => { mainWindow = null; },
+    ).then((w) => { mainWindow = w; });
+  }
 });
 
 // before-quit es síncrono en Electron — el async no se awaita.

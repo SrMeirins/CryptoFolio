@@ -1,6 +1,8 @@
 import { utilityProcess, UtilityProcess } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import { pollUntil } from './shared/poll-until';
+import { DEFAULT_BACKEND_PORT } from './shared/ports';
 
 interface BackendOptions {
   databaseUrl: string;
@@ -24,7 +26,7 @@ export class BackendManager {
 
   constructor(opts: BackendOptions) {
     this.databaseUrl = opts.databaseUrl;
-    this.port = opts.port ?? 3001;
+    this.port = opts.port ?? DEFAULT_BACKEND_PORT;
     this.onCrash = opts.onCrash;
     this.walletSyncEncryptionKey = opts.walletSyncEncryptionKey;
   }
@@ -101,31 +103,35 @@ export class BackendManager {
     maxWaitMs = 30_000,
   ): Promise<void> {
     const url = `http://127.0.0.1:${this.port}/health`;
-    const deadline = Date.now() + maxWaitMs;
 
-    while (Date.now() < deadline) {
-      // Si el proceso ya murió, reportar inmediatamente con los logs de error
-      if (hasExited()) {
-        const stderr = this.recentStderr.join('').trim();
-        const code = getExitCode();
-        throw new Error(
-          `El backend terminó inesperadamente (código ${code}).\n\n` +
-          (stderr ? `Error:\n${stderr}` : 'Sin detalles adicionales en los logs.')
-        );
-      }
-      try {
-        const res = await fetch(url);
-        if (res.ok) return;
-      } catch {
-        // Aún no está listo
-      }
-      await new Promise(r => setTimeout(r, 300));
-    }
-
-    const stderr = this.recentStderr.slice(-5).join('').trim();
-    throw new Error(
-      `El backend no respondió en ${maxWaitMs / 1000}s.\n\n` +
-      (stderr ? `Últimos logs:\n${stderr}` : 'Sin salida en stderr.')
+    await pollUntil(
+      async () => {
+        // Si el proceso ya murió, reportar inmediatamente con los logs de error
+        // (condición irrecuperable — no tiene sentido seguir sondeando hasta el timeout).
+        if (hasExited()) {
+          const stderr = this.recentStderr.join('').trim();
+          const code = getExitCode();
+          throw new Error(
+            `El backend terminó inesperadamente (código ${code}).\n\n` +
+            (stderr ? `Error:\n${stderr}` : 'Sin detalles adicionales en los logs.')
+          );
+        }
+        try {
+          const res = await fetch(url);
+          return res.ok;
+        } catch {
+          return false; // Aún no está listo
+        }
+      },
+      {
+        timeoutMs: maxWaitMs,
+        intervalMs: 300,
+        timeoutMessage: () => {
+          const stderr = this.recentStderr.slice(-5).join('').trim();
+          return `El backend no respondió en ${maxWaitMs / 1000}s.\n\n` +
+            (stderr ? `Últimos logs:\n${stderr}` : 'Sin salida en stderr.');
+        },
+      },
     );
   }
 
@@ -134,7 +140,7 @@ export class BackendManager {
 
     if (stderr.includes('EADDRINUSE')) {
       return (
-        'El puerto 3001 ya está en uso por otro proceso.\n\n' +
+        `El puerto ${this.port} ya está en uso por otro proceso.\n\n` +
         'Causa más probable: el backend de Docker Compose sigue corriendo.\n\n' +
         'Solución: ejecuta "docker compose down" y vuelve a abrir CryptoFolio.'
       );

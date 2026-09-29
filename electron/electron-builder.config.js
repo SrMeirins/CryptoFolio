@@ -10,9 +10,9 @@ module.exports = {
   copyright: 'Copyright © 2026 CryptoFolio',
 
   // Archivos del proceso Electron (main + preload compilados).
-  // Usamos la forma {from, to} para que electron-builder no aplique los
-  // filtros de .gitignore — el directorio dist/ está gitignoreado pero sí
-  // debe incluirse en el paquete (se genera en CI antes de empaquetar).
+  // compiled/ está gitignoreado (no es código fuente) pero sí debe
+  // incluirse en el paquete final — se genera con `npm run build` antes
+  // de empaquetar (en CI o en local).
   files: [
     'compiled/**/*',
     'assets/**/*',
