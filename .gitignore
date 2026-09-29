@@ -14,6 +14,9 @@ credentials.*
 .venv/
 __pycache__/
 
+# ── Claude Code (config/permisos locales, no compartir entre máquinas) ─────
+.claude/
+
 # ── CSVs y datos sensibles ─────────────────────────────────────────────────
 *.csv
 *.xlsx
