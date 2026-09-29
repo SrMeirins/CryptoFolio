@@ -36,6 +36,15 @@
 # ─────────────────────────────────────────────────────────────────────────────
 name: ${COMPOSE_PROJECT_NAME:-cryptofolio}
 
+# Límite de logs para todos los servicios — mismo criterio que
+# docker-compose.yml (producción). Evita que los logs crezcan sin límite
+# durante sesiones de desarrollo largas.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # ── PostgreSQL ─────────────────────────────────────────────────────────────
   postgres:
@@ -74,6 +83,7 @@ services:
       - DAC_OVERRIDE
       - SETUID
       - SETGID
+    logging: *default-logging
 
   # ── Backend Node.js ────────────────────────────────────────────────────────
   backend:
@@ -110,7 +120,7 @@ services:
     ports:
       - "127.0.0.1:${BACKEND_HOST_PORT:-43001}:3001"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -122,6 +132,7 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    logging: *default-logging
 
   # ── Frontend React (Vite) ──────────────────────────────────────────────────
   frontend:
@@ -137,12 +148,21 @@ services:
       - ./frontend/src:/app/src
     ports:
       - "127.0.0.1:${FRONTEND_HOST_PORT:-45173}:5173"
+    healthcheck:
+      # Vite dev server no tenía healthcheck propio (solo dependía de que el
+      # backend estuviera sano) — wget disponible en node:20-alpine (busybox).
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5173/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - frontend-net
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    logging: *default-logging
 
   # ── Frontend en modo producción (opcional: docker compose --profile prod up) ─
   # Build real con `vite build` servido estático por nginx — sin dev server
@@ -161,6 +181,12 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:${FRONTEND_PROD_HOST_PORT:-45180}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - frontend-net
     security_opt:
@@ -175,6 +201,7 @@ services:
       - /tmp
       - /var/cache/nginx
       - /var/run
+    logging: *default-logging
 
   # ── Backup automático de PostgreSQL ─────────────────────────────────────────
   # pg_dump comprimido a diario mientras el stack esté levantado, con retención
@@ -202,6 +229,17 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # DAC_OVERRIDE: BUG REAL detectado y corregido (mismo que en
+    # docker-compose.yml de producción) — ./backups es un bind-mount
+    # propiedad del usuario del host, no root; sin esta capability, el
+    # backup fallaba con "Permission denied" en silencio desde que se
+    # añadió cap_drop: ALL. A diferencia de postgres/backend, este servicio
+    # no baja privilegios tras arrancar — DAC_OVERRIDE queda activa de forma
+    # permanente (trade-off deliberado por portabilidad entre distintos UID
+    # de host, ver mismo comentario en docker-compose.yml).
+    cap_add:
+      - DAC_OVERRIDE
+    logging: *default-logging
 
   # ── pgAdmin (opcional: make tools / docker compose --profile tools up) ──────
   pgadmin:
@@ -221,6 +259,11 @@ services:
       # reutilizaba POSTGRES_PASSWORD: comprometer uno comprometía el otro).
       # Generado por scripts/dev-env.sh junto al resto de secretos de .env.dev.
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-dev_password_local}
+    volumes:
+      # Sin esto, pgAdmin pierde TODAS las conexiones/sesiones guardadas
+      # cada vez que se recrea el contenedor — /var/lib/pgadmin es donde
+      # guarda su SQLite de sesiones y el árbol de servidores.
+      - pgadmin_data:/var/lib/pgadmin
     ports:
       # Puerto interno 8080, no 80: con cap_drop: ALL, pgAdmin no tiene
       # NET_BIND_SERVICE para bindear el 80 y cae automáticamente al 8080
@@ -235,11 +278,14 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    logging: *default-logging
 
 volumes:
   postgres_data:
     driver: local
   csv_uploads:
+    driver: local
+  pgadmin_data:
     driver: local
 
 networks:

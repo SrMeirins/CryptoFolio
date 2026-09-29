@@ -18,9 +18,22 @@
 #
 # Endurecimiento (mismo criterio que el stack de dev, ver su cabecera):
 # redes segmentadas, cap_drop: ALL + no-new-privileges en todos los
-# servicios, rootfs de solo lectura en el frontend.
+# servicios, rootfs de solo lectura en postgres/backend/frontend/db-backup
+# (verificado con el stack real: todos arrancan y funcionan igual con el
+# sistema de ficheros del contenedor en modo lectura, salvo los volúmenes/
+# tmpfs explícitamente montados), logs con límite de tamaño (evita llenar
+# el disco en un self-host que corre desatendido durante meses).
 # ─────────────────────────────────────────────────────────────────────────────
 name: cryptofolio
+
+# Límite de logs para todos los servicios — Docker no limita el driver
+# json-file por defecto, y un stack que corre meses sin supervisión puede
+# llenar el disco solo con logs. 10MB x 3 ficheros = 30MB máx. por servicio.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   # ── PostgreSQL ─────────────────────────────────────────────────────────────
@@ -61,6 +74,14 @@ services:
       - DAC_OVERRIDE
       - SETUID
       - SETGID
+    # Rootfs de solo lectura — verificado con el stack real: Postgres solo
+    # necesita escribir en su volumen de datos (ya montado aparte) y en
+    # /tmp / el socket Unix, cubiertos por tmpfs.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    logging: *default-logging
 
   # ── Backend Node.js (build de producción real) ──────────────────────────────
   backend:
@@ -92,7 +113,7 @@ services:
     volumes:
       - csv_uploads:/app/uploads
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -104,6 +125,13 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # Rootfs de solo lectura — verificado con el stack real (build compilado,
+    # sin ts-node-dev ni bind-mounts de código): el único directorio en el
+    # que escribe de verdad es /app/uploads, ya cubierto por el volumen.
+    read_only: true
+    tmpfs:
+      - /tmp
+    logging: *default-logging
 
   # ── Frontend (build de producción real, servido por nginx) ─────────────────
   frontend:
@@ -121,6 +149,15 @@ services:
       # exponerla directamente a la red sin un reverse proxy con su propia
       # autenticación delante.
       - "127.0.0.1:${FRONTEND_HOST_PORT:-8080}:8080"
+    healthcheck:
+      # nginx-unprivileged trae wget/curl (verificado) — antes este servicio
+      # no tenía healthcheck propio, solo dependía de que el backend
+      # estuviera sano; con esto se detecta también si nginx mismo se cae.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - frontend-net
     security_opt:
@@ -132,6 +169,7 @@ services:
       - /tmp
       - /var/cache/nginx
       - /var/run
+    logging: *default-logging
 
   # ── Backup automático de PostgreSQL ─────────────────────────────────────────
   # pg_dump comprimido a diario, con retención por cantidad de ficheros. Ver
@@ -159,6 +197,25 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # DAC_OVERRIDE: BUG REAL detectado y corregido — ./backups es un
+    # bind-mount propiedad del usuario del host (no root), y el proceso de
+    # este contenedor corre como root sin remapeo de usuario. Sin esta
+    # capability, escribir un fichero nuevo ahí da "Permission denied" —
+    # verificado: el backup llevaba fallando en silencio desde que se
+    # añadió cap_drop: ALL sin volver a probar la escritura real.
+    # A diferencia de postgres/backend, este servicio NO baja privilegios
+    # tras arrancar (backup-loop.sh corre como root todo el ciclo de vida,
+    # sin USER en la imagen base ni gosu) — DAC_OVERRIDE queda activa de
+    # forma permanente, no solo durante el arranque. Es un trade-off
+    # deliberado por portabilidad: matchear el UID/GID exacto del host para
+    # evitar esto rompería en cualquier usuario self-hosted con un UID
+    # distinto al nuestro.
+    cap_add:
+      - DAC_OVERRIDE
+    read_only: true
+    tmpfs:
+      - /tmp
+    logging: *default-logging
 
   # ── pgAdmin (opcional: docker compose --profile tools up -d) ───────────────
   pgadmin:
@@ -174,6 +231,12 @@ services:
       # `docker compose up -d` para todo el mundo, use o no pgAdmin
       # (verificado empíricamente). Fallback solo para este caso opcional.
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-cambia_esto_si_usas_pgadmin}
+    volumes:
+      # Sin esto, pgAdmin pierde TODAS las conexiones/sesiones guardadas
+      # cada vez que se recrea el contenedor — /var/lib/pgadmin es donde
+      # guarda su SQLite de sesiones y el árbol de servidores (verificado
+      # en config.py de la imagen: DATA_DIR = /var/lib/<app>).
+      - pgadmin_data:/var/lib/pgadmin
     ports:
       - "127.0.0.1:${PGADMIN_HOST_PORT:-8081}:8080"
     depends_on:
@@ -185,11 +248,14 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    logging: *default-logging
 
 volumes:
   postgres_data:
     driver: local
   csv_uploads:
+    driver: local
+  pgadmin_data:
     driver: local
 
 networks:
