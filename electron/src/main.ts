@@ -3,6 +3,7 @@ import { autoUpdater } from 'electron-updater';
 import path from 'path';
 import { PostgresManager } from './postgres-manager';
 import { BackendManager } from './backend-manager';
+import { SecretsManager } from './secrets-manager';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -288,10 +289,16 @@ async function startup(): Promise<void> {
   await postgresManager.start();
   console.log('[app] PostgreSQL listo.');
 
+  // Clave de cifrado de API keys on-chain: se genera una vez y se persiste
+  // (no hay .env editable por el usuario final en la app de escritorio).
+  const secretsManager = new SecretsManager(app.getPath('userData'));
+  secretsManager.loadOrCreate();
+
   setSplashStatus('Iniciando servidor...');
   console.log('[app] Arrancando backend...');
   backendManager = new BackendManager({
     databaseUrl: postgresManager.connectionString,
+    walletSyncEncryptionKey: secretsManager.walletSyncEncryptionKey,
     onCrash: async (detail) => {
       await dialog.showMessageBox({
         type: 'error',
