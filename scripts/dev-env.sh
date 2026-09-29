@@ -59,16 +59,31 @@ port_busy() { # port_busy <puerto>
   ss -Htan "( sport = :${1} )" 2>/dev/null | grep -q .
 }
 
+# Puertos ya asignados EN ESTA MISMA ejecución — port_busy solo ve el estado
+# real del sistema, así que dos bases con ventanas de escaneo solapadas
+# (p. ej. PGADMIN 45050-45350 y FRONTEND 45173-45473) podían devolver el
+# MISMO puerto si estaba libre a nivel de SO pero ya elegido para otro
+# servicio unas líneas antes — bug real, no solo teórico, en una máquina con
+# tantos puertos ocupados por otros proyectos como esta.
+#
+# IMPORTANTE: se asigna con `printf -v` a la variable destino, nunca con
+# `VAR="$(pick_free_port ...)"` — la sustitución de comandos ejecuta la
+# función en una subshell, así que cualquier cambio a ASSIGNED_PORTS se
+# perdería al salir de ella y esta protección no serviría de nada.
+ASSIGNED_PORTS=" "
+
 # Primera capa de puertos libres desde una base (escanea hacia arriba).
-pick_free_port() { # pick_free_port <base>
+# Escribe el resultado en la variable cuyo NOMBRE se pasa como 2º argumento.
+pick_free_port() { # pick_free_port <base> <nombre_variable_destino>
   local p="$1" tries=0
-  while port_busy "$p"; do
+  while port_busy "$p" || [[ "$ASSIGNED_PORTS" == *" $p "* ]]; do
     p=$((p + 1)); tries=$((tries + 1))
     if (( tries > 300 )); then
       echo "No se encontró un puerto libre cerca de $1" >&2; return 1
     fi
   done
-  printf '%s' "$p"
+  ASSIGNED_PORTS+="$p "
+  printf -v "$2" '%s' "$p"
 }
 
 # Secreto hex aleatorio (openssl)
@@ -117,11 +132,11 @@ SUBSCAN_API_KEY="$(read_key "$ENV_USER" SUBSCAN_API_KEY || true)"
 
 # ── Puertos host libres ───────────────────────────────────────────────────────
 log "Asignando puertos host libres..."
-FRONTEND_HOST_PORT="$(pick_free_port "$BASE_FRONTEND")"
-FRONTEND_PROD_HOST_PORT="$(pick_free_port "$BASE_FRONTEND_PROD")"
-BACKEND_HOST_PORT="$(pick_free_port "$BASE_BACKEND")"
-PG_HOST_PORT="$(pick_free_port "$BASE_PG")"
-PGADMIN_HOST_PORT="$(pick_free_port "$BASE_PGADMIN")"
+pick_free_port "$BASE_FRONTEND" FRONTEND_HOST_PORT
+pick_free_port "$BASE_FRONTEND_PROD" FRONTEND_PROD_HOST_PORT
+pick_free_port "$BASE_BACKEND" BACKEND_HOST_PORT
+pick_free_port "$BASE_PG" PG_HOST_PORT
+pick_free_port "$BASE_PGADMIN" PGADMIN_HOST_PORT
 
 # ── Escribir .env.dev (0600: contiene secretos) ───────────────────────────────
 umask 077
