@@ -9,6 +9,45 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Añadido
+
+- **Importación de Bitvavo** — además de Binance, la app ahora soporta el CSV exportado directamente desde Bitvavo (parser, validador y selector de exchange en la pantalla de Importación).
+- **Verificación automática de saldos on-chain** — para wallets frías, además de introducir el saldo manualmente puedes añadir la dirección pública y la app comprobará el saldo real directamente en la blockchain (XRP Ledger, Hedera, Stellar, Bitcoin, Solana, Ethereum, Cardano y Polkadot Asset Hub), avisando si hay alguna discrepancia. API keys de los proveedores configurables desde Settings → Wallets, cifradas en la base de datos.
+- **Backup automático diario de PostgreSQL** — el stack de Docker incluye ahora un sidecar que hace `pg_dump` comprimido cada día con retención configurable por número de copias.
+
+### Cambiado
+
+- **Stack de Docker de producción separado del de desarrollo** — `docker-compose.yml` (para usuarios finales) ahora construye un build de producción real (nginx sirviendo estático, sin dev server) y exige explícitamente la contraseña de la base de datos antes de arrancar. El stack de desarrollo interno vive en `docker-compose.dev.yml`.
+- Documentación de instalación (README) revisada a fondo para reflejar el estado real de la app.
+
+### Corregido
+
+- Varias omisiones silenciosas en el motor de importación de CSV: si Binance incluyera alguna vez una fila de comisión adicional en operaciones de Convert/Small Assets Exchange/ETH 2.0 Staking, ahora el import falla explícito en vez de perder ese dato sin avisar.
+- La app de escritorio ahora puede usar la verificación de saldos on-chain (antes no tenía forma de generar la clave de cifrado necesaria).
+
+### Seguridad
+
+- Actualizadas dependencias con vulnerabilidades conocidas de denegación de servicio (backend y frontend).
+- Corregida una inyección de fórmulas CSV (CSV Formula Injection) en las exportaciones fiscales y en la exportación del historial de transacciones.
+- Endurecido el stack de Docker: contenedores sin privilegios de kernel innecesarios, redes internas segmentadas, superficie de puertos expuestos reducida al mínimo imprescindible.
+- Corregido que, en modo Electron, el backend aceptaba peticiones de cualquier origen en vez de solo el propio.
+
+## [0.0.14] - 2026-06-17
+
+### Corregido
+
+#### Electron — icono en barra de tareas de Ubuntu (fix real esta vez)
+
+- **El fix de la v0.0.12 no era el definitivo** — Electron/Chromium siempre reporta el `WM_CLASS` en minúsculas (`cryptofolio`, el `productName` tal cual), independientemente de `app.setName()` o de forzarlo por línea de comandos. El `.desktop` generado declaraba `StartupWMClass=CryptoFolio` (con mayúsculas) y el matching de GNOME es case-sensitive, así que nunca coincidía. Corregido declarando `StartupWMClass: 'cryptofolio'` (minúsculas, igual que lo reporta Electron) en `electron-builder.config.js`, y eliminados los intentos anteriores de forzar el `WM_CLASS` desde `main.ts` (innecesarios con este enfoque).
+
+## [0.0.13] - 2026-06-17
+
+### Corregido
+
+#### CI — condición de carrera en la publicación de releases
+
+- **`.deb` y `.exe` no aparecían en el release** — los 3 builders (Windows/macOS/Linux) intentaban crear el draft del release simultáneamente al terminar; el que llegaba tarde encontraba "release doesn't exist" y perdía su subida de artefactos. Corregido con un job `create-draft` que crea el draft antes de que los builders arranquen (`needs: create-draft`).
+
 ## [0.0.12] - 2026-06-17
 
 ### Corregido
