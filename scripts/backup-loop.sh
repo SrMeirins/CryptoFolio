@@ -3,6 +3,12 @@
 # el stack esté levantado. pg_dump comprimido + retención por cantidad de
 # ficheros (más portable en Alpine/busybox que -mtime en find).
 set -eu
+# El exit code de un pipe es el del ÚLTIMO comando por defecto: sin
+# pipefail, "pg_dump | gzip" reporta éxito (exit 0 de gzip) aunque pg_dump
+# falle — el backup queda como un .gz válido pero vacío, marcado "OK" en el
+# log. Confirmado que busybox ash (la shell real de postgres:16-alpine) sí
+# soporta esta opción.
+set -o pipefail
 
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 RETENTION_COUNT="${BACKUP_RETENTION_COUNT:-14}"
