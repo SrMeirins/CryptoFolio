@@ -17,13 +17,14 @@ The following uses are always free under the AGPL:
 
 - Self-hosting for your own personal use
 - Self-hosting within a non-profit organization
+- Evaluation and testing
 - Forking and contributing back to this repository
 
 ## Contact
 
 To obtain a commercial license or discuss your use case:
 
-**Email:** marincaserojorge@gmail.com
+**Email:** <marincaserojorge@gmail.com>
 
 ---
 
