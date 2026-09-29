@@ -12,7 +12,9 @@
 #   • --fresh: regenera secretos y puertos (lo usa `make dev-clean` tras liberar
 #     los volúmenes y puertos con `down -v`).
 #   • Si existe un .env del usuario, reaprovecha sus valores NO placeholder
-#     (p. ej. COINGECKO_API_KEY y, si ya lo puso, POSTGRES_PASSWORD).
+#     (p. ej. COINGECKO_API_KEY, las API keys on-chain, POSTGRES_PASSWORD y,
+#     si ya la tiene, WALLET_SYNC_ENCRYPTION_KEY — así no se cifra con una
+#     clave distinta en cada stack).
 #
 # Uso: scripts/dev-env.sh [--fresh]
 # ─────────────────────────────────────────────────────────────────────────────
