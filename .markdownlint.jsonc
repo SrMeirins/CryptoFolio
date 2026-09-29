@@ -1,0 +1,13 @@
+{
+  // Repite el mismo encabezado en secciones "hermanas" distintas (p. ej.
+  // "### Corregido" en cada versión de CHANGELOG.md) — patrón deliberado,
+  // no un error de duplicación.
+  "MD024": { "siblings_only": true },
+  // Longitud de línea: prosa en párrafos largos (README, specs) no se
+  // ajusta a un límite fijo de columnas sin quedar peor.
+  "MD013": false,
+  // HTML inline: necesario para los badges centrados y las secciones
+  // colapsables (<details>/<summary>) del README — estándar en READMEs de
+  // GitHub, no un error a corregir.
+  "MD033": false
+}

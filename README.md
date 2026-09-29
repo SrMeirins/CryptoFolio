@@ -61,7 +61,7 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 - [Características](#-características)
 - [Capturas de pantalla](#-capturas-de-pantalla)
 - [Stack tecnológico](#-stack-tecnológico)
-- [Instalación paso a paso](#-instalación-paso-a-paso)
+- [Instalación con Docker (self-hosted)](#-instalación-con-docker-self-hosted)
 - [Configuración](#-configuración)
 - [Cómo usar la app](#-cómo-usar-la-app)
 - [Preguntas frecuentes](#-preguntas-frecuentes)
@@ -126,7 +126,7 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 
 ---
 
-## 🛠️ Stack tecnológico
+## 🛠 Stack tecnológico
 
 <div align="center">
 
@@ -311,7 +311,7 @@ docker compose up -d --build
 
 ---
 
-## ⚙️ Configuración
+## ⚙ Configuración
 
 Todas las opciones se configuran en el archivo `.env` (ver `.env.example` para la lista completa, comentada):
 
