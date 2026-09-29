@@ -2,6 +2,13 @@ import { db } from '../../db/client';
 
 const BASE_URL = process.env.COINGECKO_BASE_URL || 'https://api.coingecko.com/api/v3';
 const API_KEY = process.env.COINGECKO_API_KEY || '';
+// La cabecera depende del host, no es la misma para ambos planes (confirmado
+// contra la doc oficial): x-cg-demo-api-key contra api.coingecko.com (plan
+// gratuito), x-cg-pro-api-key solo contra pro-api.coingecko.com (plan de
+// pago). Antes se enviaba siempre x-cg-pro-api-key — contra el host gratuito
+// (el que usa esta app por defecto) esa cabecera se ignora en silencio, así
+// que una API key gratuita configurada no tenía ningún efecto real.
+const API_KEY_HEADER = BASE_URL.includes('pro-api.coingecko.com') ? 'x-cg-pro-api-key' : 'x-cg-demo-api-key';
 
 // Mapa symbol → coingecko_id (se carga desde DB al iniciar)
 let coinGeckoIds: Map<string, string> = new Map();
@@ -80,13 +87,29 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// ── Rate limit compartido ────────────────────────────────────────────────
+// Timestamp hasta el que sabemos que CoinGecko nos está limitando (último
+// Retry-After recibido, de CUALQUIER llamada). Antes, cada símbolo pagaba su
+// propia cascada completa de reintentos (hasta 3×60s) sin saber que ya
+// sabíamos que seguíamos limitados — un import con varios símbolos sin
+// caché podía bloquearse muchos minutos. Ahora, un intento que empieza
+// dentro de la ventana ya conocida falla rápido en vez de repetir la espera.
+let rateLimitedUntil = 0;
+
 // ── Fetch con retry ────────────────────────────────────────────────────────
-async function fetchWithRetry(url: string, retries = 3): Promise<unknown> {
+// retries=2 (antes 3): con el límite gratuito, 2 intentos ya cubren un fallo
+// puntual; un tercero solo alargaba la espera sin cambiar el desenlace.
+async function fetchWithRetry(url: string, retries = 2): Promise<unknown> {
+  if (Date.now() < rateLimitedUntil) {
+    const waitSec = Math.round((rateLimitedUntil - Date.now()) / 1000);
+    throw new Error(`CoinGecko sigue en rate limit (${waitSec}s restantes de una espera ya conocida) — se reintentará en la próxima sesión`);
+  }
+
   const headers: Record<string, string> = {
     'Accept': 'application/json',
   };
   if (API_KEY) {
-    headers['x-cg-pro-api-key'] = API_KEY;
+    headers[API_KEY_HEADER] = API_KEY;
   }
 
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -98,6 +121,7 @@ async function fetchWithRetry(url: string, retries = 3): Promise<unknown> {
         const retryAfter = parseInt(res.headers.get('retry-after') ?? '0', 10);
         const waitMs = retryAfter > 0 ? retryAfter * 1000 : attempt * 15000;
         const waitSec = Math.round(waitMs / 1000);
+        rateLimitedUntil = Date.now() + waitMs;
         console.warn(`[PRICES] Rate limit (429), esperando ${waitSec}s...`);
         _statusCallback?.(`⏳ Rate limit CoinGecko 429 — esperando ${waitSec}s (intento ${attempt}/${retries})...`);
         await sleep(waitMs);
