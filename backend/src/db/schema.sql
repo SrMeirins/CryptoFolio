@@ -132,7 +132,7 @@ INSERT INTO wallets (name, type, is_system, is_default, color) VALUES
 CREATE TABLE wallet_addresses (
   id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   wallet_id           UUID NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
-  network_id          UUID REFERENCES networks(id),
+  network_id          UUID REFERENCES networks(id) ON DELETE RESTRICT,
   custom_network      TEXT,
   custom_explorer_url TEXT,
   address             TEXT,
@@ -229,11 +229,11 @@ CREATE TABLE transactions (
   fee_asset             TEXT,
   fee_amount            NUMERIC(38, 18) CHECK (fee_amount IS NULL OR fee_amount >= 0),
   fee_eur               NUMERIC(38, 18),
-  wallet_id             UUID NOT NULL REFERENCES wallets(id),
+  wallet_id             UUID NOT NULL REFERENCES wallets(id) ON DELETE RESTRICT,
   account               TEXT,
   notes                 TEXT,
   manually_added        BOOLEAN NOT NULL DEFAULT FALSE,
-  destination_wallet_id UUID REFERENCES wallets(id),
+  destination_wallet_id UUID REFERENCES wallets(id) ON DELETE RESTRICT,
   destination_pending   BOOLEAN NOT NULL DEFAULT FALSE,
   linked_tx_id          UUID REFERENCES transactions(id) ON DELETE SET NULL,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -267,7 +267,7 @@ CREATE TABLE fifo_lots (
   opened_at           TIMESTAMPTZ NOT NULL,
   closed_at           TIMESTAMPTZ,
   is_closed           BOOLEAN NOT NULL DEFAULT FALSE,
-  wallet_id           UUID NOT NULL REFERENCES wallets(id),
+  wallet_id           UUID NOT NULL REFERENCES wallets(id) ON DELETE RESTRICT,
   -- clock_timestamp() (no NOW()) — runFifoEngine corre en una única transacción,
   -- y NOW() devolvería el mismo valor fijo para todos los lotes de una ejecución.
   -- Se usa como desempate en getOpenLots cuando dos lotes comparten opened_at.
