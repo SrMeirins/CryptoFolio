@@ -18,6 +18,7 @@
     "dev": "NODE_ENV=development electron compiled/main.js",
     "test": "vitest run",
     "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
     "dist": "electron-builder --config electron-builder.config.js --publish always",
     "dist:win": "electron-builder --win --config electron-builder.config.js --publish always",
     "dist:mac": "electron-builder --mac --config electron-builder.config.js --publish always",

@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../test/setup-test-db';
@@ -7,6 +7,17 @@ import { createTestDatabase, TestDatabase } from '../test/setup-test-db';
 // validan la entrada con Zod: un valor numérico inválido debe rechazarse con
 // 400, nunca convertirse silenciosamente a 0 (bug real detectado en auditoría
 // — antes `parseFloat(x ?? '0') || 0` aceptaba cualquier basura como monto 0).
+
+// transactions.ts resuelve el precio histórico contra la API pública de
+// Binance (no CoinGecko) sin mockear — en un runner de CI compartido esa
+// llamada de red real puede ser lenta o toparse con rate limit, superando
+// el timeout por defecto del test (5s). Este test es sobre validación Zod,
+// no sobre precisión de precio, así que se mockea (mismo patrón que
+// fifo/engine.test.ts) — encontrado al verificar el ci.yml nuevo contra el
+// runner real de GitHub Actions (pasaba siempre en local).
+vi.mock('../modules/prices/binance', () => ({
+  getHistoricalPriceEur: vi.fn(() => Promise.resolve(100)),
+}));
 let testDb: TestDatabase;
 let pool: Pool;
 let app: import('express').Express;
