@@ -2,7 +2,7 @@ import { utilityProcess, UtilityProcess } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { pollUntil } from './shared/poll-until';
-import { DEFAULT_BACKEND_PORT } from './shared/ports';
+import { BACKEND_PORT_BASE } from './shared/ports';
 
 interface BackendOptions {
   databaseUrl: string;
@@ -26,7 +26,10 @@ export class BackendManager {
 
   constructor(opts: BackendOptions) {
     this.databaseUrl = opts.databaseUrl;
-    this.port = opts.port ?? DEFAULT_BACKEND_PORT;
+    // El llamador (main.ts) resuelve un puerto libre real con findFreePort()
+    // antes de construir BackendManager — este fallback solo aplica si
+    // alguna vez se instancia sin pasar puerto explícito.
+    this.port = opts.port ?? BACKEND_PORT_BASE;
     this.onCrash = opts.onCrash;
     this.walletSyncEncryptionKey = opts.walletSyncEncryptionKey;
   }

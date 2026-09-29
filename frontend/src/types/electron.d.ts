@@ -1,6 +1,4 @@
 interface ElectronBridge {
-  apiUrl:     string
-  wsUrl:      string
   isElectron: boolean
   openExternal: (url: string) => void
   getUpdateStatus: () => Promise<{ available: boolean; downloaded: boolean; version: string | null }>

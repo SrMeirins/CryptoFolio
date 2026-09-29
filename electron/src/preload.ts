@@ -4,11 +4,13 @@
  * Solo exponemos lo estrictamente necesario vía contextBridge.
  */
 import { contextBridge, ipcRenderer, shell } from 'electron';
-import { DEFAULT_BACKEND_PORT } from './shared/ports';
 
+// apiUrl/wsUrl no se exponen: el frontend se sirve siempre desde el propio
+// backend (mismo origen), así que usa rutas relativas (/api, /ws) — no
+// necesita conocer el puerto. Además, desde que el puerto del backend se
+// elige dinámicamente en cada arranque (ver shared/find-free-port.ts), un
+// valor fijo aquí habría quedado incorrecto.
 contextBridge.exposeInMainWorld('__CRYPTOFOLIO__', {
-  apiUrl:     `http://127.0.0.1:${DEFAULT_BACKEND_PORT}`,
-  wsUrl:      `ws://127.0.0.1:${DEFAULT_BACKEND_PORT}`,
   isElectron: true,
 
   openExternal: (url: string) => shell.openExternal(url),

@@ -7,5 +7,10 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     environment: 'node',
+    // compiled/ son artefactos de build (tsconfig.json no excluye los
+    // *.test.ts de su propio outDir — deuda técnica ya catalogada, mismo
+    // gap que backend/tsconfig.json). Sin esto, un build local deja test
+    // duplicados en CommonJS que vitest no puede ejecutar.
+    exclude: ['**/node_modules/**', '**/compiled/**'],
   },
 })
