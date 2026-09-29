@@ -1,4 +1,4 @@
-import { utilityProcess, UtilityProcess, app } from 'electron';
+import { utilityProcess, UtilityProcess } from 'electron';
 import path from 'path';
 import fs from 'fs';
 

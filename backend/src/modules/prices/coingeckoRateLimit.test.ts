@@ -1,4 +1,20 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
+
+// getCurrentPricesEur toca price_cache de verdad (INSERT tras cada precio
+// resuelto) — necesita una base de datos real con el esquema cargado, igual
+// que el resto de tests de este módulo. Una única BBDD de test para todo el
+// fichero (no una por test): solo variamos COINGECKO_BASE_URL/API_KEY.
+let testDb: TestDatabase;
+
+beforeAll(async () => {
+  testDb = await createTestDatabase();
+  process.env.DATABASE_URL = testDb.connectionString;
+}, 30000);
+
+afterAll(async () => {
+  if (testDb) await testDb.teardown();
+});
 
 // BASE_URL y la cabecera de API key se leen de env al cargar el módulo —
 // cada test necesita una instancia fresca (vi.resetModules + import dinámico
