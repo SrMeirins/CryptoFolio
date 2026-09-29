@@ -4,10 +4,11 @@
  * Solo exponemos lo estrictamente necesario vía contextBridge.
  */
 import { contextBridge, ipcRenderer, shell } from 'electron';
+import { DEFAULT_BACKEND_PORT } from './shared/ports';
 
 contextBridge.exposeInMainWorld('__CRYPTOFOLIO__', {
-  apiUrl:     'http://127.0.0.1:3001',
-  wsUrl:      'ws://127.0.0.1:3001',
+  apiUrl:     `http://127.0.0.1:${DEFAULT_BACKEND_PORT}`,
+  wsUrl:      `ws://127.0.0.1:${DEFAULT_BACKEND_PORT}`,
   isElectron: true,
 
   openExternal: (url: string) => shell.openExternal(url),
