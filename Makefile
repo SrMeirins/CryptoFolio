@@ -12,6 +12,7 @@
 #
 # Atajo:  make dev        (BBDD con datos, reutiliza volumen si existe)
 #         make dev-clean  (BBDD VACÍA: borra volúmenes y arranca de cero)
+#         make test        (las 3 suites: backend+frontend+electron)
 #         make help       (lista de comandos)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -23,7 +24,10 @@ ENV_SH      := ./scripts/dev-env.sh
 COMPOSE     := docker compose -f $(DEV_COMPOSE_FILE) --env-file $(DEV_ENV)
 
 .DEFAULT_GOAL := help
-.PHONY: help env dev dev-clean rebuild restart tools prod down ps logs logs-backend logs-frontend psql sh-backend backend-test urls clean nuke
+.PHONY: help env dev dev-clean rebuild restart tools prod down ps logs logs-backend logs-frontend \
+        urls open version psql sh-backend sh-frontend \
+        test test-backend test-frontend test-electron lint typecheck \
+        backup restore clean nuke
 
 ## ── Ayuda ────────────────────────────────────────────────────────────────────
 help: ## Mostrar esta ayuda
@@ -37,6 +41,7 @@ dev: ## Levantar el stack dev (reutiliza BBDD si existe). make env → up -d --b
 	@$(ENV_SH)
 	@$(COMPOSE) up -d --build
 	@$(MAKE) --no-print-directory urls
+	@$(MAKE) --no-print-directory open
 
 dev-clean: ## Levantar LIMPIO (BBDD vacía): down -v + regenera env + up --build
 	@echo "⚠️  Se eliminarán los volúmenes (datos de Postgres y CSVs subidos)."
@@ -44,6 +49,7 @@ dev-clean: ## Levantar LIMPIO (BBDD vacía): down -v + regenera env + up --build
 	@$(ENV_SH) --fresh
 	@$(COMPOSE) up -d --build
 	@$(MAKE) --no-print-directory urls
+	@$(MAKE) --no-print-directory open
 
 rebuild: ## Reconstruir imágenes y reiniciar manteniendo datos
 	@$(COMPOSE) up -d --build
@@ -80,11 +86,50 @@ logs-frontend: ## Logs solo del frontend
 	@$(COMPOSE) logs -f --tail=100 frontend
 
 urls: ## Imprimir las URLs reales (resolviendo puertos asignados)
-	@f=$$( $(COMPOSE) port frontend 5173 2>/dev/null); b=$$( $(COMPOSE) port backend 3001 2>/dev/null); \
+	@f=$$( $(COMPOSE) port frontend 5173 2>/dev/null); \
+	b=$$( $(COMPOSE) port backend 3001 2>/dev/null); \
+	p=$$( $(COMPOSE) port postgres 5432 2>/dev/null); \
 	echo ""; \
 	echo "  🖥️   Frontend  → http://$${f:-<sin subir>}"; \
 	echo "  🔌   Backend   → http://$${b:-<sin subir>}"; \
-	echo "  🐘   Postgres  → localhost:$$(grep -E '^PG_HOST_PORT=' $(DEV_ENV) | cut -d= -f2)"; echo ""
+	echo "  🐘   Postgres  → $${p:-<sin subir>}"; echo ""
+
+open: ## Abrir el frontend en el navegador (best-effort, Linux/macOS)
+	@f=$$( $(COMPOSE) port frontend 5173 2>/dev/null); \
+	if [ -z "$$f" ]; then \
+	  exit 0; \
+	elif command -v xdg-open >/dev/null 2>&1; then \
+	  xdg-open "http://$$f" >/dev/null 2>&1 & \
+	elif command -v open >/dev/null 2>&1; then \
+	  open "http://$$f" >/dev/null 2>&1 & \
+	fi; \
+	true
+
+version: ## Mostrar la versión actual (tag git más cercano)
+	@git describe --tags --always
+
+## ── Calidad ──────────────────────────────────────────────────────────────────
+# test-backend/test-frontend/lint/typecheck necesitan el stack levantado
+# (make dev primero) — corren dentro de los contenedores, no en el host.
+test: test-backend test-frontend test-electron ## Correr los tests de los 3 proyectos
+
+test-backend: ## Tests del backend (dentro del contenedor)
+	@$(COMPOSE) exec backend npm test
+
+test-frontend: ## Tests del frontend (dentro del contenedor)
+	@$(COMPOSE) exec frontend npm test
+
+test-electron: ## Tests de electron (en el host — no tiene contenedor propio)
+	@npm test --prefix electron
+
+lint: ## Lint de backend y frontend (electron no tiene lint configurado aún)
+	@$(COMPOSE) exec backend npm run lint
+	@$(COMPOSE) exec frontend npm run lint
+
+typecheck: ## Typecheck de los 3 proyectos
+	@$(COMPOSE) exec backend npm run typecheck
+	@$(COMPOSE) exec frontend npm run typecheck
+	@cd electron && npx tsc --noEmit
 
 ## ── Acceso ───────────────────────────────────────────────────────────────────
 psql: ## Shell psql dentro del contenedor de Postgres
@@ -93,8 +138,8 @@ psql: ## Shell psql dentro del contenedor de Postgres
 sh-backend: ## Shell dentro del contenedor del backend
 	@$(COMPOSE) exec backend sh
 
-backend-test: ## Correr los tests del backend dentro del contenedor
-	@$(COMPOSE) exec backend npm test
+sh-frontend: ## Shell dentro del contenedor del frontend
+	@$(COMPOSE) exec frontend sh
 
 ## ── Backup ───────────────────────────────────────────────────────────────────
 backup: ## Backup manual inmediato de Postgres (pg_dump comprimido en ./backups)
