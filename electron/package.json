@@ -16,6 +16,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "NODE_ENV=development electron compiled/main.js",
+    "test": "vitest run",
     "dist": "electron-builder --config electron-builder.config.js --publish always",
     "dist:win": "electron-builder --win --config electron-builder.config.js --publish always",
     "dist:mac": "electron-builder --mac --config electron-builder.config.js --publish always",
@@ -31,6 +32,7 @@
     "@types/pg": "^8.20.0",
     "electron": "^42.4.0",
     "electron-builder": "^24.13.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.11"
   }
 }

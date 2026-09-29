@@ -57,10 +57,10 @@ tmp/
 temp/
 .cache/
 
-# ── Seguimiento local de la revisión de código (no es para el repo) ───────
-REVISION_CODIGO.md
-AUDITORIA_TRACKING.md
-WALLETS_VERIFICACION.md
+# ── Notas y seguimiento local (no es para el repo) ─────────────────────────
+# Tracking de auditoría, wallets de verificación, revisión de código/refactor
+# — todo local, jerarquizado por tema. Ver notas/README.md.
+notas/
 
 # ── Documentación interna (no publicar) ────────────────────────────────────
 docs/binance-operations-pendientes.md

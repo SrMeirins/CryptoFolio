@@ -43,15 +43,15 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 
 | Funcionalidad | Soportado |
 | --- | --- |
-| **Exchange para importar** | ✅ Binance (CSV en español e inglés) |
-| **Wallets frías** | ✅ Configuración manual (Ledger, Tangem, Trezor...) — sin conexión directa al hardware |
+| **Exchanges para importar** | ✅ Binance y Bitvavo (CSV) |
+| **Wallets frías** | ✅ Configuración manual (Ledger, Tangem, Trezor...) — verificación de saldo on-chain automática en varias redes |
+| **Sincronización on-chain** | ✅ XRP Ledger, Hedera, Stellar, Bitcoin, Solana, Ethereum, Cardano y Polkadot Asset Hub |
 | **Método de cálculo fiscal** | ✅ FIFO |
 | **País** | ✅ España (IRPF) |
 | **Otros exchanges** | ❌ No soportados de momento |
-| **Sincronización on-chain** | ❌ No disponible |
 | **Otros países / métodos** | ❌ No disponible |
 
-> Si usas Binance y tributas en España, esta app es para ti.  
+> Si usas Binance/Bitvavo y tributas en España, esta app es para ti.  
 > Para otros exchanges o países, la app no es útil aún.
 
 ---
@@ -88,14 +88,14 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 - Modelo **721** (criptomonedas en el extranjero)
 - **Informe PDF profesional** listo para llevar al gestor
 
-### 📥 Importación — Solo Binance
+### 📥 Importación — Binance y Bitvavo
 
-- CSV exportado desde Binance (idioma español e inglés)
+- CSV exportado desde Binance (idioma español e inglés) o Bitvavo
 - Deduplicación automática — importa el mismo CSV dos veces sin problemas
 - Preview antes de confirmar la importación
 - Asignación de coste de adquisición para depósitos externos (transfers desde wallets frías)
 - Motor FIFO que se **recalcula automáticamente** tras cada importación
-- **+40 tipos de operación soportados**: compras, ventas, staking, Launchpool, ETH 2.0, airdrops, cashback, grid bots (Strategy), transfers internos, margin…
+- **+40 tipos de operación soportados** (Binance): compras, ventas, staking, Launchpool, ETH 2.0, airdrops, cashback, grid bots (Strategy), transfers internos, margin…
 
 > 📖 **[Ver referencia completa de operaciones soportadas →](docs/operaciones-soportadas.md)**
 
@@ -234,7 +234,7 @@ cd CryptoFolio
 
 ### Paso 3 — Configura el entorno
 
-Necesitas crear un archivo `.env` con la configuración de la base de datos.
+Necesitas crear un archivo `.env` con al menos la contraseña de la base de datos — **es obligatoria**: el siguiente paso falla con un mensaje claro si no la defines.
 
 **En macOS / Linux:**
 
@@ -248,13 +248,14 @@ cp .env.example .env
 Copy-Item .env.example .env
 ```
 
-Abre el archivo `.env` con cualquier editor de texto (Notepad, VSCode...) y cambia los valores marcados:
+Abre el archivo `.env` con cualquier editor de texto (Notepad, VSCode...) y cambia el único valor obligatorio:
 
 ```env
 # Elige una contraseña para la base de datos (sin espacios ni comillas)
 POSTGRES_PASSWORD=MiContraseñaSegura123
-DATABASE_URL=postgresql://cryptotracker:MiContraseñaSegura123@postgres:5432/cryptotracker
 ```
+
+Todo lo demás en `.env.example` es opcional (API key de CoinGecko Pro, verificación on-chain, puerto...) — el `.env` funciona perfectamente solo con esa línea.
 
 ---
 
@@ -264,20 +265,22 @@ DATABASE_URL=postgresql://cryptotracker:MiContraseñaSegura123@postgres:5432/cry
 docker compose up -d
 ```
 
-La primera vez tardará unos minutos mientras descarga las imágenes. Verás algo así:
+La primera vez tardará unos minutos mientras construye las imágenes (build real de producción, no un servidor de desarrollo). Verás algo así:
 
 ```text
-✔ Container cryptotracker_postgres   Started
-✔ Container cryptotracker_backend    Started
-✔ Container cryptotracker_frontend   Started
+✔ Container cryptofolio-postgres-1   Started
+✔ Container cryptofolio-backend-1    Started
+✔ Container cryptofolio-frontend-1   Started
 ```
+
+> Si olvidaste definir `POSTGRES_PASSWORD` en el `.env`, el comando falla aquí mismo con un mensaje que te lo indica — no arranca con una contraseña insegura por defecto.
 
 ---
 
 ### Paso 5 — Abre el navegador
 
 ```text
-http://localhost:5173
+http://localhost:8080
 ```
 
 ¡Listo! 🎉
@@ -310,27 +313,32 @@ docker compose up -d --build
 
 ## ⚙️ Configuración
 
-Todas las opciones se configuran en el archivo `.env`:
+Todas las opciones se configuran en el archivo `.env` (ver `.env.example` para la lista completa, comentada):
 
-| Variable | Descripción | Valor por defecto |
-|---|---|---|
-| `POSTGRES_PASSWORD` | Contraseña de la base de datos | *(obligatorio cambiarlo)* |
-| `DATABASE_URL` | URL de conexión a PostgreSQL | *(debe coincidir con la contraseña)* |
-| `BACKEND_PORT` | Puerto del backend | `3001` |
-| `PRICE_REFRESH_INTERVAL_MS` | Intervalo de refresco de precios (ms) | `60000` (1 min) |
-| `COINGECKO_API_KEY` | API key de CoinGecko Pro (opcional) | vacío |
+| Variable | Descripción | Obligatoria | Valor por defecto |
+| --- | --- | :---: | --- |
+| `POSTGRES_PASSWORD` | Contraseña de la base de datos | ✅ **Sí** | *(sin valor por defecto — el arranque falla si falta)* |
+| `FRONTEND_HOST_PORT` | Puerto en el que se accede a la app | No | `8080` |
+| `COINGECKO_API_KEY` | API key de CoinGecko Pro | No | vacío (usa el tier gratuito) |
+| `PRICE_REFRESH_INTERVAL_MS` | Intervalo de refresco de precios (ms) | No | `60000` (1 min) |
+| `WALLET_SYNC_ENCRYPTION_KEY` | Clave que cifra las API keys de verificación on-chain | Solo si usas verificación on-chain | vacío |
+| `ETHERSCAN_API_KEY` / `BLOCKFROST_API_KEY` / `SUBSCAN_API_KEY` | API keys de proveedores on-chain (Ethereum/Cardano/Polkadot) | No — se configuran también desde Settings → Wallets | vacío |
+
+> Postgres y el backend **no exponen ningún puerto al host** — solo son alcanzables entre sí dentro de la red interna de Docker. El único punto de entrada es el frontend, en `FRONTEND_HOST_PORT`.
 
 ---
 
 ## 📖 Cómo usar la app
 
-### 1. Exporta tu CSV desde Binance
+### 1. Exporta tu CSV desde Binance o Bitvavo
 
 Dentro de Binance: **Cartera → Historial → Generar estado de cuenta → Todos los registros → Exportar**
 
+Dentro de Bitvavo: **Cuenta → Historial de órdenes/transacciones → Exportar**
+
 Descarga el CSV y guárdalo en tu ordenador.
 
-> ⚠️ Solo se soporta el CSV de Binance. Otros exchanges no son compatibles actualmente.
+> ⚠️ Solo se soportan los CSV de Binance y Bitvavo. Otros exchanges no son compatibles actualmente.
 
 ### 2. Importa el CSV en CryptoFolio
 
@@ -340,7 +348,7 @@ Ve a la sección **Importación**, sube el CSV y revisa el preview antes de conf
 
 Si tienes activos en wallets frías (Ledger, Tangem, Trezor...), ve a **Settings → Wallets** y añádelas manualmente indicando qué activos tienes y en qué cantidad.
 
-> Las wallets frías no se sincronizan automáticamente. Deberás actualizar los saldos manualmente cuando muevas fondos.
+> Para las redes soportadas (XRP Ledger, Hedera, Stellar, Bitcoin, Solana, Ethereum, Cardano, Polkadot Asset Hub), puedes además añadir la dirección pública de la wallet para que CryptoFolio verifique el saldo directamente on-chain y te avise si hay una discrepancia con lo registrado manualmente.
 
 ### 4. Revisa tu portfolio
 
@@ -362,14 +370,14 @@ En **Fiscal** selecciona el año fiscal y verás:
 <details>
 <summary><b>¿Es seguro? ¿Mis datos van a algún servidor?</b></summary>
 
-No. CryptoFolio funciona completamente en tu máquina. Los únicos datos que salen son peticiones de precios a las APIs públicas de Binance y CoinGecko (sin autenticación, sin datos personales). Tu historial de transacciones nunca sale de tu ordenador.
+No. CryptoFolio funciona completamente en tu máquina. Los únicos datos que salen son peticiones de precios a las APIs públicas de Binance y CoinGecko (sin autenticación, sin datos personales), y — solo si activas la verificación de saldos on-chain para una wallet fría — consultas de direcciones públicas a los exploradores de blockchain correspondientes (Etherscan, Blockfrost...). Tu historial de transacciones nunca sale de tu ordenador.
 
 </details>
 
 <details>
 <summary><b>¿Funciona con Kraken, Coinbase u otros exchanges?</b></summary>
 
-No. Actualmente solo se soporta la importación mediante el CSV de Binance. Otros exchanges requieren parsers específicos que no están implementados todavía. Si quieres contribuir añadiendo soporte para otro exchange, abre un issue.
+No. Actualmente solo se soporta la importación mediante CSV de Binance y Bitvavo. Otros exchanges requieren parsers específicos que no están implementados todavía. Si quieres contribuir añadiendo soporte para otro exchange, abre un issue.
 
 </details>
 
@@ -399,7 +407,8 @@ Los datos se guardan en un volumen Docker que persiste aunque apagues o reinicie
 
 Los errores más comunes:
 
-- **Puerto ya en uso:** otro programa usa el puerto 5173 o 3001. Puedes cambiarlo en el `.env`.
+- **Puerto ya en uso:** otro programa usa el puerto 8080. Puedes cambiarlo en el `.env` con `FRONTEND_HOST_PORT`.
+- **"variable is required" / falla al arrancar:** falta `POSTGRES_PASSWORD` en tu `.env` — es la única variable obligatoria.
 - **Docker no está corriendo:** abre Docker Desktop y espera a que arranque.
 - **Error de permisos en Linux:** asegúrate de haber ejecutado `sudo usermod -aG docker $USER` y haber cerrado sesión.
 

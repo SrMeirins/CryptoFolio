@@ -6,6 +6,11 @@ interface BackendOptions {
   databaseUrl: string;
   port?: number;
   onCrash?: (detail: string) => void;
+  // Clave AES-256 (base64) para cifrar/descifrar API keys de proveedores
+  // on-chain — ver secrets-manager.ts. Opcional: sin ella, el backend sigue
+  // funcionando normalmente, solo la verificación de saldos on-chain queda
+  // deshabilitada (falla de forma controlada al intentar guardar una key).
+  walletSyncEncryptionKey?: string;
 }
 
 export class BackendManager {
@@ -13,6 +18,7 @@ export class BackendManager {
   private readonly databaseUrl: string;
   private readonly port: number;
   private readonly onCrash?: (detail: string) => void;
+  private readonly walletSyncEncryptionKey?: string;
   private recentStderr: string[] = [];
   private running = false;
 
@@ -20,6 +26,7 @@ export class BackendManager {
     this.databaseUrl = opts.databaseUrl;
     this.port = opts.port ?? 3001;
     this.onCrash = opts.onCrash;
+    this.walletSyncEncryptionKey = opts.walletSyncEncryptionKey;
   }
 
   /** Ruta al entry point del backend compilado */
@@ -47,6 +54,9 @@ export class BackendManager {
         ELECTRON_MODE: 'true',
         // El backend solo escucha en localhost — nunca en 0.0.0.0
         BACKEND_HOST: '127.0.0.1',
+        ...(this.walletSyncEncryptionKey
+          ? { WALLET_SYNC_ENCRYPTION_KEY: this.walletSyncEncryptionKey }
+          : {}),
       },
       stdio: 'pipe',
     });

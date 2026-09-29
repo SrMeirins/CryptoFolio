@@ -1,5 +1,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# CryptoFolio — Makefile de desarrollo Dockerizado
+# CryptoFolio — Makefile de DESARROLLO Dockerizado (uso interno del equipo)
+#
+# Todos los targets de este Makefile usan docker-compose.dev.yml — el stack
+# de desarrollo, nunca el de producción. Un usuario final NO necesita este
+# Makefile: solo necesita `docker compose up -d` con docker-compose.yml
+# (ver README.md, sección de instalación).
 #
 # Todo el stack usa un `.env.dev` (gitignoreado, generado) con secretos
 # aleatorios y puertos host libres → arranca SIEMPRE sin colisionar con otras
@@ -12,9 +17,10 @@
 
 SHELL       := /bin/bash
 DEV_ENV     := .env.dev
+DEV_COMPOSE_FILE := docker-compose.dev.yml
 ENV_SH      := ./scripts/dev-env.sh
-# Compose siempre anclado a nuestro env de desarrollo y al proyecto aislado.
-COMPOSE     := docker compose --env-file $(DEV_ENV)
+# Compose siempre anclado al fichero de dev, nuestro env y el proyecto aislado.
+COMPOSE     := docker compose -f $(DEV_COMPOSE_FILE) --env-file $(DEV_ENV)
 
 .DEFAULT_GOAL := help
 .PHONY: help env dev dev-clean rebuild restart tools prod down ps logs logs-backend logs-frontend psql sh-backend backend-test urls clean nuke

@@ -1,0 +1,259 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CryptoFolio — stack de DESARROLLO Dockerizado (uso interno, no para usuarios)
+#
+# Este fichero es SOLO para desarrollar/probar CryptoFolio en local — nunca
+# se recomienda a usuarios finales. El fichero que sí deben usar es
+# `docker-compose.yml` (producción, self-hosted real), documentado en el
+# README. Diferencias clave: aquí el backend corre con hot-reload
+# (ts-node-dev + bind-mount de src/), el frontend por defecto es el dev
+# server de Vite (sin minificar), y los puertos están pensados para convivir
+# con otros stacks Docker en la misma máquina (no para exponerse a nadie).
+#
+# Arranque: `make dev` (BBDD con datos) o `make dev-clean` (BBDD vacía) — el
+# Makefile ya apunta a este fichero explícitamente (`-f docker-compose.dev.yml`).
+#
+# Diseño anti-colisión (para convivir con otras apps dockerizadas):
+#   • Nombre de proyecto aislado (COMPOSE_PROJECT_NAME) → redes y volúmenes
+#     namespaced; nunca chocan con otros stacks.
+#   • SIN container_name → Docker asigna <proyecto>_<servicio>_1; permite varios
+#     entornos y no secuestra nombres globales.
+#   • Puertos host en rango poco transitado (4xxxx), SIEMPRE ligados a 127.0.0.1
+#     (nunca a la LAN) y sobreescribibles vía variables *_HOST_PORT.
+#   • Los puertos INTERNOS de cada servicio son fijos: es lo que usa la red de
+#     compose (p. ej. el proxy de Vite apunta a backend:3001).
+#
+# Endurecimiento (defensa en profundidad, aunque todo esté en 127.0.0.1):
+#   • Redes segmentadas: backend-net (postgres/backend/db-backup/pgadmin) y
+#     frontend-net (frontend/backend) — el frontend nunca puede alcanzar
+#     Postgres directamente, solo al backend.
+#   • cap_drop: ALL + no-new-privileges en todos los servicios (mínimo
+#     privilegio de kernel; ninguno necesita capabilities especiales salvo
+#     Postgres, que las añade explícitamente para su chown inicial de datos).
+#
+# Arranque recomendado: `make dev` (BBDD con datos) o `make dev-clean` (BBDD vacía).
+# El Makefile genera un `.env.dev` (gitignoreado) con secretos aleatorios y
+# puertos libres auto-detectados; por eso aquí no hay credenciales fijas reales.
+# ─────────────────────────────────────────────────────────────────────────────
+name: ${COMPOSE_PROJECT_NAME:-cryptofolio}
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cryptotracker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_local}
+      POSTGRES_DB: ${POSTGRES_DB:-cryptotracker}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Schema inicial se ejecuta SOLO al crear el volumen (arranque limpio)
+      - ./backend/src/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    ports:
+      # Host: puerto alto y poco común, ligado a loopback. Interno fijo 5432.
+      - "127.0.0.1:${PG_HOST_PORT:-45432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cryptotracker} -d ${POSTGRES_DB:-cryptotracker}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - backend-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # El entrypoint oficial arranca como root y hace chown/chmod del volumen de
+    # datos antes de bajar privilegios a "postgres" (vía gosu/setuid) — sin estas
+    # 3 capabilities concretas, initdb falla (verificado: falla real con solo
+    # cap_drop: ALL). El resto del proceso postgres corre sin privilegios.
+    cap_add:
+      - CHOWN
+      - FOWNER
+      - DAC_OVERRIDE
+      - SETUID
+      - SETGID
+
+  # ── Backend Node.js ────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      # DATABASE_URL se deriva del servicio postgres (red interna 5432), así el
+      # host mapeado da igual y nunca hay descuadre usuario/clave/db.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-cryptotracker}:${POSTGRES_PASSWORD:-dev_password_local}@postgres:5432/${POSTGRES_DB:-cryptotracker}}
+      # Interno FIJO a 3001: lo consumen el proxy de Vite (backend:3001) y el
+      # healthcheck. Para cambiar el acceso desde el host usa BACKEND_HOST_PORT.
+      BACKEND_PORT: "3001"
+      COINGECKO_BASE_URL: ${COINGECKO_BASE_URL:-https://api.coingecko.com/api/v3}
+      COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
+      # Verificación de saldos on-chain (backend/src/modules/walletSync) — todas
+      # opcionales; sin ellas, esas redes concretas simplemente no se verifican.
+      WALLET_SYNC_ENCRYPTION_KEY: ${WALLET_SYNC_ENCRYPTION_KEY:-}
+      ETHERSCAN_API_KEY: ${ETHERSCAN_API_KEY:-}
+      BLOCKFROST_API_KEY: ${BLOCKFROST_API_KEY:-}
+      SUBSCAN_API_KEY: ${SUBSCAN_API_KEY:-}
+      PRICE_REFRESH_INTERVAL_MS: ${PRICE_REFRESH_INTERVAL_MS:-60000}
+    command: ["npx", "ts-node-dev", "--respawn", "--transpile-only", "--poll", "src/index.ts"]
+    volumes:
+      # Hot reload: ts-node-dev lee directamente src/ (no usa dist/)
+      - ./backend/src:/app/src
+      # Carpeta para subida de CSVs (persiste entre reinicios)
+      - csv_uploads:/app/uploads
+    ports:
+      - "127.0.0.1:${BACKEND_HOST_PORT:-43001}:3001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - backend-net
+      - frontend-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # ── Frontend React (Vite) ──────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      # Hot reload: montar src del host para que Vite sirva siempre el código actual
+      - ./frontend/src:/app/src
+    ports:
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-45173}:5173"
+    networks:
+      - frontend-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # ── Frontend en modo producción (opcional: docker compose --profile prod up) ─
+  # Build real con `vite build` servido estático por nginx — sin dev server
+  # expuesto. Alternativa a `frontend` para cuando el stack de Docker se
+  # despliega en un servidor accesible por red en vez de solo en local.
+  # No sustituye a `frontend`: conviven, cada uno con su puerto host.
+  frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    profiles:
+      - prod
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FRONTEND_PROD_HOST_PORT:-45180}:8080"
+    networks:
+      - frontend-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      # nginx necesita escribir su pid y cachés temporales de proxy/body;
+      # con la imagen no-root y rootfs de solo lectura, tmpfs es suficiente
+      # y evita dar escritura real en el sistema de ficheros de la imagen.
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+
+  # ── Backup automático de PostgreSQL ─────────────────────────────────────────
+  # pg_dump comprimido a diario mientras el stack esté levantado, con retención
+  # por cantidad de ficheros. Ver scripts/backup-loop.sh. `make backup` hace un
+  # dump manual inmediato sin depender de este servicio.
+  db-backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-cryptotracker}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-dev_password_local}
+      PGDATABASE: ${POSTGRES_DB:-cryptotracker}
+      BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-14}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup-loop.sh:/backup-loop.sh:ro
+    entrypoint: ["/bin/sh", "/backup-loop.sh"]
+    networks:
+      - backend-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # ── pgAdmin (opcional: make tools / docker compose --profile tools up) ──────
+  pgadmin:
+    # Tag fijo (no :latest): make dev/tools siempre reproducible, sin sorpresas
+    # de una actualización silenciosa de pgAdmin entre arranques.
+    image: dpage/pgadmin4:9.18.0
+    restart: unless-stopped
+    profiles:
+      - tools
+    environment:
+      # ".local" es un TLD de uso especial que el validador de email de pgAdmin
+      # 9.x rechaza (verificado: con :latest quedó cacheada antes una versión
+      # menos estricta que no lo comprobaba). ".app" es un gTLD real y pasa la
+      # validación sin necesidad de que el dominio exista de verdad.
+      PGADMIN_DEFAULT_EMAIL: admin@cryptofolio.app
+      # Password PROPIO de pgAdmin, independiente del de Postgres (antes
+      # reutilizaba POSTGRES_PASSWORD: comprometer uno comprometía el otro).
+      # Generado por scripts/dev-env.sh junto al resto de secretos de .env.dev.
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-dev_password_local}
+    ports:
+      # Puerto interno 8080, no 80: con cap_drop: ALL, pgAdmin no tiene
+      # NET_BIND_SERVICE para bindear el 80 y cae automáticamente al 8080
+      # (lo señaliza como "Restricted security context detected" en el log).
+      - "127.0.0.1:${PGADMIN_HOST_PORT:-45050}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  postgres_data:
+    driver: local
+  csv_uploads:
+    driver: local
+
+networks:
+  # Subredes FIJAS (no delegadas al pool por defecto de Docker): en máquinas
+  # con muchos stacks Docker el pool de direcciones se agota ("all predefined
+  # address pools have been fully subnetted"). 10.250.x.0/24 es un rango alto
+  # sin uso conocido en este host — cambia si colisiona con otra red tuya.
+  # Solo el backend puede hablar con Postgres/pgAdmin/el sidecar de backup.
+  backend-net:
+    ipam:
+      config:
+        - subnet: 10.250.10.0/24
+  # El frontend solo puede hablar con el backend (nunca con Postgres directo).
+  frontend-net:
+    ipam:
+      config:
+        - subnet: 10.250.11.0/24
