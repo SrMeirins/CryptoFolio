@@ -4,6 +4,7 @@ import { db } from '../../db/client';
 import { ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
 import { ACCOUNT_TO_WALLET, TRANSFER_DESTINATIONS } from './binanceAccounts';
+import { rowHash } from './parser';
 import { Exchange, parseExchangeCsv, validateExchangeCsv } from './exchanges';
 import { getHistoricalPriceEur, refreshLivePrices } from '../prices/binance';
 import { setCoinGeckoStatusCallback, prefetchHistoricalPrices as prefetchCoinGeckoHistoricalPrices } from '../prices/coingecko';
@@ -367,6 +368,23 @@ export async function importCsvFile(
       bom: true,
       trim: true,
     });
+    // occurrenceIndex por tupla, en el MISMO orden y con la MISMA clave que
+    // parser.ts — imprescindible para que el hash de aquí coincida con el
+    // rawRowHashes[0] que trae la transacción ya parseada (ver rowHash() en
+    // parser.ts: dos fórmulas de hash distintas para la misma fila nunca
+    // coinciden, y la resolución de destino fallaba en silencio para TODAS
+    // las transferencias internas — bug real encontrado 2026-09-29).
+    const tupleOccurrences = new Map<string, number>();
+    function nextOccurrenceIndex(rec: Record<string, string>): number {
+      const tupleKey = [
+        rec['User ID'], rec['Time'], rec['Account'], rec['Operation'],
+        rec['Coin'], rec['Change'],
+      ].join('|');
+      const idx = tupleOccurrences.get(tupleKey) ?? 0;
+      tupleOccurrences.set(tupleKey, idx + 1);
+      return idx;
+    }
+
     // Indexar todas las filas de entrada (change > 0) de operaciones de transferencia interna
     // por el identificador que comparte con su fila de salida: time|operation|coin|absChange
     for (const rec of rawRecords) {
@@ -376,17 +394,15 @@ export async function importCsvFile(
         incomingByKey.set(key, rec['Account']);
       }
     }
-    // Para cada fila de salida, calcular su hash (igual que el parser) y mapear al destino real
     for (const rec of rawRecords) {
       const change = parseFloat(rec['Change'] ?? '0');
+      const occurrenceIndex = nextOccurrenceIndex(rec);
       if (change < 0 && TRANSFER_DESTINATIONS[rec['Operation']]) {
         const absChangeStr = rec['Change'].startsWith('-') ? rec['Change'].slice(1) : rec['Change'];
         const key = `${rec['Time']}|${rec['Operation']}|${rec['Coin']}|${absChangeStr}`;
         const incomingAccount = incomingByKey.get(key);
         if (incomingAccount) {
-          const hash = createHash('sha256').update(
-            [rec['User ID'] ?? '', rec['Time'] ?? '', rec['Account'] ?? '', rec['Operation'] ?? '', rec['Coin'] ?? '', rec['Change'] ?? '', rec['Remark'] ?? ''].join('|')
-          ).digest('hex');
+          const hash = rowHash(rec, occurrenceIndex);
           transferDestByHash.set(hash, incomingAccount);
         }
       }

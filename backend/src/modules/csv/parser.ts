@@ -82,7 +82,7 @@ function parseDate(raw: string): Date {
 // MISMA operación real y la duplicaría en un reimport. El índice de
 // aparición ya protege contra colisiones sin necesitar el contenido de
 // Remark para desambiguar.
-function rowHash(row: Record<string, string>, occurrenceIndex: number): string {
+export function rowHash(row: Record<string, string>, occurrenceIndex: number): string {
   const key = [
     row['User ID'] ?? '',
     row['Time'] ?? '',
