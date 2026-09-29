@@ -26,7 +26,7 @@ COMPOSE     := docker compose -f $(DEV_COMPOSE_FILE) --env-file $(DEV_ENV)
 .DEFAULT_GOAL := help
 .PHONY: help env dev dev-clean rebuild restart tools prod down ps logs logs-backend logs-frontend \
         urls open version psql sh-backend sh-frontend \
-        test test-backend test-frontend test-electron lint typecheck \
+        test test-backend test-frontend test-electron lint lint-md typecheck \
         backup restore clean nuke
 
 ## ── Ayuda ────────────────────────────────────────────────────────────────────
@@ -130,6 +130,9 @@ typecheck: ## Typecheck de los 3 proyectos
 	@$(COMPOSE) exec backend npm run typecheck
 	@$(COMPOSE) exec frontend npm run typecheck
 	@cd electron && npx tsc --noEmit
+
+lint-md: ## Lint de todos los ficheros Markdown del repo (en el host, no necesita el stack levantado)
+	@npm run lint:md
 
 ## ── Acceso ───────────────────────────────────────────────────────────────────
 psql: ## Shell psql dentro del contenedor de Postgres
