@@ -148,6 +148,54 @@ export interface SimulationResult {
   lotsConsumed:   SimulatedLot[]
 }
 
+// Forma mínima común de wallet que necesita el wizard de operaciones
+// (constants/operations.ts la consume para el selector). WalletsSection.tsx
+// (pages/settings/) tiene su propio tipo local más completo (con
+// addresses/notes/is_default) para la pantalla de gestión de wallets —
+// no se ha forzado una unión aquí para no tocar ese fichero fuera de su
+// propio turno; comparten queryKey ('wallets') así que React Query ya
+// cachea/deduplica entre ambos aunque los tipos no estén unificados.
+export interface Wallet {
+  id:        string
+  name:      string
+  type:      string
+  color:     string
+  is_system: boolean
+}
+
+export interface FieldDefinition {
+  name: string
+  label: string
+  required: boolean
+  auto?: boolean
+  type: 'asset' | 'number' | 'wallet' | 'datetime' | 'text' | 'select'
+  placeholder?: string
+  hint?: string
+  options?: { value: string; label: string }[]
+}
+
+export interface OperationType {
+  id: string
+  category: string
+  label: string
+  description: string
+  helper: string
+  fiscalHelper: string
+  fiscalTreatment: string
+  fifoEffect: string
+  fields: FieldDefinition[]
+  example?: string
+  badge: string
+  badgeColor: 'green' | 'red' | 'blue' | 'gray' | 'amber'
+}
+
+export interface CategoryMeta { label: string; description: string; icon: string }
+
+export interface CatalogData {
+  categories: Record<string, CategoryMeta>
+  operations: OperationType[]
+}
+
 export interface FiatBalance {
   wallet_id: string
   wallet_name: string
@@ -207,7 +255,8 @@ export const portfolioApi = {
     topAssets: { asset: string; ops: number; eur_volume: number }[]
     fees: { asset: string; ops: number; total_amount: number; total_eur: number }[]
   }>('/transactions/stats'),
-  getWallets: () => api.get<unknown[]>('/wallets'),
+  getWallets: () => api.get<Wallet[]>('/wallets'),
+  getCatalog: () => api.get<CatalogData>('/catalog'),
   getNetworks: () => api.get<unknown[]>('/wallets/networks'),
   createWallet: (data: Record<string, unknown>) => api.post<{ id: string }>('/wallets', data),
   updateWallet: (id: string, data: Record<string, unknown>) => api.put<{ success: boolean }>(`/wallets/${id}`, data),
