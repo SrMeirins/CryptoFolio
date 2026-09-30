@@ -60,6 +60,11 @@ jobs:
         working-directory: electron
         run: npm ci
 
+      # Sobrescribe electron/package.json#version con la del tag — el valor
+      # committeado en el repo es solo un punto de partida razonable (se
+      # mantiene sincronizado a mano con el último tag real), nunca la
+      # fuente de verdad real. electron-builder lo usa para nombrar los
+      # instaladores (CryptoFolio-Setup-X.Y.Z.exe, etc.).
       - name: Set version
         if: inputs.version != ''
         working-directory: electron
