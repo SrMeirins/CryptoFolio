@@ -60,8 +60,6 @@
 }
 
 @layer utilities {
-  .text-positive { @apply text-accent-green; }
-  .text-negative { @apply text-accent-red; }
   .card { @apply bg-background-card border border-border rounded-xl p-5; }
   .mono { @apply font-mono; }
 }
