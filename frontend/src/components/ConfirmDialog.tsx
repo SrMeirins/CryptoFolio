@@ -1,5 +1,6 @@
-import { useEffect, useRef, useId } from 'react'
+import { useRef, useId } from 'react'
 import { AlertTriangle, X } from 'lucide-react'
+import { useModalA11y } from '../hooks/useModalA11y'
 
 interface ConfirmDialogProps {
   title: string
@@ -22,47 +23,10 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const titleId   = useId()
   const messageId = useId()
-  const dialogRef = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
-
-  // Foco al botón de cancelar al abrir (nunca al de confirmar, aunque no
-  // sea "danger" — evita que un Enter accidental dispare la acción) y
-  // restaurado al elemento que tenía el foco antes de abrir el diálogo al
-  // cerrarlo. Escape cierra como cancelar. Tab/Shift+Tab quedan atrapados
-  // dentro del diálogo mientras está abierto (un modal no debe dejar
-  // navegar por teclado al contenido de detrás).
-  useEffect(() => {
-    const previouslyFocused = document.activeElement as HTMLElement | null
-    cancelRef.current?.focus()
-
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onCancel()
-        return
-      }
-      if (e.key !== 'Tab' || !dialogRef.current) return
-      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      )
-      if (focusable.length === 0) return
-      const first = focusable[0]
-      const last  = focusable[focusable.length - 1]
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      previouslyFocused?.focus()
-    }
-  }, [onCancel])
+  // Foco inicial siempre al botón cancelar (nunca al de confirmar, aunque
+  // no sea "danger") — evita que un Enter accidental dispare la acción.
+  const dialogRef = useModalA11y<HTMLDivElement>(onCancel, cancelRef)
 
   return (
     // Overlay
