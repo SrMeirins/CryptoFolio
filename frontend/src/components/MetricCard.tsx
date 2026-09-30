@@ -3,9 +3,7 @@ import { AnimatedNumber } from './AnimatedNumber'
 
 export interface Change24h { eur: string; pct: string; positive: boolean }
 
-export function MetricCard({
-  label, value, rawValue, format, positive, loading, tooltip, change24h, change24hLoading,
-}: {
+interface MetricCardProps {
   label: string
   value: string
   rawValue?: number
@@ -15,7 +13,11 @@ export function MetricCard({
   tooltip?: React.ReactNode
   change24h?: Change24h | null
   change24hLoading?: boolean
-}) {
+}
+
+export function MetricCard({
+  label, value, rawValue, format, positive, loading, tooltip, change24h, change24hLoading,
+}: MetricCardProps) {
   const colorClass =
     positive === undefined ? 'text-white' :
     positive ? 'text-accent-green' : 'text-accent-red'
@@ -30,7 +32,7 @@ export function MetricCard({
       {loading
         ? <div className="h-8 w-32 skeleton rounded-lg" />
         : (
-          <p key="value" className={`text-[1.65rem] font-semibold tracking-tight leading-none font-['JetBrains_Mono',monospace] animate-value-reveal ${colorClass}`}>
+          <p className={`text-[1.65rem] font-semibold tracking-tight leading-none mono animate-value-reveal ${colorClass}`}>
             {rawValue !== undefined && format
               ? <AnimatedNumber value={rawValue} format={format} />
               : value
