@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { ChevronDown, Check } from 'lucide-react'
+import { useClickOutside } from '../../hooks/useClickOutside'
 
 export const SPECIAL_DESTINATIONS = [
   {
@@ -33,13 +34,7 @@ export function WithdrawalSelector({ value, coldWallets, onChange }: {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    function onOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    if (open) document.addEventListener('mousedown', onOutside)
-    return () => document.removeEventListener('mousedown', onOutside)
-  }, [open])
+  useClickOutside(ref, () => setOpen(false), open)
 
   const special = SPECIAL_DESTINATIONS.find(s => s.id === value)
   const wallet  = coldWallets.find(w => w.id === value)

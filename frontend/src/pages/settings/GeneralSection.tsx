@@ -2,13 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { portfolioApi } from '../../api/portfolio'
 import { AlertCircle, Bell, BellOff, X, ArrowRight, Wrench } from 'lucide-react'
-
-const NOTIFICATION_ROUTES: Record<string, string> = {
-  'no-price':            '/settings?tab=assets',
-  'lots-no-price':       '/settings?tab=assets',
-  'pending-withdrawals': '/history',
-  'crypto-deposits':     '/import',
-}
+import { NOTIFICATION_ROUTES } from '../../constants/notifications'
 
 const NOTIFICATION_LABELS: Record<string, string> = {
   'no-price':            'Ir a Activos',

@@ -4,6 +4,7 @@ import {
   ChevronRight, ChevronLeft, Info, AlertCircle, CheckCircle, X, Zap,
   ChevronDown,
 } from 'lucide-react'
+import { useClickOutside } from '../hooks/useClickOutside'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 interface WalletOption { id: string; name: string; type: string; color: string; is_system: boolean }
@@ -619,13 +620,7 @@ function WalletPicker({
   const ref = useRef<HTMLDivElement>(null)
   const selected = wallets.find(w => w.id === value)
 
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    if (open) document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [open])
+  useClickOutside(ref, () => setOpen(false), open)
 
   const typeLabel: Record<string, string> = { exchange: 'Exchange', cold: 'Frío', hot: 'Caliente', other: 'Otro' }
 
