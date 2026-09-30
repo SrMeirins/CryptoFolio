@@ -7,7 +7,7 @@
 module.exports = {
   appId: 'com.cryptofolio.app',
   productName: 'CryptoFolio',
-  copyright: 'Copyright © 2026 CryptoFolio',
+  copyright: `Copyright © ${new Date().getFullYear()} CryptoFolio`,
 
   // Archivos del proceso Electron (main + preload compilados).
   // compiled/ está gitignoreado (no es código fuente) pero sí debe
