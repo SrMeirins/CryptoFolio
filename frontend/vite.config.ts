@@ -1,6 +1,14 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// 'backend' resuelve por DNS de Docker Compose dentro de la red del stack de
+// dev (docker-compose.dev.yml) — solo funciona corriendo `vite` DENTRO de
+// ese contenedor (el flujo real: `make dev`), no invocando `vite`/`npm run
+// dev` directo en el host. Si algún día se necesita correr fuera de Docker
+// (p. ej. para probar el modo dev de Electron, que carga localhost:5173),
+// hace falta otro mecanismo (variable de entorno, host.docker.internal...).
+const BACKEND_HOST = 'backend:3001'
+
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -11,8 +19,8 @@ export default defineConfig({
       // durar varios minutos (precios históricos con backoff de CoinGecko). Sin esto, el
       // http-proxy del dev corta la conexión por inactividad y el frontend lo pinta como
       // "Error de conexión" aunque el backend siga procesando.
-      '/api': { target: 'http://backend:3001', changeOrigin: true, timeout: 0, proxyTimeout: 0 },
-      '/ws':  { target: 'ws://backend:3001',  ws: true },
+      '/api': { target: `http://${BACKEND_HOST}`, changeOrigin: true, timeout: 0, proxyTimeout: 0 },
+      '/ws':  { target: `ws://${BACKEND_HOST}`,  ws: true },
     },
   },
   build: {

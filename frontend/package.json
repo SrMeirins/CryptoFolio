@@ -1,6 +1,6 @@
 {
-  "name": "cryptotracker-frontend",
-  "version": "0.0.10",
+  "name": "cryptofolio-frontend",
+  "version": "0.0.14",
   "private": true,
   "scripts": {
     "dev": "vite",
