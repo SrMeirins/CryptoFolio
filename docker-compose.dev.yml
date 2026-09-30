@@ -143,9 +143,6 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    volumes:
-      # Hot reload: montar src del host para que Vite sirva siempre el código actual
-      - ./frontend/src:/app/src
     ports:
       - "127.0.0.1:${FRONTEND_HOST_PORT:-45173}:5173"
     healthcheck:
@@ -168,12 +165,23 @@ services:
     # dev`). Sin este bloque, este servicio heredaba en silencio el
     # read_only/tmpfs pensado para nginx (/var/cache/nginx, /var/run) — rutas
     # que no existen en esta imagen, así que Vite no podía escribir su caché
-    # de dependencias en /app/node_modules/.vite y quedaba en bucle de error
-    # (comprobado: ENOENT en mkdir, reproducido y corregido en este cambio).
+    # de dependencias en /app/node_modules/.vite y quedaba en bucle de error.
     read_only: true
     tmpfs:
       - /tmp
-      - /app/node_modules/.vite
+    volumes:
+      # Hot reload: montar src del host para que Vite sirva siempre el código actual
+      - ./frontend/src:/app/src
+      # Caché de dependencias de Vite — tmpfs de solo-lectura del rootfs
+      # necesita mode explícito: a diferencia de /tmp (que Docker monta en
+      # 1777 por defecto), un tmpfs normal se monta a 0755 propiedad de
+      # root, ilegible en escritura para el usuario "node" (no-root) que
+      # corre este contenedor — comprobado en vivo (EACCES en mkdir antes
+      # de este cambio).
+      - type: tmpfs
+        target: /app/node_modules/.vite
+        tmpfs:
+          mode: 01777
     logging: *default-logging
 
   # ── Frontend en modo producción (opcional: docker compose --profile prod up) ─
