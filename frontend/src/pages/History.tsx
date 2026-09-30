@@ -689,11 +689,15 @@ export function History() {
   async function handleDelete(id: string) {
     setDeletingId(id)
     try {
-      await portfolioApi.deleteManualTx(id)
+      const result = await portfolioApi.deleteManualTx(id)
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
       queryClient.invalidateQueries({ queryKey: ['tx-stats'] })
       queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
-      toast.success('Transacción eliminada', 'FIFO recalculado')
+      if (result.fifoError) {
+        toast.warning('Transacción eliminada', `Eliminada, pero el recálculo FIFO falló: ${result.fifoError}`)
+      } else {
+        toast.success('Transacción eliminada', 'FIFO recalculado')
+      }
     } catch (e) {
       toast.error('Error al eliminar', (e as Error).message)
     } finally {
