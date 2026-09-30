@@ -10,15 +10,15 @@ interface Props {
 }
 
 /**
- * Renders `format(value)` and smoothly interpolates from the previous value
- * to the new one using requestAnimationFrame whenever `value` changes.
- * On first mount the value appears instantly (no animation from 0).
+ * Renderiza `format(value)` e interpola suavemente del valor anterior al
+ * nuevo con requestAnimationFrame cada vez que cambia `value`.
+ * En el montaje inicial el valor aparece al instante (sin animar desde 0).
  */
 export function AnimatedNumber({ value, format, className = '', duration = 450 }: Props) {
   const [displayed, setDisplayed] = useState(value)
 
-  // Keep a ref in sync with state so we can read current position
-  // synchronously when a new update arrives mid-animation.
+  // Ref sincronizado con el state para poder leer la posición actual de
+  // forma síncrona si llega una actualización nueva a mitad de animación.
   const displayedRef = useRef(value)
   const rafRef       = useRef(0)
   const isFirst      = useRef(true)
