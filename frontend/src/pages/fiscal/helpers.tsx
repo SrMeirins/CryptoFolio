@@ -45,15 +45,17 @@ export function useTramos(): Tramo[] {
   return TRAMOS_DEFAULT.map((t, i) => ({ ...t, tipo: tipos[i] ?? t.tipo }))
 }
 
-export function calcularTramos(base: number, tramos: Tramo[] = TRAMOS_DEFAULT): { tramo: string; tipo: number; cuota: number }[] {
+export interface TramoDesglose { tramo: string; tipo: number; cuota: number; base: number }
+
+export function calcularTramos(base: number, tramos: Tramo[] = TRAMOS_DEFAULT): TramoDesglose[] {
   if (base <= 0) return []
-  const result = []
+  const result: TramoDesglose[] = []
   let restante = base
   let anterior = 0
   for (const t of tramos) {
     if (restante <= 0) break
     const tramo = Math.min(restante, t.hasta - anterior)
-    if (tramo > 0) result.push({ tramo: t.label, tipo: t.tipo, cuota: tramo * (t.tipo / 100) })
+    if (tramo > 0) result.push({ tramo: t.label, tipo: t.tipo, cuota: tramo * (t.tipo / 100), base: tramo })
     restante -= tramo
     anterior = t.hasta === Infinity ? restante : t.hasta
   }
