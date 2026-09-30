@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 
 export function InfoTooltip({ label, children, direction = 'down' }: {
   label: string
@@ -6,23 +6,33 @@ export function InfoTooltip({ label, children, direction = 'down' }: {
   direction?: 'up' | 'down'
 }) {
   const [visible, setVisible] = useState(false)
+  const tooltipId = useId()
 
   return (
     <div className="relative inline-flex items-center"
       onMouseEnter={() => setVisible(true)}
       onMouseLeave={() => setVisible(false)}>
-      <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-semibold cursor-default select-none transition-all duration-150 ${
-        visible
-          ? 'bg-accent-blue/20 text-accent-blue border border-accent-blue/50'
-          : 'bg-white/5 text-gray-600 border border-white/10 hover:border-white/20 hover:text-gray-400'
-      }`}>
+      <button
+        type="button"
+        aria-label={label}
+        aria-describedby={visible ? tooltipId : undefined}
+        onFocus={() => setVisible(true)}
+        onBlur={() => setVisible(false)}
+        className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-semibold cursor-default select-none transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 ${
+          visible
+            ? 'bg-accent-blue/20 text-accent-blue border border-accent-blue/50'
+            : 'bg-white/5 text-gray-600 border border-white/10 hover:border-white/20 hover:text-gray-400'
+        }`}>
         ?
-      </span>
+      </button>
 
       {visible && (
-        <div className={`absolute left-1/2 -translate-x-1/2 z-[100] w-64 pointer-events-none ${
-          direction === 'down' ? 'top-full mt-2.5' : 'bottom-full mb-2.5'
-        }`}>
+        <div
+          id={tooltipId}
+          role="tooltip"
+          className={`absolute left-1/2 -translate-x-1/2 z-[100] w-64 pointer-events-none ${
+            direction === 'down' ? 'top-full mt-2.5' : 'bottom-full mb-2.5'
+          }`}>
           {direction === 'down' && (
             <div className="flex justify-center -mb-px">
               <div className="w-2.5 h-2.5 rotate-45 border-l border-t border-white/10 bg-gray-950/90 backdrop-blur-xl" />
