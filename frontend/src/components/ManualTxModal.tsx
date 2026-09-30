@@ -4,7 +4,7 @@ import {
   Loader, ArrowRight, Package, Zap,
 } from 'lucide-react'
 import { OperationWizard, WizardResult } from './OperationWizard'
-import { portfolioApi, ManualTxPreview, Transaction } from '../api/portfolio'
+import { portfolioApi, ManualTxPreview, Transaction, FifoRunResult } from '../api/portfolio'
 import { formatEur, formatPrice, formatAmount, pnlColor } from '../utils/format'
 import { useToast } from './Toast'
 
@@ -36,13 +36,6 @@ function txToInitialValues(tx: Transaction): { operationTypeId: string; fields: 
 
 type Step = 'wizard' | 'preview' | 'saving' | 'done'
 
-interface FifoStats {
-  lotsCreated: number
-  lotsConsumed: number
-  totalGainEur: number
-  totalLossEur: number
-}
-
 export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModalProps) {
   const toast = useToast()
   const isEditMode = !!transaction
@@ -51,7 +44,7 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
   const [preview, setPreview]       = useState<ManualTxPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [error, setError]           = useState<string | null>(null)
-  const [fifoStats, setFifoStats]   = useState<FifoStats | null>(null)
+  const [fifoStats, setFifoStats]   = useState<FifoRunResult | null>(null)
 
   const initialValues = transaction ? txToInitialValues(transaction) : undefined
 
@@ -79,22 +72,24 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
 
     try {
       const data = buildTxData(wizardResult)
-      if (isEditMode && transaction) {
-        const result = await portfolioApi.updateManualTx(transaction.id, data) as { success: boolean; fifo?: FifoStats }
-        if (result.fifo) setFifoStats(result.fifo)
-        setStep('done')
-        onSuccess()
-        toast.success(
-          'Transacción actualizada',
-          result.fifo ? `FIFO recalculado · ${result.fifo.lotsCreated} lotes creados` : 'FIFO actualizándose...'
-        )
+      const result = isEditMode && transaction
+        ? await portfolioApi.updateManualTx(transaction.id, data)
+        : await portfolioApi.createManualTx(data)
+
+      if (result.fifo) setFifoStats(result.fifo)
+      setStep('done')
+      onSuccess()
+
+      const successTitle = isEditMode ? 'Transacción actualizada' : 'Transacción guardada'
+      if (result.fifoError) {
+        // success:true en la respuesta HTTP pero el recálculo FIFO ha
+        // fallado (backend/src/routes/transactions.ts) — la transacción se
+        // guardó, pero lotes/ganancias pueden estar desactualizados hasta
+        // recalcular a mano. Antes este caso se perdía en silencio.
+        toast.warning(successTitle, `Guardada, pero el recálculo FIFO falló: ${result.fifoError}`)
       } else {
-        const result = await portfolioApi.createManualTx(data) as { success: boolean; fifo?: FifoStats }
-        if (result.fifo) setFifoStats(result.fifo)
-        setStep('done')
-        onSuccess()
         toast.success(
-          'Transacción guardada',
+          successTitle,
           result.fifo ? `FIFO recalculado · ${result.fifo.lotsCreated} lotes creados` : 'FIFO actualizándose...'
         )
       }
@@ -322,7 +317,7 @@ function PreviewContent({ preview, wizardResult }: { preview: ManualTxPreview & 
 // ── DoneScreen ─────────────────────────────────────────────────────────────
 function DoneScreen({
   fifoStats, isEditMode, onClose, onAddAnother,
-}: { fifoStats: FifoStats | null; isEditMode: boolean; onClose: () => void; onAddAnother?: () => void }) {
+}: { fifoStats: FifoRunResult | null; isEditMode: boolean; onClose: () => void; onAddAnother?: () => void }) {
   return (
     <>
       <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">

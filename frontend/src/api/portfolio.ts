@@ -1,5 +1,16 @@
 import { api } from './client'
 
+// Resultado del motor FIFO (backend/src/modules/fifo/engine.ts). Lo devuelven
+// tal cual /fifo/run y, anidado bajo `fifo`, los 3 endpoints de transacción
+// manual — antes había 3 copias inline de esta forma en este fichero, una de
+// ellas (deleteManualTx) desincronizada (solo 2 de los 4 campos reales).
+export interface FifoRunResult {
+  lotsCreated:  number
+  lotsConsumed: number
+  totalGainEur: number
+  totalLossEur: number
+}
+
 export interface FifoLot {
   asset: string
   wallet_id: string
@@ -126,7 +137,7 @@ export const portfolioApi = {
   getLockedAmounts: () => api.get<LockedAmount[]>('/fifo/locked'),
   getFiatBalances: () => api.get<FiatBalance[]>('/fifo/fiat-balances'),
   getFiscalSummary: () => api.get<FiscalYear[]>('/fifo/summary'),
-  runFifo: () => api.post<{ success: boolean; lotsCreated: number; lotsConsumed: number; totalGainEur: number; totalLossEur: number }>('/fifo/run'),
+  runFifo: () => api.post<{ success: boolean } & FifoRunResult>('/fifo/run'),
   getLivePrices: () => api.get<Record<string, number>>('/prices/live'),
   getHistoricalPrice: (asset: string, date: string) =>
     api.get<{ asset: string; date: string; price_eur: number }>(`/prices/historical?asset=${asset}&date=${date}`),
@@ -144,12 +155,17 @@ export const portfolioApi = {
   searchCoinGecko: (symbol: string) => api.get<{ found: boolean; coingecko_id?: string; price_eur?: number }>(`/settings/coingecko/search?symbol=${encodeURIComponent(symbol)}`),
   previewManualTx: (data: Record<string, unknown>) =>
     api.post<ManualTxPreview>('/transactions/manual/preview', data),
+  // Los 3 endpoints, verificados contra backend/src/routes/transactions.ts:
+  // `fifo` siempre viene (nunca `undefined`) — es `null` en vez de ausente
+  // cuando el recálculo FIFO falla, y en ese caso viene también `fifoError`
+  // con el motivo (antes ninguno de los 3 tipos declaraba `fifoError`, así
+  // que ese fallo se perdía en silencio para quien llamaba).
   createManualTx: (data: Record<string, unknown>) =>
-    api.post<{ success: boolean; fifo?: { lotsCreated: number; lotsConsumed: number; totalGainEur: number; totalLossEur: number } }>('/transactions/manual', data),
+    api.post<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>('/transactions/manual', data),
   updateManualTx: (id: string, data: Record<string, unknown>) =>
-    api.put<{ success: boolean; fifo?: { lotsCreated: number; lotsConsumed: number; totalGainEur: number; totalLossEur: number } }>(`/transactions/${id}`, data),
+    api.put<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>(`/transactions/${id}`, data),
   deleteManualTx: (id: string) =>
-    api.delete<{ success: boolean; fifo?: { lotsCreated: number; lotsConsumed: number } }>(`/transactions/${id}`),
+    api.delete<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>(`/transactions/${id}`),
   getTransactions: (params?: Record<string, string | undefined>) => {
     const filtered = params
       ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][])
