@@ -123,6 +123,31 @@ export interface Transaction {
   linked_tx_asset: string | null
 }
 
+export interface SimulatedLot {
+  lotId:             string
+  walletName:        string
+  openedAt:          string
+  qtyAvailable:      number
+  qtyConsumed:       number
+  costBasisConsumed: number
+  pricePerUnit:      number
+  proceedsEur:       number
+  gainLossEur:       number
+}
+
+export interface SimulationResult {
+  asset:          string
+  quantity:       number
+  priceEur:       number
+  totalProceeds:  number
+  totalCostBasis: number
+  totalGain:      number
+  totalLoss:      number
+  netGainLoss:    number
+  irpfEstimate:   number
+  lotsConsumed:   SimulatedLot[]
+}
+
 export interface FiatBalance {
   wallet_id: string
   wallet_name: string
@@ -251,4 +276,6 @@ export const portfolioApi = {
   }>>('/settings/pending-deposits'),
   bulkSetCosts: (updates: { id: string; pricePerUnit: number }[]) =>
     api.post<{ success: boolean; updated: number; fifo: unknown }>('/settings/bulk-set-costs', { updates }),
+  simulateSale: (asset: string, quantity: number, priceEur: number) =>
+    api.post<SimulationResult>('/fiscal/simulate-sale', { asset, quantity, priceEur }),
 }
