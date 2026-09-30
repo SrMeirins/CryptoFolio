@@ -153,7 +153,9 @@ sh-frontend: ## Shell dentro del contenedor del frontend
 ## ── Backup ───────────────────────────────────────────────────────────────────
 backup: ## Backup manual inmediato de Postgres (pg_dump comprimido, fuera del repo)
 	@mkdir -p "$(BACKUP_DIR)"
-	@ts=$$(date +%Y%m%d_%H%M%S); \
+	@chmod 700 "$(BACKUP_DIR)"
+	@umask 077; \
+	 ts=$$(date +%Y%m%d_%H%M%S); \
 	 file="$(BACKUP_DIR)/cryptotracker_manual_$$ts.sql.gz"; \
 	 $(COMPOSE) exec -T postgres sh -lc 'pg_dump -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' | gzip > "$$file"; \
 	 echo "Backup escrito en $$file ($$(du -h "$$file" | cut -f1))"

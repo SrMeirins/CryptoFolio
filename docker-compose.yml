@@ -194,6 +194,15 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en tu .env (copia .env.example primero)}
       PGDATABASE: ${POSTGRES_DB:-cryptotracker}
       BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-14}
+    # Corre como el usuario real del host (no root) — HOST_UID/HOST_GID en
+    # tu .env (`id -u` / `id -g`). Revisión de seguridad detectó que la
+    # solución anterior (DAC_OVERRIDE permanente + chmod 777 en
+    # backup-loop.sh) dejaba los backups — datos financieros reales —
+    # legibles y escribibles por CUALQUIER usuario de la máquina, no solo
+    # por este proceso. Verificado empíricamente que pg_dump funciona igual
+    # de bien con un UID arbitrario sin entrada en /etc/passwd — no hace
+    # falta root en ningún momento del ciclo de vida de este servicio.
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     volumes:
       - ${BACKUP_HOST_DIR:-~/.local/share/CryptoFolio/backups}:/backups
       - ./scripts/backup-loop.sh:/backup-loop.sh:ro
@@ -204,21 +213,6 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    # DAC_OVERRIDE: BUG REAL detectado y corregido — ./backups es un
-    # bind-mount propiedad del usuario del host (no root), y el proceso de
-    # este contenedor corre como root sin remapeo de usuario. Sin esta
-    # capability, escribir un fichero nuevo ahí da "Permission denied" —
-    # verificado: el backup llevaba fallando en silencio desde que se
-    # añadió cap_drop: ALL sin volver a probar la escritura real.
-    # A diferencia de postgres/backend, este servicio NO baja privilegios
-    # tras arrancar (backup-loop.sh corre como root todo el ciclo de vida,
-    # sin USER en la imagen base ni gosu) — DAC_OVERRIDE queda activa de
-    # forma permanente, no solo durante el arranque. Es un trade-off
-    # deliberado por portabilidad: matchear el UID/GID exacto del host para
-    # evitar esto rompería en cualquier usuario self-hosted con un UID
-    # distinto al nuestro.
-    cap_add:
-      - DAC_OVERRIDE
     read_only: true
     tmpfs:
       - /tmp

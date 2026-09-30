@@ -14,16 +14,15 @@ BACKUP_DIR="${BACKUP_DIR:-/backups}"
 RETENTION_COUNT="${BACKUP_RETENTION_COUNT:-14}"
 
 # El directorio de backups vive FUERA del repo, en el host (ver
-# docker-compose*.yml) — su dueño real depende de quién lo cree primero:
-# este contenedor (root) si es la primera vez que arranca el stack, o el
-# usuario normal si ya hizo antes un `make backup`/backup manual desde el
-# host. chmod 777 aquí (no chown: no conocemos el UID/GID real del host)
-# asegura que ambos lados puedan siempre leer/escribir, sin depender del
-# orden de arranque. Mismo host de confianza única que el resto del
-# modelo de seguridad de este proyecto self-hosted — no expone nada a la
-# red, solo afecta a otros usuarios locales de la misma máquina.
+# docker-compose*.yml). Este contenedor corre con el UID/GID real del host
+# (HOST_UID/HOST_GID, no root) — mismo dueño que un `make backup` manual
+# desde fuera de Docker, así que no hace falta ningún permiso especial ni
+# capability extra para escribir aquí. 700: los backups contienen datos
+# financieros reales, sin motivo para que otros usuarios de la máquina
+# puedan siquiera listar el directorio.
 mkdir -p "$BACKUP_DIR"
-chmod 777 "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
+umask 077 # los .sql.gz se crean 0600, no legibles por otros usuarios
 
 do_backup() {
   ts=$(date +%Y%m%d_%H%M%S)

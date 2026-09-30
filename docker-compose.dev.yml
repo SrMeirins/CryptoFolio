@@ -224,6 +224,10 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD:-dev_password_local}
       PGDATABASE: ${POSTGRES_DB:-cryptotracker}
       BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-14}
+    # Corre como el usuario real del host (no root) — ver comentario
+    # completo en docker-compose.yml de producción. HOST_UID/HOST_GID los
+    # detecta scripts/dev-env.sh automáticamente (`id -u`/`id -g`).
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     volumes:
       - ${BACKUP_HOST_DIR_DEV:-~/.local/share/CryptoFolio/backups-dev}:/backups
       - ./scripts/backup-loop.sh:/backup-loop.sh:ro
@@ -234,16 +238,6 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    # DAC_OVERRIDE: BUG REAL detectado y corregido (mismo que en
-    # docker-compose.yml de producción) — BACKUP_HOST_DIR es un bind-mount
-    # propiedad del usuario del host, no root; sin esta capability, el
-    # backup fallaba con "Permission denied" en silencio desde que se
-    # añadió cap_drop: ALL. A diferencia de postgres/backend, este servicio
-    # no baja privilegios tras arrancar — DAC_OVERRIDE queda activa de forma
-    # permanente (trade-off deliberado por portabilidad entre distintos UID
-    # de host, ver mismo comentario en docker-compose.yml).
-    cap_add:
-      - DAC_OVERRIDE
     logging: *default-logging
 
   # ── pgAdmin (opcional: make tools / docker compose --profile tools up) ──────

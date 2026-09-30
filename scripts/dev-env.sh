@@ -112,6 +112,12 @@ pick_secret() { # pick_secret <clave> <fallback_previo>
   printf ''  # vacío → el llamador genera uno nuevo
 }
 
+# UID/GID reales del host — para que db-backup corra como este usuario en
+# vez de root (ver docker-compose.dev.yml). `id -u`/`id -g` son estables
+# entre ejecuciones, no hace falta persistirlos como un secreto.
+HOST_UID="$(id -u)"
+HOST_GID="$(id -g)"
+
 PREV_PG_PASS="$(read_key "$ENV_DEV" POSTGRES_PASSWORD || true)"
 PREV_PGADMIN_PASS="$(read_key "$ENV_DEV" PGADMIN_PASSWORD || true)"
 
@@ -146,6 +152,11 @@ cat > "$ENV_DEV" <<EOF
 # Regenerar con: make dev-clean   (o)   scripts/dev-env.sh --fresh
 COMPOSE_PROJECT_NAME=cryptofolio
 NODE_ENV=development
+
+# UID/GID reales del host — para que db-backup corra como este usuario en
+# vez de root (evita depender de permisos abiertos o capabilities extra).
+HOST_UID=${HOST_UID}
+HOST_GID=${HOST_GID}
 
 POSTGRES_USER=${POSTGRES_USER}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
