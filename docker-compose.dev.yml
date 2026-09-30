@@ -150,7 +150,7 @@ services:
       - "127.0.0.1:${FRONTEND_HOST_PORT:-45173}:5173"
     healthcheck:
       # Vite dev server no tenía healthcheck propio (solo dependía de que el
-      # backend estuviera sano) — wget disponible en node:20-alpine (busybox).
+      # backend estuviera sano) — wget disponible en node:24-alpine (busybox).
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5173/ || exit 1"]
       interval: 10s
       timeout: 5s
@@ -162,6 +162,18 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # Redeclarado explícito (no heredado): docker-compose.yml define un
+    # servicio "frontend" distinto (nginx de producción) que Compose fusiona
+    # con este por compartir nombre al usar ambos ficheros a la vez (`make
+    # dev`). Sin este bloque, este servicio heredaba en silencio el
+    # read_only/tmpfs pensado para nginx (/var/cache/nginx, /var/run) — rutas
+    # que no existen en esta imagen, así que Vite no podía escribir su caché
+    # de dependencias en /app/node_modules/.vite y quedaba en bucle de error
+    # (comprobado: ENOENT en mkdir, reproducido y corregido en este cambio).
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/node_modules/.vite
     logging: *default-logging
 
   # ── Frontend en modo producción (opcional: docker compose --profile prod up) ─

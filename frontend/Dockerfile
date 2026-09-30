@@ -1,9 +1,9 @@
-FROM node:20-alpine
+FROM node:24.21.0-alpine3.24
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install && chown -R node:node /app
+RUN npm ci && chown -R node:node /app
 
 USER node
 
