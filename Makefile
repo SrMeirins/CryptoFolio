@@ -22,6 +22,10 @@ DEV_COMPOSE_FILE := docker-compose.dev.yml
 ENV_SH      := ./scripts/dev-env.sh
 # Compose siempre anclado al fichero de dev, nuestro env y el proyecto aislado.
 COMPOSE     := docker compose -f $(DEV_COMPOSE_FILE) --env-file $(DEV_ENV)
+# Misma carpeta que usa el sidecar db-backup (docker-compose.dev.yml) —
+# fuera del repo a propósito, ver comentario ahí. Sobreescribible con
+# BACKUP_HOST_DIR_DEV en el entorno si quieres otra ruta.
+BACKUP_DIR  := $(shell eval echo $${BACKUP_HOST_DIR_DEV:-~/.local/share/CryptoFolio/backups-dev})
 
 .DEFAULT_GOAL := help
 .PHONY: help env dev dev-clean rebuild restart tools prod down ps logs logs-backend logs-frontend \
@@ -39,6 +43,7 @@ env: ## Generar .env.dev si no existe (secretos + puertos libres). Idempotente.
 
 dev: ## Levantar el stack dev (reutiliza BBDD si existe). make env → up -d --build
 	@$(ENV_SH)
+	@mkdir -p "$(BACKUP_DIR)"
 	@$(COMPOSE) up -d --build
 	@$(MAKE) --no-print-directory urls
 	@$(MAKE) --no-print-directory open
@@ -47,6 +52,7 @@ dev-clean: ## Levantar LIMPIO (BBDD vacía): down -v + regenera env + up --build
 	@echo "⚠️  Se eliminarán los volúmenes (datos de Postgres y CSVs subidos)."
 	@$(COMPOSE) down -v --remove-orphans
 	@$(ENV_SH) --fresh
+	@mkdir -p "$(BACKUP_DIR)"
 	@$(COMPOSE) up -d --build
 	@$(MAKE) --no-print-directory urls
 	@$(MAKE) --no-print-directory open
@@ -145,15 +151,17 @@ sh-frontend: ## Shell dentro del contenedor del frontend
 	@$(COMPOSE) exec frontend sh
 
 ## ── Backup ───────────────────────────────────────────────────────────────────
-backup: ## Backup manual inmediato de Postgres (pg_dump comprimido en ./backups)
-	@mkdir -p backups
-	@ts=$$(date +%Y%m%d_%H%M%S); \
-	 file="backups/cryptotracker_manual_$$ts.sql.gz"; \
+backup: ## Backup manual inmediato de Postgres (pg_dump comprimido, fuera del repo)
+	@mkdir -p "$(BACKUP_DIR)"
+	@chmod 700 "$(BACKUP_DIR)"
+	@umask 077; \
+	 ts=$$(date +%Y%m%d_%H%M%S); \
+	 file="$(BACKUP_DIR)/cryptotracker_manual_$$ts.sql.gz"; \
 	 $(COMPOSE) exec -T postgres sh -lc 'pg_dump -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' | gzip > "$$file"; \
 	 echo "Backup escrito en $$file ($$(du -h "$$file" | cut -f1))"
 
-restore: ## Restaurar un backup: make restore FILE=backups/cryptotracker_...sql.gz
-	@if [ -z "$(FILE)" ]; then echo "Uso: make restore FILE=backups/archivo.sql.gz"; exit 1; fi
+restore: ## Restaurar un backup: make restore FILE=/ruta/al/backup.sql.gz
+	@if [ -z "$(FILE)" ]; then echo "Uso: make restore FILE=$(BACKUP_DIR)/archivo.sql.gz"; exit 1; fi
 	@echo "⚠️  Esto SOBREESCRIBE la base de datos actual con $(FILE)."
 	@read -r -p "¿Continuar? [y/N] " r; \
 	 if [ "$$r" = "y" ] || [ "$$r" = "Y" ]; then \

@@ -13,6 +13,17 @@ set -o pipefail
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 RETENTION_COUNT="${BACKUP_RETENTION_COUNT:-14}"
 
+# El directorio de backups vive FUERA del repo, en el host (ver
+# docker-compose*.yml). Este contenedor corre con el UID/GID real del host
+# (HOST_UID/HOST_GID, no root) — mismo dueño que un `make backup` manual
+# desde fuera de Docker, así que no hace falta ningún permiso especial ni
+# capability extra para escribir aquí. 700: los backups contienen datos
+# financieros reales, sin motivo para que otros usuarios de la máquina
+# puedan siquiera listar el directorio.
+mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
+umask 077 # los .sql.gz se crean 0600, no legibles por otros usuarios
+
 do_backup() {
   ts=$(date +%Y%m%d_%H%M%S)
   file="$BACKUP_DIR/cryptotracker_${ts}.sql.gz"
@@ -29,5 +40,5 @@ do_backup() {
 
 while true; do
   do_backup || echo "[backup] fallo, se reintentará en el siguiente ciclo" >&2
-  sleep 86400
+  sleep 604800 # 7 días — backup diario resultaba una carga excesiva sin necesidad real
 done

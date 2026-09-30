@@ -204,9 +204,14 @@ services:
     logging: *default-logging
 
   # ── Backup automático de PostgreSQL ─────────────────────────────────────────
-  # pg_dump comprimido a diario mientras el stack esté levantado, con retención
+  # pg_dump comprimido semanal mientras el stack esté levantado, con retención
   # por cantidad de ficheros. Ver scripts/backup-loop.sh. `make backup` hace un
   # dump manual inmediato sin depender de este servicio.
+  #
+  # BACKUP_HOST_DIR_DEV: fuera del repo a propósito, ver mismo comentario en
+  # docker-compose.yml de producción. Carpeta DISTINTA de la de producción
+  # (sufijo -dev) — si compartieran carpeta, cada `make dev-clean` mezclaría
+  # backups de pruebas con backups reales.
   db-backup:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -219,8 +224,12 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD:-dev_password_local}
       PGDATABASE: ${POSTGRES_DB:-cryptotracker}
       BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-14}
+    # Corre como el usuario real del host (no root) — ver comentario
+    # completo en docker-compose.yml de producción. HOST_UID/HOST_GID los
+    # detecta scripts/dev-env.sh automáticamente (`id -u`/`id -g`).
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     volumes:
-      - ./backups:/backups
+      - ${BACKUP_HOST_DIR_DEV:-~/.local/share/CryptoFolio/backups-dev}:/backups
       - ./scripts/backup-loop.sh:/backup-loop.sh:ro
     entrypoint: ["/bin/sh", "/backup-loop.sh"]
     networks:
@@ -229,16 +238,6 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    # DAC_OVERRIDE: BUG REAL detectado y corregido (mismo que en
-    # docker-compose.yml de producción) — ./backups es un bind-mount
-    # propiedad del usuario del host, no root; sin esta capability, el
-    # backup fallaba con "Permission denied" en silencio desde que se
-    # añadió cap_drop: ALL. A diferencia de postgres/backend, este servicio
-    # no baja privilegios tras arrancar — DAC_OVERRIDE queda activa de forma
-    # permanente (trade-off deliberado por portabilidad entre distintos UID
-    # de host, ver mismo comentario en docker-compose.yml).
-    cap_add:
-      - DAC_OVERRIDE
     logging: *default-logging
 
   # ── pgAdmin (opcional: make tools / docker compose --profile tools up) ──────
