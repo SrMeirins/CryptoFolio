@@ -1,6 +1,8 @@
 # Operaciones soportadas — Binance CSV
 
-Referencia completa de todos los tipos de operación que CryptoTracker reconoce e importa desde el historial CSV de Binance. Cada sección describe qué es la operación, cómo aparece en el CSV, cómo la procesamos internamente, cómo se refleja en el historial y el portfolio, y cuál es su tratamiento fiscal en España (IRPF 2024).
+Referencia completa de todos los tipos de operación que CryptoFolio reconoce e importa desde el historial CSV de Binance. Cada sección describe qué es la operación, cómo aparece en el CSV, cómo la procesamos internamente, cómo se refleja en el historial y el portfolio, y cuál es su tratamiento fiscal en España (IRPF 2024).
+
+> Este documento cubre solo Binance. Para Bitvavo (modelo mucho más simple, 4 tipos de operación), ver [operaciones-soportadas-bitvavo.md](operaciones-soportadas-bitvavo.md).
 
 ---
 
@@ -10,7 +12,7 @@ Referencia completa de todos los tipos de operación que CryptoTracker reconoce 
 2. [SELL — Venta de criptomoneda](#2-sell--venta-de-criptomoneda)
 3. [FEE_EXCHANGE — Comisión de exchange](#3-fee_exchange--comisión-de-exchange)
 4. [STAKING_REWARD — Recompensa de staking](#4-staking_reward--recompensa-de-staking)
-5. [LENDING_INTEREST / LENDING_INTEREST_LOCKED — Interés de préstamo/depósito](#5-lending_interest--lending_interest_locked--interés-de-préstamodeposito)
+5. [LENDING_INTEREST / LENDING_INTEREST_LOCKED — Interés de préstamo/depósito](#5-lending_interest--lending_interest_locked--interés-de-préstamodepósito)
 6. [AIRDROP — Distribución gratuita de tokens](#6-airdrop--distribución-gratuita-de-tokens)
 7. [CASHBACK — Devolución de comisión o bono](#7-cashback--devolución-de-comisión-o-bono)
 8. [STAKING_LOCK / STAKING_UNLOCK — Bloqueo y desbloqueo de staking](#8-staking_lock--staking_unlock--bloqueo-y-desbloqueo-de-staking)
@@ -33,7 +35,7 @@ Una compra es cualquier operación en la que adquieres criptomoneda a cambio de 
 ### Etiquetas CSV de Binance que generan un BUY
 
 | Etiqueta CSV | Cuenta | Descripción |
-|---|---|---|
+| --- | --- | --- |
 | `Transaction Buy` | Spot / Cross Margin / Isolated Margin / Strategy | Compra en el mercado spot. Aparece junto a `Transaction Spend` (la salida de dinero) y opcionalmente `Transaction Fee` (la comisión). |
 | `Transaction Spend` | Spot / Cross Margin / Isolated Margin / Strategy | Fila de coste de la compra anterior. Se agrupa automáticamente con `Transaction Buy`. |
 | `Transaction Fee` | Spot / Cross Margin / Isolated Margin / Strategy | Fila de comisión de la compra o venta. Se agrupa automáticamente con su operación. |
@@ -49,27 +51,31 @@ Una compra es cualquier operación en la que adquieres criptomoneda a cambio de 
 ### Ejemplo de CSV
 
 **Compra normal EUR → BTC:**
-```
+
+```csv
 84158159,24-01-15 10:30:00,Spot,Transaction Buy,BTC,0.00250000,
 84158159,24-01-15 10:30:00,Spot,Transaction Spend,EUR,-250.00000000,
 84158159,24-01-15 10:30:00,Spot,Transaction Fee,BNB,-0.00015000,
 ```
 
 **Compra ejecutada por un grid bot en Strategy (USDT → AMP):**
-```
+
+```csv
 84158159,24-03-15 12:36:00,Strategy,Transaction Buy,AMP,598,
 84158159,24-03-15 12:36:00,Strategy,Transaction Spend,USDT,-5.979402,
 84158159,24-03-15 12:36:00,Strategy,Transaction Fee,AMP,-0.598,
 ```
 
 **Swap cripto → cripto (Binance Convert USDT → SOL):**
-```
+
+```csv
 84158159,24-03-20 14:00:00,Spot,Binance Convert,SOL,2.50000000,
 84158159,24-03-20 14:00:00,Spot,Binance Convert,USDT,-250.00000000,
 ```
 
 **ETH 2.0 Staking (ETH → BETH):**
-```
+
+```csv
 84158159,21-09-22 21:18:36,Spot,ETH 2.0 Staking,ETH,-0.05000000,
 84158159,21-09-22 21:18:36,Spot,ETH 2.0 Staking,BETH,0.05000000,
 ```
@@ -77,6 +83,7 @@ Una compra es cualquier operación en la que adquieres criptomoneda a cambio de 
 ### Cómo lo procesamos
 
 El parser agrupa todas las filas con el mismo timestamp y tipo de operación en un único "grupo". Dentro del grupo identifica:
+
 - La fila positiva → el activo que se recibe (`asset`, `amount`)
 - La fila negativa → el coste (`cost_asset`, `cost_amount`)
 - La fila de fee (si la hay) → `fee_asset`, `fee_amount`
@@ -86,6 +93,7 @@ Para ETH 2.0 Staking, el parser detecta las dos filas (ETH negativo, BETH positi
 ### En el historial
 
 Aparece como **"Compra"** con el activo recibido en verde. La columna de valor muestra:
+
 - Si se pagó con EUR: el coste en euros directamente.
 - Si se pagó con otra cripto: el importe en la cripto pagada (ej. `0,0500 ETH`). No se muestra un valor EUR inventado.
 - La línea secundaria `@ X EUR` muestra el precio por unidad al que se compró.
@@ -113,7 +121,7 @@ Una venta es cualquier operación en la que entregas criptomoneda a cambio de eu
 ### Etiquetas CSV de Binance que generan un SELL
 
 | Etiqueta CSV | Cuenta | Descripción |
-|---|---|---|
+| --- | --- | --- |
 | `Transaction Sold` | Spot / Cross Margin / Isolated Margin / Strategy | Venta en el mercado spot. Fila negativa que representa la salida de cripto. |
 | `Transaction Revenue` | Spot / Cross Margin / Isolated Margin / Strategy | Fila de ingreso de la venta (el EUR recibido). Se agrupa con `Transaction Sold`. |
 | `Cross Margin Liquidation - Small Assets Takeover` | Cross Margin | Venta forzosa de colateral durante una liquidación. Transmisión patrimonial imponible. |
@@ -121,7 +129,8 @@ Una venta es cualquier operación en la que entregas criptomoneda a cambio de eu
 ### Ejemplo de CSV
 
 **Venta BTC → EUR:**
-```
+
+```csv
 84158159,24-06-01 16:45:00,Spot,Transaction Sold,BTC,-0.00250000,
 84158159,24-06-01 16:45:00,Spot,Transaction Revenue,EUR,287.50000000,
 84158159,24-06-01 16:45:00,Spot,Transaction Fee,BNB,-0.00012000,
@@ -130,6 +139,7 @@ Una venta es cualquier operación en la que entregas criptomoneda a cambio de eu
 ### Cómo lo procesamos
 
 El parser agrupa las filas del mismo timestamp. Identifica:
+
 - La fila negativa de cripto → el activo vendido
 - La fila positiva de EUR → el ingreso recibido
 - La fila de fee → se añade al coste para reducir el beneficio neto
@@ -141,6 +151,7 @@ Aparece como **"Venta"** con el activo vendido en rojo. La columna de valor mues
 ### En FIFO
 
 Se **consumen lotes FIFO** del activo vendido en orden cronológico (primero el más antiguo). Para cada lote consumido se calcula:
+
 - `ganancia = valor_venta_eur - cost_basis_eur`
 
 La ganancia neta acumulada está visible en el panel de FIFO del portfolio.
@@ -148,6 +159,7 @@ La ganancia neta acumulada está visible en el panel de FIFO del portfolio.
 ### Fiscalmente (España — IRPF)
 
 Cada venta es una **transmisión patrimonial** (art. 33 LIRPF). La ganancia o pérdida se integra en la **base imponible del ahorro**:
+
 - 19% hasta 6.000 €
 - 21% de 6.000 € a 50.000 €
 - 23% de 50.000 € a 200.000 €
@@ -166,7 +178,7 @@ Comisiones que el exchange cobra en un activo que ya posees (normalmente BNB, qu
 ### Etiquetas CSV de Binance que generan un FEE_EXCHANGE
 
 | Etiqueta CSV | Cuenta | Descripción |
-|---|---|---|
+| --- | --- | --- |
 | `Transaction Fee` | Spot / Cross Margin / Isolated Margin | Fee de la operación de compra o venta. Cuando va en BNB, es un FEE_EXCHANGE; cuando va en el mismo activo de la operación, se integra en el BUY/SELL. |
 | `BNB Fee Deduction` | Spot / Isolated Margin | Deducción de fee en BNB como operación independiente. |
 | `Margin Fee` | Cross Margin | Interés de margen periódico pagado en cripto. |
@@ -177,7 +189,7 @@ Comisiones que el exchange cobra en un activo que ya posees (normalmente BNB, qu
 
 ### Ejemplo de CSV
 
-```
+```csv
 84158159,24-01-15 10:30:00,Spot,Transaction Fee,BNB,-0.00015000,
 ```
 
@@ -208,7 +220,7 @@ Tokens recibidos como recompensa por participar en el mecanismo de consenso Proo
 ### Etiquetas CSV de Binance que generan un STAKING_REWARD
 
 | Etiqueta CSV | Cuenta | Descripción |
-|---|---|---|
+| --- | --- | --- |
 | `Staking Rewards` | Spot | Recompensa de staking PoS en Binance Earn. |
 | `ETH 2.0 Staking Rewards` | Spot | Recompensa periódica de validar bloques en Ethereum 2.0, recibida en BETH. |
 | `Launchpool Interest` | Funding | Rendimiento generado por participar en un Launchpool. |
@@ -216,7 +228,7 @@ Tokens recibidos como recompensa por participar en el mecanismo de consenso Proo
 
 ### Ejemplo de CSV
 
-```
+```csv
 84158159,24-02-10 00:00:00,Spot,Staking Rewards,ADA,2.15000000,
 84158159,23-09-23 10:00:00,Spot,ETH 2.0 Staking Rewards,BETH,0.00000580,
 ```
@@ -250,7 +262,7 @@ Intereses recibidos por prestar liquidez a Binance a través de los productos Si
 ### Etiquetas CSV de Binance que generan un LENDING_INTEREST
 
 | Etiqueta CSV | Cuenta | Tipo interno | Descripción |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `Simple Earn Flexible Interest` | Spot | `LENDING_INTEREST` | Interés diario de Simple Earn Flexible. |
 | `Savings Interest` | Funding | `LENDING_INTEREST` | Variante antigua de Simple Earn Flexible. |
 | `POS savings interest` | Funding | `LENDING_INTEREST` | Variante POS de savings. |
@@ -258,7 +270,7 @@ Intereses recibidos por prestar liquidez a Binance a través de los productos Si
 
 ### Ejemplo de CSV
 
-```
+```csv
 84158159,24-03-01 00:00:00,Spot,Simple Earn Flexible Interest,USDT,0.12500000,
 84158159,24-03-31 00:00:00,Spot,Simple Earn Locked Rewards,BNB,0.05000000,
 ```
@@ -290,7 +302,7 @@ Tokens recibidos gratis, sin entregar nada a cambio. Puede ser un airdrop de un 
 ### Etiquetas CSV de Binance que generan un AIRDROP
 
 | Etiqueta CSV | Cuenta | Descripción |
-|---|---|---|
+| --- | --- | --- |
 | `Airdrop Assets` | Funding | Airdrop genérico de un proyecto. |
 | `Distribution` | Spot | Distribución de tokens por Binance. |
 | `Asset Recovery` | Funding | Recuperación de tokens de un proyecto antiguo/migrado. |
@@ -300,7 +312,7 @@ Tokens recibidos gratis, sin entregar nada a cambio. Puede ser un airdrop de un 
 
 ### Ejemplo de CSV
 
-```
+```csv
 84158159,24-08-29 11:53:20,Spot,Token Swap - Distribution,SLF,45,
 84158159,23-06-15 00:00:00,Funding,Launchpool Airdrop - User Claim Distribution,ARKM,120.50000000,
 84158159,23-04-01 00:00:00,Funding,Airdrop Assets,ARB,15.00000000,
@@ -335,7 +347,7 @@ Tokens o importes recibidos como devolución por comisiones pagadas, bonos de re
 ### Etiquetas CSV de Binance que generan un CASHBACK
 
 | Etiqueta CSV | Cuenta | Descripción |
-|---|---|---|
+| --- | --- | --- |
 | `Commission History` | Funding | Comisión de referido recibida en el activo que ha operado tu referido. |
 | `Commission Rebate` | Funding | Rebate de comisión. |
 | `Referral Kickback` | Funding | Bonus de referido recibido en BNB u otro activo. |
@@ -347,7 +359,7 @@ Tokens o importes recibidos como devolución por comisiones pagadas, bonos de re
 
 ### Ejemplo de CSV
 
-```
+```csv
 84158159,24-05-20 09:00:00,Funding,Commission History,DOGE,5.25000000,
 84158159,24-04-10 12:00:00,Funding,Cashback Voucher,BNB,0.01500000,
 ```
@@ -381,13 +393,13 @@ Estos dos tipos van **siempre enlazados**: cada UNLOCK tiene un puntero (`linked
 ### Etiquetas CSV de Binance
 
 | Etiqueta CSV | Cuenta | Tipo interno |
-|---|---|---|
+| --- | --- | --- |
 | `Staking Purchase` | Spot / Funding | `STAKING_LOCK` |
 | `Staking Redemption` | Spot / Funding | `STAKING_UNLOCK` |
 
 ### Ejemplo de CSV
 
-```
+```csv
 84158159,24-01-01 10:00:00,Funding,Staking Purchase,DOT,50.00000000,
 84158159,24-04-01 10:00:00,Funding,Staking Redemption,DOT,50.00000000,
 ```
@@ -427,13 +439,13 @@ El activo bloqueado puede ser **cualquier token** que Binance permita en cada La
 ### Etiquetas CSV de Binance
 
 | Etiqueta CSV | Cuenta | Tipo interno |
-|---|---|---|
+| --- | --- | --- |
 | `Launchpool Subscription` | Spot / Funding | `LAUNCHPOOL_LOCK` |
 | `Launchpool Redemption` | Spot / Funding | `LAUNCHPOOL_UNLOCK` |
 
 ### Ejemplo de CSV
 
-```
+```csv
 84158159,24-06-01 09:00:00,Spot,Launchpool Subscription,BNB,2.00000000,
 84158159,24-06-15 09:00:00,Spot,Launchpool Redemption,BNB,2.00000000,
 84158159,24-06-02 00:00:00,Spot,Launchpool Airdrop - System Distribution,LISTA,350.00000000,
@@ -471,7 +483,7 @@ Movimiento de activos entre dos sub-cuentas dentro del mismo exchange (ej. de Sp
 ### Etiquetas CSV de Binance
 
 | Etiqueta CSV | Cuenta origen | Wallet destino |
-|---|---|---|
+| --- | --- | --- |
 | `Transfer Between Main and Funding Wallet` | Spot | → Binance Funding |
 | `Transfer Between Main and Funding Wallet` | Funding | → Binance Spot |
 | `Transfer Between Main Account/Futures and Margin Account` | Spot | → Binance Cross Margin |
@@ -481,7 +493,7 @@ Movimiento de activos entre dos sub-cuentas dentro del mismo exchange (ej. de Sp
 
 ### Ejemplo de CSV
 
-```
+```csv
 84158159,24-02-01 11:00:00,Spot,Transfer Between Main and Funding Wallet,ETH,-1.50000000,
 84158159,24-02-01 11:00:00,Funding,Transfer Between Main and Funding Wallet,ETH,1.50000000,
 ```
@@ -515,12 +527,12 @@ Ingreso de euros (u otra moneda fiat) en tu cuenta de Binance desde una cuenta b
 ### Etiquetas CSV de Binance
 
 | Etiqueta CSV | Cuenta |
-|---|---|
-| `Deposit` | Spot |
+|--------------|--------|
+| `Deposit`    | Spot   |
 
 ### Ejemplo de CSV
 
-```
+```csv
 84158159,24-01-10 09:00:00,Spot,Deposit,EUR,1000.00000000,
 ```
 
@@ -550,13 +562,13 @@ Retiro de euros de tu cuenta Binance a una cuenta bancaria.
 
 ### Etiquetas CSV de Binance
 
-| Etiqueta CSV | Cuenta |
-|---|---|
-| `Fiat Withdraw` | Spot |
+| Etiqueta CSV    | Cuenta |
+|-----------------|--------|
+| `Fiat Withdraw` | Spot   |
 
 ### Ejemplo de CSV
 
-```
+```csv
 84158159,24-06-30 15:00:00,Spot,Fiat Withdraw,EUR,-500.00000000,
 ```
 
@@ -635,7 +647,7 @@ Operaciones que Binance incluye en el CSV como asientos contables auxiliares, pe
 ### Etiquetas CSV ignoradas
 
 | Etiqueta CSV | Cuenta | Motivo |
-|---|---|---|
+| --- | --- | --- |
 | `Simple Earn Flexible Subscription` | Funding | El capital se mueve internamente a Earn; no es una venta ni una compra. |
 | `Simple Earn Flexible Redemption` | Funding | Vuelta del capital de Earn a Spot; no es una compra. |
 | `Simple Earn Locked Subscription` | Funding | Bloqueo en Earn Locked; el capital sigue siendo tuyo. |
@@ -663,7 +675,7 @@ La cuenta **Strategy** es la sub-cuenta que Binance usa para aislar los activos 
 ### Operaciones soportadas en Strategy
 
 | Etiqueta CSV | Tipo interno | Descripción |
-|---|---|---|
+| --- | --- | --- |
 | `Transaction Buy` | `BUY` | Compra ejecutada automáticamente por el bot (orden de compra del grid). |
 | `Transaction Spend` | `BUY` | Coste de la compra del bot (USDT u otro par base). |
 | `Transaction Fee` | `BUY` | Comisión de la operación del bot (normalmente en el activo comprado). |
@@ -697,7 +709,7 @@ Cada venta ejecutada por el bot dentro de Strategy es una **transmisión patrimo
 ## Apéndice — Resumen rápido de tipos internos
 
 | Tipo interno | Descripción corta | Abre lote | Consume lotes | Hecho imponible |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `BUY` | Compra EUR→cripto o swap cripto→cripto | ✅ (activo recibido) | ✅ si pagó con cripto | Solo el activo pagado (si era cripto) |
 | `SELL` | Venta cripto→EUR | ❌ | ✅ | ✅ Ganancia/pérdida patrimonial |
 | `FEE_EXCHANGE` | Fee pagada en cripto | ❌ | ✅ | ✅ Ganancia/pérdida patrimonial |

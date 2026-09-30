@@ -97,7 +97,7 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 - Motor FIFO que se **recalcula automáticamente** tras cada importación
 - **+40 tipos de operación soportados** (Binance): compras, ventas, staking, Launchpool, ETH 2.0, airdrops, cashback, grid bots (Strategy), transfers internos, margin…
 
-> 📖 **[Ver referencia completa de operaciones soportadas →](docs/operaciones-soportadas.md)**
+> 📖 **[Ver referencia completa de operaciones soportadas (Binance) →](docs/operaciones-soportadas.md)** · **[Bitvavo →](docs/operaciones-soportadas-bitvavo.md)**
 
 ### 📋 Historial
 - Búsqueda y filtrado por fecha, activo, tipo de operación y wallet
