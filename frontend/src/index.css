@@ -105,3 +105,10 @@
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ── Popover del selector de rango de fechas ──────────────────────────────── */
+@keyframes datePickerIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.animate-date-picker-in { animation: datePickerIn 0.18s ease-out both; }
