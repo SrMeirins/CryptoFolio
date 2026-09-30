@@ -5,6 +5,8 @@ import { SecretsManager } from './secrets-manager';
 import { createSplash, setSplashStatus, closeSplash } from './splash';
 import { createWindow } from './window';
 import { registerUpdateIpcHandlers, checkForUpdateOnStartup, schedulePeriodicUpdateCheck, UpdaterDeps } from './updater';
+import { findFreePort } from './shared/find-free-port';
+import { BACKEND_PORT_BASE } from './shared/ports';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -16,6 +18,10 @@ process.stderr.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'E
 let mainWindow:   BrowserWindow | null = null;
 let postgresManager: PostgresManager;
 let backendManager:  BackendManager;
+// Puerto real del backend, resuelto una vez en startup() — 'activate'
+// (macOS) reabre ventana reusando el mismo backend ya arrancado, así que
+// necesita el mismo puerto, no uno nuevo.
+let backendPort = BACKEND_PORT_BASE;
 
 // ── Seguridad: un solo proceso ──────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
@@ -68,7 +74,9 @@ async function startup(): Promise<void> {
 
   setSplashStatus('Iniciando servidor...');
   console.log('[app] Arrancando backend...');
+  backendPort = await findFreePort(BACKEND_PORT_BASE);
   backendManager = new BackendManager({
+    port: backendPort,
     databaseUrl: postgresManager.connectionString,
     walletSyncEncryptionKey: secretsManager.walletSyncEncryptionKey,
     onCrash: async (detail) => {
@@ -105,6 +113,7 @@ app.whenReady().then(async () => {
     // 3. Crear ventana principal
     mainWindow = await createWindow(
       isDev,
+      backendPort,
       () => closeSplash(),
       () => { mainWindow = null; },
     );
@@ -137,6 +146,7 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow(
       isDev,
+      backendPort,
       () => closeSplash(),
       () => { mainWindow = null; },
     ).then((w) => { mainWindow = w; });

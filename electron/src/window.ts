@@ -1,14 +1,17 @@
 import { BrowserWindow, shell } from 'electron';
 import path from 'path';
-import { DEFAULT_BACKEND_PORT } from './shared/ports';
 
 /**
- * Crea la ventana principal. `onReadyToShow` se invoca justo antes de
- * mostrarla (el llamador lo usa para cerrar el splash primero) y `onClosed`
- * cuando el usuario la cierra (el llamador limpia su propia referencia).
+ * Crea la ventana principal. `backendPort` es el puerto REAL ya resuelto
+ * por main.ts (findFreePort()), no un valor fijo — determina de dónde
+ * carga la app y qué orígenes se permiten navegar en modo producción.
+ * `onReadyToShow` se invoca justo antes de mostrarla (el llamador lo usa
+ * para cerrar el splash primero) y `onClosed` cuando el usuario la cierra
+ * (el llamador limpia su propia referencia).
  */
 export async function createWindow(
   isDev: boolean,
+  backendPort: number,
   onReadyToShow: () => void,
   onClosed: () => void,
 ): Promise<BrowserWindow> {
@@ -55,7 +58,7 @@ export async function createWindow(
   });
 
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const allowed = isDev ? 'http://localhost:5173' : `http://127.0.0.1:${DEFAULT_BACKEND_PORT}`;
+    const allowed = isDev ? 'http://localhost:5173' : `http://127.0.0.1:${backendPort}`;
     if (!url.startsWith(allowed)) {
       event.preventDefault();
       shell.openExternal(url);
@@ -71,7 +74,7 @@ export async function createWindow(
     await mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    await mainWindow.loadURL(`http://127.0.0.1:${DEFAULT_BACKEND_PORT}`);
+    await mainWindow.loadURL(`http://127.0.0.1:${backendPort}`);
   }
 
   mainWindow.once('ready-to-show', () => {

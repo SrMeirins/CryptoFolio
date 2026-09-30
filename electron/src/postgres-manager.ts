@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import { execSync } from 'child_process';
 import { Client } from 'pg';
 import { pollUntil } from './shared/poll-until';
+import { findFreePort } from './shared/find-free-port';
+import { POSTGRES_PORT_BASE } from './shared/ports';
 
 const CONFIG_FILE = 'electron-db.json';
 
@@ -32,14 +34,22 @@ export class PostgresManager {
     return `postgresql://${this.user}:${this.config.password}@127.0.0.1:${this.config.port}/${this.database}`;
   }
 
-  private loadOrCreateConfig(): DbConfig {
+  // La contraseña se reutiliza entre arranques (estable, no hay motivo para
+  // rotarla sola). El puerto, en cambio, se re-verifica en CADA arranque —
+  // nunca se confía en el persistido a ciegas: si algo más (Docker, otra
+  // app, otro Postgres local...) lo ha ocupado desde la última vez, se
+  // elige otro automáticamente en vez de fallar al arrancar.
+  private async loadOrCreateConfig(): Promise<DbConfig> {
+    let password: string;
     if (fs.existsSync(this.configPath)) {
-      return JSON.parse(fs.readFileSync(this.configPath, 'utf8')) as DbConfig;
+      const existing = JSON.parse(fs.readFileSync(this.configPath, 'utf8')) as DbConfig;
+      password = existing.password;
+    } else {
+      password = crypto.randomBytes(24).toString('hex');
     }
-    const config: DbConfig = {
-      password: crypto.randomBytes(24).toString('hex'),
-      port: 54321,
-    };
+
+    const port = await findFreePort(POSTGRES_PORT_BASE);
+    const config: DbConfig = { password, port };
     fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
     return config;
   }
@@ -146,7 +156,7 @@ export class PostgresManager {
   }
 
   async start(): Promise<void> {
-    this.config = this.loadOrCreateConfig();
+    this.config = await this.loadOrCreateConfig();
 
     const { default: EmbeddedPostgres } = await import('embedded-postgres');
 
