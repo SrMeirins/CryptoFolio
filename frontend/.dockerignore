@@ -8,3 +8,10 @@ dist-ssr
 !.env.example
 .git
 coverage
+*.md
+Dockerfile*
+.dockerignore
+.vscode
+.idea
+*.pem
+*.key
