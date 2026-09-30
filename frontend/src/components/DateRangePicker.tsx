@@ -1,6 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react'
 import { useClickOutside } from '../hooks/useClickOutside'
+import {
+  DAYS_ES, MONTHS_ES, today, startOfMonth, startOfYear,
+  parseDate, fmtShort, getDaysInGrid, inDateRange,
+} from '../utils/date'
 
 interface Props {
   from:     string   // 'YYYY-MM-DD' o ''
@@ -8,53 +12,61 @@ interface Props {
   onChange: (from: string, to: string) => void
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-const DAYS_ES  = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
-const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-const MONTHS_SHORT = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
-
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-}
-function today(): string { return ymd(new Date()) }
-function startOfMonth(d: Date): string { return ymd(new Date(d.getFullYear(), d.getMonth(), 1)) }
-function endOfMonth(d: Date): string   { return ymd(new Date(d.getFullYear(), d.getMonth()+1, 0)) }
-function startOfYear(d: Date): string  { return `${d.getFullYear()}-01-01` }
-
-function parseDate(s: string): Date | null {
-  if (!s) return null
-  const d = new Date(s + 'T00:00:00')
-  return isNaN(d.getTime()) ? null : d
+interface DayCellProps {
+  day:        string
+  isFrom:     boolean
+  isTo:       boolean
+  isInRange:  boolean
+  isToday:    boolean
+  onClick:    () => void
+  onHover:    () => void
+  onHoverEnd: () => void
 }
 
-function fmtShort(s: string): string {
-  const d = parseDate(s)
-  if (!d) return ''
-  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`
-}
+function DayCell({ day, isFrom, isTo, isInRange, isToday, onClick, onHover, onHoverEnd }: DayCellProps) {
+  const isSingle = isFrom && isTo
+  const isStart  = isFrom && !isSingle
+  const isEnd    = isTo   && !isSingle
+  const dayNum   = parseInt(day.slice(8))
 
-function getDaysInGrid(year: number, month: number): (string | null)[] {
-  const first    = new Date(year, month, 1)
-  const lastDay  = new Date(year, month + 1, 0).getDate()
-  // getDay(): 0=Sun → convert to Mon-first: 0→6, 1→0 ... 6→5
-  const startDow = (first.getDay() + 6) % 7
-  const cells: (string | null)[] = []
-  for (let i = 0; i < startDow; i++) cells.push(null)
-  for (let d = 1; d <= lastDay; d++) {
-    cells.push(ymd(new Date(year, month, d)))
-  }
-  while (cells.length % 7 !== 0) cells.push(null)
-  return cells
-}
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={onHover}
+      onMouseLeave={onHoverEnd}
+      className={`
+        relative h-8 text-xs font-medium transition-all duration-100 select-none
+        ${isInRange ? 'bg-accent-blue/12 text-white' : ''}
+        ${isStart   ? 'rounded-l-full' : ''}
+        ${isEnd     ? 'rounded-r-full' : ''}
+        ${isSingle  ? 'rounded-full' : ''}
+        ${!isFrom && !isTo && !isInRange ? 'hover:bg-white/8 rounded-full text-gray-300' : ''}
+      `}
+    >
+      {/* Fondo del día seleccionado (from/to) */}
+      {(isFrom || isTo) && (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold bg-accent-blue text-white">
+            {dayNum}
+          </span>
+        </span>
+      )}
 
-function inRange(d: string, from: string, to: string): boolean {
-  if (!from || !to || !d) return false
-  const [a, b] = from <= to ? [from, to] : [to, from]
-  return d > a && d < b
-}
+      {/* Número del día */}
+      {!isFrom && !isTo && (
+        <span className={`relative z-10 ${isToday ? 'text-accent-blue font-bold' : ''}`}>
+          {dayNum}
+        </span>
+      )}
 
-// ── Componente ─────────────────────────────────────────────────────────────
+      {/* Punto "hoy" */}
+      {isToday && !isFrom && !isTo && (
+        <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent-blue" />
+      )}
+    </button>
+  )
+}
 
 export function DateRangePicker({ from, to, onChange }: Props) {
   const [open,     setOpen]     = useState(false)
@@ -70,7 +82,7 @@ export function DateRangePicker({ from, to, onChange }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   // Cerrar al clicar fuera
-  useClickOutside(ref, () => close(), open)
+  useClickOutside(ref, close, open)
 
   // Sincronizar estado interno cuando cambian los props
   useEffect(() => { setTmpFrom(from); setTmpTo(to) }, [from, to])
@@ -149,6 +161,7 @@ export function DateRangePicker({ from, to, onChange }: Props) {
 
       {/* Trigger */}
       <button
+        type="button"
         onClick={openPicker}
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border transition-all ${
           hasRange
@@ -160,7 +173,9 @@ export function DateRangePicker({ from, to, onChange }: Props) {
         <span className="max-w-[160px] truncate">{label}</span>
         {hasRange && (
           <button
+            type="button"
             onClick={e => { e.stopPropagation(); onChange('', '') }}
+            aria-label="Quitar filtro de fechas"
             className="ml-0.5 text-accent-blue/60 hover:text-accent-blue transition-colors"
           >
             <X size={10} />
@@ -171,19 +186,9 @@ export function DateRangePicker({ from, to, onChange }: Props) {
       {/* Popover */}
       {open && (
         <div
-          className="absolute top-full mt-2 z-50 left-0 bg-[#0f1117] border border-white/12 rounded-2xl shadow-2xl overflow-hidden"
-          style={{
-            minWidth: 280,
-            animation: 'datePickerIn 0.18s ease-out both',
-          }}
+          className="absolute top-full mt-2 z-50 left-0 bg-[#0f1117] border border-white/12 rounded-2xl shadow-2xl overflow-hidden animate-date-picker-in"
+          style={{ minWidth: 280 }}
         >
-          <style>{`
-            @keyframes datePickerIn {
-              from { opacity: 0; transform: translateY(-6px) scale(0.97); }
-              to   { opacity: 1; transform: translateY(0)    scale(1); }
-            }
-          `}</style>
-
           {/* Atajos */}
           <div className="flex items-center gap-1 px-3 pt-3 pb-2">
             {SHORTCUTS.map(s => {
@@ -198,6 +203,7 @@ export function DateRangePicker({ from, to, onChange }: Props) {
                       : false
               return (
                 <button
+                  type="button"
                   key={s.label}
                   onClick={s.f}
                   className={`flex-1 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
@@ -217,7 +223,9 @@ export function DateRangePicker({ from, to, onChange }: Props) {
           {/* Navegación mes */}
           <div className="flex items-center justify-between px-3 py-2.5">
             <button
+              type="button"
               onClick={prevMonth}
+              aria-label="Mes anterior"
               className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all active:scale-90"
             >
               <ChevronLeft size={14} />
@@ -226,7 +234,9 @@ export function DateRangePicker({ from, to, onChange }: Props) {
               {MONTHS_ES[viewM]} <span className="text-gray-500 font-normal">{viewY}</span>
             </span>
             <button
+              type="button"
               onClick={nextMonth}
+              aria-label="Mes siguiente"
               className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all active:scale-90"
             >
               <ChevronRight size={14} />
@@ -244,60 +254,22 @@ export function DateRangePicker({ from, to, onChange }: Props) {
 
             {/* Días */}
             <div className="grid grid-cols-7 gap-y-0.5">
-              {cells.map((d, i) => {
-                if (!d) return <div key={i} />
-
-                const isFrom    = d === previewFrom
-                const isTo      = d === previewTo && previewTo !== ''
-                const isInRange = inRange(d, previewFrom, previewTo)
-                const isToday   = d === todayStr
-                const isSingle  = isFrom && isTo
-
-                const isStart   = isFrom && !isSingle
-                const isEnd     = isTo   && !isSingle
-
-                return (
-                  <button
+              {cells.map((d, i) => d
+                ? (
+                  <DayCell
                     key={d}
+                    day={d}
+                    isFrom={d === previewFrom}
+                    isTo={d === previewTo && previewTo !== ''}
+                    isInRange={inDateRange(d, previewFrom, previewTo)}
+                    isToday={d === todayStr}
                     onClick={() => handleDayClick(d)}
-                    onMouseEnter={() => picking === 'to' && setHover(d)}
-                    onMouseLeave={() => setHover(null)}
-                    className={`
-                      relative h-8 text-xs font-medium transition-all duration-100 select-none
-                      ${isInRange ? 'bg-accent-blue/12 text-white' : ''}
-                      ${isStart   ? 'rounded-l-full' : ''}
-                      ${isEnd     ? 'rounded-r-full' : ''}
-                      ${isSingle  ? 'rounded-full' : ''}
-                      ${!isFrom && !isTo && !isInRange ? 'hover:bg-white/8 rounded-full text-gray-300' : ''}
-                    `}
-                  >
-                    {/* Fondo del día seleccionado (from/to) */}
-                    {(isFrom || isTo) && (
-                      <span className="absolute inset-0 flex items-center justify-center">
-                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
-                          isSingle
-                            ? 'bg-accent-blue text-white'
-                            : 'bg-accent-blue text-white'
-                        }`}>
-                          {parseInt(d.slice(8))}
-                        </span>
-                      </span>
-                    )}
-
-                    {/* Número del día */}
-                    {!isFrom && !isTo && (
-                      <span className={`relative z-10 ${isToday ? 'text-accent-blue font-bold' : ''}`}>
-                        {parseInt(d.slice(8))}
-                      </span>
-                    )}
-
-                    {/* Punto "hoy" */}
-                    {isToday && !isFrom && !isTo && (
-                      <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent-blue" />
-                    )}
-                  </button>
+                    onHover={() => picking === 'to' && setHover(d)}
+                    onHoverEnd={() => setHover(null)}
+                  />
                 )
-              })}
+                : <div key={i} />
+              )}
             </div>
 
             {/* Indicador de selección en curso */}
