@@ -172,9 +172,16 @@ services:
     logging: *default-logging
 
   # ── Backup automático de PostgreSQL ─────────────────────────────────────────
-  # pg_dump comprimido a diario, con retención por cantidad de ficheros. Ver
+  # pg_dump comprimido semanal, con retención por cantidad de ficheros. Ver
   # scripts/backup-loop.sh. Para un backup manual inmediato:
   # `docker compose exec -T postgres pg_dump -U ... | gzip > backup.sql.gz`
+  #
+  # BACKUP_HOST_DIR: fuera del repo a propósito (antes era ./backups, dentro
+  # del checkout de git) — directorio estándar de datos de aplicación del
+  # usuario, no algo que deba vivir junto al código fuente. Default pensado
+  # para Linux/Docker Desktop vía WSL2 (~/.local/share/CryptoFolio/backups,
+  # convención XDG); en macOS/Windows nativo puedes sobreescribirlo en tu
+  # .env con la ruta que prefieras.
   db-backup:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -188,7 +195,7 @@ services:
       PGDATABASE: ${POSTGRES_DB:-cryptotracker}
       BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-14}
     volumes:
-      - ./backups:/backups
+      - ${BACKUP_HOST_DIR:-~/.local/share/CryptoFolio/backups}:/backups
       - ./scripts/backup-loop.sh:/backup-loop.sh:ro
     entrypoint: ["/bin/sh", "/backup-loop.sh"]
     networks:

@@ -13,6 +13,18 @@ set -o pipefail
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 RETENTION_COUNT="${BACKUP_RETENTION_COUNT:-14}"
 
+# El directorio de backups vive FUERA del repo, en el host (ver
+# docker-compose*.yml) — su dueño real depende de quién lo cree primero:
+# este contenedor (root) si es la primera vez que arranca el stack, o el
+# usuario normal si ya hizo antes un `make backup`/backup manual desde el
+# host. chmod 777 aquí (no chown: no conocemos el UID/GID real del host)
+# asegura que ambos lados puedan siempre leer/escribir, sin depender del
+# orden de arranque. Mismo host de confianza única que el resto del
+# modelo de seguridad de este proyecto self-hosted — no expone nada a la
+# red, solo afecta a otros usuarios locales de la misma máquina.
+mkdir -p "$BACKUP_DIR"
+chmod 777 "$BACKUP_DIR"
+
 do_backup() {
   ts=$(date +%Y%m%d_%H%M%S)
   file="$BACKUP_DIR/cryptotracker_${ts}.sql.gz"
@@ -29,5 +41,5 @@ do_backup() {
 
 while true; do
   do_backup || echo "[backup] fallo, se reintentará en el siguiente ciclo" >&2
-  sleep 86400
+  sleep 604800 # 7 días — backup diario resultaba una carga excesiva sin necesidad real
 done
