@@ -1,267 +1,14 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { portfolioApi, FiatBalance, FifoLot } from '../api/portfolio'
-import { AssetTable } from '../components/AssetTable'
+import { portfolioApi } from '../api/portfolio'
 import { SaleSimulatorModal } from '../components/SaleSimulatorModal'
 import { usePricesStore } from '../store/pricesStore'
 import { formatEur } from '../utils/format'
-import { aggregateLotsByAsset } from '../utils/assetTable'
 import { PortfolioSummaryCards } from '../components/PortfolioSummaryCards'
 import { RefreshCw, Wallet, Search, X } from 'lucide-react'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-
-// ── Cálculo de totales globales ────────────────────────────────────────────
-function usePortfolioTotals(lots: FifoLot[], fiatBalances: FiatBalance[]) {
-  const prices = usePricesStore(s => s.prices)
-
-  let totalValue  = 0
-  let totalCost   = 0
-  let assetsTotal = 0
-  let pricesMissing = 0
-
-  for (const [asset, { qty, cost }] of aggregateLotsByAsset(lots)) {
-    assetsTotal++
-    totalCost += cost
-    const price = prices[asset] ?? 0
-    if (price > 0) totalValue += qty * price
-    else pricesMissing++
-  }
-
-  for (const b of fiatBalances) {
-    const bal = parseFloat(b.balance)
-    if (bal > 0) totalValue += bal
-  }
-
-  const pnl    = totalValue - totalCost
-  const pnlPct = totalCost > 0 ? (pnl / totalCost) * 100 : 0
-
-  return { totalValue, totalCost, pnl, pnlPct, assetsTotal, pricesMissing }
-}
-
-
-// ── AllocationDonut ────────────────────────────────────────────────────────
-const DONUT_COLORS = [
-  '#6366f1','#F0B90B','#00c896','#e74c3c','#8b5cf6',
-  '#3b82f6','#f59e0b','#10b981','#ef4444','#a78bfa',
-  '#06b6d4','#f97316','#84cc16','#ec4899','#14b8a6',
-]
-
-function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatBalances: FiatBalance[] }) {
-  const prices = usePricesStore(s => s.prices)
-
-  const [hovered, setHovered] = useState<string | null>(null)
-
-  type DonutItem = { name: string; value: number; pct: number }
-  const { total, items } = useMemo<{ total: number; items: DonutItem[] }>(() => {
-    const byAsset = new Map<string, number>()
-    for (const lot of lots) {
-      const price = prices[lot.asset] ?? 0
-      if (price === 0) continue
-      byAsset.set(lot.asset, (byAsset.get(lot.asset) ?? 0) + parseFloat(lot.quantity) * price)
-    }
-    for (const b of fiatBalances) {
-      const val = parseFloat(b.balance)
-      if (val > 0) byAsset.set(b.asset, (byAsset.get(b.asset) ?? 0) + val)
-    }
-    const total = [...byAsset.values()].reduce((s, v) => s + v, 0)
-    if (total === 0) return { total: 0, items: [] }
-    const sorted = [...byAsset.entries()].sort((a, b) => b[1] - a[1])
-    const top = sorted.slice(0, 8)
-    const restVal = sorted.slice(8).reduce((s, [, v]) => s + v, 0)
-    return {
-      total,
-      items: [
-        ...top.map(([name, value]) => ({ name, value, pct: (value / total) * 100 })),
-        ...(restVal > 0 ? [{ name: 'Otros', value: restVal, pct: (restVal / total) * 100 }] : []),
-      ],
-    }
-  }, [lots, fiatBalances, prices])
-
-  if (total === 0) return null
-
-  const hoveredEntry = items.find(d => d.name === hovered)
-
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: { payload: DonutItem }[] }) => {
-    if (!active || !payload?.[0]) return null
-    const d = payload[0].payload
-    return (
-      <div className="bg-gray-950/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2.5 shadow-xl text-xs">
-        <p className="font-semibold text-white mono mb-0.5">{d.name}</p>
-        <p className="text-gray-300">{formatEur(d.value)}</p>
-        <p className="text-gray-500">{d.pct.toFixed(1)}% del portfolio</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="bg-background-card border border-border rounded-2xl p-6 space-y-5">
-      {/* Cabecera */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-white">Distribución del portfolio</h3>
-          <p className="text-xs text-gray-600 mt-0.5">{items.length} activos · actualización cada 5 s</p>
-        </div>
-        <p className="text-xl font-semibold mono text-white">{formatEur(total)}</p>
-      </div>
-
-      <div className="flex items-center gap-8">
-        {/* Donut más grande */}
-        <div className="relative shrink-0" style={{ width: 240, height: 240 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={items}
-                cx="50%" cy="50%"
-                innerRadius={78} outerRadius={110}
-                paddingAngle={2}
-                dataKey="value"
-                strokeWidth={0}
-                onMouseEnter={(_, __, e) => setHovered((e.target as SVGElement).closest('[name]')?.getAttribute('name') ?? null)}
-                onMouseLeave={() => setHovered(null)}
-              >
-                {items.map((entry, i) => (
-                  <Cell
-                    key={entry.name}
-                    fill={DONUT_COLORS[i % DONUT_COLORS.length]}
-                    opacity={hovered && hovered !== entry.name ? 0.25 : 1}
-                    style={{ transition: 'opacity 0.2s', cursor: 'default', outline: 'none' }}
-                  />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
-
-          {/* Centro */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-0.5">
-            {hoveredEntry ? (
-              <>
-                <p className="text-base font-bold text-white mono tracking-tight">{hoveredEntry.name}</p>
-                <p className="text-2xl font-semibold mono text-white">{hoveredEntry.pct.toFixed(1)}%</p>
-                <p className="text-xs text-gray-500 mono">{formatEur(hoveredEntry.value)}</p>
-              </>
-            ) : (
-              <>
-                <p className="text-[10px] text-gray-600 uppercase tracking-widest">portfolio</p>
-                <p className="text-lg font-bold mono text-white leading-tight">{formatEur(total)}</p>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Leyenda — lista vertical con barra de proporción */}
-        <div className="flex-1 space-y-2 min-w-0">
-          {items.map((entry, i) => {
-            const color = DONUT_COLORS[i % DONUT_COLORS.length]
-            const isActive = !hovered || hovered === entry.name
-            return (
-              <div
-                key={entry.name}
-                className="cursor-default"
-                style={{ opacity: isActive ? 1 : 0.3, transition: 'opacity 0.2s' }}
-                onMouseEnter={() => setHovered(entry.name)}
-                onMouseLeave={() => setHovered(null)}
-              >
-                <div className="flex items-center justify-between mb-0.5">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                    <span className="text-xs font-medium text-gray-200 truncate">{entry.name}</span>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0 ml-2">
-                    <span className="text-xs text-gray-500 mono">{formatEur(entry.value)}</span>
-                    <span className="text-xs font-semibold mono w-10 text-right" style={{ color }}>{entry.pct.toFixed(1)}%</span>
-                  </div>
-                </div>
-                {/* Barra proporcional */}
-                <div className="h-0.5 bg-background-tertiary rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${entry.pct}%`, backgroundColor: color, opacity: 0.6 }}
-                  />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── WalletSections ── una sección por cada wallet real ─────────────────────
-function WalletSections({ lots, fiatBalances, onSimulate }: { lots: FifoLot[]; fiatBalances: FiatBalance[]; onSimulate: (asset: string, qty: number, price: number) => void }) {
-  // Coleccionar wallets únicas en orden: frías primero, exchanges al final
-  const walletOrder: string[] = []
-  const seen = new Set<string>()
-
-  // 1. Wallets frías
-  for (const lot of lots) {
-    if (lot.wallet_kind !== 'exchange' && !seen.has(lot.wallet_id)) {
-      walletOrder.push(lot.wallet_id)
-      seen.add(lot.wallet_id)
-    }
-  }
-  // 2. Exchanges
-  for (const lot of lots) {
-    if (lot.wallet_kind === 'exchange' && !seen.has(lot.wallet_id)) {
-      walletOrder.push(lot.wallet_id)
-      seen.add(lot.wallet_id)
-    }
-  }
-  // 3. Wallets que solo tienen fiat (sin lotes cripto)
-  for (const b of fiatBalances) {
-    if (!seen.has(b.wallet_id)) {
-      walletOrder.push(b.wallet_id)
-      seen.add(b.wallet_id)
-    }
-  }
-
-  const groups = walletOrder.map(wid => {
-    const wLots = lots.filter(l => l.wallet_id === wid)
-    const wFiat = fiatBalances.filter(b => b.wallet_id === wid)
-    const ref   = wLots[0] ?? { wallet_name: wFiat[0]?.wallet_name, wallet_color: wFiat[0]?.wallet_color, wallet_kind: wFiat[0]?.wallet_kind }
-    return {
-      key:   wid,
-      name:  ref.wallet_name  as string,
-      color: ref.wallet_color as string,
-      kind:  ref.wallet_kind  as string,
-      lots:  wLots,
-      fiats: wFiat,
-      assetCount: new Set(wLots.map(l => l.asset)).size,
-    }
-  })
-
-  const KIND_LABEL: Record<string, string> = {
-    exchange: 'Exchange',
-    hardware: 'Hardware',
-    cold:     'Frío',
-    hot:      'Caliente',
-  }
-
-  return (
-    <div className="space-y-6">
-      {groups.map(g => (
-        <div key={g.key} className="space-y-2">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
-            <h2 className="text-sm font-semibold tracking-wide" style={{ color: g.color }}>
-              {g.name}
-            </h2>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-md border font-medium uppercase tracking-wide text-gray-600 border-gray-700/60">
-              {KIND_LABEL[g.kind] ?? g.kind}
-            </span>
-            {g.assetCount > 0 && (
-              <span className="text-xs text-gray-600">
-                {g.assetCount} activo{g.assetCount !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-          <AssetTable lots={g.lots} fiatBalances={g.fiats} onSimulate={onSimulate} />
-        </div>
-      ))}
-    </div>
-  )
-}
+import { usePortfolioTotals } from './portfolio/usePortfolioTotals'
+import { AllocationDonut } from './portfolio/AllocationDonut'
+import { WalletSections } from './portfolio/WalletSections'
 
 export function Portfolio() {
   const prices = usePricesStore(s => s.prices)
@@ -325,6 +72,7 @@ export function Portfolio() {
             />
             {search && (
               <button
+                type="button"
                 onClick={() => { setSearch(''); searchRef.current?.focus() }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
               >
@@ -429,7 +177,7 @@ export function Portfolio() {
             <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
               <Search size={22} className="text-gray-700" />
               <p className="text-gray-500 text-sm">Sin resultados para <span className="mono text-white">"{search}"</span></p>
-              <button onClick={() => setSearch('')} className="text-xs text-accent-blue hover:text-accent-blue/80 transition-colors">
+              <button type="button" onClick={() => setSearch('')} className="text-xs text-accent-blue hover:text-accent-blue/80 transition-colors">
                 Limpiar búsqueda
               </button>
             </div>
