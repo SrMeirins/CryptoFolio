@@ -1,57 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   TrendingUp, TrendingDown, ArrowLeftRight, Coins, Receipt, Settings,
-  ChevronRight, ChevronLeft, Info, AlertCircle, CheckCircle, X, Zap,
-  ChevronDown,
+  ChevronRight, ChevronLeft, ChevronDown, Info, AlertCircle, CheckCircle, X, Zap,
 } from 'lucide-react'
-import { useClickOutside } from '../hooks/useClickOutside'
-
-// ── Tipos ──────────────────────────────────────────────────────────────────
-interface WalletOption { id: string; name: string; type: string; color: string; is_system: boolean }
-
-function useWallets() {
-  const [wallets, setWallets] = useState<WalletOption[]>([])
-  const fetched = useRef(false)
-  useEffect(() => {
-    if (fetched.current) return
-    fetched.current = true
-    fetch('/api/wallets').then(r => r.json()).then(setWallets).catch(() => {})
-  }, [])
-  return wallets
-}
-
-interface FieldDefinition {
-  name: string
-  label: string
-  required: boolean
-  auto?: boolean
-  type: 'asset' | 'number' | 'wallet' | 'datetime' | 'text' | 'select'
-  placeholder?: string
-  hint?: string
-  options?: { value: string; label: string }[]
-}
-
-interface OperationType {
-  id: string
-  category: string
-  label: string
-  description: string
-  helper: string
-  fiscalHelper: string
-  fiscalTreatment: string
-  fifoEffect: string
-  fields: FieldDefinition[]
-  example?: string
-  badge: string
-  badgeColor: 'green' | 'red' | 'blue' | 'gray' | 'amber'
-}
-
-interface CategoryMeta { label: string; description: string; icon: string }
-
-interface CatalogData {
-  categories: Record<string, CategoryMeta>
-  operations: OperationType[]
-}
+import { portfolioApi, type OperationType } from '../api/portfolio'
+import { DynamicField } from './DynamicField'
+import { WalletLabel } from './WalletPicker'
 
 interface OperationWizardProps {
   unknownOperation?: {
@@ -100,7 +55,7 @@ const CATEGORIES_ORDER = ['ACQUISITION', 'DISPOSITION', 'INCOME', 'MOVEMENT', 'F
 
 // ── Componente principal ───────────────────────────────────────────────────
 export function OperationWizard({ unknownOperation, initialValues, onComplete, onCancel }: OperationWizardProps) {
-  const [catalog, setCatalog]           = useState<CatalogData | null>(null)
+  const { data: catalog } = useQuery({ queryKey: ['operation-catalog'], queryFn: portfolioApi.getCatalog })
   const [step, setStep]                 = useState<'type' | 'fields' | 'confirm'>('type')
   const [selectedType, setSelectedType] = useState<OperationType | null>(null)
   const [expandedCat, setExpandedCat]   = useState<string | null>('ACQUISITION')
@@ -110,11 +65,10 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
   const [autoPrice, setAutoPrice]       = useState<number | null>(null)
   const [autoPriceLoading, setAutoPriceLoading] = useState(false)
 
-  useEffect(() => {
-    fetch('/api/catalog').then(r => r.json()).then(setCatalog).catch(() => {})
-  }, [])
-
-  // Pre-populate from initialValues (edit mode) once catalog is loaded
+  // Pre-popular desde initialValues (modo edición) una vez cargado el catálogo.
+  // Deps intencionalmente solo [catalog]: debe correr una única vez al
+  // llegar el catálogo, no en cada cambio de initialValues (prop estable
+  // durante la vida del wizard en modo edición).
   useEffect(() => {
     if (!catalog || !initialValues) return
     const opType = catalog.operations.find(op => op.id === initialValues.operationTypeId)
@@ -123,7 +77,8 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
       setFieldValues(initialValues.fields)
       setStep('fields')
     }
-  }, [catalog]) // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalog])
 
   useEffect(() => {
     if (unknownOperation) {
@@ -136,7 +91,9 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
     }
   }, [unknownOperation])
 
-  // Default timestamp a "ahora" si no viene prefijado
+  // Default timestamp a "ahora" si no viene prefijado. Deps solo [step]:
+  // se evalúa una vez por paso, usando el valor actual de fieldValues.timestamp
+  // sin disparar el efecto cada vez que el usuario edita el campo.
   useEffect(() => {
     if (!fieldValues.timestamp && !unknownOperation) {
       setFieldValues(prev => ({
@@ -144,9 +101,13 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
         timestamp: new Date().toISOString(),
       }))
     }
-  }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
 
-  // Auto-precio en tiempo real
+  // Auto-precio en tiempo real. Deps sin fieldValues.price_eur a propósito:
+  // el guard `if (fieldValues.price_eur) return` ya cubre no pisar un precio
+  // que el usuario haya escrito a mano, sin necesidad de re-disparar el
+  // efecto cada vez que ese campo cambia.
   useEffect(() => {
     if (!selectedType) return
     const asset     = fieldValues.asset as string
@@ -161,16 +122,14 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
       setAutoPriceLoading(true)
       try {
         const dateStr = new Date(timestamp).toISOString().slice(0, 10)
-        const res = await fetch(`/api/prices/historical?asset=${asset}&date=${dateStr}`)
-        if (res.ok) {
-          const data = await res.json()
-          setAutoPrice(data.price_eur > 0 ? data.price_eur : null)
-        }
+        const { price_eur } = await portfolioApi.getHistoricalPrice(asset, dateStr)
+        setAutoPrice(price_eur > 0 ? price_eur : null)
       } catch { setAutoPrice(null) }
       finally { setAutoPriceLoading(false) }
     }, 800)
     return () => clearTimeout(debounce)
-  }, [fieldValues.asset, fieldValues.timestamp, selectedType]) // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldValues.asset, fieldValues.timestamp, selectedType])
 
   if (!catalog) {
     return (
@@ -227,7 +186,7 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
             </p>
           )}
         </div>
-        <button onClick={onCancel} className="text-gray-500 hover:text-white transition-colors p-1">
+        <button type="button" onClick={onCancel} aria-label="Cerrar" className="text-gray-500 hover:text-white transition-colors p-1">
           <X size={18} />
         </button>
       </div>
@@ -287,6 +246,7 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
                 <div key={catKey} className="rounded-xl border border-border overflow-hidden">
                   {/* Cabecera categoría */}
                   <button
+                    type="button"
                     onClick={() => setExpandedCat(isOpen ? null : catKey)}
                     className="w-full flex items-center justify-between px-4 py-2.5 bg-background-tertiary hover:bg-border/40 transition-colors text-left"
                   >
@@ -306,6 +266,7 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
                     <div className="divide-y divide-border/40">
                       {ops.map(op => (
                         <button
+                          type="button"
                           key={op.id}
                           onClick={() => handleSelectType(op)}
                           className="w-full flex items-center justify-between px-4 py-3 hover:bg-background-tertiary/60 transition-colors text-left group"
@@ -337,6 +298,7 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
           <div className="p-5">
             {/* Helper toggle */}
             <button
+              type="button"
               onClick={() => setShowHelper(!showHelper)}
               className="flex items-center gap-2 text-xs text-accent-blue hover:text-accent-blue/80 transition-colors mb-4"
             >
@@ -478,6 +440,7 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
       {/* Footer */}
       <div className="flex items-center justify-between px-5 py-3.5 border-t border-border shrink-0">
         <button
+          type="button"
           onClick={() => {
             if (step === 'type')    onCancel()
             if (step === 'fields')  setStep('type')
@@ -491,6 +454,7 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
 
         {step === 'fields' && (
           <button
+            type="button"
             onClick={() => setStep('confirm')}
             disabled={!isFormValid()}
             className="flex items-center gap-2 px-5 py-2 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
@@ -502,6 +466,7 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
 
         {step === 'confirm' && (
           <button
+            type="button"
             onClick={handleComplete}
             className="flex items-center gap-2 px-5 py-2 bg-accent-green hover:bg-accent-green/80 rounded-lg text-sm font-medium transition-colors"
           >
@@ -510,160 +475,6 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
           </button>
         )}
       </div>
-    </div>
-  )
-}
-
-// ── WalletLabel helper ─────────────────────────────────────────────────────
-function WalletLabel({ walletId }: { walletId: string }) {
-  const [name, setName] = useState<string>(walletId)
-  useEffect(() => {
-    fetch('/api/wallets').then(r => r.json()).then((ws: WalletOption[]) => {
-      const w = ws.find(w => w.id === walletId)
-      if (w) setName(w.name)
-    }).catch(() => {})
-  }, [walletId])
-  return <>{name}</>
-}
-
-// ── DynamicField ───────────────────────────────────────────────────────────
-function DynamicField({
-  field, value, onChange,
-}: {
-  field: FieldDefinition; value: unknown; onChange: (val: unknown) => void
-}) {
-  const baseInput = 'w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-accent-blue transition-colors'
-  const wallets = useWallets()
-
-  return (
-    <div className="space-y-1">
-      <label className="flex items-center gap-1.5 text-xs font-medium text-gray-400">
-        {field.label}
-        {field.required
-          ? <span className="text-accent-red text-[10px]">requerido</span>
-          : field.auto
-          ? <span className="flex items-center gap-0.5 text-accent-blue bg-accent-blue/10 px-1.5 py-0.5 rounded text-[10px]">
-              <Zap size={8} /> auto
-            </span>
-          : <span className="text-gray-700 text-[10px]">opcional</span>
-        }
-      </label>
-
-      {field.type === 'number' && (
-        <input
-          type="number" step="any"
-          placeholder={field.placeholder ?? '0'}
-          value={(value as number) ?? ''}
-          onChange={e => onChange(e.target.value ? parseFloat(e.target.value) : '')}
-          className={baseInput}
-        />
-      )}
-
-      {field.type === 'text' && (
-        <input
-          type="text"
-          placeholder={field.placeholder ?? ''}
-          value={(value as string) ?? ''}
-          onChange={e => onChange(e.target.value)}
-          className={baseInput}
-        />
-      )}
-
-      {field.type === 'datetime' && (
-        <input
-          type="datetime-local"
-          value={value ? new Date(value as string).toISOString().slice(0, 16) : ''}
-          onChange={e => onChange(e.target.value ? new Date(e.target.value).toISOString() : '')}
-          className={`${baseInput} [color-scheme:dark]`}
-        />
-      )}
-
-      {field.type === 'asset' && (
-        <input
-          type="text"
-          placeholder={field.placeholder ?? 'BTC, ETH, XRP...'}
-          value={(value as string) ?? ''}
-          onChange={e => onChange(e.target.value.toUpperCase())}
-          className={`${baseInput} font-mono uppercase tracking-wider`}
-        />
-      )}
-
-      {field.type === 'wallet' && (
-        <WalletPicker wallets={wallets} value={value as string} onChange={onChange} />
-      )}
-
-      {field.type === 'select' && field.options && (
-        <select
-          value={(value as string) ?? ''}
-          onChange={e => onChange(e.target.value)}
-          className={baseInput}
-        >
-          <option value="">Seleccionar...</option>
-          {field.options.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      )}
-
-      {field.hint && <p className="text-[11px] text-gray-600 leading-tight">{field.hint}</p>}
-    </div>
-  )
-}
-
-// ── WalletPicker ─ selector rico con colores y tipo ────────────────────────
-function WalletPicker({
-  wallets, value, onChange,
-}: {
-  wallets: WalletOption[]; value: string; onChange: (val: unknown) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const selected = wallets.find(w => w.id === value)
-
-  useClickOutside(ref, () => setOpen(false), open)
-
-  const typeLabel: Record<string, string> = { exchange: 'Exchange', cold: 'Frío', hot: 'Caliente', other: 'Otro' }
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm hover:border-accent-blue/50 transition-colors text-left"
-      >
-        {selected ? (
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: selected.color }} />
-            <span className="text-white truncate">{selected.name}</span>
-            <span className="text-xs text-gray-600 shrink-0">{typeLabel[selected.type] ?? selected.type}</span>
-          </div>
-        ) : (
-          <span className="text-gray-600">Seleccionar wallet...</span>
-        )}
-        <ChevronDown size={13} className={`text-gray-500 shrink-0 ml-2 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-background-card border border-border rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
-          {wallets.length === 0 ? (
-            <div className="px-4 py-3 text-xs text-gray-500">Sin wallets configuradas</div>
-          ) : (
-            wallets.map(w => (
-              <button
-                key={w.id}
-                type="button"
-                onClick={() => { onChange(w.id); setOpen(false) }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-background-tertiary transition-colors text-left ${w.id === value ? 'bg-background-tertiary' : ''}`}
-              >
-                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: w.color }} />
-                <span className="text-sm text-gray-200 flex-1">{w.name}</span>
-                <span className="text-[10px] text-gray-600">{typeLabel[w.type] ?? w.type}</span>
-                {w.id === value && <CheckCircle size={11} className="text-accent-green shrink-0" />}
-              </button>
-            ))
-          )}
-        </div>
-      )}
     </div>
   )
 }
