@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { TrendingDown, ChevronUp, ChevronDown, Download } from 'lucide-react'
 import { formatEur } from '../../utils/format'
-import { AssetLogo } from './helpers'
+import { CryptoIcon } from '../../components/CryptoIcon'
 import type { RendimientoEvent } from './types'
 
 export function TablaRendimientos({ rendimientos, year }: { rendimientos: RendimientoEvent[]; year: number }) {
@@ -104,7 +104,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5">
-                      <AssetLogo symbol={r.activo} size={16} />
+                      <CryptoIcon symbol={r.activo} size={16} />
                       <span className="font-bold mono">{r.activo}</span>
                     </div>
                   </td>

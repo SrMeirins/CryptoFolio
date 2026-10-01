@@ -1,6 +1,6 @@
 import { Calendar } from 'lucide-react'
 import { formatEur, pnlColor } from '../../utils/format'
-import { pnlBg } from './helpers'
+import { pnlBg } from './constants'
 import type { FiscalSummary } from './types'
 
 export function FiscalSummaryCardsSkeleton() {

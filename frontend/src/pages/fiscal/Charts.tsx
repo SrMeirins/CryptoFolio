@@ -4,8 +4,28 @@ import {
   AreaChart, Area,
 } from 'recharts'
 import { formatEur, pnlColor } from '../../utils/format'
-import { AssetLogo, ChartTooltip, PNL_THRESHOLD } from './helpers'
+import { CryptoIcon } from '../../components/CryptoIcon'
+import { PNL_THRESHOLD } from './constants'
 import type { YearOverview, MonthlyData, BreakdownItem } from './types'
+
+function ChartTooltip({ active, payload, label }: {
+  active?: boolean
+  payload?: { value: number; name?: string }[]
+  label?: string
+}) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-background-card border border-border rounded-xl px-3 py-2 text-xs shadow-lg">
+      <p className="text-gray-400 mb-1">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} className={`font-bold mono ${(p.value ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+          {p.name && <span className="text-gray-500 font-normal mr-1">{p.name}</span>}
+          {(p.value ?? 0) >= 0 ? '+' : ''}{formatEur(p.value ?? 0)}
+        </p>
+      ))}
+    </div>
+  )
+}
 
 export function ComparativaAnual({ data }: { data: YearOverview[] }) {
   if (data.length < 2) return null
@@ -96,7 +116,7 @@ export function DesglosePorActivo({ data }: { data: BreakdownItem[] }) {
           return (
             <div key={item.asset} className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 w-20 shrink-0">
-                <AssetLogo symbol={item.asset} size={16} />
+                <CryptoIcon symbol={item.asset} size={16} />
                 <span className="text-xs font-bold mono text-gray-300">{item.asset}</span>
               </div>
               <div className="flex-1 flex items-center gap-1 h-5">

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
 import { AlertCircle, Check, RotateCcw } from 'lucide-react'
-import { TRAMOS_DEFAULT } from '../fiscal/helpers'
+import { TRAMOS_DEFAULT } from '../../utils/tramosIrpf'
 
 export function FiscalSection() {
   const { data: config = {} } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })

@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
 import { TrendingUp, Search, Filter, ChevronUp, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { formatEur, pnlColor } from '../../utils/format'
-import { AssetLogo, PNL_THRESHOLD } from './helpers'
+import { CryptoIcon } from '../../components/CryptoIcon'
+import { PNL_THRESHOLD } from './constants'
 import type { FiscalEvent, FiscalSummary } from './types'
 
 type SortKey = 'fecha' | 'activoTransmitido' | 'gananciaPerdidaEur' | 'valorTransmisionEur'
@@ -198,12 +199,12 @@ export function TablaEventos({ events, summary, year: _year }: { events: FiscalE
                     </td>
                     <td className="px-4 py-2.5 min-w-[140px]">
                       <div className="flex items-center gap-1 whitespace-nowrap">
-                        <AssetLogo symbol={e.activoTransmitido} size={15} />
+                        <CryptoIcon symbol={e.activoTransmitido} size={15} />
                         <span className="font-bold mono text-[11px]">{e.activoTransmitido}</span>
                         {e.activoRecibido ? (
                           <>
                             <span className="text-gray-600 text-[10px] mx-0.5">→</span>
-                            <AssetLogo symbol={e.activoRecibido} size={15} />
+                            <CryptoIcon symbol={e.activoRecibido} size={15} />
                             <span className="font-bold mono text-[11px]">{e.activoRecibido}</span>
                           </>
                         ) : isFee ? (

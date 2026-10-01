@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useId } from 'react'
 import { X, Calculator, AlertCircle } from 'lucide-react'
 import { formatAmount, formatPrice } from '../utils/format'
-import { useTramos, calcularTramos, type TramoDesglose } from '../pages/fiscal/helpers'
+import { useTramos } from '../hooks/useTramos'
+import { calcularTramos, type TramoDesglose } from '../utils/tramosIrpf'
 import { portfolioApi, type SimulationResult } from '../api/portfolio'
 import { useDebounce } from '../hooks/useDebounce'
 import { useModalA11y } from '../hooks/useModalA11y'
@@ -92,7 +93,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
   const net = result?.netGainLoss ?? 0
 
   // Desglose por tramos reutilizando la misma función que TaxCards.tsx
-  // (pages/fiscal/helpers.tsx) — antes este cálculo estaba reimplementado
+  // (utils/tramosIrpf.ts) — antes este cálculo estaba reimplementado
   // aquí, con riesgo de divergir si cambia la normativa de tramos.
   const tramosDesglose: TramoDesglose[] = net > 0.005 ? calcularTramos(net, tramosConfig) : []
 
