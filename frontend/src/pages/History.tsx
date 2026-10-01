@@ -1,94 +1,28 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { Fragment, useState, useMemo, useRef, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi, Transaction } from '../api/portfolio'
 import {
   Search, ChevronLeft, ChevronRight, X, RefreshCw,
-  Trash2, AlertTriangle, PenLine, Download, ChevronDown,
-  TrendingUp, TrendingDown, Zap, Calendar,
-  ChevronUp, BarChart2, Package, ArrowUpDown, ArrowUp, ArrowDown,
-  ArrowRight,
+  Download, PenLine, Calendar,
+  ArrowUpDown, ArrowUp, ArrowDown, Package,
 } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { ManualTxModal } from '../components/ManualTxModal'
 import { DateRangePicker } from '../components/DateRangePicker'
-import { CopyButton } from '../components/CopyButton'
-import { CryptoIcon } from '../components/CryptoIcon'
-import { formatEur, formatPrice, formatAmount } from '../utils/format'
+import { formatEur } from '../utils/format'
 import { invalidateTransactionQueries } from '../utils/queryInvalidation'
 import { useWalletsQuery } from '../hooks/useWallets'
 import { OP_META } from '../constants/operations'
 import { buildHistoryCsv } from './history/buildHistoryCsv'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-
-const CARD_META = {
-  invested: { icon: TrendingUp,   iconColor: '#10b981', bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.2)'  },
-  ops:      { icon: BarChart2,    iconColor: '#6366f1', bg: 'rgba(99,102,241,0.08)',  border: 'rgba(99,102,241,0.2)'  },
-  fees:     { icon: Zap,          iconColor: '#f59e0b', bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.2)'  },
-  sells:    { icon: TrendingDown, iconColor: '#ef4444', bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.2)'   },
-}
+import { fmtDateGroup, calcEurValue } from './history/helpers'
+import { TxRow } from './history/TxRow'
+import { StatsBar } from './history/StatsBar'
+import { AnalyticsPanel } from './history/AnalyticsPanel'
 
 type SortKey = 'fecha' | 'eur' | 'activo'
 type SortDir = 'asc' | 'desc'
 
 const PAGE_SIZE = 50
-
-// ── Helpers ───────────────────────────────────────────────────────────────
-function fmtDate(ts: string): { date: string; time: string } {
-  const d = new Date(ts)
-  return {
-    date: d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' }),
-    time: d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-  }
-}
-
-function fmtDateGroup(ts: string): string {
-  return new Date(ts).toLocaleDateString('es-ES', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  })
-}
-
-function fmtMonthLabel(mes: string): string {
-  const [y, m] = mes.split('-')
-  return new Date(parseInt(y), parseInt(m) - 1, 1)
-    .toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
-}
-
-function calcEurValue(tx: Transaction): number | null {
-  if (tx.cost_asset === 'EUR' && tx.cost_amount) return Math.abs(parseFloat(tx.cost_amount))
-  // price_per_unit solo está en EUR para ops sin cost_asset (income: staking, airdrop...)
-  // Para swaps cripto↔cripto price_per_unit es el ratio en units del cost_asset, no en EUR
-  if (!tx.cost_asset && tx.price_per_unit && tx.amount_net) {
-    const p = parseFloat(tx.price_per_unit), a = Math.abs(parseFloat(tx.amount_net))
-    if (!isNaN(p) && !isNaN(a) && p > 0 && a > 0) return p * a
-  }
-  return null
-}
-
-function calcFeeEur(tx: Transaction): number | null {
-  if (!tx.fee_amount || !tx.fee_asset) return null
-  const amt = parseFloat(tx.fee_amount)
-  if (isNaN(amt) || amt <= 0) return null
-  if (tx.fee_asset === 'EUR') return amt
-  if (tx.fee_asset === tx.asset && tx.price_per_unit) {
-    const p = parseFloat(tx.price_per_unit)
-    if (!isNaN(p) && p > 0) return amt * p
-  }
-  return null
-}
-
-// ── Highlight ─────────────────────────────────────────────────────────────
-function Highlight({ text, query }: { text: string; query: string }) {
-  if (!query.trim()) return <>{text}</>
-  const idx = text.toLowerCase().indexOf(query.toLowerCase())
-  if (idx === -1) return <>{text}</>
-  return (
-    <>
-      {text.slice(0, idx)}
-      <mark className="bg-accent-amber/30 text-white rounded px-0.5">{text.slice(idx, idx + query.length)}</mark>
-      {text.slice(idx + query.length)}
-    </>
-  )
-}
 
 // ── SortIcon ─────────────────────────────────────────────────────────────
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
@@ -96,424 +30,6 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
   return sortDir === 'asc'
     ? <ArrowUp size={10} className="text-accent-blue ml-1" />
     : <ArrowDown size={10} className="text-accent-blue ml-1" />
-}
-
-// ── Chip de operación ──────────────────────────────────────────────────────
-function OpChip({ type }: { type: string }) {
-  const meta = OP_META[type] ?? { label: type, color: '#6b7280' }
-  return (
-    <span
-      className="inline-flex items-center font-semibold rounded-md text-[10px] px-1.5 py-0.5 whitespace-nowrap shrink-0"
-      style={{ backgroundColor: `${meta.color}20`, color: meta.color }}
-    >
-      {meta.label}
-    </span>
-  )
-}
-
-// ── Chart tooltip ──────────────────────────────────────────────────────────
-function ChartTooltip({ active, payload, label }: {
-  active?: boolean; payload?: { value: number; name?: string }[]; label?: string
-}) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-background-card border border-border rounded-xl px-3 py-2 text-xs shadow-lg">
-      <p className="text-gray-400 mb-1 font-medium">{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} className="text-white mono">{p.name}: <span className="font-bold">{p.value}</span></p>
-      ))}
-    </div>
-  )
-}
-
-// ── Stats bar ──────────────────────────────────────────────────────────────
-function StatsBar({ stats }: {
-  stats: {
-    totals: {
-      total_ops: number; unique_assets: number; total_invested: number
-      total_fee_ops: number; total_fees_eur: number; total_buys: number; total_sells: number; total_manual: number
-    }
-  }
-}) {
-  const { totals } = stats
-  const cards = [
-    { ...CARD_META.invested, title: 'Invertido',    value: formatEur(totals.total_invested),  sub: `${totals.total_buys} compras`        },
-    { ...CARD_META.ops,      title: 'Operaciones',  value: totals.total_ops.toLocaleString('es-ES'), sub: `${totals.unique_assets} activos únicos` },
-    { ...CARD_META.fees,     title: 'Comisiones',   value: formatEur(totals.total_fees_eur),   sub: `${totals.total_fee_ops} ops con fee` },
-    { ...CARD_META.sells,    title: 'Ventas',       value: totals.total_sells.toLocaleString('es-ES'), sub: `${totals.total_manual} manuales`    },
-  ]
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {cards.map((c) => {
-        const Icon = c.icon
-        return (
-          <div key={c.title} className="rounded-2xl p-4 flex items-center gap-3 border"
-            style={{ backgroundColor: c.bg, borderColor: c.border }}>
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-              style={{ backgroundColor: `${c.iconColor}22` }}>
-              <Icon size={16} style={{ color: c.iconColor }} />
-            </div>
-            <div className="min-w-0">
-              <div className="text-[10px] text-gray-500 uppercase tracking-widest">{c.title}</div>
-              <div className="text-base font-bold mono text-white truncate">{c.value}</div>
-              <div className="text-[10px] text-gray-600">{c.sub}</div>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-// ── Panel analítica ────────────────────────────────────────────────────────
-function AnalyticsPanel({ stats, onAssetClick }: {
-  stats: {
-    monthly:   { mes: string; total_ops: number; compras: number; ventas: number; ingresos: number; transferencias: number; eur_invertido: number }[]
-    topAssets: { asset: string; ops: number; eur_volume: number }[]
-    fees:      { asset: string; ops: number; total_amount: number; total_eur: number }[]
-  }
-  onAssetClick: (asset: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const chartData = stats.monthly.map(m => ({
-    name:          fmtMonthLabel(m.mes),
-    Compras:       m.compras,
-    Ventas:        m.ventas,
-    Ingresos:      m.ingresos,
-    Transferencias: m.transferencias,
-    Otros:         m.total_ops - m.compras - m.ventas - m.ingresos - m.transferencias,
-  }))
-  const maxOps = Math.max(...stats.monthly.map(m => m.total_ops), 1)
-
-  return (
-    <div className="bg-background-card border border-border rounded-2xl overflow-hidden">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.02] transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <BarChart2 size={14} className="text-gray-500" />
-          <span className="text-sm font-medium">Analítica de actividad</span>
-          <span className="text-[10px] text-gray-600">últimos 18 meses · top activos · fees</span>
-        </div>
-        {open ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
-      </button>
-
-      {open && (
-        <div className="border-t border-border p-5 space-y-5">
-          {/* Gráfico — ancho completo */}
-          <div>
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-3">Operaciones por mes</p>
-            <ResponsiveContainer width="100%" height={130}>
-              <BarChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} barSize={10} barGap={1}>
-                <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                <YAxis hide domain={[0, maxOps * 1.2]} />
-                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                <Bar dataKey="Compras"        stackId="a" fill="#10b981" />
-                <Bar dataKey="Ventas"         stackId="a" fill="#ef4444" />
-                <Bar dataKey="Ingresos"       stackId="a" fill="#f59e0b" />
-                <Bar dataKey="Transferencias" stackId="a" fill="#6b7280" />
-                <Bar dataKey="Otros"          stackId="a" fill="#4b5563" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="flex items-center gap-4 mt-2">
-              {[['Compras','#10b981'],['Ventas','#ef4444'],['Ingresos','#f59e0b'],['Transferencias','#6b7280'],['Otros','#4b5563']].map(([l,c]) => (
-                <div key={l} className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                  <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: c }} />{l}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Top activos + Fees — dos columnas iguales */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1 border-t border-border/50">
-            {/* Top activos */}
-            <div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">
-                Top activos <span className="text-gray-700 normal-case">· último año</span>
-              </p>
-              <div className="space-y-1.5">
-                {stats.topAssets.slice(0, 6).map((a) => (
-                  <button
-                    key={a.asset}
-                    onClick={() => onAssetClick(a.asset)}
-                    className="w-full flex items-center gap-2 group/asset hover:bg-background-tertiary/50 rounded-lg px-1 py-0.5 transition-colors"
-                    title={`Filtrar por ${a.asset}`}
-                  >
-                    <CryptoIcon symbol={a.asset} size={16} />
-                    <span className="text-xs mono font-bold text-gray-300 w-12 shrink-0 group-hover/asset:text-white transition-colors">{a.asset}</span>
-                    <div className="flex-1 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-accent-blue/60 group-hover/asset:bg-accent-blue transition-colors"
-                        style={{ width: `${(a.ops / (stats.topAssets[0]?.ops ?? 1)) * 100}%` }} />
-                    </div>
-                    <span className="text-[10px] text-gray-500 w-5 text-right shrink-0">{a.ops}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="text-[9px] text-gray-700 mt-1.5 pl-1">Click para filtrar</p>
-            </div>
-
-            {/* Fees por activo */}
-            {stats.fees.length > 0 && (
-              <div>
-                <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">
-                  Fees por activo <span className="text-gray-700 normal-case">· último año</span>
-                </p>
-                <div className="space-y-1.5">
-                  {stats.fees.map((f) => (
-                    <div key={f.asset} className="flex items-center gap-2">
-                      <CryptoIcon symbol={f.asset} size={16} />
-                      <span className="text-xs mono font-bold text-gray-300 w-12 shrink-0">{f.asset}</span>
-                      <div className="flex-1 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
-                        <div className="h-full rounded-full bg-accent-amber/50"
-                          style={{ width: `${(f.total_eur / (stats.fees[0]?.total_eur ?? 1)) * 100}%` }} />
-                      </div>
-                      {f.total_eur > 0
-                        ? <span className="text-[11px] text-gray-400 mono font-semibold shrink-0">{formatEur(f.total_eur)}</span>
-                        : <span className="text-[10px] text-gray-600 mono shrink-0">{formatAmount(f.total_amount, 4)}</span>
-                      }
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Fila de transacción ────────────────────────────────────────────────────
-function TxRow({
-  tx, onDelete, onEdit, isDeleting, searchTerm,
-}: {
-  tx: Transaction
-  onDelete: (id: string) => void
-  onEdit:   (tx: Transaction) => void
-  isDeleting: boolean
-  searchTerm: string
-}) {
-  const [expanded, setExpanded]           = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-
-  const meta   = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: '#6b7280', group: 'other', rowBg: 'transparent' }
-  const isBuy  = meta.group === 'buy' || meta.group === 'income'
-  const isSell = meta.group === 'sell'
-
-  const { date, time } = fmtDate(tx.timestamp)
-  const eurValue = calcEurValue(tx)
-  const feeEur   = calcFeeEur(tx)
-
-  const hasCost  = tx.cost_asset && tx.cost_amount && parseFloat(tx.cost_amount) !== 0
-  const priceLine = tx.price_per_unit
-    ? (() => {
-        const p = parseFloat(tx.price_per_unit)
-        if (isNaN(p) || p <= 0) return null
-        const sym = tx.cost_asset ?? 'EUR'
-        if (p >= 10000) return `${p.toLocaleString('es-ES', { maximumFractionDigits: 0 })} ${sym}`
-        if (p >= 100)   return `${p.toFixed(2)} ${sym}`
-        if (p >= 1)     return `${p.toFixed(4)} ${sym}`
-        return `${p.toFixed(6)} ${sym}`
-      })()
-    : null
-
-  return (
-    <>
-      <tr
-        className={`group border-b border-border/40 transition-colors cursor-pointer ${expanded ? 'bg-background-tertiary/50' : ''}`}
-        style={{ backgroundColor: expanded ? undefined : meta.rowBg }}
-        onClick={() => setExpanded(e => !e)}
-      >
-        {/* Fecha */}
-        <td className="px-4 py-2.5 whitespace-nowrap align-middle">
-          <div className="text-[11px] font-medium text-gray-300">{date}</div>
-          <div className="text-[10px] text-gray-600 mono">{time}</div>
-        </td>
-
-        {/* Tipo */}
-        <td className="px-3 py-2.5 align-middle">
-          <div className="flex items-center gap-1.5">
-            <OpChip type={tx.operation_type} />
-            {tx.manually_added && (
-              <span className="text-[9px] px-1 py-0.5 rounded bg-accent-blue/15 text-accent-blue font-bold shrink-0">M</span>
-            )}
-          </div>
-        </td>
-
-        {/* Activo + cantidad */}
-        <td className="px-3 py-2.5 align-middle">
-          <div className="flex items-center gap-2 min-w-0">
-            <CryptoIcon symbol={tx.asset} size={26} />
-            <div className="min-w-0">
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-bold mono text-sm text-white">
-                  <Highlight text={tx.asset} query={searchTerm} />
-                </span>
-                <span className={`text-xs mono font-semibold ${isBuy ? 'text-accent-green' : isSell ? 'text-accent-red' : 'text-gray-300'}`}>
-                  {isBuy ? '+' : isSell ? '−' : ''}{formatAmount(tx.amount_net, 6)}
-                </span>
-              </div>
-              {tx.notes && (
-                <p className="text-[10px] text-gray-600 truncate max-w-[200px] leading-tight mt-0.5">{tx.notes}</p>
-              )}
-            </div>
-          </div>
-        </td>
-
-        {/* Valor EUR */}
-        <td className="px-3 py-2.5 text-right align-middle">
-          {eurValue != null ? (
-            <>
-              <div className="text-sm mono font-semibold text-white">{formatPrice(eurValue)}</div>
-              {priceLine && <div className="text-[10px] text-gray-600 mono mt-0.5">@ {priceLine}</div>}
-            </>
-          ) : hasCost ? (
-            <>
-              <div className="text-xs mono text-gray-400">{formatAmount(tx.cost_amount, 4)}</div>
-              <div className="text-[10px] text-gray-600">{tx.cost_asset}</div>
-            </>
-          ) : (
-            <span className="text-gray-700 text-xs">—</span>
-          )}
-        </td>
-
-        {/* Fee */}
-        <td className="px-3 py-2.5 align-middle">
-          {tx.fee_asset && tx.fee_amount ? (
-            <div className="flex items-center gap-1.5">
-              <CryptoIcon symbol={tx.fee_asset} size={14} />
-              <div>
-                <div className="text-xs mono text-gray-400">
-                  {formatAmount(tx.fee_amount, 6)} <span className="text-gray-600 text-[10px]">{tx.fee_asset}</span>
-                </div>
-                {feeEur != null && <div className="text-[10px] text-gray-600 mono">{formatEur(feeEur)}</div>}
-              </div>
-            </div>
-          ) : (
-            <span className="text-gray-700 text-xs">—</span>
-          )}
-        </td>
-
-        {/* Wallet */}
-        <td className="px-3 py-2.5 align-middle">
-          {tx.operation_type === 'TRANSFER_INTERNAL' && tx.destination_wallet_name ? (
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold"
-                style={{ backgroundColor: `${tx.wallet_color}18`, color: tx.wallet_color }}>
-                {tx.wallet_name}
-              </span>
-              <ArrowRight size={10} className="text-gray-600 shrink-0" />
-              <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold"
-                style={{ backgroundColor: `${tx.destination_wallet_color}18`, color: tx.destination_wallet_color ?? '#6b7280' }}>
-                {tx.destination_wallet_name}
-              </span>
-            </div>
-          ) : (
-            <>
-              <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold"
-                style={{ backgroundColor: `${tx.wallet_color}18`, color: tx.wallet_color }}>
-                {tx.wallet_name}
-              </span>
-              {tx.account && <div className="text-[10px] text-gray-600 mt-0.5">{tx.account}</div>}
-            </>
-          )}
-        </td>
-
-        {/* Acciones */}
-        <td className="px-3 py-2.5 align-middle" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center justify-end gap-0.5">
-            {!confirmDelete && (
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
-                <button onClick={() => onEdit(tx)}
-                  className="p-1.5 rounded-lg hover:bg-accent-blue/10 text-gray-600 hover:text-accent-blue transition-colors"
-                  title="Editar transacción">
-                  <PenLine size={12} />
-                </button>
-                {tx.manually_added && (
-                  <button onClick={() => setConfirmDelete(true)}
-                    className="p-1.5 rounded-lg hover:bg-accent-red/10 text-gray-600 hover:text-accent-red transition-colors"
-                    title="Eliminar transacción">
-                    <Trash2 size={12} />
-                  </button>
-                )}
-              </div>
-            )}
-            {tx.manually_added && confirmDelete && (
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-gray-500">¿Borrar?</span>
-                <button onClick={() => onDelete(tx.id)} disabled={isDeleting} className="text-accent-red p-0.5">
-                  {isDeleting ? <RefreshCw size={11} className="animate-spin" /> : <AlertTriangle size={11} />}
-                </button>
-                <button onClick={() => setConfirmDelete(false)} className="text-gray-600 p-0.5"><X size={11} /></button>
-              </div>
-            )}
-            <button onClick={() => setExpanded(e => !e)}
-              className="p-1 text-gray-700 hover:text-gray-400 transition-colors">
-              {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            </button>
-          </div>
-        </td>
-      </tr>
-
-      {/* Fila expandida */}
-      {expanded && (
-        <tr className="bg-background-tertiary/15">
-          <td colSpan={7} className="px-6 py-3 border-b border-border">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-              <div>
-                <div className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">ID</div>
-                <div className="mono text-gray-500 text-[10px] break-all flex items-center gap-1">
-                  {tx.id}
-                  <CopyButton text={tx.id} size={10} title="Copiar ID" className="ml-1" />
-                </div>
-              </div>
-              {tx.price_per_unit && (
-                <div>
-                  <div className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">Precio unitario</div>
-                  <div className="mono text-gray-300">{parseFloat(tx.price_per_unit).toFixed(8)} {tx.cost_asset ?? 'EUR'}</div>
-                </div>
-              )}
-              {tx.destination_wallet_name && (
-                <div>
-                  <div className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">Destino</div>
-                  <span className="text-[11px] px-2 py-0.5 rounded-md font-semibold"
-                    style={{ backgroundColor: `${tx.destination_wallet_color}18`, color: tx.destination_wallet_color ?? '#6b7280' }}>
-                    {tx.destination_wallet_name}
-                  </span>
-                </div>
-              )}
-              <div>
-                <div className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">Importado</div>
-                <div className="text-gray-500 text-[11px]">
-                  {new Date(tx.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
-                  {tx.manually_added && <span className="ml-1.5 text-accent-blue font-medium">· Manual</span>}
-                </div>
-              </div>
-              {tx.linked_tx_id && tx.linked_tx_timestamp && (
-                <div className="col-span-2">
-                  <div className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">
-                    {tx.operation_type === 'STAKING_UNLOCK' ? 'Staking purchase vinculado' : 'Staking redemption vinculada'}
-                  </div>
-                  <div className="text-[11px] text-amber-400/80 font-mono">
-                    {new Date(tx.linked_tx_timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    {' · '}
-                    {tx.linked_tx_amount ? parseFloat(tx.linked_tx_amount).toFixed(6) : ''} {tx.linked_tx_asset}
-                  </div>
-                </div>
-              )}
-              {tx.notes && (
-                <div className="col-span-2">
-                  <div className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">Notas</div>
-                  <div className="text-gray-400">{tx.notes}</div>
-                </div>
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
-  )
 }
 
 // ── Filtros ────────────────────────────────────────────────────────────────
@@ -566,7 +82,11 @@ export function History() {
     placeholderData: prev => prev,
   })
 
-  const rawTransactions: Transaction[] = data?.transactions ?? []
+  // Envuelto en su propio useMemo: `data?.transactions ?? []` crea un array
+  // nuevo en cada render donde `data.transactions` es undefined, lo que
+  // invalidaría la memoización de `transactions` de abajo en cada render en
+  // vez de solo cuando cambian los datos reales.
+  const rawTransactions = useMemo(() => data?.transactions ?? [], [data])
   const total      = data?.total ?? 0
   const totalEur   = data?.total_eur ?? 0
   const totalPages = Math.ceil(total / PAGE_SIZE)
@@ -667,16 +187,16 @@ export function History() {
           </div>
           <div className="flex items-center gap-2">
             {hasActiveFilters && (
-              <button onClick={clearFilters}
+              <button type="button" onClick={clearFilters}
                 className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-white px-3 py-1.5 border border-border rounded-lg hover:border-gray-500 transition-colors">
                 <X size={11} /> Limpiar
               </button>
             )}
-            <button onClick={exportCsv}
+            <button type="button" onClick={exportCsv}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-background-tertiary border border-border rounded-lg text-xs text-gray-400 hover:text-white hover:border-gray-500 transition-colors">
               <Download size={13} /> CSV
             </button>
-            <button onClick={() => setShowNewTx(true)}
+            <button type="button" onClick={() => setShowNewTx(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-blue/15 border border-accent-blue/30 rounded-lg text-xs text-accent-blue hover:bg-accent-blue/25 transition-colors font-medium">
               + Nueva
             </button>
@@ -696,7 +216,7 @@ export function History() {
               className="bg-background-tertiary border border-border rounded-lg pl-7 pr-8 py-1.5 text-xs placeholder-gray-600 focus:outline-none focus:border-accent-blue w-48"
             />
             {filters.search && (
-              <button onClick={() => setFilter('search', '')}
+              <button type="button" onClick={() => setFilter('search', '')} aria-label="Limpiar búsqueda"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400">
                 <X size={10} />
               </button>
@@ -732,7 +252,7 @@ export function History() {
           />
 
           {/* Solo manuales */}
-          <button onClick={() => setFilter('manualOnly', !filters.manualOnly)}
+          <button type="button" onClick={() => setFilter('manualOnly', !filters.manualOnly)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
               filters.manualOnly
                 ? 'bg-accent-blue/10 border-accent-blue/40 text-accent-blue'
@@ -767,7 +287,7 @@ export function History() {
                 {hasActiveFilters ? 'Sin resultados para estos filtros.' : 'No hay transacciones. Importa un CSV para empezar.'}
               </p>
               {hasActiveFilters && (
-                <button onClick={clearFilters} className="text-xs text-accent-blue hover:underline">Limpiar filtros</button>
+                <button type="button" onClick={clearFilters} className="text-xs text-accent-blue hover:underline">Limpiar filtros</button>
               )}
             </div>
           ) : (
@@ -776,18 +296,18 @@ export function History() {
                 <thead>
                   <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-border bg-background-tertiary/40">
                     <th className="text-left px-4 py-2.5 font-medium">
-                      <button onClick={() => toggleSort('fecha')} className="flex items-center hover:text-gray-300 transition-colors">
+                      <button type="button" onClick={() => toggleSort('fecha')} className="flex items-center hover:text-gray-300 transition-colors">
                         Fecha <SortIcon col="fecha" sortKey={sortKey} sortDir={sortDir} />
                       </button>
                     </th>
                     <th className="text-left px-3 py-2.5 font-medium">Tipo</th>
                     <th className="text-left px-3 py-2.5 font-medium">
-                      <button onClick={() => toggleSort('activo')} className="flex items-center hover:text-gray-300 transition-colors">
+                      <button type="button" onClick={() => toggleSort('activo')} className="flex items-center hover:text-gray-300 transition-colors">
                         Activo <SortIcon col="activo" sortKey={sortKey} sortDir={sortDir} />
                       </button>
                     </th>
                     <th className="text-right px-3 py-2.5 font-medium">
-                      <button onClick={() => toggleSort('eur')} className="flex items-center ml-auto hover:text-gray-300 transition-colors">
+                      <button type="button" onClick={() => toggleSort('eur')} className="flex items-center ml-auto hover:text-gray-300 transition-colors">
                         Valor EUR <SortIcon col="eur" sortKey={sortKey} sortDir={sortDir} />
                       </button>
                     </th>
@@ -798,8 +318,8 @@ export function History() {
                 </thead>
                 <tbody>
                   {grouped.map(([day, txs]) => (
-                    <>
-                      <tr key={`day-${day}`} className="bg-background-tertiary/25">
+                    <Fragment key={day}>
+                      <tr className="bg-background-tertiary/25">
                         <td colSpan={7} className="px-4 py-1.5">
                           <div className="flex items-center gap-2">
                             <Calendar size={9} className="text-gray-600" />
@@ -822,7 +342,7 @@ export function History() {
                           searchTerm={filters.search}
                         />
                       ))}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -839,15 +359,19 @@ export function History() {
           </span>
           <div className="flex items-center gap-1">
             <button
+              type="button"
               onClick={() => setFilter('offset', Math.max(0, filters.offset - PAGE_SIZE))}
               disabled={filters.offset === 0}
+              aria-label="Página anterior"
               className="p-1.5 rounded-lg bg-background-tertiary border border-border hover:bg-border disabled:opacity-40 transition-colors">
               <ChevronLeft size={14} />
             </button>
             <span className="text-xs text-gray-500 px-2 mono">{currentPage + 1} / {totalPages}</span>
             <button
+              type="button"
               onClick={() => setFilter('offset', filters.offset + PAGE_SIZE)}
               disabled={filters.offset + PAGE_SIZE >= total}
+              aria-label="Página siguiente"
               className="p-1.5 rounded-lg bg-background-tertiary border border-border hover:bg-border disabled:opacity-40 transition-colors">
               <ChevronRight size={14} />
             </button>
