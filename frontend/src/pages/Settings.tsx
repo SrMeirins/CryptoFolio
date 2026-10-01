@@ -8,16 +8,7 @@ import { AssetsSection } from './settings/AssetsSection'
 import { FiscalSection } from './settings/FiscalSection'
 import { DatosSection } from './settings/DatosSection'
 import { GeneralSection } from './settings/GeneralSection'
-
-const SETUP_KEY = 'cflio_setup_seen'
-
-function useSetup() {
-  const [seen, setSeen] = useState(() => localStorage.getItem(SETUP_KEY) === 'true')
-  function markSeen() { localStorage.setItem(SETUP_KEY, 'true'); setSeen(true) }
-  return { setupSeen: seen, markSetupSeen: markSeen }
-}
-
-interface WalletData { id: string; is_system: boolean }
+import { useSetupSeen } from '../hooks/useSetupSeen'
 
 function SetupBanner({ onDismiss, onAddWallet }: { onDismiss: () => void; onAddWallet: () => void }) {
   return (
@@ -90,7 +81,7 @@ function SettingsTabs({ active, onChange }: { active: string; onChange: (t: stri
 const VALID_TABS = ['wallets', 'assets', 'fiscal', 'datos', 'general']
 
 export function Settings() {
-  const { setupSeen, markSetupSeen } = useSetup()
+  const { setupSeen, markSetupSeen } = useSetupSeen()
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
   const [activeTab, setActiveTab] = useState(() =>
@@ -109,9 +100,9 @@ export function Settings() {
     setSearchParams({ tab }, { replace: true })
   }
 
-  const { data: wallets = [], isFetched: walletsFetched } = useQuery<WalletData[]>({
+  const { data: wallets = [], isFetched: walletsFetched } = useQuery({
     queryKey: ['wallets'],
-    queryFn: () => fetch('/api/wallets').then(r => r.json()),
+    queryFn: portfolioApi.getWallets,
   })
 
   // Auto-dismiss banner once wallets data arrives and user already has a non-system wallet

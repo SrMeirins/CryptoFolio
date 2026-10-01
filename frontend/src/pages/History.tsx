@@ -13,7 +13,9 @@ import { ManualTxModal } from '../components/ManualTxModal'
 import { DateRangePicker } from '../components/DateRangePicker'
 import { CopyButton } from '../components/CopyButton'
 import { CryptoIcon } from '../components/CryptoIcon'
-import { formatEur, formatPrice } from '../utils/format'
+import { formatEur, formatPrice, formatAmount } from '../utils/format'
+import { invalidateTransactionQueries } from '../utils/queryInvalidation'
+import { useWalletsQuery } from '../hooks/useWallets'
 import { OP_META } from '../constants/operations'
 import { buildHistoryCsv } from './history/buildHistoryCsv'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -31,16 +33,6 @@ type SortDir = 'asc' | 'desc'
 const PAGE_SIZE = 50
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-function fmtAmount(n: string | null | number, decimals = 6): string {
-  if (n === null || n === undefined || n === '') return '—'
-  const v = typeof n === 'string' ? parseFloat(n) : n
-  if (isNaN(v)) return '—'
-  if (Math.abs(v) >= 1_000_000) return v.toLocaleString('es-ES', { maximumFractionDigits: 0 })
-  if (Math.abs(v) >= 1000)      return v.toLocaleString('es-ES', { maximumFractionDigits: 2 })
-  if (Math.abs(v) >= 1)         return v.toFixed(4)
-  return v.toFixed(decimals)
-}
-
 function fmtDate(ts: string): { date: string; time: string } {
   const d = new Date(ts)
   return {
@@ -82,23 +74,6 @@ function calcFeeEur(tx: Transaction): number | null {
     if (!isNaN(p) && p > 0) return amt * p
   }
   return null
-}
-
-// Atajo de fecha
-function dateShortcut(mode: 'today' | 'month' | 'year'): { date_from: string; date_to: string } {
-  const now  = new Date()
-  const pad  = (n: number) => String(n).padStart(2, '0')
-  const ymd  = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-  if (mode === 'today') {
-    const s = ymd(now)
-    return { date_from: s, date_to: s }
-  }
-  if (mode === 'month') {
-    const from = new Date(now.getFullYear(), now.getMonth(), 1)
-    return { date_from: ymd(from), date_to: ymd(now) }
-  }
-  // year
-  return { date_from: `${now.getFullYear()}-01-01`, date_to: ymd(now) }
 }
 
 // ── Highlight ─────────────────────────────────────────────────────────────
@@ -295,7 +270,7 @@ function AnalyticsPanel({ stats, onAssetClick }: {
                       </div>
                       {f.total_eur > 0
                         ? <span className="text-[11px] text-gray-400 mono font-semibold shrink-0">{formatEur(f.total_eur)}</span>
-                        : <span className="text-[10px] text-gray-600 mono shrink-0">{fmtAmount(f.total_amount, 4)}</span>
+                        : <span className="text-[10px] text-gray-600 mono shrink-0">{formatAmount(f.total_amount, 4)}</span>
                       }
                     </div>
                   ))}
@@ -376,7 +351,7 @@ function TxRow({
                   <Highlight text={tx.asset} query={searchTerm} />
                 </span>
                 <span className={`text-xs mono font-semibold ${isBuy ? 'text-accent-green' : isSell ? 'text-accent-red' : 'text-gray-300'}`}>
-                  {isBuy ? '+' : isSell ? '−' : ''}{fmtAmount(tx.amount_net)}
+                  {isBuy ? '+' : isSell ? '−' : ''}{formatAmount(tx.amount_net, 6)}
                 </span>
               </div>
               {tx.notes && (
@@ -395,7 +370,7 @@ function TxRow({
             </>
           ) : hasCost ? (
             <>
-              <div className="text-xs mono text-gray-400">{fmtAmount(tx.cost_amount, 4)}</div>
+              <div className="text-xs mono text-gray-400">{formatAmount(tx.cost_amount, 4)}</div>
               <div className="text-[10px] text-gray-600">{tx.cost_asset}</div>
             </>
           ) : (
@@ -410,7 +385,7 @@ function TxRow({
               <CryptoIcon symbol={tx.fee_asset} size={14} />
               <div>
                 <div className="text-xs mono text-gray-400">
-                  {fmtAmount(tx.fee_amount, 6)} <span className="text-gray-600 text-[10px]">{tx.fee_asset}</span>
+                  {formatAmount(tx.fee_amount, 6)} <span className="text-gray-600 text-[10px]">{tx.fee_asset}</span>
                 </div>
                 {feeEur != null && <div className="text-[10px] text-gray-600 mono">{formatEur(feeEur)}</div>}
               </div>
@@ -564,14 +539,7 @@ export function History() {
   const [editingTx, setEditingTx]     = useState<Transaction | null>(null)
   const [showNewTx, setShowNewTx]     = useState(false)
 
-  const { data: walletList = [] } = useQuery({
-    queryKey: ['wallets-list'],
-    queryFn:  async () => {
-      const r = await fetch('/api/wallets')
-      return r.json() as Promise<{ id: string; name: string; color: string }[]>
-    },
-    staleTime: 60_000,
-  })
+  const walletList = useWalletsQuery()
 
   const { data: stats } = useQuery({
     queryKey: ['tx-stats'],
@@ -648,9 +616,7 @@ export function History() {
     setDeletingId(id)
     try {
       const result = await portfolioApi.deleteManualTx(id)
-      queryClient.invalidateQueries({ queryKey: ['transactions'] })
-      queryClient.invalidateQueries({ queryKey: ['tx-stats'] })
-      queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
+      invalidateTransactionQueries(queryClient)
       if (result.fifoError) {
         toast.warning('Transacción eliminada', `Eliminada, pero el recálculo FIFO falló: ${result.fifoError}`)
       } else {
@@ -664,9 +630,7 @@ export function History() {
   }
 
   function handleModalSuccess() {
-    queryClient.invalidateQueries({ queryKey: ['transactions'] })
-    queryClient.invalidateQueries({ queryKey: ['tx-stats'] })
-    queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
+    invalidateTransactionQueries(queryClient)
     setEditingTx(null); setShowNewTx(false)
   }
 

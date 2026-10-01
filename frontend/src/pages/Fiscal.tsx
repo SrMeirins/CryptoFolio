@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { FileText, Info, Calendar, AlertTriangle } from 'lucide-react'
+import { portfolioApi } from '../api/portfolio'
 import { formatEur, pnlColor } from '../utils/format'
 import { pnlBg, baseTramosCompensada } from './fiscal/helpers'
 import { ComparativaAnual, EvolucionMensual, DesglosePorActivo } from './fiscal/Charts'
@@ -9,77 +10,66 @@ import { Modelo721Card } from './fiscal/Modelo721Card'
 import { TablaEventos } from './fiscal/TablaEventos'
 import { TablaRendimientos } from './fiscal/TablaRendimientos'
 import { ExportPanel } from './fiscal/ExportPanel'
-import type {
-  FiscalSummary, FiscalEvent, RendimientoEvent, Modelo721,
-  YearOverview, Carryforward, BreakdownItem, MonthlyData,
-} from './fiscal/types'
-
-async function fetchOk(url: string) {
-  const r = await fetch(url)
-  if (!r.ok) throw new Error(`HTTP ${r.status}: ${url}`)
-  return r.json()
-}
 
 export function Fiscal() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const currentYear = new Date().getFullYear()
 
-  const { data: years = [] } = useQuery<number[]>({
+  const { data: years = [] } = useQuery({
     queryKey: ['fiscal-years'],
-    queryFn: () => fetchOk('/api/fiscal/years'),
+    queryFn: portfolioApi.getFiscalYears,
   })
 
-  const { data: overview = [] } = useQuery<YearOverview[]>({
+  const { data: overview = [] } = useQuery({
     queryKey: ['fiscal-overview'],
-    queryFn: () => fetchOk('/api/fiscal/overview'),
+    queryFn: portfolioApi.getFiscalOverview,
     staleTime: 5 * 60_000,
   })
 
-  const { data: carryforward } = useQuery<Carryforward>({
+  const { data: carryforward } = useQuery({
     queryKey: ['fiscal-carryforward'],
-    queryFn: () => fetchOk('/api/fiscal/carryforward'),
+    queryFn: portfolioApi.getFiscalCarryforward,
     staleTime: 5 * 60_000,
   })
 
   const activeYear = selectedYear ?? (years.length > 0 ? years[0] : null)
 
-  const { data: summary, isLoading: summaryLoading } = useQuery<FiscalSummary>({
+  // activeYear! en las queryFn: no-null assertion segura — `enabled: !!activeYear`
+  // garantiza que React Query nunca las ejecuta con activeYear a null.
+  const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['fiscal-summary-detail', activeYear],
-    queryFn: () => fetchOk(`/api/fiscal/${activeYear}/summary`),
+    queryFn: () => portfolioApi.getFiscalSummaryDetail(activeYear!),
     enabled: !!activeYear,
     staleTime: 5 * 60_000,
   })
 
-  const { data: events, isLoading: eventsLoading, isError: eventsError } = useQuery<{
-    fiscalEvents: FiscalEvent[]
-    rendimientos: RendimientoEvent[]
-  }>({
+  const { data: events, isLoading: eventsLoading, isError: eventsError } = useQuery({
     queryKey: ['fiscal-events', activeYear],
-    queryFn: () => fetchOk(`/api/fiscal/${activeYear}/events`),
+    queryFn: () => portfolioApi.getFiscalEvents(activeYear!),
     enabled: !!activeYear,
     staleTime: 5 * 60_000,
     retry: false,
   })
 
-  const { data: modelo721, isLoading: modelo721Loading } = useQuery<Modelo721>({
+  const { data: modelo721, isLoading: modelo721Loading } = useQuery({
     queryKey: ['fiscal-721', activeYear],
-    queryFn: () => fetchOk(`/api/fiscal/${activeYear}/modelo721`),
+    queryFn: () => portfolioApi.getFiscalModelo721(activeYear!),
     enabled: !!activeYear,
     staleTime: 5 * 60_000,
     retry: false,
   })
 
-  const { data: breakdown = [], isError: breakdownError } = useQuery<BreakdownItem[]>({
+  const { data: breakdown = [], isError: breakdownError } = useQuery({
     queryKey: ['fiscal-breakdown', activeYear],
-    queryFn: () => fetchOk(`/api/fiscal/${activeYear}/breakdown`),
+    queryFn: () => portfolioApi.getFiscalBreakdown(activeYear!),
     enabled: !!activeYear,
     staleTime: 5 * 60_000,
     retry: false,
   })
 
-  const { data: monthly, isError: monthlyError } = useQuery<MonthlyData>({
+  const { data: monthly, isError: monthlyError } = useQuery({
     queryKey: ['fiscal-monthly', activeYear],
-    queryFn: () => fetchOk(`/api/fiscal/${activeYear}/monthly`),
+    queryFn: () => portfolioApi.getFiscalMonthly(activeYear!),
     enabled: !!activeYear,
     staleTime: 5 * 60_000,
     retry: false,

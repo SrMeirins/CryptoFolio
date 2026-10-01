@@ -28,6 +28,25 @@ export interface FiatRow {
 
 export type UnifiedRow = CryptoRow | FiatRow
 
+/**
+ * Agrupa lotes FIFO por activo, sumando cantidad y coste base — sin
+ * desglose por wallet ni fiat (para eso usa `buildRows`). Antes esta
+ * misma agregación se reimplementaba por separado en `Portfolio.tsx`
+ * (`usePortfolioTotals`) y 3 veces dentro de `Dashboard.tsx` (`TopMovers`,
+ * `AllocationChart`, y el cálculo de totales del propio `Dashboard()`).
+ */
+export function aggregateLotsByAsset(lots: FifoLot[]): Map<string, { qty: number; cost: number }> {
+  const byAsset = new Map<string, { qty: number; cost: number }>()
+  for (const lot of lots) {
+    const prev = byAsset.get(lot.asset) ?? { qty: 0, cost: 0 }
+    byAsset.set(lot.asset, {
+      qty:  prev.qty  + parseFloat(lot.quantity),
+      cost: prev.cost + parseFloat(lot.cost_basis_eur),
+    })
+  }
+  return byAsset
+}
+
 /** Agrupa lotes FIFO y saldos fiat en filas unificadas por activo, ordenadas por valor descendente. */
 export function buildRows(
   lots: FifoLot[],
