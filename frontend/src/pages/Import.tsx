@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { portfolioApi } from '../api/portfolio'
 import { Plus, HardDrive, ArrowRight, X } from 'lucide-react'
 import { OperationWizard } from '../components/OperationWizard'
 import { ManualTxModal } from '../components/ManualTxModal'
@@ -14,20 +13,9 @@ import { AdvancedSection } from './import/AdvancedSection'
 import type { PreviewResult, ProgressEvent, WizardResult } from './import/types'
 import { invalidateTransactionQueries } from '../utils/queryInvalidation'
 import { useSetupSeen } from '../hooks/useSetupSeen'
-
-// Comprueba si una importación quedó registrada pese a haberse perdido el stream.
-// El backend inserta la fila en csv_imports dentro de la misma transacción que las
-// transacciones, así que verla aparecerer (con un count mayor) confirma el commit.
-async function waitForImportCommit(prevCount: number, attempts = 8, delayMs = 3000): Promise<boolean> {
-  for (let i = 0; i < attempts; i++) {
-    await new Promise(r => setTimeout(r, delayMs))
-    try {
-      const list = await portfolioApi.getImports()
-      if (list.length > prevCount) return true
-    } catch { /* reintenta */ }
-  }
-  return false
-}
+import { portfolioApi } from '../api/portfolio'
+import { waitForImportCommit, readProgressStream } from './import/importStream'
+import { useWithdrawalDestinations, useDepositCosts, clearImportSessionStorage } from './import/useImportSessionState'
 
 export function ImportPage() {
   const queryClient = useQueryClient()
@@ -44,25 +32,13 @@ export function ImportPage() {
   const [preview, setPreview]   = useState<PreviewResult | null>(null)
   const [catalogingOp, setCatalogingOp] = useState<string | null>(null)
   const [resolvedOps, setResolvedOps]   = useState<Record<string, WizardResult>>({})
-  const [withdrawalDestinations, setWithdrawalDestinations] = useState<Record<string, string>>(() => {
-    try { return JSON.parse(sessionStorage.getItem('import_withdrawal_dest') ?? '{}') } catch { return {} }
-  })
-  const [depositCosts, setDepositCosts] = useState<Record<string, number | null>>(() => {
-    try { return JSON.parse(sessionStorage.getItem('import_deposit_costs') ?? '{}') } catch { return {} }
-  })
+  const [withdrawalDestinations, setWithdrawalDestinations] = useWithdrawalDestinations()
+  const [depositCosts, setDepositCosts] = useDepositCosts()
   const [progressLog, setProgressLog] = useState<ProgressEvent[]>([])
   const [showTxTable, setShowTxTable] = useState(false)
   const [txPage, setTxPage]           = useState(0)
   const [showManualTx, setShowManualTx] = useState(false)
   const TX_PAGE_SIZE = 20
-
-  useEffect(() => {
-    try { sessionStorage.setItem('import_withdrawal_dest', JSON.stringify(withdrawalDestinations)) } catch { /* ignorar */ }
-  }, [withdrawalDestinations])
-
-  useEffect(() => {
-    try { sessionStorage.setItem('import_deposit_costs', JSON.stringify(depositCosts)) } catch { /* ignorar */ }
-  }, [depositCosts])
 
   const { data: imports = [] } = useQuery({
     queryKey: ['imports'],
@@ -100,6 +76,12 @@ export function ImportPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  function finishImportSuccess() {
+    setStage('done')
+    invalidateTransactionQueries(queryClient, { includeImports: true })
+    clearImportSessionStorage()
   }
 
   async function handleConfirm() {
@@ -142,36 +124,10 @@ export function ImportPage() {
         return
       }
 
-      const reader  = res.body?.getReader()
-      const decoder = new TextDecoder()
-      if (!reader) return
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        const text  = decoder.decode(value)
-        const lines = text.split('\n').filter(l => l.startsWith('data: '))
-
-        for (const line of lines) {
-          try {
-            const event: ProgressEvent = JSON.parse(line.slice(6))
-            setProgressLog(prev => [...prev, event])
-
-            if (event.phase === 'error') sawTerminal = true
-
-            if (event.phase === 'done') {
-              sawTerminal = true
-              setStage('done')
-              invalidateTransactionQueries(queryClient, { includeImports: true })
-              try {
-                sessionStorage.removeItem('import_withdrawal_dest')
-                sessionStorage.removeItem('import_deposit_costs')
-              } catch { /* ignorar */ }
-            }
-          } catch { /* ignorar */ }
-        }
-      }
+      sawTerminal = await readProgressStream(res, event => {
+        setProgressLog(prev => [...prev, event])
+        if (event.phase === 'done') finishImportSuccess()
+      })
     } catch {
       // El stream se cortó sin emitir done/error. No asumimos fallo: el backend puede
       // haber terminado igualmente (la importación y el FIFO se comitean en servidor).
@@ -181,12 +137,7 @@ export function ImportPage() {
     if (!sawTerminal) {
       const commitado = await waitForImportCommit(prevImportCount)
       if (commitado) {
-        setStage('done')
-        invalidateTransactionQueries(queryClient, { includeImports: true })
-        try {
-          sessionStorage.removeItem('import_withdrawal_dest')
-          sessionStorage.removeItem('import_deposit_costs')
-        } catch { /* ignorar */ }
+        finishImportSuccess()
         setProgressLog(prev => [...prev, {
           phase: 'done',
           message: 'Importación completada. La conexión con el navegador se perdió durante el cálculo de precios, pero las transacciones se guardaron correctamente. Recarga la vista para ver el resultado.'
@@ -210,10 +161,7 @@ export function ImportPage() {
     setDepositCosts({})
     fileBufferRef.current = null
     if (fileRef.current) fileRef.current.value = ''
-    try {
-      sessionStorage.removeItem('import_withdrawal_dest')
-      sessionStorage.removeItem('import_deposit_costs')
-    } catch { /* ignorar */ }
+    clearImportSessionStorage()
   }
 
   async function handleDelete(id: string) {
@@ -238,7 +186,9 @@ export function ImportPage() {
             </Link>
           </div>
           <button
+            type="button"
             onClick={markSetupSeen}
+            aria-label="Cerrar aviso"
             className="text-gray-600 hover:text-white transition-colors shrink-0"
           >
             <X size={15} />
@@ -250,6 +200,7 @@ export function ImportPage() {
         <h1 className="text-2xl font-semibold">Importar CSV</h1>
         <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={() => setShowManualTx(true)}
             className="flex items-center gap-2 px-4 py-2 bg-background-tertiary hover:bg-border border border-border rounded-lg text-sm font-medium transition-colors"
           >
@@ -257,7 +208,7 @@ export function ImportPage() {
             Nueva transaccion
           </button>
           {stage !== 'upload' && (
-            <button onClick={handleReset} className="text-xs text-gray-500 hover:text-white transition-colors">
+            <button type="button" onClick={handleReset} className="text-xs text-gray-500 hover:text-white transition-colors">
               Volver al inicio
             </button>
           )}
