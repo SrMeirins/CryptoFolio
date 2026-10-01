@@ -24,15 +24,15 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
       const price = prices[asset] ?? 0
       if (price > 0) byAsset.set(asset, qty * price)
     }
-    for (const b of fiatBalances) {
-      const val = parseFloat(b.balance)
-      if (val > 0) byAsset.set(b.asset, (byAsset.get(b.asset) ?? 0) + val)
+    for (const bal of fiatBalances) {
+      const val = parseFloat(bal.balance)
+      if (val > 0) byAsset.set(bal.asset, (byAsset.get(bal.asset) ?? 0) + val)
     }
-    const total = [...byAsset.values()].reduce((s, v) => s + v, 0)
+    const total = [...byAsset.values()].reduce((sum, val) => sum + val, 0)
     if (total === 0) return { total: 0, items: [] }
     const sorted = [...byAsset.entries()].sort((a, b) => b[1] - a[1])
     const top = sorted.slice(0, 8)
-    const restVal = sorted.slice(8).reduce((s, [, v]) => s + v, 0)
+    const restVal = sorted.slice(8).reduce((sum, [, val]) => sum + val, 0)
     return {
       total,
       items: [
@@ -44,16 +44,16 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
 
   if (total === 0) return null
 
-  const hoveredEntry = items.find(d => d.name === hovered)
+  const hoveredEntry = items.find(item => item.name === hovered)
 
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: { payload: DonutItem }[] }) => {
     if (!active || !payload?.[0]) return null
-    const d = payload[0].payload
+    const item = payload[0].payload
     return (
       <div className="bg-gray-950/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2.5 shadow-xl text-xs">
-        <p className="font-semibold text-white mono mb-0.5">{d.name}</p>
-        <p className="text-gray-300">{formatEur(d.value)}</p>
-        <p className="text-gray-500">{d.pct.toFixed(1)}% del portfolio</p>
+        <p className="font-semibold text-white mono mb-0.5">{item.name}</p>
+        <p className="text-gray-300">{formatEur(item.value)}</p>
+        <p className="text-gray-500">{item.pct.toFixed(1)}% del portfolio</p>
       </div>
     )
   }
@@ -84,10 +84,10 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
                 onMouseEnter={(data: DonutItem) => setHovered(data.name)}
                 onMouseLeave={() => setHovered(null)}
               >
-                {items.map((entry, i) => (
+                {items.map((entry, idx) => (
                   <Cell
                     key={entry.name}
-                    fill={DONUT_COLORS[i % DONUT_COLORS.length]}
+                    fill={DONUT_COLORS[idx % DONUT_COLORS.length]}
                     opacity={hovered && hovered !== entry.name ? 0.25 : 1}
                     style={{ transition: 'opacity 0.2s', cursor: 'default', outline: 'none' }}
                   />
@@ -116,8 +116,8 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
 
         {/* Leyenda — lista vertical con barra de proporción */}
         <div className="flex-1 space-y-2 min-w-0">
-          {items.map((entry, i) => {
-            const color = DONUT_COLORS[i % DONUT_COLORS.length]
+          {items.map((entry, idx) => {
+            const color = DONUT_COLORS[idx % DONUT_COLORS.length]
             const isActive = !hovered || hovered === entry.name
             return (
               <div

@@ -88,21 +88,21 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
                 Top activos <span className="text-gray-700 normal-case">· último año</span>
               </p>
               <div className="space-y-1.5">
-                {stats.topAssets.slice(0, 6).map((a) => (
+                {stats.topAssets.slice(0, 6).map((row) => (
                   <button
-                    key={a.asset}
+                    key={row.asset}
                     type="button"
-                    onClick={() => onAssetClick(a.asset)}
+                    onClick={() => onAssetClick(row.asset)}
                     className="w-full flex items-center gap-2 group/asset hover:bg-background-tertiary/50 rounded-lg px-1 py-0.5 transition-colors"
-                    title={`Filtrar por ${a.asset}`}
+                    title={`Filtrar por ${row.asset}`}
                   >
-                    <CryptoIcon symbol={a.asset} size={16} />
-                    <span className="text-xs mono font-bold text-gray-300 w-12 shrink-0 group-hover/asset:text-white transition-colors">{a.asset}</span>
+                    <CryptoIcon symbol={row.asset} size={16} />
+                    <span className="text-xs mono font-bold text-gray-300 w-12 shrink-0 group-hover/asset:text-white transition-colors">{row.asset}</span>
                     <div className="flex-1 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
                       <div className="h-full rounded-full bg-accent-blue/60 group-hover/asset:bg-accent-blue transition-colors"
-                        style={{ width: `${(a.ops / (stats.topAssets[0]?.ops ?? 1)) * 100}%` }} />
+                        style={{ width: `${(row.ops / (stats.topAssets[0]?.ops ?? 1)) * 100}%` }} />
                     </div>
-                    <span className="text-[10px] text-gray-500 w-5 text-right shrink-0">{a.ops}</span>
+                    <span className="text-[10px] text-gray-500 w-5 text-right shrink-0">{row.ops}</span>
                   </button>
                 ))}
               </div>
@@ -116,17 +116,17 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
                   Fees por activo <span className="text-gray-700 normal-case">· último año</span>
                 </p>
                 <div className="space-y-1.5">
-                  {stats.fees.map((f) => (
-                    <div key={f.asset} className="flex items-center gap-2">
-                      <CryptoIcon symbol={f.asset} size={16} />
-                      <span className="text-xs mono font-bold text-gray-300 w-12 shrink-0">{f.asset}</span>
+                  {stats.fees.map((row) => (
+                    <div key={row.asset} className="flex items-center gap-2">
+                      <CryptoIcon symbol={row.asset} size={16} />
+                      <span className="text-xs mono font-bold text-gray-300 w-12 shrink-0">{row.asset}</span>
                       <div className="flex-1 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
                         <div className="h-full rounded-full bg-accent-amber/50"
-                          style={{ width: `${(f.total_eur / (stats.fees[0]?.total_eur ?? 1)) * 100}%` }} />
+                          style={{ width: `${(row.total_eur / (stats.fees[0]?.total_eur ?? 1)) * 100}%` }} />
                       </div>
-                      {f.total_eur > 0
-                        ? <span className="text-[11px] text-gray-400 mono font-semibold shrink-0">{formatEur(f.total_eur)}</span>
-                        : <span className="text-[10px] text-gray-600 mono shrink-0">{formatAmount(f.total_amount, 4)}</span>
+                      {row.total_eur > 0
+                        ? <span className="text-[11px] text-gray-400 mono font-semibold shrink-0">{formatEur(row.total_eur)}</span>
+                        : <span className="text-[10px] text-gray-600 mono shrink-0">{formatAmount(row.total_amount, 4)}</span>
                       }
                     </div>
                   ))}

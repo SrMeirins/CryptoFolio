@@ -61,14 +61,15 @@ export function ImportPage() {
       form.append('file', file)
       form.append('exchange', exchange)
       const res  = await fetch('/api/imports/preview', { method: 'POST', body: form })
-      const data: PreviewResult = await res.json()
+      const body: unknown = await res.json()
 
       if (!res.ok) {
-        setError((data as unknown as { error: string }).error || 'Error en preview')
+        setError((body as { error?: string }).error || 'Error en preview')
         setLoading(false)
         return
       }
 
+      const data = body as PreviewResult
       setPreview(data)
       setStage('preview')
     } catch {
