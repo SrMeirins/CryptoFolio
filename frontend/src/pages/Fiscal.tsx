@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { FileText, Info, Calendar, AlertTriangle } from 'lucide-react'
+import { FileText, Info, AlertTriangle } from 'lucide-react'
 import { portfolioApi } from '../api/portfolio'
-import { formatEur, pnlColor } from '../utils/format'
-import { pnlBg, baseTramosCompensada } from './fiscal/helpers'
+import { FISCAL_STALE_TIME, baseTramosCompensada } from './fiscal/helpers'
 import { ComparativaAnual, EvolucionMensual, DesglosePorActivo } from './fiscal/Charts'
 import { TramosIRPF, CompensacionPerdidas } from './fiscal/TaxCards'
 import { Modelo721Card } from './fiscal/Modelo721Card'
 import { TablaEventos } from './fiscal/TablaEventos'
 import { TablaRendimientos } from './fiscal/TablaRendimientos'
 import { ExportPanel } from './fiscal/ExportPanel'
+import { YearTabs } from './fiscal/YearTabs'
+import { FiscalSummaryCards, FiscalSummaryCardsSkeleton } from './fiscal/FiscalSummaryCards'
 
 export function Fiscal() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
@@ -23,39 +24,40 @@ export function Fiscal() {
   const { data: overview = [] } = useQuery({
     queryKey: ['fiscal-overview'],
     queryFn: portfolioApi.getFiscalOverview,
-    staleTime: 5 * 60_000,
+    staleTime: FISCAL_STALE_TIME,
   })
 
   const { data: carryforward } = useQuery({
     queryKey: ['fiscal-carryforward'],
     queryFn: portfolioApi.getFiscalCarryforward,
-    staleTime: 5 * 60_000,
+    staleTime: FISCAL_STALE_TIME,
   })
 
   const activeYear = selectedYear ?? (years.length > 0 ? years[0] : null)
 
   // activeYear! en las queryFn: no-null assertion segura — `enabled: !!activeYear`
   // garantiza que React Query nunca las ejecuta con activeYear a null.
-  const { data: summary, isLoading: summaryLoading } = useQuery({
+  const { data: summary, isLoading: summaryLoading, isError: summaryError } = useQuery({
     queryKey: ['fiscal-summary-detail', activeYear],
     queryFn: () => portfolioApi.getFiscalSummaryDetail(activeYear!),
     enabled: !!activeYear,
-    staleTime: 5 * 60_000,
+    staleTime: FISCAL_STALE_TIME,
+    retry: false,
   })
 
   const { data: events, isLoading: eventsLoading, isError: eventsError } = useQuery({
     queryKey: ['fiscal-events', activeYear],
     queryFn: () => portfolioApi.getFiscalEvents(activeYear!),
     enabled: !!activeYear,
-    staleTime: 5 * 60_000,
+    staleTime: FISCAL_STALE_TIME,
     retry: false,
   })
 
-  const { data: modelo721, isLoading: modelo721Loading } = useQuery({
+  const { data: modelo721, isLoading: modelo721Loading, isError: modelo721Error } = useQuery({
     queryKey: ['fiscal-721', activeYear],
     queryFn: () => portfolioApi.getFiscalModelo721(activeYear!),
     enabled: !!activeYear,
-    staleTime: 5 * 60_000,
+    staleTime: FISCAL_STALE_TIME,
     retry: false,
   })
 
@@ -63,7 +65,7 @@ export function Fiscal() {
     queryKey: ['fiscal-breakdown', activeYear],
     queryFn: () => portfolioApi.getFiscalBreakdown(activeYear!),
     enabled: !!activeYear,
-    staleTime: 5 * 60_000,
+    staleTime: FISCAL_STALE_TIME,
     retry: false,
   })
 
@@ -71,11 +73,11 @@ export function Fiscal() {
     queryKey: ['fiscal-monthly', activeYear],
     queryFn: () => portfolioApi.getFiscalMonthly(activeYear!),
     enabled: !!activeYear,
-    staleTime: 5 * 60_000,
+    staleTime: FISCAL_STALE_TIME,
     retry: false,
   })
 
-  const hasError = eventsError || breakdownError || monthlyError
+  const hasError = eventsError || breakdownError || monthlyError || summaryError || modelo721Error
 
   if (hasError && activeYear) {
     return (
@@ -97,6 +99,10 @@ export function Fiscal() {
     )
   }
 
+  const cfYear = carryforward?.detalle.find(d => d.year === activeYear)
+  const baseCompensada = summary ? baseTramosCompensada(cfYear, summary.netoPatrimonial, summary.totalRendimientos) : 0
+  const huboCompensacion = !!cfYear && cfYear.compensado > 0.01
+
   return (
     <div className="p-6 space-y-5 max-w-5xl mx-auto">
 
@@ -111,102 +117,31 @@ export function Fiscal() {
             <Info size={11} />
             Información orientativa
           </div>
-          {activeYear && <ExportPanel year={activeYear} />}
+          <ExportPanel year={activeYear} />
         </div>
       </div>
 
-      {/* Tabs por año */}
-      <div className="flex gap-2 flex-wrap">
-        {years.map((year: number) => {
-          const ov   = overview.find(o => o.year === year)
-          const neto = ov?.netoPatrimonial ?? 0
-          return (
-            <button
-              key={year}
-              onClick={() => setSelectedYear(year)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                activeYear === year
-                  ? 'bg-accent-blue/20 border border-accent-blue/40 text-white'
-                  : 'bg-background-tertiary border border-border text-gray-400 hover:text-white hover:border-gray-500'
-              }`}
-            >
-              <span>{year}</span>
-              {year === currentYear && (
-                <span className="text-[10px] bg-accent-blue/20 text-accent-blue px-1.5 py-0.5 rounded-full">EN CURSO</span>
-              )}
-              {ov && (
-                <span className={`text-[10px] font-mono font-bold ${neto >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
-                  {neto >= 0 ? '+' : ''}{formatEur(neto)}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
+      <YearTabs years={years} activeYear={activeYear} overview={overview} currentYear={currentYear} onSelect={setSelectedYear} />
 
       {overview.length >= 2 && <ComparativaAnual data={overview} />}
 
       {summaryLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-background-card border border-border rounded-2xl p-5 animate-pulse">
-              <div className="h-3 bg-background-tertiary rounded w-3/4 mb-3" />
-              <div className="h-7 bg-background-tertiary rounded w-1/2" />
-            </div>
-          ))}
-        </div>
+        <FiscalSummaryCardsSkeleton />
       ) : summary && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className={`bg-background-card border rounded-2xl p-5 ${pnlBg(summary.totalGanancias)}`}>
-              <div className="text-[11px] text-gray-500 uppercase tracking-widest mb-2">Ganancias</div>
-              <div className="text-xl font-bold mono text-accent-green">+{formatEur(summary.totalGanancias)}</div>
-              <div className="text-[10px] text-gray-600 mt-1.5">Base del ahorro IRPF</div>
-            </div>
-
-            <div className={`bg-background-card border rounded-2xl p-5 ${pnlBg(summary.totalPerdidas)}`}>
-              <div className="text-[11px] text-gray-500 uppercase tracking-widest mb-2">Pérdidas</div>
-              <div className="text-xl font-bold mono text-accent-red">{formatEur(summary.totalPerdidas)}</div>
-              <div className="text-[10px] text-gray-600 mt-1.5">Compensables 4 años</div>
-            </div>
-
-            <div className={`bg-background-card border rounded-2xl p-5 ${pnlBg(summary.netoPatrimonial)}`}>
-              <div className="text-[11px] text-gray-500 uppercase tracking-widest mb-2">Neto a declarar</div>
-              <div className={`text-xl font-bold mono ${pnlColor(summary.netoPatrimonial)}`}>
-                {summary.netoPatrimonial >= 0 ? '+' : ''}{formatEur(summary.netoPatrimonial)}
-              </div>
-              <div className="text-[10px] text-gray-600 mt-1.5">{summary.numOperacionesPatrimoniales} operaciones</div>
-              {summary.esAnioEnCurso && (
-                <div className="text-[10px] text-accent-blue mt-1 flex items-center gap-1">
-                  <Calendar size={9} />
-                  Año en curso · hasta hoy
-                </div>
-              )}
-            </div>
-
-            <div className="bg-background-card border border-border rounded-2xl p-5">
-              <div className="text-[11px] text-gray-500 uppercase tracking-widest mb-2">Rendimientos</div>
-              <div className="text-xl font-bold mono text-accent-amber">{formatEur(summary.totalRendimientos)}</div>
-              <div className="text-[10px] text-gray-600 mt-1.5">{summary.numRendimientos} operaciones</div>
-            </div>
-          </div>
+          <FiscalSummaryCards summary={summary} />
 
           {monthly && monthly.meses.length > 1 && (
             <EvolucionMensual data={monthly} esAnioEnCurso={summary.esAnioEnCurso} />
           )}
 
           {breakdown.length > 0 && <DesglosePorActivo data={breakdown} />}
-          {(() => {
-            const cfYear = carryforward?.detalle.find(d => d.year === activeYear)
-            const baseCompensada = baseTramosCompensada(cfYear, summary.netoPatrimonial, summary.totalRendimientos)
-            const huboCompensacion = !!cfYear && cfYear.compensado > 0.01
-            return baseCompensada > 0 && (
-              <TramosIRPF
-                base={baseCompensada}
-                label={`Tramos IRPF — estimación ${activeYear}${huboCompensacion ? ' (tras compensar pérdidas)' : ''}`}
-              />
-            )
-          })()}
+          {baseCompensada > 0 && (
+            <TramosIRPF
+              base={baseCompensada}
+              label={`Tramos IRPF — estimación ${activeYear}${huboCompensacion ? ' (tras compensar pérdidas)' : ''}`}
+            />
+          )}
 
           {carryforward && <CompensacionPerdidas data={carryforward} />}
 
