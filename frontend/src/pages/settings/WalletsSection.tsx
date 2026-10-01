@@ -3,9 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
 import {
   Plus, Search, Check, X, ExternalLink, Trash2,
-  ChevronDown, Building2, Shield, Smartphone, Landmark, Copy, RefreshCw,
+  ChevronDown, Building2, Shield, Smartphone, Landmark, RefreshCw,
 } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { CopyButton } from '../../components/CopyButton'
 
 interface SyncDetail {
   asset: string
@@ -60,18 +61,6 @@ const WALLET_TYPE_META: Record<string, { icon: typeof Shield; label: string }> =
 function truncateAddress(addr: string) {
   if (addr.length <= 16) return addr
   return `${addr.slice(0, 8)}…${addr.slice(-6)}`
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
-  return (
-    <button
-      onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }}
-      className="p-1 text-gray-700 hover:text-gray-400 transition-colors"
-    >
-      {copied ? <Check size={11} className="text-accent-green" /> : <Copy size={11} />}
-    </button>
-  )
 }
 
 const SYNC_BADGE: Record<AddressData['sync_status'], { label: string; className: string }> = {
@@ -609,7 +598,7 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                               {addr.address
                                 ? <>
                                     <span className="text-xs mono text-gray-500 truncate">{truncateAddress(addr.address)}</span>
-                                    <CopyButton text={addr.address} />
+                                    <CopyButton text={addr.address} title="Copiar dirección" className="p-1" />
                                     {explorerHref && (
                                       <a href={explorerHref} target="_blank" rel="noopener noreferrer"
                                         className="p-1 text-gray-700 hover:text-accent-blue transition-colors">
