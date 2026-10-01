@@ -48,10 +48,25 @@ export function formatPrice(value: number): string {
   return _getPriceFmt(d).format(value)
 }
 
-export function formatAmount(value: number): string {
-  if (value >= 1000) return value.toLocaleString('es-ES', { maximumFractionDigits: 2 })
-  if (value >= 1) return value.toLocaleString('es-ES', { maximumFractionDigits: 4 })
-  return value.toLocaleString('es-ES', { maximumFractionDigits: 8 })
+/**
+ * Cantidad con decimales adaptativos según magnitud (sin símbolo de
+ * divisa, a diferencia de formatPrice). Acepta null/string porque los
+ * campos numéricos de la API llegan como string (precisión decimal) y a
+ * veces ausentes — antes esto se resolvía con reimplementaciones locales
+ * en Dashboard.tsx y History.tsx, cada una con su propio redondeo y sin
+ * `Math.abs` (esta función, antes de unificar, clasificaba mal la
+ * magnitud de valores negativos: -5000 caía en el bucket de 8 decimales
+ * en vez del de 2, al comparar `value >= 1000` directamente).
+ */
+export function formatAmount(value: number | string | null | undefined, decimals = 8): string {
+  if (value === null || value === undefined || value === '') return '—'
+  const v = typeof value === 'string' ? parseFloat(value) : value
+  if (isNaN(v)) return '—'
+  const abs = Math.abs(v)
+  if (abs >= 1_000_000) return v.toLocaleString('es-ES', { maximumFractionDigits: 0 })
+  if (abs >= 1000)      return v.toLocaleString('es-ES', { maximumFractionDigits: 2 })
+  if (abs >= 1)         return v.toLocaleString('es-ES', { maximumFractionDigits: 4 })
+  return v.toLocaleString('es-ES', { maximumFractionDigits: decimals })
 }
 
 export function pnlColor(value: number): string {

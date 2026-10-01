@@ -2,8 +2,10 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { portfolioApi, FifoLot, FiscalYear, FiatBalance } from '../api/portfolio'
 import { usePricesStore } from '../store/pricesStore'
-import { formatEur, pnlColor } from '../utils/format'
-import { MetricCard, Change24h } from '../components/MetricCard'
+import { formatEur, formatAmount } from '../utils/format'
+import { aggregateLotsByAsset } from '../utils/assetTable'
+import { type Change24h } from '../components/MetricCard'
+import { PortfolioSummaryCards } from '../components/PortfolioSummaryCards'
 import { OP_META } from '../constants/operations'
 import { Link } from 'react-router-dom'
 import {
@@ -74,17 +76,8 @@ function TopMovers({ lots }: { lots: FifoLot[] }) {
   const prices = usePricesStore(s => s.prices)
 
   const { top, bottom } = useMemo(() => {
-    const byAsset = new Map<string, { qty: number; cost: number }>()
-    for (const lot of lots) {
-      const prev = byAsset.get(lot.asset) ?? { qty: 0, cost: 0 }
-      byAsset.set(lot.asset, {
-        qty:  prev.qty  + parseFloat(lot.quantity),
-        cost: prev.cost + parseFloat(lot.cost_basis_eur),
-      })
-    }
-
     const items: Omit<MoverItem, 'rank'>[] = []
-    for (const [asset, { qty, cost }] of byAsset) {
+    for (const [asset, { qty, cost }] of aggregateLotsByAsset(lots)) {
       const price = prices[asset]
       if (!price || qty < 0.000001 || cost <= 0) continue
       const avg = cost / qty
@@ -139,14 +132,6 @@ function relativeDate(ts: string): string {
   return new Date(ts).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
 }
 
-function fmtAmount(n: string | null): string {
-  if (!n) return '—'
-  const v = parseFloat(n)
-  if (Math.abs(v) >= 1000) return v.toLocaleString('es-ES', { maximumFractionDigits: 2 })
-  if (Math.abs(v) >= 1)    return v.toFixed(4)
-  return v.toFixed(6)
-}
-
 function RecentActivity() {
   const { data, isLoading } = useQuery({
     queryKey: ['recent-transactions'],
@@ -180,10 +165,16 @@ function RecentActivity() {
       ) : (
         <div className="divide-y divide-border/30">
           {txs.map(tx => {
-            const meta = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: '#6b7280', rowBg: 'transparent' }
-            const isIncome = ['STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','CASHBACK','AIRDROP','FORK'].includes(tx.operation_type)
-            const isSell   = ['SELL','SELL_FIAT','SELL_CRYPTO'].includes(tx.operation_type)
-            const isBuy    = ['BUY','BUY_FIAT','BUY_CRYPTO'].includes(tx.operation_type)
+            // Clasificación vía meta.group (constants/operations.ts), no un
+            // array hardcodeado aparte: antes este fichero reimplementaba su
+            // propia lista de tipos por categoría, con riesgo real de
+            // desincronizarse de OP_META si se añade un tipo de operación
+            // nuevo (p. ej. MARGIN_BORROW/MARGIN_REPAY, añadidos en el
+            // Nivel 2 y ya ausentes de esta lista hasta ahora).
+            const meta = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: '#6b7280', group: 'other' as const, rowBg: 'transparent' }
+            const isIncome = meta.group === 'income'
+            const isSell   = meta.group === 'sell'
+            const isBuy    = meta.group === 'buy'
             return (
               <div
                 key={tx.id}
@@ -218,7 +209,7 @@ function RecentActivity() {
                   <p className={`text-xs font-mono mt-0.5 ${
                     isBuy ? 'text-accent-green/80' : isSell ? 'text-accent-red/80' : isIncome ? 'text-violet-400/80' : 'text-gray-500'
                   }`}>
-                    {isBuy ? '+' : isSell ? '−' : ''}{fmtAmount(tx.amount)}
+                    {isBuy ? '+' : isSell ? '−' : ''}{formatAmount(tx.amount, 6)}
                   </p>
                 </div>
 
@@ -252,7 +243,7 @@ function fmtChartDate(dateStr: string, period: string): string {
 function PortfolioHistoryChart({ currentValue }: { currentValue?: number }) {
   const [period, setPeriod] = useState('1y')
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['portfolio-history', period],
     queryFn: () => portfolioApi.getPortfolioHistory(period),
     staleTime: 5 * 60_000,
@@ -402,14 +393,12 @@ function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatBalances
       return acc
     }, {} as Record<string, number>)
 
-    const cryptoMap = new Map<string, number>()
-    for (const lot of lots) {
-      const val = parseFloat(lot.quantity) * (prices[lot.asset] ?? 0)
-      if (val > 0) cryptoMap.set(lot.asset, (cryptoMap.get(lot.asset) ?? 0) + val)
-    }
+    const cryptoValues = Array.from(aggregateLotsByAsset(lots), ([asset, { qty }]) =>
+      [asset, qty * (prices[asset] ?? 0)] as const
+    ).filter(([, value]) => value > 0)
 
     const items = [
-      ...Array.from(cryptoMap.entries()).map(([name, value]) => ({ name, value, isFiat: false })),
+      ...cryptoValues.map(([name, value]) => ({ name, value, isFiat: false })),
       ...Object.entries(fiatByAsset).filter(([, v]) => v > 0).map(([name, value]) => ({ name, value, isFiat: true })),
     ].sort((a, b) => b.value - a.value)
 
@@ -666,106 +655,70 @@ export function Dashboard() {
       </div>
 
       {/* Métricas principales */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        <MetricCard
-          label="Valor actual"
-          value={hasPrices ? formatEur(totalValue) : '—'}
-          rawValue={hasPrices ? totalValue : undefined}
-          format={formatEur}
-          loading={lotsLoading}
-          change24h={hasPrices ? change24h : null}
-          change24hLoading={ydayLoading}
-          tooltip={
-            <>
-              <p>Valoración total de la cartera a precio de mercado en tiempo real: cripto + saldos en efectivo.</p>
-              <div className="bg-white/5 rounded-lg px-3 py-2.5 space-y-1.5 text-[10px]">
-                <div className="flex justify-between text-gray-400">
-                  <span>Cripto</span>
-                  <span className="mono text-gray-200">{formatEur(cryptoValue)}</span>
-                </div>
-                <div className="flex justify-between text-gray-400">
-                  <span>Cash / Fiat</span>
-                  <span className="mono text-gray-200">{formatEur(totalFiat)}</span>
-                </div>
+      <PortfolioSummaryCards
+        totalValue={totalValue}
+        totalCost={totalCost}
+        pnl={totalPnl}
+        pnlPct={totalPnlPct}
+        hasPrices={hasPrices}
+        loading={lotsLoading}
+        change24h={change24h}
+        change24hLoading={ydayLoading}
+        eurFlow={eurFlow}
+        valueTooltip={
+          <>
+            <p>Valoración total de la cartera a precio de mercado en tiempo real: cripto + saldos en efectivo.</p>
+            <div className="bg-white/5 rounded-lg px-3 py-2.5 space-y-1.5 text-[10px]">
+              <div className="flex justify-between text-gray-400">
+                <span>Cripto</span>
+                <span className="mono text-gray-200">{formatEur(cryptoValue)}</span>
               </div>
-            </>
-          }
-        />
-
-        <MetricCard
-          label="Coste de adquisición"
-          value={formatEur(totalCost)}
-          rawValue={totalCost}
-          format={formatEur}
-          loading={lotsLoading}
-          tooltip={
-            <>
-              <p>Importe total pagado para adquirir los activos que <span className="text-white">aún mantienes en cartera</span>, según el método FIFO.</p>
-              <p>Cada venta reduce este valor en proporción al lote consumido.</p>
-            </>
-          }
-        />
-
-        <MetricCard
-          label="P&L no realizado"
-          value={hasPrices ? (totalPnl >= 0 ? '+' : '') + formatEur(totalPnl) : '—'}
-          rawValue={hasPrices ? totalPnl : undefined}
-          format={v => (v >= 0 ? '+' : '') + formatEur(v)}
-          positive={hasPrices ? totalPnl >= 0 : undefined}
-          loading={lotsLoading}
-          tooltip={
-            <>
-              <p>Diferencia entre la valoración actual y el coste FIFO de las posiciones abiertas.</p>
-              <p className="font-mono text-[10px] bg-white/5 px-2.5 py-1.5 rounded-lg text-gray-400">
-                Valor actual − Coste de adquisición
-              </p>
-              <p className="text-gray-500">No tiene impacto fiscal hasta que se materialice con una venta.</p>
-            </>
-          }
-        />
-
-        <MetricCard
-          label="Rentabilidad"
-          value={hasPrices ? (totalPnlPct >= 0 ? '+' : '') + totalPnlPct.toFixed(2) + '%' : '—'}
-          rawValue={hasPrices ? totalPnlPct : undefined}
-          format={v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%'}
-          positive={hasPrices ? totalPnlPct >= 0 : undefined}
-          loading={lotsLoading}
-          tooltip={
-            <>
-              <p>Rendimiento porcentual sobre el capital invertido en las posiciones actuales.</p>
-              <p className="font-mono text-[10px] bg-white/5 px-2.5 py-1.5 rounded-lg text-gray-400">
-                (Valor − Coste) ÷ Coste × 100
-              </p>
-            </>
-          }
-        />
-
-        {eurFlow && (
-          <MetricCard
-            label="EUR neto en cripto"
-            value={formatEur(eurFlow.netFromBank)}
-            rawValue={eurFlow.netFromBank}
-            format={formatEur}
-            loading={lotsLoading}
-            tooltip={
-              <>
-                <p>Capital real comprometido en cripto: euros ingresados al exchange desde tu banco, menos lo retirado.</p>
-                <div className="bg-white/5 rounded-lg px-3 py-2.5 space-y-1.5 text-[10px]">
-                  <div className="flex justify-between text-gray-400">
-                    <span>Depósitos al exchange</span>
-                    <span className="mono text-gray-200">{formatEur(eurFlow.deposited)}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-400">
-                    <span>Retiradas al banco</span>
-                    <span className="mono text-gray-200">− {formatEur(eurFlow.withdrawn)}</span>
-                  </div>
-                </div>
-              </>
-            }
-          />
+              <div className="flex justify-between text-gray-400">
+                <span>Cash / Fiat</span>
+                <span className="mono text-gray-200">{formatEur(totalFiat)}</span>
+              </div>
+            </div>
+          </>
+        }
+        costTooltip={
+          <>
+            <p>Importe total pagado para adquirir los activos que <span className="text-white">aún mantienes en cartera</span>, según el método FIFO.</p>
+            <p>Cada venta reduce este valor en proporción al lote consumido.</p>
+          </>
+        }
+        pnlTooltip={
+          <>
+            <p>Diferencia entre la valoración actual y el coste FIFO de las posiciones abiertas.</p>
+            <p className="font-mono text-[10px] bg-white/5 px-2.5 py-1.5 rounded-lg text-gray-400">
+              Valor actual − Coste de adquisición
+            </p>
+            <p className="text-gray-500">No tiene impacto fiscal hasta que se materialice con una venta.</p>
+          </>
+        }
+        pnlPctTooltip={
+          <>
+            <p>Rendimiento porcentual sobre el capital invertido en las posiciones actuales.</p>
+            <p className="font-mono text-[10px] bg-white/5 px-2.5 py-1.5 rounded-lg text-gray-400">
+              (Valor − Coste) ÷ Coste × 100
+            </p>
+          </>
+        }
+        eurFlowTooltip={eurFlow && (
+          <>
+            <p>Capital real comprometido en cripto: euros ingresados al exchange desde tu banco, menos lo retirado.</p>
+            <div className="bg-white/5 rounded-lg px-3 py-2.5 space-y-1.5 text-[10px]">
+              <div className="flex justify-between text-gray-400">
+                <span>Depósitos al exchange</span>
+                <span className="mono text-gray-200">{formatEur(eurFlow.deposited)}</span>
+              </div>
+              <div className="flex justify-between text-gray-400">
+                <span>Retiradas al banco</span>
+                <span className="mono text-gray-200">− {formatEur(eurFlow.withdrawn)}</span>
+              </div>
+            </div>
+          </>
         )}
-      </div>
+      />
 
       {/* Top movers */}
       <TopMovers lots={lots} />

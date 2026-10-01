@@ -1,17 +1,10 @@
 import { useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, CheckCircle } from 'lucide-react'
-import { portfolioApi, type Wallet } from '../api/portfolio'
+import { type Wallet } from '../api/portfolio'
 import { useClickOutside } from '../hooks/useClickOutside'
+import { useWalletsQuery } from '../hooks/useWallets'
 
 const TYPE_LABEL: Record<string, string> = { exchange: 'Exchange', cold: 'Frío', hot: 'Caliente', other: 'Otro' }
-
-// Mismo queryKey que WalletsSection.tsx (pages/settings/) — React Query
-// cachea y deduplica entre ambos aunque cada uno tenga su propio tipo hoy.
-export function useWalletsQuery() {
-  const { data: wallets = [] } = useQuery({ queryKey: ['wallets'], queryFn: portfolioApi.getWallets })
-  return wallets
-}
 
 /** Resuelve un id de wallet a su nombre, reutilizando la misma caché que WalletPicker. */
 export function WalletLabel({ walletId }: { walletId: string }) {

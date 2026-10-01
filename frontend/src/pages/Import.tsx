@@ -12,8 +12,8 @@ import { ImportsList } from './import/ImportsList'
 import { PendingDepositsPanel } from './import/PendingDepositsPanel'
 import { AdvancedSection } from './import/AdvancedSection'
 import type { PreviewResult, ProgressEvent, WizardResult } from './import/types'
-
-const SETUP_KEY = 'cflio_setup_seen'
+import { invalidateTransactionQueries } from '../utils/queryInvalidation'
+import { useSetupSeen } from '../hooks/useSetupSeen'
 
 // Comprueba si una importación quedó registrada pese a haberse perdido el stream.
 // El backend inserta la fila en csv_imports dentro de la misma transacción que las
@@ -35,7 +35,7 @@ export function ImportPage() {
   const fileRef     = useRef<HTMLInputElement>(null)
   const fileBufferRef = useRef<File | null>(null)
 
-  const [setupSeen, setSetupSeen] = useState(() => localStorage.getItem(SETUP_KEY) === 'true')
+  const { setupSeen, markSetupSeen } = useSetupSeen()
   const [stage, setStage] = useState<'upload' | 'preview' | 'catalog' | 'progress' | 'done'>('upload')
   const [exchange, setExchange] = useState<'binance' | 'bitvavo'>('binance')
   const [dragOver, setDragOver] = useState(false)
@@ -163,10 +163,7 @@ export function ImportPage() {
             if (event.phase === 'done') {
               sawTerminal = true
               setStage('done')
-              queryClient.invalidateQueries({ queryKey: ['imports'] })
-              queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
-              queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
-              queryClient.invalidateQueries({ queryKey: ['transactions'] })
+              invalidateTransactionQueries(queryClient, { includeImports: true })
               try {
                 sessionStorage.removeItem('import_withdrawal_dest')
                 sessionStorage.removeItem('import_deposit_costs')
@@ -185,10 +182,7 @@ export function ImportPage() {
       const commitado = await waitForImportCommit(prevImportCount)
       if (commitado) {
         setStage('done')
-        queryClient.invalidateQueries({ queryKey: ['imports'] })
-        queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
-        queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
-        queryClient.invalidateQueries({ queryKey: ['transactions'] })
+        invalidateTransactionQueries(queryClient, { includeImports: true })
         try {
           sessionStorage.removeItem('import_withdrawal_dest')
           sessionStorage.removeItem('import_deposit_costs')
@@ -224,10 +218,7 @@ export function ImportPage() {
 
   async function handleDelete(id: string) {
     await portfolioApi.deleteImport(id)
-    queryClient.invalidateQueries({ queryKey: ['imports'] })
-    queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
-    queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
-    queryClient.invalidateQueries({ queryKey: ['transactions'] })
+    invalidateTransactionQueries(queryClient, { includeImports: true })
   }
 
   return (
@@ -247,7 +238,7 @@ export function ImportPage() {
             </Link>
           </div>
           <button
-            onClick={() => { localStorage.setItem(SETUP_KEY, 'true'); setSetupSeen(true) }}
+            onClick={markSetupSeen}
             className="text-gray-600 hover:text-white transition-colors shrink-0"
           >
             <X size={15} />
@@ -355,9 +346,7 @@ export function ImportPage() {
           onClose={() => setShowManualTx(false)}
           onSuccess={() => {
             setShowManualTx(false)
-            queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
-            queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
-            queryClient.invalidateQueries({ queryKey: ['transactions'] })
+            invalidateTransactionQueries(queryClient)
           }}
         />
       )}

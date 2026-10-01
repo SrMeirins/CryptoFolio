@@ -1,4 +1,12 @@
 import { api } from './client'
+// Tipos del módulo fiscal detallado (pages/fiscal/) — viven ahí por ser
+// específicos de ese dominio, no en api/portfolio.ts; se importan aquí solo
+// para tipar los métodos de red, igual que ya se hacía desde pages/fiscal/
+// para el resto de tipos de esta API.
+import type {
+  FiscalSummary, FiscalEvent, RendimientoEvent, Modelo721,
+  YearOverview, Carryforward, BreakdownItem, MonthlyData,
+} from '../pages/fiscal/types'
 
 // Resultado del motor FIFO (backend/src/modules/fifo/engine.ts). Lo devuelven
 // tal cual /fifo/run y, anidado bajo `fifo`, los 3 endpoints de transacción
@@ -327,4 +335,17 @@ export const portfolioApi = {
     api.post<{ success: boolean; updated: number; fifo: unknown }>('/settings/bulk-set-costs', { updates }),
   simulateSale: (asset: string, quantity: number, priceEur: number) =>
     api.post<SimulationResult>('/fiscal/simulate-sale', { asset, quantity, priceEur }),
+  // Módulo fiscal detallado (pages/fiscal/Fiscal.tsx) — antes estas 8
+  // llamadas usaban un fetchOk() local propio del fichero, sin pasar por
+  // este cliente: sin el timeout de 30s del Nivel 2 ni el manejo de error
+  // estandarizado del resto de la app.
+  getFiscalYears: () => api.get<number[]>('/fiscal/years'),
+  getFiscalOverview: () => api.get<YearOverview[]>('/fiscal/overview'),
+  getFiscalCarryforward: () => api.get<Carryforward>('/fiscal/carryforward'),
+  getFiscalSummaryDetail: (year: number) => api.get<FiscalSummary>(`/fiscal/${year}/summary`),
+  getFiscalEvents: (year: number) =>
+    api.get<{ fiscalEvents: FiscalEvent[]; rendimientos: RendimientoEvent[] }>(`/fiscal/${year}/events`),
+  getFiscalModelo721: (year: number) => api.get<Modelo721>(`/fiscal/${year}/modelo721`),
+  getFiscalBreakdown: (year: number) => api.get<BreakdownItem[]>(`/fiscal/${year}/breakdown`),
+  getFiscalMonthly: (year: number) => api.get<MonthlyData>(`/fiscal/${year}/monthly`),
 }

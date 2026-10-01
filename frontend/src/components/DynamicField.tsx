@@ -1,6 +1,7 @@
 import { Zap } from 'lucide-react'
 import { type FieldDefinition } from '../api/portfolio'
-import { WalletPicker, useWalletsQuery } from './WalletPicker'
+import { WalletPicker } from './WalletPicker'
+import { useWalletsQuery } from '../hooks/useWallets'
 
 const baseInput = 'w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-accent-blue transition-colors'
 
