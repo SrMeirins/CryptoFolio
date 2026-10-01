@@ -6,11 +6,13 @@ import {
   Trash2, AlertTriangle, PenLine, Download, ChevronDown,
   TrendingUp, TrendingDown, Zap, Calendar,
   ChevronUp, BarChart2, Package, ArrowUpDown, ArrowUp, ArrowDown,
-  Copy, Check, ArrowRight,
+  ArrowRight,
 } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { ManualTxModal } from '../components/ManualTxModal'
 import { DateRangePicker } from '../components/DateRangePicker'
+import { CopyButton } from '../components/CopyButton'
+import { CryptoIcon } from '../components/CryptoIcon'
 import { formatEur, formatPrice } from '../utils/format'
 import { OP_META } from '../constants/operations'
 import { buildHistoryCsv } from './history/buildHistoryCsv'
@@ -113,56 +115,12 @@ function Highlight({ text, query }: { text: string; query: string }) {
   )
 }
 
-// ── CopyButton ────────────────────────────────────────────────────────────
-function CopyButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false)
-  function handleCopy(e: React.MouseEvent) {
-    e.stopPropagation()
-    navigator.clipboard.writeText(value).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    })
-  }
-  return (
-    <button
-      onClick={handleCopy}
-      className="ml-1 text-gray-700 hover:text-gray-400 transition-colors inline-flex items-center"
-      title="Copiar ID"
-    >
-      {copied ? <Check size={10} className="text-accent-green" /> : <Copy size={10} />}
-    </button>
-  )
-}
-
 // ── SortIcon ─────────────────────────────────────────────────────────────
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
   if (col !== sortKey) return <ArrowUpDown size={10} className="text-gray-700 ml-1" />
   return sortDir === 'asc'
     ? <ArrowUp size={10} className="text-accent-blue ml-1" />
     : <ArrowDown size={10} className="text-accent-blue ml-1" />
-}
-
-// ── Logo de activo ─────────────────────────────────────────────────────────
-function AssetLogo({ symbol, size = 20 }: { symbol: string; size?: number }) {
-  const [ok, setOk] = useState(true)
-  if (ok) {
-    return (
-      <img
-        src={`https://assets.coincap.io/assets/icons/${symbol.toLowerCase()}@2x.png`}
-        alt={symbol} width={size} height={size}
-        className="rounded-full shrink-0"
-        onError={() => setOk(false)}
-      />
-    )
-  }
-  return (
-    <div
-      className="rounded-full bg-background-tertiary flex items-center justify-center font-bold text-gray-400 shrink-0"
-      style={{ width: size, height: size, fontSize: size * 0.38 }}
-    >
-      {symbol.slice(0, 2)}
-    </div>
-  )
 }
 
 // ── Chip de operación ──────────────────────────────────────────────────────
@@ -307,7 +265,7 @@ function AnalyticsPanel({ stats, onAssetClick }: {
                     className="w-full flex items-center gap-2 group/asset hover:bg-background-tertiary/50 rounded-lg px-1 py-0.5 transition-colors"
                     title={`Filtrar por ${a.asset}`}
                   >
-                    <AssetLogo symbol={a.asset} size={16} />
+                    <CryptoIcon symbol={a.asset} size={16} />
                     <span className="text-xs mono font-bold text-gray-300 w-12 shrink-0 group-hover/asset:text-white transition-colors">{a.asset}</span>
                     <div className="flex-1 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
                       <div className="h-full rounded-full bg-accent-blue/60 group-hover/asset:bg-accent-blue transition-colors"
@@ -329,7 +287,7 @@ function AnalyticsPanel({ stats, onAssetClick }: {
                 <div className="space-y-1.5">
                   {stats.fees.map((f) => (
                     <div key={f.asset} className="flex items-center gap-2">
-                      <AssetLogo symbol={f.asset} size={16} />
+                      <CryptoIcon symbol={f.asset} size={16} />
                       <span className="text-xs mono font-bold text-gray-300 w-12 shrink-0">{f.asset}</span>
                       <div className="flex-1 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
                         <div className="h-full rounded-full bg-accent-amber/50"
@@ -411,7 +369,7 @@ function TxRow({
         {/* Activo + cantidad */}
         <td className="px-3 py-2.5 align-middle">
           <div className="flex items-center gap-2 min-w-0">
-            <AssetLogo symbol={tx.asset} size={26} />
+            <CryptoIcon symbol={tx.asset} size={26} />
             <div className="min-w-0">
               <div className="flex items-baseline gap-1.5">
                 <span className="font-bold mono text-sm text-white">
@@ -449,7 +407,7 @@ function TxRow({
         <td className="px-3 py-2.5 align-middle">
           {tx.fee_asset && tx.fee_amount ? (
             <div className="flex items-center gap-1.5">
-              <AssetLogo symbol={tx.fee_asset} size={14} />
+              <CryptoIcon symbol={tx.fee_asset} size={14} />
               <div>
                 <div className="text-xs mono text-gray-400">
                   {fmtAmount(tx.fee_amount, 6)} <span className="text-gray-600 text-[10px]">{tx.fee_asset}</span>
@@ -532,7 +490,7 @@ function TxRow({
                 <div className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">ID</div>
                 <div className="mono text-gray-500 text-[10px] break-all flex items-center gap-1">
                   {tx.id}
-                  <CopyButton value={tx.id} />
+                  <CopyButton text={tx.id} size={10} title="Copiar ID" className="ml-1" />
                 </div>
               </div>
               {tx.price_per_unit && (

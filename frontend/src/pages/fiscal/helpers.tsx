@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
 import { formatEur } from '../../utils/format'
+import { CryptoIcon } from '../../components/CryptoIcon'
 import type { CarryforwardDetalle } from './types'
 
 export const PNL_THRESHOLD = 0.005
@@ -69,30 +69,10 @@ export function tramoActivo(base: number, tramos: Tramo[] = TRAMOS_DEFAULT): num
   return tramos[tramos.length - 1]?.tipo ?? 28
 }
 
-export function AssetLogo({ symbol, size = 24 }: { symbol: string; size?: number }) {
-  const [ok, setOk] = useState(true)
-  const url = `https://assets.coincap.io/assets/icons/${symbol.toLowerCase()}@2x.png`
-  if (ok) {
-    return (
-      <img
-        src={url}
-        alt={symbol}
-        width={size}
-        height={size}
-        className="rounded-full"
-        onError={() => setOk(false)}
-      />
-    )
-  }
-  return (
-    <div
-      className="rounded-full bg-background-tertiary flex items-center justify-center text-xs font-bold text-gray-300"
-      style={{ width: size, height: size, fontSize: size * 0.38 }}
-    >
-      {symbol.slice(0, 2)}
-    </div>
-  )
-}
+// Re-exportado como AssetLogo (no renombrado) para no tocar los más de 4
+// ficheros de pages/fiscal/ que ya lo importan desde aquí — misma
+// implementación que CryptoIcon.tsx (components/), antes duplicada aquí.
+export const AssetLogo = CryptoIcon
 
 export function ChartTooltip({ active, payload, label }: {
   active?: boolean
