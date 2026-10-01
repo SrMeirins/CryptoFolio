@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { TrendingUp, TrendingDown, ChevronDown } from 'lucide-react'
 import { formatEur, formatAmount, formatPrice, pnlColor } from '../utils/format'
-import { type TramoDesglose } from '../pages/fiscal/helpers'
+import { type TramoDesglose } from '../utils/tramosIrpf'
 import { type SimulationResult } from '../api/portfolio'
 
 export function SaleSimulatorResults({ result, loading, net, tramosDesglose }: {

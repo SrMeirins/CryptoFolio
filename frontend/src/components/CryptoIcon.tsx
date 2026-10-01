@@ -4,11 +4,11 @@ import { useState } from 'react'
  * Logo de un activo cripto vía CoinCap, con fallback a las iniciales si la
  * imagen no existe (activos poco comunes, nombres no estándar...).
  *
- * Mismo patrón duplicado hasta ahora en pages/fiscal/helpers.tsx
- * (AssetLogo) y pages/History.tsx (AssetLogo, definición local separada) —
- * pendientes de migrar a este componente compartido en sus propios turnos.
- * pages/Dashboard.tsx tiene una variante con anillo de color según
- * subida/bajada, genuinamente distinta (no es el mismo caso de uso).
+ * pages/fiscal/ y pages/History.tsx tenían cada uno su propio AssetLogo
+ * duplicado (uno como re-export, otro como definición local) — ya migrados
+ * a este componente compartido. pages/Dashboard.tsx tiene una variante con
+ * anillo de color según subida/bajada, genuinamente distinta (no es el
+ * mismo caso de uso).
  */
 export function CryptoIcon({ symbol, size = 28 }: { symbol: string; size?: number }) {
   const [error, setError] = useState(false)

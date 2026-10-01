@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AlertTriangle, Info, ChevronDown, ChevronUp } from 'lucide-react'
 import { formatEur, pnlColor } from '../../utils/format'
-import { AssetLogo } from './helpers'
+import { CryptoIcon } from '../../components/CryptoIcon'
 import type { Modelo721 } from './types'
 
 export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYear: number }) {
@@ -87,7 +87,7 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
           <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-2">
             {data.activos.map((a, i) => (
               <div key={i} className="flex items-center gap-3 bg-background-tertiary/50 rounded-xl px-3 py-2.5">
-                <AssetLogo symbol={a.asset} size={28} />
+                <CryptoIcon symbol={a.asset} size={28} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm mono">{a.asset}</span>

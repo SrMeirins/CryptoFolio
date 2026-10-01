@@ -1,19 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
-import { portfolioApi } from '../../api/portfolio'
-import { formatEur } from '../../utils/format'
-import { CryptoIcon } from '../../components/CryptoIcon'
-import type { CarryforwardDetalle } from './types'
-
-export const PNL_THRESHOLD = 0.005
-
-// Los datos fiscales de años cerrados no cambian salvo recálculo manual del FIFO.
-export const FISCAL_STALE_TIME = 5 * 60_000
-
-export function pnlBg(val: number) {
-  if (val > 0) return 'bg-accent-green/5 border-accent-green/20'
-  if (val < 0) return 'bg-accent-red/5 border-accent-red/20'
-  return 'bg-background-tertiary border-border'
-}
+import type { CarryforwardDetalle } from '../pages/fiscal/types'
 
 export interface Tramo { hasta: number; tipo: number; label: string }
 
@@ -28,24 +13,14 @@ export const TRAMOS_DEFAULT: Tramo[] = [
   { hasta: Infinity, tipo: 30, label: '> 300.000 €' },
 ]
 
-// Alias para compatibilidad con código existente
-export const TRAMOS = TRAMOS_DEFAULT
-
-function parseTipos(stored: string): number[] | null {
+/** Parsea y valida el override de tipos guardado en config (Ajustes → Fiscal). */
+export function parseTipos(stored: string): number[] | null {
   try {
     const arr = JSON.parse(stored)
     if (Array.isArray(arr) && arr.length === TRAMOS_DEFAULT.length && arr.every(n => typeof n === 'number' && n > 0 && n <= 100))
       return arr
   } catch { /* noop */ }
   return null
-}
-
-// Hook — lee porcentajes desde config y aplica sobre los tramos por defecto
-export function useTramos(): Tramo[] {
-  const { data: config = {} } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
-  const tipos = config['irpf_tramos_tipos'] ? parseTipos(config['irpf_tramos_tipos']) : null
-  if (!tipos) return TRAMOS_DEFAULT
-  return TRAMOS_DEFAULT.map((t, i) => ({ ...t, tipo: tipos[i] ?? t.tipo }))
 }
 
 export interface TramoDesglose { tramo: string; tipo: number; cuota: number; base: number }
@@ -70,30 +45,6 @@ export function tramoActivo(base: number, tramos: Tramo[] = TRAMOS_DEFAULT): num
     if (base <= t.hasta) return t.tipo
   }
   return tramos[tramos.length - 1]?.tipo ?? 28
-}
-
-// Re-exportado como AssetLogo (no renombrado) para no tocar los más de 4
-// ficheros de pages/fiscal/ que ya lo importan desde aquí — misma
-// implementación que CryptoIcon.tsx (components/), antes duplicada aquí.
-export const AssetLogo = CryptoIcon
-
-export function ChartTooltip({ active, payload, label }: {
-  active?: boolean
-  payload?: { value: number; name?: string }[]
-  label?: string
-}) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-background-card border border-border rounded-xl px-3 py-2 text-xs shadow-lg">
-      <p className="text-gray-400 mb-1">{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} className={`font-bold mono ${(p.value ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
-          {p.name && <span className="text-gray-500 font-normal mr-1">{p.name}</span>}
-          {(p.value ?? 0) >= 0 ? '+' : ''}{formatEur(p.value ?? 0)}
-        </p>
-      ))}
-    </div>
-  )
 }
 
 // Base para la tarjeta de Tramos IRPF, YA compensada con pérdidas arrastradas

@@ -1,6 +1,7 @@
 import { Scale, Info } from 'lucide-react'
 import { formatEur } from '../../utils/format'
-import { useTramos, calcularTramos, tramoActivo } from './helpers'
+import { useTramos } from '../../hooks/useTramos'
+import { calcularTramos, tramoActivo } from '../../utils/tramosIrpf'
 import type { Carryforward } from './types'
 
 export function TramosIRPF({ base, label }: { base: number; label: string }) {
