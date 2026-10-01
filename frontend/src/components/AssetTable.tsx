@@ -1,43 +1,13 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, Settings, ArrowUpDown, ArrowUp, ArrowDown, Calculator, Lock } from 'lucide-react'
+import { ChevronDown, ChevronRight, Settings, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { FifoLot, FiatBalance, LockedAmount, portfolioApi } from '../api/portfolio'
+import { type FifoLot, type FiatBalance, portfolioApi } from '../api/portfolio'
 import { usePricesStore } from '../store/pricesStore'
-import { formatEur, formatPrice, formatAmount, pnlColor } from '../utils/format'
-
-// ── CryptoIcon ── logo real con fallback ──────────────────────────────────
-function CryptoIcon({ symbol, size = 28 }: { symbol: string; size?: number }) {
-  const [error, setError] = useState(false)
-  const src = `https://assets.coincap.io/assets/icons/${symbol.toLowerCase()}@2x.png`
-
-  if (error) {
-    return (
-      <div
-        className="rounded-full bg-accent-blue/10 flex items-center justify-center shrink-0"
-        style={{ width: size, height: size }}
-      >
-        <span className="text-accent-blue font-bold" style={{ fontSize: size * 0.35 }}>
-          {symbol.slice(0, 2)}
-        </span>
-      </div>
-    )
-  }
-
-  return (
-    <div className="rounded-full overflow-hidden bg-background-tertiary shrink-0 flex items-center justify-center"
-      style={{ width: size, height: size }}>
-      <img
-        src={src}
-        alt={symbol}
-        width={size}
-        height={size}
-        onError={() => setError(true)}
-        className="w-full h-full object-cover"
-      />
-    </div>
-  )
-}
+import { formatEur } from '../utils/format'
+import { buildRows, sortRows, type CryptoRow, type UnifiedRow, type SortKey, type SortDir } from '../utils/assetTable'
+import { CryptoRowComponent } from './AssetTableCryptoRow'
+import { FiatRowComponent } from './AssetTableFiatRow'
 
 interface AssetTableProps {
   lots: FifoLot[]
@@ -45,437 +15,7 @@ interface AssetTableProps {
   onSimulate?: (asset: string, qty: number, price: number) => void
 }
 
-// ── Wallet breakdown dentro de un activo ──────────────────────────────────
-
-interface WalletBreakdown {
-  wallet_id:    string
-  wallet_name:  string
-  wallet_color: string
-  wallet_kind:  string
-  quantity:     number
-  costBasis:    number
-}
-
-// ── Tipos unificados ───────────────────────────────────────────────────────
-
-interface CryptoRow {
-  kind:           'crypto'
-  asset:          string
-  value:          number
-  totalQuantity:  number
-  totalCostBasis: number
-  avgPrice:       number
-  wallets:        WalletBreakdown[]
-}
-
-interface FiatRow {
-  kind:    'fiat'
-  asset:   string
-  value:   number
-  wallets: { wallet_id: string; wallet_name: string; wallet_color: string }[]
-}
-
-type UnifiedRow = CryptoRow | FiatRow
-
-// ── Agrupación ────────────────────────────────────────────────────────────
-
-function buildRows(
-  lots: FifoLot[],
-  prices: Record<string, number>,
-  fiatBalances: FiatBalance[]
-): UnifiedRow[] {
-  const cryptoMap = new Map<string, CryptoRow>()
-
-  for (const lot of lots) {
-    const qty   = parseFloat(lot.quantity)
-    const cost  = parseFloat(lot.cost_basis_eur)
-    const price = prices[lot.asset] ?? 0
-
-    if (!cryptoMap.has(lot.asset)) {
-      cryptoMap.set(lot.asset, {
-        kind: 'crypto', asset: lot.asset,
-        value: 0, totalQuantity: 0, totalCostBasis: 0,
-        avgPrice: parseFloat(lot.avg_price_eur),
-        wallets: [],
-      })
-    }
-    const row = cryptoMap.get(lot.asset)!
-    row.totalQuantity  += qty
-    row.totalCostBasis += cost
-    row.value           = row.totalQuantity * price
-
-    // Acumular por wallet
-    const existing = row.wallets.find(w => w.wallet_id === lot.wallet_id)
-    if (existing) {
-      existing.quantity += qty
-      existing.costBasis += cost
-    } else {
-      row.wallets.push({
-        wallet_id:    lot.wallet_id,
-        wallet_name:  lot.wallet_name,
-        wallet_color: lot.wallet_color,
-        wallet_kind:  lot.wallet_kind,
-        quantity:     qty,
-        costBasis:    cost,
-      })
-    }
-  }
-
-  const fiatMap = new Map<string, FiatRow>()
-  for (const b of fiatBalances) {
-    const bal = parseFloat(b.balance)
-    if (!fiatMap.has(b.asset)) {
-      fiatMap.set(b.asset, { kind: 'fiat', asset: b.asset, value: 0, wallets: [] })
-    }
-    const row = fiatMap.get(b.asset)!
-    row.value += bal
-    if (!row.wallets.find(w => w.wallet_id === b.wallet_id)) {
-      row.wallets.push({ wallet_id: b.wallet_id, wallet_name: b.wallet_name, wallet_color: b.wallet_color })
-    }
-  }
-
-  return [
-    ...cryptoMap.values(),
-    ...fiatMap.values(),
-  ].sort((a, b) => b.value - a.value)
-}
-
-// ── Fila cripto (con expand) ───────────────────────────────────────────────
-
-
-// Nombre corto para chip de wallet:
-// Exchange → solo la sub-cuenta ("Binance Spot" → "Spot", "Binance Funding" → "Funding")
-// Cold wallet → nombre completo
-function walletShortName(name: string, kind: string): string {
-  if (kind === 'exchange') {
-    const parts = name.split(' ')
-    return parts.length > 1 ? parts.slice(1).join(' ') : name
-  }
-  return name
-}
-
-function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate, lockedAmounts = [] }: {
-  row: CryptoRow
-  prices: Record<string, number>
-  yesterdayPrices: Record<string, number>
-  totalPortfolioValue: number
-  compact?: boolean
-  onSimulate?: (asset: string, qty: number, price: number) => void
-  lockedAmounts?: LockedAmount[]
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const price      = prices[row.asset] ?? 0
-  const pnl        = row.value - row.totalCostBasis
-  const pnlPct     = row.totalCostBasis > 0 ? (pnl / row.totalCostBasis) * 100 : 0
-  const hasPrice   = price > 0
-  const canExpand  = row.wallets.length > 1 || lockedAmounts.length > 0
-
-  // 24h change
-  const ydayPrice   = yesterdayPrices[row.asset]
-  const change24h   = hasPrice && ydayPrice && ydayPrice > 0
-    ? ((price - ydayPrice) / ydayPrice) * 100
-    : null
-
-  // Break-even: precio al que vendiendo todo recuperas exactamente lo invertido
-  const breakEvenPrice = row.totalQuantity > 0 ? row.totalCostBasis / row.totalQuantity : null
-
-  // Peso sobre el portfolio total
-  const portfolioWeight = hasPrice && totalPortfolioValue > 0
-    ? (row.value / totalPortfolioValue) * 100
-    : null
-
-  return (
-    <>
-      <tr
-        className={`transition-colors ${canExpand ? 'cursor-pointer hover:bg-background-tertiary/60' : 'hover:bg-background-tertiary/30'} ${expanded ? 'bg-background-tertiary/40' : ''}`}
-        onClick={() => canExpand && setExpanded(e => !e)}
-      >
-        {/* Activo */}
-        <td className="px-5 py-3">
-          <div className="flex items-center gap-2">
-            <div className="w-4 shrink-0 flex items-center justify-center">
-              {canExpand
-                ? expanded
-                  ? <ChevronDown size={12} className="text-gray-500" />
-                  : <ChevronRight size={12} className="text-gray-500" />
-                : <span className="w-3" />
-              }
-            </div>
-            <CryptoIcon symbol={row.asset} size={28} />
-            <span className="font-medium">{row.asset}</span>
-            {!expanded && (
-              <div className="flex gap-1 ml-1 flex-wrap">
-                {row.wallets.map(w => (
-                  <span key={w.wallet_id}
-                    className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-                    style={{ backgroundColor: `${w.wallet_color}18`, color: w.wallet_color }}>
-                    {walletShortName(w.wallet_name, w.wallet_kind)}
-                  </span>
-                ))}
-                {lockedAmounts.length > 0 && (() => {
-                  const onlyLaunchpool = lockedAmounts.every(l => l.lock_kind === 'launchpool')
-                  return (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex items-center gap-0.5 ${onlyLaunchpool ? 'bg-violet-500/10 text-violet-400' : 'bg-amber-500/10 text-amber-400'}`}>
-                      <Lock size={8} />
-                      {formatAmount(lockedAmounts.reduce((s, l) => s + parseFloat(l.locked_amount), 0))}
-                    </span>
-                  )
-                })()}
-              </div>
-            )}
-            {onSimulate && (
-              <button
-                onClick={e => { e.stopPropagation(); onSimulate(row.asset, row.totalQuantity, prices[row.asset] ?? 0) }}
-                className="ml-auto p-1 text-gray-600 hover:text-accent-blue hover:bg-accent-blue/10 rounded-md transition-colors shrink-0"
-                title="Simular venta"
-              >
-                <Calculator size={13} />
-              </button>
-            )}
-          </div>
-        </td>
-
-        {/* Cantidad */}
-        <td className={`px-4 ${compact ? 'py-2' : 'py-3'} text-right mono text-gray-300`}>{formatAmount(row.totalQuantity)}</td>
-
-        {/* Precio actual + 24h */}
-        <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono`}>
-          {hasPrice ? (
-            <div className="flex flex-col items-end gap-0.5">
-              <span>{formatPrice(price)}</span>
-              {change24h !== null && (
-                <span className={`text-[10px] font-semibold px-1.5 py-px rounded-full ${
-                  change24h >= 0
-                    ? 'text-accent-green bg-accent-green/10'
-                    : 'text-accent-red bg-accent-red/10'
-                }`}>
-                  {change24h >= 0 ? '▲' : '▼'} {Math.abs(change24h).toFixed(2)}%
-                </span>
-              )}
-            </div>
-          ) : (
-            <Link to="/settings?tab=assets"
-              className="inline-flex items-center gap-1 text-[11px] text-accent-amber/80 hover:text-accent-amber bg-accent-amber/8 border border-accent-amber/20 px-2 py-0.5 rounded-md transition-colors"
-              title="Configura el par de precio en Settings → Activos"
-            >
-              <Settings size={10} />Sin precio
-            </Link>
-          )}
-        </td>
-
-
-        {/* Break-even — oculto en compacto */}
-        {!compact && (
-          <td className="px-4 py-3 text-right mono text-gray-400">
-            {breakEvenPrice !== null ? formatPrice(breakEvenPrice) : <span className="text-gray-600">—</span>}
-          </td>
-        )}
-
-        {/* Valor EUR */}
-        <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono font-medium`}>
-          {hasPrice ? formatEur(row.value)
-            : <span className="text-gray-600 text-xs">—</span>}
-        </td>
-
-        {/* Coste base — oculto en compacto */}
-        {!compact && (
-          <td className="px-4 py-3 text-right mono text-gray-400">{formatEur(row.totalCostBasis)}</td>
-        )}
-
-        {/* P&L € — oculto en compacto */}
-        {!compact && (
-          <td className={`px-4 py-3 text-right mono font-medium ${hasPrice ? pnlColor(pnl) : 'text-gray-600'}`}>
-            {hasPrice ? (pnl >= 0 ? '+' : '') + formatEur(pnl) : '—'}
-          </td>
-        )}
-
-        {/* P&L % */}
-        <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-sm ${hasPrice ? pnlColor(pnlPct) : 'text-gray-600'}`}>
-          {hasPrice ? (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%' : '—'}
-        </td>
-
-        {/* % Cartera */}
-        <td className="px-4 py-3">
-          {portfolioWeight !== null ? (
-            <div className="flex flex-col items-end gap-1">
-              <span className="text-xs mono text-gray-400">{portfolioWeight.toFixed(1)}%</span>
-              <div className="w-16 h-1 bg-background-tertiary rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-accent-blue/60 transition-all duration-500"
-                  style={{ width: `${Math.min(portfolioWeight, 100)}%` }}
-                />
-              </div>
-            </div>
-          ) : (
-            <span className="text-gray-700 text-xs">—</span>
-          )}
-        </td>
-      </tr>
-
-      {/* Sub-filas por wallet */}
-      {expanded && row.wallets.map(w => {
-        const wValue     = w.quantity * price
-        const wPnl       = hasPrice ? wValue - w.costBasis : null
-        const wPnlPct    = w.costBasis > 0 && wPnl !== null ? (wPnl / w.costBasis) * 100 : null
-        const wLocked    = lockedAmounts.filter(l => l.wallet_id === w.wallet_id)
-
-        return (
-          <>
-            <tr key={w.wallet_id} className="bg-background-tertiary/20 border-l-2"
-              style={{ borderLeftColor: w.wallet_color }}>
-              <td className="pl-12 pr-4 py-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: w.wallet_color }} />
-                  <span className="text-xs text-gray-400">{w.wallet_name}</span>
-                </div>
-              </td>
-              <td className="px-4 py-2 text-right mono text-xs text-gray-400">{formatAmount(w.quantity)}</td>
-              <td className="px-4 py-2 text-right mono text-xs text-gray-600">—</td>
-              {!compact && <td className="px-4 py-2 text-right mono text-xs text-gray-600">—</td>}
-              <td className="px-4 py-2 text-right mono text-xs">
-                {hasPrice ? <span className="text-gray-300">{formatEur(wValue)}</span> : <span className="text-gray-600">—</span>}
-              </td>
-              {!compact && <td className="px-4 py-2 text-right mono text-xs text-gray-500">{formatEur(w.costBasis)}</td>}
-              {!compact && (
-                <td className={`px-4 py-2 text-right mono text-xs ${wPnl !== null ? pnlColor(wPnl) : 'text-gray-600'}`}>
-                  {wPnl !== null ? (wPnl >= 0 ? '+' : '') + formatEur(wPnl) : '—'}
-                </td>
-              )}
-              <td className={`px-4 py-2 text-right mono text-xs ${wPnlPct !== null ? pnlColor(wPnlPct) : 'text-gray-600'}`}>
-                {wPnlPct !== null ? (wPnlPct >= 0 ? '+' : '') + wPnlPct.toFixed(2) + '%' : '—'}
-              </td>
-              <td className="px-4 py-2 text-right">
-                {hasPrice && totalPortfolioValue > 0 ? (
-                  <span className="text-[10px] mono text-gray-600">
-                    {((wValue / totalPortfolioValue) * 100).toFixed(1)}%
-                  </span>
-                ) : <span className="text-gray-700 text-xs">—</span>}
-              </td>
-            </tr>
-            {/* Sub-filas de staking bloqueado */}
-            {wLocked.map((l, i) => {
-              const isLaunchpool = l.lock_kind === 'launchpool'
-              const clr = isLaunchpool ? { bg: 'rgba(139,92,246,0.03)', border: 'rgba(139,92,246,0.3)', icon: 'text-violet-500/70', text: 'text-violet-400/80', amount: 'text-violet-400/70', label: 'text-violet-500/50' }
-                                       : { bg: 'rgba(245,158,11,0.03)',  border: 'rgba(245,158,11,0.3)',  icon: 'text-amber-500/70',  text: 'text-amber-400/80',  amount: 'text-amber-400/70',  label: 'text-amber-500/50'  }
-              return (
-                <tr key={`locked-${i}`} style={{ backgroundColor: clr.bg, borderLeft: `2px solid ${clr.border}` }}>
-                  <td className="pl-16 pr-4 py-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <Lock size={10} className={`${clr.icon} shrink-0`} />
-                      <span className={`text-[11px] ${clr.text}`}>{l.staking_type}</span>
-                    </div>
-                  </td>
-                  <td className={`px-4 py-1.5 text-right mono text-[11px] ${clr.amount}`}>
-                    {formatAmount(parseFloat(l.locked_amount))}
-                  </td>
-                  <td colSpan={compact ? 3 : 5} className={`px-4 py-1.5 text-[10px] ${clr.label} italic`}>
-                    {isLaunchpool ? 'bloqueado en launchpool' : 'bloqueado en staking'}
-                  </td>
-                </tr>
-              )
-            })}
-          </>
-        )
-      })}
-    </>
-  )
-}
-
-// ── Fila fiat ─────────────────────────────────────────────────────────────
-
-const FIAT_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', CHF: '₣' }
-
-function FiatRowComponent({ row, totalPortfolioValue, compact = false }: { row: FiatRow; totalPortfolioValue: number; compact?: boolean }) {
-  const symbol = FIAT_SYMBOLS[row.asset] ?? row.asset[0]
-
-  return (
-    <tr className="hover:bg-background-tertiary/30 transition-colors">
-      <td className="px-5 py-3">
-        <div className="flex items-center gap-2">
-          <span className="w-4 shrink-0" />
-          <div className="w-7 h-7 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0 ring-1 ring-emerald-500/30 overflow-hidden">
-            <span className="text-sm font-bold text-emerald-400">{symbol}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium">{row.asset}</span>
-            <span className="text-[10px] font-semibold tracking-widest text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded uppercase">
-              FIAT
-            </span>
-          </div>
-        </div>
-      </td>
-      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-gray-300`}>{formatEur(row.value)}</td>
-      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-gray-500`}>{formatPrice(1)}</td>
-      {!compact && <td className="px-4 py-3 text-right mono text-gray-600">—</td>}
-      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono font-medium text-white`}>{formatEur(row.value)}</td>
-      {!compact && <td className="px-4 py-3 text-right mono text-gray-600">—</td>}
-      {!compact && <td className="px-4 py-3 text-right mono text-gray-600">—</td>}
-      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-gray-600`}>—</td>
-      {/* % cartera fiat */}
-      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'}`}>
-        {totalPortfolioValue > 0 ? (
-          <div className="flex flex-col items-end gap-1">
-            <span className="text-xs mono text-gray-400">
-              {((row.value / totalPortfolioValue) * 100).toFixed(1)}%
-            </span>
-            <div className="w-16 h-1 bg-background-tertiary rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-emerald-500/50 transition-all duration-500"
-                style={{ width: `${Math.min((row.value / totalPortfolioValue) * 100, 100)}%` }}
-              />
-            </div>
-          </div>
-        ) : <span className="text-gray-700 text-xs">—</span>}
-      </td>
-    </tr>
-  )
-}
-
-// ── Tabla principal ────────────────────────────────────────────────────────
-
 const DUST_THRESHOLD = 1
-
-type SortKey = 'asset' | 'quantity' | 'price' | 'value' | 'cost' | 'pnl' | 'pnlpct' | 'weight' | 'breakeven'
-type SortDir = 'asc' | 'desc'
-
-function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices: Record<string, number>, total: number): UnifiedRow[] {
-  return [...rows].sort((a, b) => {
-    let va = 0, vb = 0
-    if (key === 'asset') {
-      const cmp = a.asset.localeCompare(b.asset)
-      return dir === 'asc' ? cmp : -cmp
-    }
-    if (key === 'quantity') {
-      va = a.kind === 'crypto' ? a.totalQuantity : 0
-      vb = b.kind === 'crypto' ? b.totalQuantity : 0
-    } else if (key === 'price') {
-      va = a.kind === 'crypto' ? (prices[a.asset] ?? 0) : 1
-      vb = b.kind === 'crypto' ? (prices[b.asset] ?? 0) : 1
-    } else if (key === 'value') {
-      va = a.value; vb = b.value
-    } else if (key === 'cost') {
-      va = a.kind === 'crypto' ? a.totalCostBasis : 0
-      vb = b.kind === 'crypto' ? b.totalCostBasis : 0
-    } else if (key === 'pnl') {
-      const priceA = a.kind === 'crypto' ? (prices[a.asset] ?? 0) : 0
-      const priceB = b.kind === 'crypto' ? (prices[b.asset] ?? 0) : 0
-      va = priceA > 0 && a.kind === 'crypto' ? a.value - a.totalCostBasis : -Infinity
-      vb = priceB > 0 && b.kind === 'crypto' ? b.value - b.totalCostBasis : -Infinity
-    } else if (key === 'pnlpct') {
-      const priceA = a.kind === 'crypto' ? (prices[a.asset] ?? 0) : 0
-      const priceB = b.kind === 'crypto' ? (prices[b.asset] ?? 0) : 0
-      va = priceA > 0 && a.kind === 'crypto' && a.totalCostBasis > 0 ? ((a.value - a.totalCostBasis) / a.totalCostBasis) * 100 : -Infinity
-      vb = priceB > 0 && b.kind === 'crypto' && b.totalCostBasis > 0 ? ((b.value - b.totalCostBasis) / b.totalCostBasis) * 100 : -Infinity
-    } else if (key === 'weight') {
-      va = total > 0 ? (a.value / total) * 100 : 0
-      vb = total > 0 ? (b.value / total) * 100 : 0
-    } else if (key === 'breakeven') {
-      va = a.kind === 'crypto' && a.totalQuantity > 0 ? a.totalCostBasis / a.totalQuantity : 0
-      vb = b.kind === 'crypto' && b.totalQuantity > 0 ? b.totalCostBasis / b.totalQuantity : 0
-    }
-    return dir === 'asc' ? va - vb : vb - va
-  })
-}
 
 export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTableProps) {
   const prices   = usePricesStore(s => s.prices)
@@ -521,14 +61,16 @@ export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTablePr
 
   const sortedMain = useMemo(
     () => sortRows(mainRows, sortKey, sortDir, prices, totalValue),
-    [mainRows, sortKey, sortDir, prices, totalValue]   // eslint-disable-line
+    [mainRows, sortKey, sortDir, prices, totalValue]
   )
   const sortedDust = useMemo(
     () => sortRows(dustRows, sortKey, sortDir, prices, totalValue),
-    [dustRows, sortKey, sortDir, prices, totalValue]   // eslint-disable-line
+    [dustRows, sortKey, sortDir, prices, totalValue]
   )
 
-  // Componente de cabecera ordenable
+  // Cabecera ordenable: closure local sobre sortKey/sortDir/handleSort — no
+  // se extrae a un fichero propio porque necesita acceso directo a ambos
+  // para elegir el icono de dirección, y no se reutiliza fuera de esta tabla.
   function SortTh({ label, sk, right = true, title }: { label: string; sk: SortKey; right?: boolean; title?: string }) {
     const active = sortKey === sk
     const Icon = active ? (sortDir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
@@ -600,6 +142,7 @@ export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTablePr
             <h3 className="font-medium text-sm">Activos</h3>
             {(sortKey !== 'value' || sortDir !== 'desc') && (
               <button
+                type="button"
                 onClick={() => { setSortKey('value'); setSortDir('desc') }}
                 className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-white bg-background-tertiary hover:bg-border border border-border rounded-md px-1.5 py-0.5 transition-colors"
                 title="Restablecer orden por defecto"
@@ -612,6 +155,7 @@ export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTablePr
           <div className="flex items-center gap-3">
             {/* Toggle compacto/expandido */}
             <button
+              type="button"
               onClick={() => setCompact(c => !c)}
               className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-md border transition-colors ${
                 compact
@@ -640,6 +184,7 @@ export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTablePr
       {dustRows.length > 0 && (
         <div className={`card overflow-hidden p-0 ${onlyDust ? 'border-amber-500/20 bg-amber-500/[0.02]' : ''}`}>
           <button
+            type="button"
             onClick={() => setDustOpen(!dustOpen)}
             className="w-full px-5 py-3 flex items-center justify-between hover:bg-background-tertiary/50 transition-colors"
           >
