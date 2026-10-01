@@ -44,7 +44,7 @@ export function Dashboard() {
     staleTime: 10 * 60_000,
   })
 
-  const totalFiat = fiatBalances.reduce((s, b) => s + parseFloat(b.balance), 0)
+  const totalFiat = fiatBalances.reduce((sum, bal) => sum + parseFloat(bal.balance), 0)
 
   const cryptoValue = lots.reduce((sum, lot) => {
     const price = prices[lot.asset] ?? 0

@@ -4,13 +4,13 @@ import { formatEur } from '../../utils/format'
 
 export function FiscalCard({ data }: { data: FiscalYear[] }) {
   const currentYear = new Date().getFullYear()
-  const current = data.find((d) => d.fiscal_year === currentYear) ?? data[data.length - 1]
+  const current = data.find((fy) => fy.fiscal_year === currentYear) ?? data[data.length - 1]
   if (!current) return null
 
   const gainLoss = parseFloat(current.total_gain_loss_eur)
   const gains    = parseFloat(current.total_gains_eur)
   const losses   = parseFloat(current.total_losses_eur)
-  const ops      = parseInt(current.num_operations as unknown as string, 10)
+  const ops      = parseInt(current.num_operations, 10)
   const isPos    = gainLoss >= 0
   const accentColor = isPos ? '#10b981' : '#ef4444'
 

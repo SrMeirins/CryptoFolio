@@ -21,9 +21,9 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
   const prices  = usePricesStore((s) => s.prices)
   const [hovered, setHovered] = useState<string | null>(null)
 
-  const data = useMemo(() => {
-    const fiatByAsset = fiatBalances.reduce((acc, b) => {
-      acc[b.asset] = (acc[b.asset] ?? 0) + parseFloat(b.balance)
+  const allocation = useMemo(() => {
+    const fiatByAsset = fiatBalances.reduce((acc, bal) => {
+      acc[bal.asset] = (acc[bal.asset] ?? 0) + parseFloat(bal.balance)
       return acc
     }, {} as Record<string, number>)
 
@@ -36,16 +36,16 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
       ...Object.entries(fiatByAsset).filter(([, v]) => v > 0).map(([name, value]) => ({ name, value, isFiat: true })),
     ].sort((a, b) => b.value - a.value)
 
-    const total = items.reduce((s, d) => s + d.value, 0)
+    const total = items.reduce((sum, item) => sum + item.value, 0)
     return { items, total }
   }, [lots, fiatBalances, prices])
 
-  const { items, total } = data
+  const { items, total } = allocation
   const top = items.slice(0, 10)
 
   if (total === 0) return null
 
-  const hoveredIdx  = hovered ? top.findIndex(d => d.name === hovered) : -1
+  const hoveredIdx  = hovered ? top.findIndex(item => item.name === hovered) : -1
   const hoveredItem = hoveredIdx >= 0 ? top[hoveredIdx] : null
   const hoveredPct  = hoveredItem ? (hoveredItem.value / total) * 100 : 0
 
@@ -57,22 +57,22 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
 
       {/* Barra apilada interactiva */}
       <div className="flex h-5 rounded-xl overflow-hidden gap-px mb-2">
-        {top.map((d, i) => {
-          const color   = colorForItem(d, i)
-          const isHover = hovered === d.name
+        {top.map((item, idx) => {
+          const color   = colorForItem(item, idx)
+          const isHover = hovered === item.name
           const dimmed  = hasHover && !isHover
           return (
             <div
-              key={d.name}
+              key={item.name}
               className="transition-all duration-150 cursor-pointer"
               style={{
-                width: `${(d.value / total) * 100}%`,
+                width: `${(item.value / total) * 100}%`,
                 background: color,
                 minWidth: '4px',
                 opacity: dimmed ? 0.2 : 1,
                 filter: isHover ? `brightness(1.25) drop-shadow(0 0 5px ${color}88)` : 'none',
               }}
-              onMouseEnter={() => setHovered(d.name)}
+              onMouseEnter={() => setHovered(item.name)}
               onMouseLeave={() => setHovered(null)}
             />
           )
@@ -104,27 +104,27 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
 
       {/* Lista ranked */}
       <div className="space-y-1.5">
-        {top.map((d, i) => {
-          const pct     = (d.value / total) * 100
-          const color   = colorForItem(d, i)
-          const isHover = hovered === d.name
+        {top.map((item, idx) => {
+          const pct     = (item.value / total) * 100
+          const color   = colorForItem(item, idx)
+          const isHover = hovered === item.name
           const dimmed  = hasHover && !isHover
           return (
             <div
-              key={d.name}
+              key={item.name}
               className="flex items-center gap-3 px-2 py-1.5 rounded-lg transition-all duration-150 cursor-default"
               style={{
                 background: isHover ? `${color}12` : 'transparent',
                 opacity: dimmed ? 0.35 : 1,
               }}
-              onMouseEnter={() => setHovered(d.name)}
+              onMouseEnter={() => setHovered(item.name)}
               onMouseLeave={() => setHovered(null)}
             >
-              <span className="text-[10px] text-gray-700 w-3 text-right shrink-0">{i + 1}</span>
+              <span className="text-[10px] text-gray-700 w-3 text-right shrink-0">{idx + 1}</span>
               <div className="flex items-center gap-1.5 w-16 shrink-0">
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-                <span className="text-xs font-medium truncate" style={{ color: isHover ? color : (d.isFiat ? color : 'rgb(209 213 219)') }}>
-                  {d.name}
+                <span className="text-xs font-medium truncate" style={{ color: isHover ? color : (item.isFiat ? color : 'rgb(209 213 219)') }}>
+                  {item.name}
                 </span>
               </div>
               <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -134,7 +134,7 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
                 />
               </div>
               <span className="text-[11px] text-gray-500 font-mono w-10 text-right shrink-0">{pct.toFixed(1)}%</span>
-              <span className="text-[11px] text-gray-400 font-mono w-20 text-right shrink-0">{formatEur(d.value)}</span>
+              <span className="text-[11px] text-gray-400 font-mono w-20 text-right shrink-0">{formatEur(item.value)}</span>
             </div>
           )
         })}

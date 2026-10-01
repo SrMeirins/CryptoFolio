@@ -42,12 +42,14 @@ export function WalletSections({ lots, fiatBalances, onSimulate }: {
   const groups = walletOrder.map(wid => {
     const wLots = lots.filter(l => l.wallet_id === wid)
     const wFiat = fiatBalances.filter(b => b.wallet_id === wid)
-    const ref   = wLots[0] ?? { wallet_name: wFiat[0]?.wallet_name, wallet_color: wFiat[0]?.wallet_color, wallet_kind: wFiat[0]?.wallet_kind }
+    // walletOrder solo incluye IDs que aparecen en lots o fiatBalances, así
+    // que uno de los dos [0] siempre existe — el fallback a '' es defensivo,
+    // no se espera que se use en la práctica.
     return {
       key:   wid,
-      name:  ref.wallet_name  as string,
-      color: ref.wallet_color as string,
-      kind:  ref.wallet_kind  as string,
+      name:  wLots[0]?.wallet_name  ?? wFiat[0]?.wallet_name  ?? '',
+      color: wLots[0]?.wallet_color ?? wFiat[0]?.wallet_color ?? '',
+      kind:  wLots[0]?.wallet_kind  ?? wFiat[0]?.wallet_kind  ?? '',
       lots:  wLots,
       fiats: wFiat,
       assetCount: new Set(wLots.map(l => l.asset)).size,
