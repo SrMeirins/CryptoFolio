@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { TrendingDown, ChevronUp, ChevronDown, Download } from 'lucide-react'
+import { TrendingDown, Download } from 'lucide-react'
 import { formatEur } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
+import { TableExpandToggle } from './TableExpandToggle'
 import type { RendimientoEvent } from './types'
 
 export function TablaRendimientos({ rendimientos, year }: { rendimientos: RendimientoEvent[]; year: number }) {
@@ -30,12 +31,13 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
   return (
     <div className="bg-background-card border border-border rounded-2xl overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-wrap gap-2">
-        <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-2 hover:text-white transition-colors">
-          <TrendingDown size={15} className="text-gray-500" />
-          <span className="font-medium text-sm">Rendimientos del Capital Mobiliario</span>
-          <span className="text-xs text-gray-500">({rendimientos.length} operaciones)</span>
-          {expanded ? <ChevronUp size={13} className="text-gray-500" /> : <ChevronDown size={13} className="text-gray-500" />}
-        </button>
+        <TableExpandToggle
+          icon={TrendingDown}
+          title="Rendimientos del Capital Mobiliario"
+          count={rendimientos.length}
+          expanded={expanded}
+          onToggle={() => setExpanded(!expanded)}
+        />
 
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -67,7 +69,9 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
               </select>
 
               <button
-                onClick={() => window.open(`/api/fiscal/${year}/export?format=csv&section=rendimientos`, '_blank')}
+                type="button"
+                onClick={() => window.open(`/api/fiscal/${year}/export?format=csv`, '_blank')}
+                title="Descarga el export fiscal completo del año (el backend no soporta filtrar solo esta sección)"
                 className="flex items-center gap-1.5 px-2.5 py-1 bg-background-tertiary border border-border rounded-lg text-[11px] text-gray-300 hover:border-gray-500 transition-colors"
               >
                 <Download size={11} />
@@ -97,7 +101,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
                   <td colSpan={6} className="px-4 py-6 text-center text-gray-600 text-xs">Sin rendimientos con los filtros actuales</td>
                 </tr>
               ) : filtered.map((r, i) => (
-                <tr key={i} className="hover:bg-background-tertiary/40 transition-colors">
+                <tr key={`${r.fecha}-${r.tipo}-${r.activo}-${i}`} className="hover:bg-background-tertiary/40 transition-colors">
                   <td className="px-4 py-2.5 mono text-gray-400 text-[11px]">{r.fecha}</td>
                   <td className="px-4 py-2.5">
                     <span className="text-[10px] bg-accent-amber/10 text-accent-amber px-1.5 py-0.5 rounded">{r.tipo}</span>
