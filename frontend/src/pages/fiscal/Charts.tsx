@@ -6,6 +6,7 @@ import {
 import { formatEur, pnlColor } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { PNL_THRESHOLD } from './constants'
+import { FiscalChartCard } from './FiscalChartCard'
 import type { YearOverview, MonthlyData, BreakdownItem } from './types'
 
 function ChartTooltip({ active, payload, label }: {
@@ -33,11 +34,7 @@ export function ComparativaAnual({ data }: { data: YearOverview[] }) {
   const max = Math.max(...chartData.map(d => Math.abs(d.value)), 1)
 
   return (
-    <div className="bg-background-card border border-border rounded-2xl p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <TrendingUp size={15} className="text-gray-500" />
-        <h3 className="text-[11px] text-gray-500 font-medium uppercase tracking-widest">Comparativa interanual — G/P neto</h3>
-      </div>
+    <FiscalChartCard icon={TrendingUp} title="Comparativa interanual — G/P neto">
       <ResponsiveContainer width="100%" height={120}>
         <BarChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
           <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
@@ -45,13 +42,13 @@ export function ComparativaAnual({ data }: { data: YearOverview[] }) {
           <ReferenceLine y={0} stroke="#2a2d3e" strokeWidth={1} />
           <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
           <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={40}>
-            {chartData.map((entry, i) => (
-              <Cell key={i} fill={entry.value >= 0 ? '#10b981' : '#ef4444'} opacity={entry.en_curso ? 1 : 0.65} />
+            {chartData.map((entry) => (
+              <Cell key={entry.name} fill={entry.value >= 0 ? '#10b981' : '#ef4444'} opacity={entry.en_curso ? 1 : 0.65} />
             ))}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-    </div>
+    </FiscalChartCard>
   )
 }
 
@@ -63,23 +60,20 @@ export function EvolucionMensual({ data, esAnioEnCurso }: { data: MonthlyData; e
   const lastColor = data.meses[data.meses.length - 1]?.acumulado >= 0 ? '#10b981' : '#ef4444'
 
   return (
-    <div className="bg-background-card border border-border rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <TrendingUp size={15} className="text-gray-500" />
-          <h3 className="text-[11px] text-gray-500 font-medium uppercase tracking-widest">Evolución acumulada — mes a mes</h3>
+    <FiscalChartCard
+      icon={TrendingUp}
+      title="Evolución acumulada — mes a mes"
+      right={esAnioEnCurso && data.proyeccionFinAnio !== null && (
+        <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-xl border ${
+          data.proyeccionFinAnio >= 0
+            ? 'bg-accent-green/10 border-accent-green/20 text-accent-green'
+            : 'bg-accent-red/10 border-accent-red/20 text-accent-red'
+        }`}>
+          <Calendar size={11} />
+          <span>Proyección dic: <span className="font-bold mono">{data.proyeccionFinAnio >= 0 ? '+' : ''}{formatEur(data.proyeccionFinAnio)}</span></span>
         </div>
-        {esAnioEnCurso && data.proyeccionFinAnio !== null && (
-          <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-xl border ${
-            data.proyeccionFinAnio >= 0
-              ? 'bg-accent-green/10 border-accent-green/20 text-accent-green'
-              : 'bg-accent-red/10 border-accent-red/20 text-accent-red'
-          }`}>
-            <Calendar size={11} />
-            <span>Proyección dic: <span className="font-bold mono">{data.proyeccionFinAnio >= 0 ? '+' : ''}{formatEur(data.proyeccionFinAnio)}</span></span>
-          </div>
-        )}
-      </div>
+      )}
+    >
       <ResponsiveContainer width="100%" height={130}>
         <AreaChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
           <defs>
@@ -95,7 +89,7 @@ export function EvolucionMensual({ data, esAnioEnCurso }: { data: MonthlyData; e
           <Area type="monotone" dataKey="acumulado" stroke={lastColor} strokeWidth={2} fill="url(#areaGrad)" dot={false} activeDot={{ r: 4 }} />
         </AreaChart>
       </ResponsiveContainer>
-    </div>
+    </FiscalChartCard>
   )
 }
 
@@ -104,11 +98,7 @@ export function DesglosePorActivo({ data }: { data: BreakdownItem[] }) {
   const max = Math.max(...data.map(d => Math.max(d.ganancias, Math.abs(d.perdidas))), 1)
 
   return (
-    <div className="bg-background-card border border-border rounded-2xl p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <Filter size={15} className="text-gray-500" />
-        <h3 className="text-[11px] text-gray-500 font-medium uppercase tracking-widest">Desglose G/P por activo</h3>
-      </div>
+    <FiscalChartCard icon={Filter} title="Desglose G/P por activo">
       <div className="space-y-2">
         {data.map((item) => {
           const barG = (item.ganancias / max) * 100
@@ -139,6 +129,6 @@ export function DesglosePorActivo({ data }: { data: BreakdownItem[] }) {
           )
         })}
       </div>
-    </div>
+    </FiscalChartCard>
   )
 }
