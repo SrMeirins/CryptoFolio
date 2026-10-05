@@ -10,13 +10,16 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
   const deadline    = `31 mar ${activeYear + 1}`
   const vencido     = !data.esAnioEnCurso && activeYear < currentYear
   const pctUmbral   = Math.min((data.totalValorCustodia / data.umbral) * 100, 100)
+  const autocustodia = data.totalValor - data.totalValorCustodia
 
   return (
     <div className={`bg-background-card border rounded-2xl overflow-hidden ${
       data.superaUmbral ? 'border-accent-red/40' : 'border-border'
     }`}>
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors"
       >
         <div className="flex items-center gap-3">
@@ -57,8 +60,8 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
               {formatEur(data.totalValorCustodia)}
             </div>
             <div className="text-[10px] text-gray-500">custodia de terceros · umbral {formatEur(data.umbral)}</div>
-            {data.totalValor - data.totalValorCustodia > 0.01 && (
-              <div className="text-[10px] text-gray-600">+ {formatEur(data.totalValor - data.totalValorCustodia)} en autocustodia (no computa)</div>
+            {autocustodia > 0.01 && (
+              <div className="text-[10px] text-gray-600">+ {formatEur(autocustodia)} en autocustodia (no computa)</div>
             )}
           </div>
           {expanded ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
@@ -85,41 +88,44 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
       {expanded && (
         <div className="border-t border-border">
           <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-2">
-            {data.activos.map((a, i) => (
-              <div key={i} className="flex items-center gap-3 bg-background-tertiary/50 rounded-xl px-3 py-2.5">
-                <CryptoIcon symbol={a.asset} size={28} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm mono">{a.asset}</span>
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
-                      style={{
-                        backgroundColor: a.wallet_kind === 'exchange' ? 'rgba(245,158,11,0.12)' : `${a.wallet_color}18`,
-                        color: a.wallet_kind === 'exchange' ? '#f59e0b' : a.wallet_color,
-                      }}
-                    >
-                      {a.wallet_name}
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-gray-500 mono mt-0.5">
-                    {a.quantity.toFixed(4)} × {formatEur(a.precioEur)}
-                  </div>
-                  {a.costBasisEur > 0 && (
-                    <div className="text-[10px] text-gray-600 mono">
-                      Coste adq.: {formatEur(a.costBasisEur)}
+            {data.activos.map((a) => {
+              const pnl = a.valorEur - a.costBasisEur
+              return (
+                <div key={`${a.asset}-${a.wallet_id}`} className="flex items-center gap-3 bg-background-tertiary/50 rounded-xl px-3 py-2.5">
+                  <CryptoIcon symbol={a.asset} size={28} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm mono">{a.asset}</span>
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                        style={{
+                          backgroundColor: a.wallet_kind === 'exchange' ? 'rgba(245,158,11,0.12)' : `${a.wallet_color}18`,
+                          color: a.wallet_kind === 'exchange' ? '#f59e0b' : a.wallet_color,
+                        }}
+                      >
+                        {a.wallet_name}
+                      </span>
                     </div>
-                  )}
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="font-bold mono text-sm">{formatEur(a.valorEur)}</div>
-                  {a.costBasisEur > 0 && (
-                    <div className={`text-[10px] mono ${pnlColor(a.valorEur - a.costBasisEur)}`}>
-                      {a.valorEur - a.costBasisEur >= 0 ? '+' : ''}{formatEur(a.valorEur - a.costBasisEur)}
+                    <div className="text-[10px] text-gray-500 mono mt-0.5">
+                      {a.quantity.toFixed(4)} × {formatEur(a.precioEur)}
                     </div>
-                  )}
+                    {a.costBasisEur > 0 && (
+                      <div className="text-[10px] text-gray-600 mono">
+                        Coste adq.: {formatEur(a.costBasisEur)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-bold mono text-sm">{formatEur(a.valorEur)}</div>
+                    {a.costBasisEur > 0 && (
+                      <div className={`text-[10px] mono ${pnlColor(pnl)}`}>
+                        {pnl >= 0 ? '+' : ''}{formatEur(pnl)}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           <div className="px-5 pb-4 space-y-2">
