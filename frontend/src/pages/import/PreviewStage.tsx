@@ -1,7 +1,7 @@
 import { AlertCircle, CheckCircle, Eye, ChevronUp, ChevronDown, AlertTriangle, X, Play, Info } from 'lucide-react'
 import { WithdrawalDestinations } from './WithdrawalDestinations'
 import { LANG_LABELS, OPERATION_LABELS, OPERATION_COLORS, ACCOUNT_COLORS } from './types'
-import { AccountChip } from './UploadZone'
+import { AccountChip } from './AccountChip'
 import type { PreviewResult, DepositReview, WizardResult } from './types'
 
 export function PreviewStage({

@@ -1,16 +1,5 @@
+import { useState } from 'react'
 import { Upload, FileText, RefreshCw, AlertCircle, Info } from 'lucide-react'
-
-export function AccountChip({ account, colors }: { account: string; colors: Record<string, string> }) {
-  const color = colors[account] ?? '#6b7280'
-  return (
-    <span
-      className="inline-flex items-center text-xs px-1.5 py-0.5 rounded-md font-medium"
-      style={{ backgroundColor: `${color}18`, color }}
-    >
-      {account}
-    </span>
-  )
-}
 
 const EXCHANGE_HELP: Record<'binance' | 'bitvavo', { title: string; steps: string[]; note: string }> = {
   binance: {
@@ -36,6 +25,17 @@ const EXCHANGE_HELP: Record<'binance' | 'bitvavo', { title: string; steps: strin
   },
 }
 
+// Mismos límites que exige el backend (multer, routes/imports.ts) — validar
+// aquí antes de subir da feedback instantáneo en vez de esperar un fallo de
+// red tras enviar el fichero completo.
+const MAX_FILE_SIZE = 10 * 1024 * 1024
+
+function validateFile(file: File): string | null {
+  if (!file.name.toLowerCase().endsWith('.csv')) return 'Solo se aceptan archivos CSV'
+  if (file.size > MAX_FILE_SIZE) return `El archivo supera el máximo de 10 MB (${(file.size / 1024 / 1024).toFixed(1)} MB)`
+  return null
+}
+
 export function UploadZone({ dragOver, loading, error, fileRef, exchange, onExchangeChange, onDragOver, onFile }: {
   dragOver: boolean
   loading: boolean
@@ -46,7 +46,19 @@ export function UploadZone({ dragOver, loading, error, fileRef, exchange, onExch
   onDragOver: (v: boolean) => void
   onFile: (f: File) => void
 }) {
+  const [validationError, setValidationError] = useState<string | null>(null)
   const help = EXCHANGE_HELP[exchange]
+
+  function handleFile(file: File) {
+    const err = validateFile(file)
+    setValidationError(err)
+    if (!err) onFile(file)
+  }
+
+  function openPicker() {
+    if (!loading) fileRef.current?.click()
+  }
+
   return (
     <div className="space-y-4">
       <div className="inline-flex rounded-lg border border-border p-1 gap-1">
@@ -79,18 +91,24 @@ export function UploadZone({ dragOver, loading, error, fileRef, exchange, onExch
       </div>
 
       <div
+        role="button"
+        tabIndex={loading ? -1 : 0}
+        aria-label="Seleccionar o arrastrar archivo CSV"
         className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors cursor-pointer
           ${dragOver ? 'border-accent-blue bg-accent-blue/5' : 'border-border hover:border-gray-500'}
           ${loading ? 'opacity-50 pointer-events-none' : ''}
         `}
-        onClick={() => fileRef.current?.click()}
+        onClick={openPicker}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker() }
+        }}
         onDragOver={e => { e.preventDefault(); onDragOver(true) }}
         onDragLeave={() => onDragOver(false)}
         onDrop={e => {
           e.preventDefault()
           onDragOver(false)
           const file = e.dataTransfer.files[0]
-          if (file) onFile(file)
+          if (file) handleFile(file)
         }}
       >
         {loading ? (
@@ -117,14 +135,14 @@ export function UploadZone({ dragOver, loading, error, fileRef, exchange, onExch
           type="file"
           accept=".csv"
           className="hidden"
-          onChange={e => { const f = e.target.files?.[0]; if (f) onFile(f) }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
         />
       </div>
 
-      {error && (
+      {(validationError || error) && (
         <div className="flex items-start gap-2 p-4 bg-accent-red/10 border border-accent-red/20 rounded-lg text-sm text-accent-red">
           <AlertCircle size={15} className="shrink-0 mt-0.5" />
-          {error}
+          {validationError ?? error}
         </div>
       )}
     </div>
