@@ -1,14 +1,16 @@
 import { useState, useMemo } from 'react'
-import { TrendingUp, Search, Filter, ChevronUp, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { TrendingUp, Search, Filter, ChevronDown } from 'lucide-react'
 import { formatEur, pnlColor } from '../../utils/format'
-import { CryptoIcon } from '../../components/CryptoIcon'
+import { SortIcon } from '../../components/SortIcon'
 import { PNL_THRESHOLD } from './constants'
+import { TableExpandToggle } from './TableExpandToggle'
+import { FiscalEventRow } from './FiscalEventRow'
 import type { FiscalEvent, FiscalSummary } from './types'
 
 type SortKey = 'fecha' | 'activoTransmitido' | 'gananciaPerdidaEur' | 'valorTransmisionEur'
 type SortDir  = 'asc' | 'desc'
 
-export function TablaEventos({ events, summary, year: _year }: { events: FiscalEvent[]; summary: FiscalSummary; year: number }) {
+export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summary: FiscalSummary }) {
   const [expanded, setExpanded]     = useState(true)
   const [filterAsset, setFilterAsset] = useState('')
   const [filterTipo, setFilterTipo]   = useState<'all' | 'gain' | 'loss'>('all')
@@ -45,18 +47,20 @@ export function TablaEventos({ events, summary, year: _year }: { events: FiscalE
     return result
   }, [events, filterAsset, filterTipo, filterFrom, filterTo, sortKey, sortDir])
 
-  const totalFiltrado = filtered.reduce((s, e) => s + (e.gananciaPerdidaEur ?? 0), 0)
+  // Totales del tfoot en una sola pasada — antes eran 4 .reduce() separados
+  // sobre `filtered`, cada uno recorriendo el array completo en cada render.
+  const totales = useMemo(() => filtered.reduce((acc, e) => ({
+    gananciaPerdida:    acc.gananciaPerdida    + (e.gananciaPerdidaEur ?? 0),
+    valorTransmision:   acc.valorTransmision   + e.valorTransmisionEur,
+    gastosTransmision:  acc.gastosTransmision  + e.gastosTransmisionEur,
+    valorAdquisicion:   acc.valorAdquisicion   + e.valorAdquisicionEur,
+    gastosAdquisicion:  acc.gastosAdquisicion  + e.gastosAdquisicionEur,
+  }), { gananciaPerdida: 0, valorTransmision: 0, gastosTransmision: 0, valorAdquisicion: 0, gastosAdquisicion: 0 }),
+  [filtered])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('asc') }
-  }
-
-  function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <ArrowUpDown size={10} className="text-gray-600" />
-    return sortDir === 'asc'
-      ? <ArrowUp size={10} className="text-accent-blue" />
-      : <ArrowDown size={10} className="text-accent-blue" />
   }
 
   const hasDateFilter = filterFrom || filterTo
@@ -65,12 +69,13 @@ export function TablaEventos({ events, summary, year: _year }: { events: FiscalE
   return (
     <div className="bg-background-card border border-border rounded-2xl overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-wrap gap-2">
-        <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-2 hover:text-white transition-colors">
-          <TrendingUp size={15} className="text-gray-500" />
-          <span className="font-medium text-sm">Ganancias y Pérdidas Patrimoniales</span>
-          <span className="text-xs text-gray-500">({events.length} operaciones)</span>
-          {expanded ? <ChevronUp size={13} className="text-gray-500" /> : <ChevronDown size={13} className="text-gray-500" />}
-        </button>
+        <TableExpandToggle
+          icon={TrendingUp}
+          title="Ganancias y Pérdidas Patrimoniales"
+          count={events.length}
+          expanded={expanded}
+          onToggle={() => setExpanded(!expanded)}
+        />
 
         {expanded && (
           <div className="flex items-center gap-2 flex-wrap">
@@ -91,7 +96,7 @@ export function TablaEventos({ events, summary, year: _year }: { events: FiscalE
                 title="Hasta"
               />
               {hasDateFilter && (
-                <button onClick={() => { setFilterFrom(''); setFilterTo('') }} className="text-gray-500 hover:text-gray-300 ml-0.5">
+                <button type="button" onClick={() => { setFilterFrom(''); setFilterTo('') }} className="text-gray-500 hover:text-gray-300 ml-0.5">
                   <ChevronDown size={12} className="rotate-90" />
                 </button>
               )}
@@ -113,6 +118,7 @@ export function TablaEventos({ events, summary, year: _year }: { events: FiscalE
               {(['all', 'gain', 'loss'] as const).map(t => (
                 <button
                   key={t}
+                  type="button"
                   onClick={() => setFilterTipo(t)}
                   className={`px-2.5 py-1 transition-colors ${
                     filterTipo === t
@@ -129,6 +135,7 @@ export function TablaEventos({ events, summary, year: _year }: { events: FiscalE
 
             {hasAnyFilter && (
               <button
+                type="button"
                 onClick={() => { setFilterAsset(''); setFilterTipo('all'); setFilterFrom(''); setFilterTo('') }}
                 className="text-[11px] text-gray-500 hover:text-gray-300 px-2 py-1 border border-border rounded-lg transition-colors"
               >
@@ -145,29 +152,29 @@ export function TablaEventos({ events, summary, year: _year }: { events: FiscalE
             <thead>
               <tr className="text-gray-500 text-[10px] uppercase tracking-wider border-b border-border bg-background-tertiary/30">
                 <th className="text-left px-4 py-2.5">
-                  <button onClick={() => toggleSort('fecha')} className="flex items-center gap-1 hover:text-gray-300">
-                    Fecha <SortIcon col="fecha" />
+                  <button type="button" onClick={() => toggleSort('fecha')} className="flex items-center gap-1 hover:text-gray-300">
+                    Fecha <SortIcon col="fecha" activeCol={sortKey} dir={sortDir} />
                   </button>
                 </th>
                 <th className="text-left px-4 py-2.5">Tipo</th>
                 <th className="text-left px-4 py-2.5">
-                  <button onClick={() => toggleSort('activoTransmitido')} className="flex items-center gap-1 hover:text-gray-300">
-                    Operación <SortIcon col="activoTransmitido" />
+                  <button type="button" onClick={() => toggleSort('activoTransmitido')} className="flex items-center gap-1 hover:text-gray-300">
+                    Operación <SortIcon col="activoTransmitido" activeCol={sortKey} dir={sortDir} />
                   </button>
                 </th>
                 <th className="text-right px-4 py-2.5">Cantidad</th>
                 <th className="text-left px-4 py-2.5">Clave AEAT</th>
                 <th className="text-right px-4 py-2.5">
-                  <button onClick={() => toggleSort('valorTransmisionEur')} className="flex items-center gap-1 hover:text-gray-300 ml-auto">
-                    Val. Transmisión <SortIcon col="valorTransmisionEur" />
+                  <button type="button" onClick={() => toggleSort('valorTransmisionEur')} className="flex items-center gap-1 hover:text-gray-300 ml-auto">
+                    Val. Transmisión <SortIcon col="valorTransmisionEur" activeCol={sortKey} dir={sortDir} />
                   </button>
                 </th>
                 <th className="text-right px-4 py-2.5">Gtos.</th>
                 <th className="text-right px-4 py-2.5">Val. Adquisición</th>
                 <th className="text-right px-4 py-2.5">Gtos.</th>
                 <th className="text-right px-4 py-2.5">
-                  <button onClick={() => toggleSort('gananciaPerdidaEur')} className="flex items-center gap-1 hover:text-gray-300 ml-auto">
-                    G/P € <SortIcon col="gananciaPerdidaEur" />
+                  <button type="button" onClick={() => toggleSort('gananciaPerdidaEur')} className="flex items-center gap-1 hover:text-gray-300 ml-auto">
+                    G/P € <SortIcon col="gananciaPerdidaEur" activeCol={sortKey} dir={sortDir} />
                   </button>
                 </th>
               </tr>
@@ -180,90 +187,7 @@ export function TablaEventos({ events, summary, year: _year }: { events: FiscalE
                     Sin operaciones con los filtros actuales
                   </td>
                 </tr>
-              ) : filtered.map((e, i) => {
-                const gp    = e.gananciaPerdidaEur ?? 0
-                const isFee  = ['FEE_EXCHANGE', 'FEE_NETWORK', 'FEE'].includes(e.tipo)
-                const isLost = ['LOST', 'GIFT_SENT'].includes(e.tipo)
-                const qty    = e.cantidadTransmitida
-                return (
-                  <tr key={i} className="hover:bg-background-tertiary/40 transition-colors">
-                    <td className="px-4 py-2.5 mono text-gray-400 text-[11px]">{e.fecha}</td>
-                    <td className="px-4 py-2.5">
-                      {isFee ? (
-                        <span className="text-[10px] bg-accent-amber/10 text-accent-amber px-1.5 py-0.5 rounded">Fee</span>
-                      ) : isLost ? (
-                        <span className="text-[10px] bg-accent-red/10 text-accent-red px-1.5 py-0.5 rounded">Pérdida</span>
-                      ) : (
-                        <span className="text-[10px] bg-background-tertiary text-gray-400 px-1.5 py-0.5 rounded">{e.tipo}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 min-w-[140px]">
-                      <div className="flex items-center gap-1 whitespace-nowrap">
-                        <CryptoIcon symbol={e.activoTransmitido} size={15} />
-                        <span className="font-bold mono text-[11px]">{e.activoTransmitido}</span>
-                        {e.activoRecibido ? (
-                          <>
-                            <span className="text-gray-600 text-[10px] mx-0.5">→</span>
-                            <CryptoIcon symbol={e.activoRecibido} size={15} />
-                            <span className="font-bold mono text-[11px]">{e.activoRecibido}</span>
-                          </>
-                        ) : isFee ? (
-                          <span className="text-gray-600 text-[10px]">→ fee</span>
-                        ) : null}
-                      </div>
-                      <div className="text-[10px] text-gray-600 mt-0.5">{e.wallet}</div>
-                      {e.permutaWrapStaking && (
-                        <div
-                          className="mt-0.5 inline-block text-[10px] bg-accent-amber/10 text-accent-amber px-1.5 py-0.5 rounded"
-                          title="El wrap/unwrap de ETH↔BETH (staking de ETH 2.0) se trata como permuta imponible: criterio conservador, sin doctrina de la DGT específica. Algunos asesores lo consideran no imponible al ser 1:1 sobre el mismo derecho. Valídalo con tu asesor."
-                        >
-                          ⚠ wrap de staking tratado como permuta imponible — criterio por validar
-                        </div>
-                      )}
-                      {e.lostSinMotivo && (
-                        <div
-                          className="mt-0.5 inline-block text-[10px] bg-accent-amber/10 text-accent-amber px-1.5 py-0.5 rounded"
-                          title="Esta pérdida se computa como 100% deducible, pero su deducibilidad real depende del motivo (estafa, exchange insolvente, clave perdida...). Añade el motivo en las notas de la transacción y valídalo con tu asesor."
-                        >
-                          ⚠ pérdida sin motivo anotado — deducibilidad por validar
-                        </div>
-                      )}
-                      {e.posiblePerdidaDiferida && (
-                        <div
-                          className="mt-0.5 inline-block text-[10px] bg-accent-amber/10 text-accent-amber px-1.5 py-0.5 rounded"
-                          title="Recompraste este activo en los 2 meses anteriores o posteriores a la venta con pérdida. Art. 33.5 LIRPF: la pérdida podría no ser computable ahora (aplicación a cripto no pacífica). Consúltalo con tu asesor."
-                        >
-                          ⚠ posible pérdida diferida (recompra ±2 meses)
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-right mono text-[11px] text-gray-500">
-                      {qty >= 0.01
-                        ? qty >= 1000
-                          ? qty.toLocaleString('es-ES', { maximumFractionDigits: 2 })
-                          : qty >= 1
-                            ? qty.toFixed(4)
-                            : qty.toFixed(6)
-                        : qty.toExponential(2)}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className="bg-background-tertiary px-1.5 py-0.5 rounded text-gray-300 font-mono text-[10px]">
-                        {e.contrapartidaClave}
-                      </span>
-                      <span className="ml-1.5 text-gray-500 text-[10px]">{e.contrapartidaDescripcion}</span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right mono">{formatEur(e.valorTransmisionEur)}</td>
-                    <td className="px-4 py-2.5 text-right mono text-gray-500">{formatEur(e.gastosTransmisionEur)}</td>
-                    <td className="px-4 py-2.5 text-right mono">{formatEur(e.valorAdquisicionEur)}</td>
-                    <td className="px-4 py-2.5 text-right mono text-gray-500">{formatEur(e.gastosAdquisicionEur)}</td>
-                    <td className={`px-4 py-2.5 text-right mono font-bold ${pnlColor(gp)}`}>
-                      {Math.abs(gp) < PNL_THRESHOLD
-                        ? <span className="text-gray-500 font-normal">0,00 €</span>
-                        : <>{gp > 0 ? '+' : ''}{formatEur(gp)}</>}
-                    </td>
-                  </tr>
-                )
-              })}
+              ) : filtered.map((e) => <FiscalEventRow key={e.txId} e={e} />)}
             </tbody>
             {filtered.length > 0 && (
               <tfoot>
@@ -274,19 +198,19 @@ export function TablaEventos({ events, summary, year: _year }: { events: FiscalE
                       : `${filtered.length} operaciones`}
                   </td>
                   <td className="px-4 py-2.5 text-right mono text-xs">
-                    {formatEur(filtered.reduce((s, e) => s + e.valorTransmisionEur, 0))}
+                    {formatEur(totales.valorTransmision)}
                   </td>
                   <td className="px-4 py-2.5 text-right mono text-xs text-gray-500">
-                    {formatEur(filtered.reduce((s, e) => s + e.gastosTransmisionEur, 0))}
+                    {formatEur(totales.gastosTransmision)}
                   </td>
                   <td className="px-4 py-2.5 text-right mono text-xs">
-                    {formatEur(filtered.reduce((s, e) => s + e.valorAdquisicionEur, 0))}
+                    {formatEur(totales.valorAdquisicion)}
                   </td>
                   <td className="px-4 py-2.5 text-right mono text-xs text-gray-500">
-                    {formatEur(filtered.reduce((s, e) => s + e.gastosAdquisicionEur, 0))}
+                    {formatEur(totales.gastosAdquisicion)}
                   </td>
-                  <td className={`px-4 py-2.5 text-right mono font-bold ${pnlColor(totalFiltrado)}`}>
-                    {totalFiltrado >= 0 ? '+' : ''}{formatEur(totalFiltrado)}
+                  <td className={`px-4 py-2.5 text-right mono font-bold ${pnlColor(totales.gananciaPerdida)}`}>
+                    {totales.gananciaPerdida >= 0 ? '+' : ''}{formatEur(totales.gananciaPerdida)}
                     {filtered.length < events.length && (
                       <div className="text-[10px] text-gray-500 font-normal">
                         neto total: {summary.netoPatrimonial >= 0 ? '+' : ''}{formatEur(summary.netoPatrimonial)}
