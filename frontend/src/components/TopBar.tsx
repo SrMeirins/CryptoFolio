@@ -1,25 +1,11 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Bell, X, AlertTriangle, AlertCircle, Info, RefreshCw } from 'lucide-react'
+import { Bell, X, RefreshCw } from 'lucide-react'
 import { usePricesStore } from '../store/pricesStore'
-import { portfolioApi } from '../api/portfolio'
-import { NOTIFICATION_ROUTES } from '../constants/notifications'
+import { portfolioApi, type Notification } from '../api/portfolio'
+import { NOTIFICATION_ROUTES, NOTIFICATION_TYPE_META } from '../constants/notifications'
 import { useClickOutside } from '../hooks/useClickOutside'
-
-interface Notification {
-  id: string
-  type: 'error' | 'warning' | 'info'
-  category: string
-  message: string
-  count?: number
-}
-
-const TYPE_META = {
-  error:   { Icon: AlertCircle,   color: '#e74c3c', label: 'Error' },
-  warning: { Icon: AlertTriangle, color: '#f59e0b', label: 'Aviso' },
-  info:    { Icon: Info,          color: '#6366f1', label: 'Info'  },
-}
 
 function PriceRefreshButton() {
   const { connected, lastUpdate, setPrices } = usePricesStore(s => ({
@@ -59,8 +45,10 @@ function PriceRefreshButton() {
 
   return (
     <button
+      type="button"
       onClick={refresh}
       title={title}
+      aria-label={title}
       className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-xs ${
         refreshing
           ? 'text-accent-blue bg-accent-blue/10'
@@ -104,7 +92,9 @@ function NotificationsButton() {
   return (
     <div className="relative" ref={panelRef}>
       <button
+        type="button"
         onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
         className={`relative p-2 rounded-lg transition-colors ${
           open ? 'bg-background-tertiary text-white' : 'text-gray-500 hover:text-white hover:bg-background-tertiary'
         }`}
@@ -125,7 +115,7 @@ function NotificationsButton() {
         <div className="absolute top-full right-0 mt-2 w-96 rounded-xl border border-border bg-background-card shadow-2xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <span className="text-sm font-semibold">Avisos del sistema</span>
-            <button onClick={() => setOpen(false)} className="text-gray-600 hover:text-white transition-colors">
+            <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar avisos" className="text-gray-600 hover:text-white transition-colors">
               <X size={14} />
             </button>
           </div>
@@ -138,7 +128,7 @@ function NotificationsButton() {
             ) : (
               <div className="divide-y divide-border/50">
                 {notifications.map(n => {
-                  const { Icon, color, label } = TYPE_META[n.type]
+                  const { icon: Icon, color, label } = NOTIFICATION_TYPE_META[n.type]
                   const dest = NOTIFICATION_ROUTES[n.id]
                   return (
                     <div key={n.id}

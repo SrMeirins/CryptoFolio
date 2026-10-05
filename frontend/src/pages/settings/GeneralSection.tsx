@@ -1,20 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { portfolioApi } from '../../api/portfolio'
-import { AlertCircle, Bell, BellOff, X, ArrowRight, Wrench } from 'lucide-react'
-import { NOTIFICATION_ROUTES } from '../../constants/notifications'
+import { Bell, BellOff, X, ArrowRight, Wrench } from 'lucide-react'
+import { NOTIFICATION_ROUTES, NOTIFICATION_TYPE_META } from '../../constants/notifications'
 
 const NOTIFICATION_LABELS: Record<string, string> = {
   'no-price':            'Ir a Activos',
   'lots-no-price':       'Ir a Activos',
   'pending-withdrawals': 'Ir a Historial',
   'crypto-deposits':     'Ir a Importación',
-}
-
-const NOTIFICATION_TYPE_META: Record<string, { color: string; icon: typeof AlertCircle }> = {
-  error:   { color: '#ef4444', icon: AlertCircle },
-  warning: { color: '#f59e0b', icon: AlertCircle },
-  info:    { color: '#6366f1', icon: Bell },
 }
 
 export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => void }) {
@@ -37,9 +31,18 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
   })
 
   async function dismissAll() {
-    // Mark all seen via config key
     await portfolioApi.setConfig('notifications_dismissed_at', new Date().toISOString())
     queryClient.invalidateQueries({ queryKey: ['notifications'] })
+  }
+
+  async function dismissOne(id: string) {
+    await portfolioApi.setConfig(`notification_dismissed_${id}`, new Date().toISOString())
+    queryClient.invalidateQueries({ queryKey: ['notifications'] })
+  }
+
+  async function fixStaleWithdrawals() {
+    const r = await portfolioApi.fixStaleWithdrawals()
+    if (r.fixed > 0) queryClient.invalidateQueries({ queryKey: ['notifications'] })
   }
 
   return (
@@ -53,7 +56,7 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
             <p className="text-xs text-gray-500 mt-0.5">Alertas activas que requieren tu atención.</p>
           </div>
           {notifications.length > 0 && (
-            <button onClick={dismissAll}
+            <button type="button" onClick={dismissAll}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-white bg-background-tertiary hover:bg-border border border-border rounded-lg transition-colors">
               <BellOff size={11} /> Descartar todas
             </button>
@@ -70,21 +73,20 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
         ) : (
           <div className="space-y-2">
             {notifications.map(n => {
-              const meta = NOTIFICATION_TYPE_META[n.type] ?? NOTIFICATION_TYPE_META.info
-              const Icon = meta.icon
+              const { icon: Icon, color, label } = NOTIFICATION_TYPE_META[n.type]
               const dest = NOTIFICATION_ROUTES[n.id]
               const actionLabel = NOTIFICATION_LABELS[n.id]
               return (
                 <div key={n.id} className="flex items-start gap-3 px-4 py-3 rounded-xl border"
-                  style={{ borderColor: `${meta.color}30`, backgroundColor: `${meta.color}08` }}>
-                  <Icon size={14} className="mt-0.5 shrink-0" style={{ color: meta.color }} />
+                  style={{ borderColor: `${color}30`, backgroundColor: `${color}08` }}>
+                  <Icon size={14} className="mt-0.5 shrink-0" style={{ color }} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-medium capitalize" style={{ color: meta.color }}>{n.type}</span>
+                      <span className="text-xs font-medium" style={{ color }}>{label}</span>
                       <span className="text-xs text-gray-600">{n.category}</span>
                       {n.count && n.count > 1 && (
                         <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold"
-                          style={{ backgroundColor: `${meta.color}20`, color: meta.color }}>
+                          style={{ backgroundColor: `${color}20`, color }}>
                           ×{n.count}
                         </span>
                       )}
@@ -92,29 +94,21 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
                     <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{n.message}</p>
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
                       {dest && (
-                        <button onClick={() => goTo(dest)}
+                        <button type="button" onClick={() => goTo(dest)}
                           className="inline-flex items-center gap-1 text-xs font-medium transition-colors hover:opacity-80"
-                          style={{ color: meta.color }}>
+                          style={{ color }}>
                           {actionLabel} <ArrowRight size={10} />
                         </button>
                       )}
                       {n.id === 'pending-withdrawals' && (
-                        <button
-                          onClick={async () => {
-                            const r = await portfolioApi.fixStaleWithdrawals()
-                            if (r.fixed > 0) queryClient.invalidateQueries({ queryKey: ['notifications'] })
-                          }}
+                        <button type="button" onClick={fixStaleWithdrawals}
                           className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-white transition-colors">
                           <Wrench size={10} /> Corregir auto ({n.count})
                         </button>
                       )}
                     </div>
                   </div>
-                  <button
-                    onClick={async () => {
-                      await portfolioApi.setConfig(`notification_dismissed_${n.id}`, new Date().toISOString())
-                      queryClient.invalidateQueries({ queryKey: ['notifications'] })
-                    }}
+                  <button type="button" onClick={() => dismissOne(n.id)} aria-label="Descartar aviso"
                     className="p-1 text-gray-600 hover:text-white transition-colors shrink-0">
                     <X size={12} />
                   </button>
