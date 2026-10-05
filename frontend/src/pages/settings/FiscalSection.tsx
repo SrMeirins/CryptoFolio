@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
 import { AlertCircle, Check, RotateCcw } from 'lucide-react'
 import { TRAMOS_DEFAULT } from '../../utils/tramosIrpf'
+import { SettingsCard } from './SettingsCard'
 
 export function FiscalSection() {
   const { data: config = {} } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
@@ -22,7 +23,12 @@ export function FiscalSection() {
   }
 
   // ── Tramos IRPF ──────────────────────────────────────────────────────────
-  const storedTipos: number[] = (() => {
+  // Memoizado: envolver en useMemo (en vez de recalcular en cada render) es
+  // lo que permite incluirlo correctamente en las deps del useEffect de
+  // abajo sin romper la edición — con una referencia nueva en cada render,
+  // el efecto se dispararía con cada tecla y resetearía lo que el usuario
+  // acaba de escribir.
+  const storedTipos: number[] = useMemo(() => {
     const raw = config['irpf_tramos_tipos']
     if (!raw) return TRAMOS_DEFAULT.map(t => t.tipo)
     try {
@@ -30,13 +36,13 @@ export function FiscalSection() {
       if (Array.isArray(arr) && arr.length === TRAMOS_DEFAULT.length) return arr
     } catch { /* noop */ }
     return TRAMOS_DEFAULT.map(t => t.tipo)
-  })()
+  }, [config])
 
   const [tramosInput, setTramosInput] = useState<string[]>([])
   const [savingTramos, setSavingTramos] = useState(false)
   const [savedTramos, setSavedTramos] = useState(false)
 
-  useEffect(() => { setTramosInput(storedTipos.map(String)) }, [config])
+  useEffect(() => { setTramosInput(storedTipos.map(String)) }, [storedTipos])
 
   const tramosModified = tramosInput.some((v, i) => parseFloat(v) !== storedTipos[i])
   const tramosValid    = tramosInput.every(v => { const n = parseFloat(v); return !isNaN(n) && n > 0 && n <= 100 })
@@ -60,13 +66,10 @@ export function FiscalSection() {
     <div className="space-y-6 max-w-2xl">
 
       {/* Método de cálculo — FIFO único */}
-      <div className="rounded-xl border border-border bg-background-card p-5 space-y-3">
-        <div>
-          <h3 className="font-semibold text-sm">Método de cálculo de plusvalías</h3>
-          <p className="text-xs text-gray-500 mt-1">
-            La normativa española (AEAT) obliga al uso de FIFO para criptoactivos.
-          </p>
-        </div>
+      <SettingsCard
+        title="Método de cálculo de plusvalías"
+        description="La normativa española (AEAT) obliga al uso de FIFO para criptoactivos."
+      >
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-accent-blue/40 bg-accent-blue/6 w-fit">
           <Check size={15} className="text-accent-blue shrink-0" />
           <div>
@@ -78,20 +81,16 @@ export function FiscalSection() {
           <AlertCircle size={11} className="shrink-0 mt-0.5" />
           FIFO es el único método soportado y el exigido por la AEAT.
         </p>
-      </div>
+      </SettingsCard>
 
       {/* Umbral Modelo 721 */}
-      <div className="rounded-xl border border-border bg-background-card p-5 space-y-4">
-        <div>
-          <h3 className="font-semibold text-sm">Umbral Modelo 721</h3>
-          <p className="text-xs text-gray-500 mt-1">
-            Importe a partir del cual existe obligación de presentar el Modelo 721
-            (criptoactivos en exchanges extranjeros).
-          </p>
-        </div>
+      <SettingsCard
+        title="Umbral Modelo 721"
+        description="Importe a partir del cual existe obligación de presentar el Modelo 721 (criptoactivos en exchanges extranjeros)."
+      >
         <div className="flex items-center gap-2">
           {[25000, 50000, 100000].map(preset => (
-            <button key={preset} onClick={() => setThresholdInput(String(preset))}
+            <button key={preset} type="button" onClick={() => setThresholdInput(String(preset))}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                 thresholdInput === String(preset)
                   ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
@@ -110,7 +109,7 @@ export function FiscalSection() {
               className="px-3 py-2.5 text-sm mono bg-transparent text-white w-32 focus:outline-none"
               placeholder="50000" />
           </div>
-          <button onClick={saveThreshold}
+          <button type="button" onClick={saveThreshold}
             disabled={savingThreshold || thresholdInput === String(threshold) || !thresholdInput}
             className="px-4 py-2.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors">
             {savingThreshold ? 'Guardando...' : 'Guardar'}
@@ -125,25 +124,19 @@ export function FiscalSection() {
           <AlertCircle size={11} className="shrink-0 mt-0.5" />
           El umbral legal vigente es €50.000. Modifícalo solo si la normativa cambia.
         </p>
-      </div>
+      </SettingsCard>
 
       {/* Tramos IRPF */}
-      <div className="rounded-xl border border-border bg-background-card p-5 space-y-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="font-semibold text-sm">Tramos IRPF — base del ahorro</h3>
-            <p className="text-xs text-gray-500 mt-1">
-              Porcentajes aplicables a las ganancias patrimoniales. Los tramos en euros son fijos por ley.
-            </p>
-          </div>
-          <button
-            onClick={resetTramos}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white border border-border hover:border-gray-500 transition-all shrink-0"
-          >
+      <SettingsCard
+        title="Tramos IRPF — base del ahorro"
+        description="Porcentajes aplicables a las ganancias patrimoniales. Los tramos en euros son fijos por ley."
+        action={
+          <button type="button" onClick={resetTramos}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white border border-border hover:border-gray-500 transition-all shrink-0">
             <RotateCcw size={11} /> Restaurar
           </button>
-        </div>
-
+        }
+      >
         <div className="space-y-2">
           {TRAMOS_DEFAULT.map((t, i) => (
             <div key={i} className="flex items-center gap-3">
@@ -174,11 +167,9 @@ export function FiscalSection() {
         </div>
 
         <div className="flex items-center gap-3 pt-1">
-          <button
-            onClick={saveTramos}
+          <button type="button" onClick={saveTramos}
             disabled={savingTramos || !tramosModified || !tramosValid}
-            className="px-4 py-2.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors"
-          >
+            className="px-4 py-2.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors">
             {savingTramos ? 'Guardando...' : 'Guardar tramos'}
           </button>
           {savedTramos && (
@@ -197,14 +188,13 @@ export function FiscalSection() {
           <AlertCircle size={11} className="shrink-0 mt-0.5" />
           Modifica solo si la normativa fiscal cambia. Afecta al simulador de venta y a la página Fiscal.
         </p>
-      </div>
+      </SettingsCard>
 
       {/* País fiscal */}
-      <div className="rounded-xl border border-border bg-background-card p-5 space-y-3">
-        <div>
-          <h3 className="font-semibold text-sm">País de residencia fiscal</h3>
-          <p className="text-xs text-gray-500 mt-1">Determina la normativa aplicable y los formularios generados.</p>
-        </div>
+      <SettingsCard
+        title="País de residencia fiscal"
+        description="Determina la normativa aplicable y los formularios generados."
+      >
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-accent-blue/40 bg-accent-blue/6">
             <span className="text-lg">🇪🇸</span>
@@ -216,7 +206,7 @@ export function FiscalSection() {
           </div>
           <span className="text-xs text-gray-600">Otros países: Próximamente</span>
         </div>
-      </div>
+      </SettingsCard>
 
     </div>
   )
