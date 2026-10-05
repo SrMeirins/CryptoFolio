@@ -61,12 +61,17 @@ export interface ProgressEvent {
   total?: number
 }
 
+// La clave del tipo de transferencia interna es TRANSFER_INTERNAL (no
+// INTERNAL_TRANSFER) — mismo enum que usa el backend y constants/operations.ts
+// (OP_META). Antes la clave no coincidía nunca: PreviewStage.tsx mostraba el
+// código crudo del backend ("TRANSFER_INTERNAL") en la vista previa de
+// importación en vez de la etiqueta legible.
 export const OPERATION_LABELS: Record<string, string> = {
   BUY: 'Compra',
   SELL: 'Venta',
   DEPOSIT_FIAT: 'Deposito EUR',
   WITHDRAW: 'Retirada',
-  INTERNAL_TRANSFER: 'Transferencia interna',
+  TRANSFER_INTERNAL: 'Transferencia interna',
   IGNORED: 'Ignorado',
 }
 
@@ -75,7 +80,7 @@ export const OPERATION_COLORS: Record<string, string> = {
   SELL: 'text-accent-red',
   DEPOSIT_FIAT: 'text-accent-blue',
   WITHDRAW: 'text-accent-amber',
-  INTERNAL_TRANSFER: 'text-gray-400',
+  TRANSFER_INTERNAL: 'text-gray-400',
   IGNORED: 'text-gray-600',
 }
 
