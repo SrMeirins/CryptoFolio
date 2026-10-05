@@ -26,6 +26,12 @@ export const SPECIAL_DESTINATIONS = [
   },
 ]
 
+const SPECIAL_TRIGGER_CLASS: Record<string, string> = {
+  __lost__: 'border-accent-red/40 bg-accent-red/8',
+  __gift__: 'border-accent-blue/40 bg-accent-blue/8',
+  __external__: 'border-gray-600/40 bg-gray-600/8',
+}
+
 export function WithdrawalSelector({ value, coldWallets, onChange }: {
   value: string
   coldWallets: { id: string; name: string; color: string }[]
@@ -64,13 +70,7 @@ export function WithdrawalSelector({ value, coldWallets, onChange }: {
           open
             ? 'border-accent-blue bg-background-tertiary'
             : value
-              ? special?.id === '__lost__'
-                ? 'border-accent-red/40 bg-accent-red/8'
-                : special?.id === '__gift__'
-                  ? 'border-accent-blue/40 bg-accent-blue/8'
-                  : special?.id === '__external__'
-                    ? 'border-gray-600/40 bg-gray-600/8'
-                    : 'border-accent-green/40 bg-accent-green/8'
+              ? SPECIAL_TRIGGER_CLASS[value] ?? 'border-accent-green/40 bg-accent-green/8'
               : 'border-border bg-background-secondary hover:border-gray-600'
         }`}
       >
@@ -86,6 +86,7 @@ export function WithdrawalSelector({ value, coldWallets, onChange }: {
               {coldWallets.map(w => (
                 <button
                   key={w.id}
+                  type="button"
                   onClick={() => select(w.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-background-tertiary ${
                     value === w.id ? 'bg-accent-green/8' : ''
@@ -106,6 +107,7 @@ export function WithdrawalSelector({ value, coldWallets, onChange }: {
             {SPECIAL_DESTINATIONS.map(s => (
               <button
                 key={s.id}
+                type="button"
                 onClick={() => select(s.id)}
                 className={`w-full flex items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-background-tertiary ${
                   value === s.id ? 'bg-background-tertiary' : ''
