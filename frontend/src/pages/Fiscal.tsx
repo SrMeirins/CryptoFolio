@@ -160,7 +160,7 @@ export function Fiscal() {
             </div>
           ) : events && (
             <>
-              <TablaEventos events={events.fiscalEvents} summary={summary} year={activeYear} />
+              <TablaEventos events={events.fiscalEvents} summary={summary} />
               <TablaRendimientos rendimientos={events.rendimientos} year={activeYear} />
             </>
           )}
