@@ -213,6 +213,14 @@ export interface FiatBalance {
   balance: string
 }
 
+export interface Notification {
+  id: string
+  type: 'error' | 'warning' | 'info'
+  category: string
+  message: string
+  count?: number
+}
+
 export const portfolioApi = {
   getLots: () => api.get<FifoLot[]>('/fifo/lots'),
   getLockedAmounts: () => api.get<LockedAmount[]>('/fifo/locked'),
@@ -318,9 +326,7 @@ export const portfolioApi = {
     eurReceivedSelling: number
     netInvested: number
   }>('/fifo/eur-flow'),
-  getNotifications: () => api.get<Array<{
-    id: string; type: 'error' | 'warning' | 'info'; category: string; message: string; count?: number;
-  }>>('/settings/notifications'),
+  getNotifications: () => api.get<Notification[]>('/settings/notifications'),
   getYesterdayPrices: () => api.get<{ prices: Record<string, number> }>('/fifo/yesterday-prices'),
   getPortfolioHistory: (period: string) => api.get<{
     points: { date: string; value: number }[]
