@@ -26,10 +26,15 @@ export function DatosSection() {
   async function handleClearCache() {
     setClearingCache(true)
     setCacheResult(null)
-    const result = await portfolioApi.clearPriceCache()
-    setCacheResult(result.deleted)
-    queryClient.invalidateQueries({ queryKey: ['settings-stats'] })
-    setClearingCache(false)
+    try {
+      const result = await portfolioApi.clearPriceCache()
+      setCacheResult(result.deleted)
+      queryClient.invalidateQueries({ queryKey: ['settings-stats'] })
+    } catch (e) {
+      toast.error('Error al limpiar la caché', (e as Error).message)
+    } finally {
+      setClearingCache(false)
+    }
   }
 
   async function handleRunFifo() {
@@ -62,12 +67,17 @@ export function DatosSection() {
   async function handleReset() {
     if (resetInput !== CONFIRM_WORD) return
     setResetting(true)
-    await portfolioApi.resetAllData()
-    queryClient.invalidateQueries({ refetchType: 'all' })
-    setResetting(false)
-    setShowResetConfirm(false)
-    setResetInput('')
-    toast.success('Datos borrados', 'Todas las transacciones y lotes FIFO han sido eliminados.')
+    try {
+      await portfolioApi.resetAllData()
+      queryClient.invalidateQueries({ refetchType: 'all' })
+      setShowResetConfirm(false)
+      setResetInput('')
+      toast.success('Datos borrados', 'Todas las transacciones y lotes FIFO han sido eliminados.')
+    } catch (e) {
+      toast.error('Error al eliminar los datos', (e as Error).message)
+    } finally {
+      setResetting(false)
+    }
   }
 
   const statCards = [
@@ -112,7 +122,7 @@ export function DatosSection() {
               {cacheResult !== null && (
                 <span className="text-xs text-accent-green">{cacheResult} entradas eliminadas</span>
               )}
-              <button onClick={handleClearCache} disabled={clearingCache}
+              <button type="button" onClick={handleClearCache} disabled={clearingCache}
                 className="flex items-center gap-2 px-4 py-2 bg-background-tertiary hover:bg-border border border-border rounded-lg text-sm transition-colors disabled:opacity-50">
                 {clearingCache ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
                 Limpiar
@@ -132,7 +142,7 @@ export function DatosSection() {
                   {fifoResult}
                 </span>
               )}
-              <button onClick={handleRunFifo} disabled={runningFifo}
+              <button type="button" onClick={handleRunFifo} disabled={runningFifo}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 style={{ backgroundColor: '#6366f118', color: '#6366f1' }}>
                 {runningFifo ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
@@ -147,7 +157,7 @@ export function DatosSection() {
               <p className="text-sm font-medium">Exportar backup</p>
               <p className="text-xs text-gray-500 mt-0.5">Descarga un JSON con todas las transacciones, wallets y configuración.</p>
             </div>
-            <button onClick={handleExport} disabled={exporting}
+            <button type="button" onClick={handleExport} disabled={exporting}
               className="flex items-center gap-2 px-4 py-2 bg-background-tertiary hover:bg-border border border-border rounded-lg text-sm transition-colors disabled:opacity-50">
               {exporting ? <RefreshCw size={13} className="animate-spin" /> : <Download size={13} />}
               Descargar
@@ -169,7 +179,7 @@ export function DatosSection() {
                 Borra transacciones, lotes FIFO, importaciones y caché de precios. Irreversible.
               </p>
             </div>
-            <button onClick={() => setShowResetConfirm(true)}
+            <button type="button" onClick={() => setShowResetConfirm(true)}
               className="px-4 py-2 border border-accent-red/50 text-accent-red hover:bg-accent-red/10 rounded-lg text-sm font-medium transition-colors">
               Eliminar todo
             </button>
@@ -192,11 +202,11 @@ export function DatosSection() {
                 className="w-full bg-background-tertiary border border-accent-red/30 focus:border-accent-red rounded-lg px-3 py-2.5 text-sm mono placeholder-gray-700 focus:outline-none" />
             </div>
             <div className="flex items-center gap-2 justify-end">
-              <button onClick={() => { setShowResetConfirm(false); setResetInput('') }}
+              <button type="button" onClick={() => { setShowResetConfirm(false); setResetInput('') }}
                 className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">
                 Cancelar
               </button>
-              <button onClick={handleReset} disabled={resetInput !== CONFIRM_WORD || resetting}
+              <button type="button" onClick={handleReset} disabled={resetInput !== CONFIRM_WORD || resetting}
                 className="px-4 py-2 bg-accent-red hover:bg-accent-red/80 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors">
                 {resetting ? 'Eliminando...' : 'Sí, eliminar todo'}
               </button>
