@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
 import { RefreshCw, Trash2, Zap, Download } from 'lucide-react'
 import { useToast } from '../../components/Toast'
+import { useRunFifo } from '../../hooks/useRunFifo'
 
 const CONFIRM_WORD = 'CONFIRMAR'
 
@@ -16,8 +17,7 @@ export function DatosSection() {
   })
   const [clearingCache, setClearingCache] = useState(false)
   const [cacheResult, setCacheResult]     = useState<number | null>(null)
-  const [runningFifo, setRunningFifo]     = useState(false)
-  const [fifoResult, setFifoResult]       = useState<string | null>(null)
+  const { running: runningFifo, result: fifoResult, run: handleRunFifo } = useRunFifo()
   const [exporting, setExporting]         = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [resetInput, setResetInput]       = useState('')
@@ -35,19 +35,6 @@ export function DatosSection() {
     } finally {
       setClearingCache(false)
     }
-  }
-
-  async function handleRunFifo() {
-    setRunningFifo(true)
-    setFifoResult(null)
-    try {
-      const result = await portfolioApi.runFifo()
-      setFifoResult(`${result.lotsCreated} lotes creados, ${result.lotsConsumed} consumos procesados`)
-      queryClient.invalidateQueries({ queryKey: ['settings-stats'] })
-      queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
-    } catch (e) {
-      setFifoResult(`Error: ${(e as Error).message}`)
-    } finally { setRunningFifo(false) }
   }
 
   async function handleExport() {
