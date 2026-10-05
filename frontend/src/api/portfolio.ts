@@ -157,18 +157,58 @@ export interface SimulationResult {
 }
 
 // Forma mínima común de wallet que necesita el wizard de operaciones
-// (constants/operations.ts la consume para el selector). WalletsSection.tsx
-// (pages/settings/) tiene su propio tipo local más completo (con
-// addresses/notes/is_default) para la pantalla de gestión de wallets —
-// no se ha forzado una unión aquí para no tocar ese fichero fuera de su
-// propio turno; comparten queryKey ('wallets') así que React Query ya
-// cachea/deduplica entre ambos aunque los tipos no estén unificados.
+// (constants/operations.ts la consume para el selector). La pantalla de
+// gestión de wallets (pages/settings/wallets/) necesita un tipo más
+// completo (con addresses/notes/is_default) — ver WalletFull más abajo.
+// Ambas queries comparten la queryKey 'wallets', así que React Query
+// cachea/deduplica entre ambas aunque los tipos no coincidan.
 export interface Wallet {
   id:        string
   name:      string
   type:      string
   color:     string
   is_system: boolean
+}
+
+export interface WalletAddressSyncDetail {
+  asset: string
+  onchain_balance: number | null
+  expected_balance: number
+  checked_at: string
+  status: 'ok' | 'discrepancy' | 'error'
+}
+
+export interface WalletAddress {
+  id: string
+  network_name: string | null
+  network_native_asset: string | null
+  custom_network: string | null
+  address: string | null
+  explorer_url: string | null
+  sync_status: 'ok' | 'discrepancy' | 'error' | 'pending'
+  sync_details: WalletAddressSyncDetail[]
+}
+
+// Forma completa de wallet (con direcciones) que usa la pantalla de
+// gestión de wallets — la lista `Wallet[]` de arriba es la forma mínima
+// que consumen selectores/wizards.
+export interface WalletFull {
+  id: string
+  name: string
+  type: string
+  is_system: boolean
+  is_default: boolean
+  color: string
+  notes: string | null
+  addresses: WalletAddress[]
+}
+
+export interface Network {
+  id: string
+  name: string
+  native_asset: string
+  explorer_url: string | null
+  tokens: { id: string; asset: string }[]
 }
 
 export interface FieldDefinition {
@@ -272,8 +312,9 @@ export const portfolioApi = {
     fees: { asset: string; ops: number; total_amount: number; total_eur: number }[]
   }>('/transactions/stats'),
   getWallets: () => api.get<Wallet[]>('/wallets'),
+  getWalletsFull: () => api.get<WalletFull[]>('/wallets'),
   getCatalog: () => api.get<CatalogData>('/catalog'),
-  getNetworks: () => api.get<unknown[]>('/wallets/networks'),
+  getNetworks: () => api.get<Network[]>('/wallets/networks'),
   createWallet: (data: Record<string, unknown>) => api.post<{ id: string }>('/wallets', data),
   updateWallet: (id: string, data: Record<string, unknown>) => api.put<{ success: boolean }>(`/wallets/${id}`, data),
   deleteWallet: (id: string) => api.delete<{ success: boolean }>(`/wallets/${id}`),
