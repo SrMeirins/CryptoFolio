@@ -9,6 +9,10 @@ describe('irpf', () => {
     expect(calcularIrpfAhorro(0)).toBe(0);
     expect(calcularIrpfAhorro(-5)).toBe(0);
   });
+  it('redondea a céntimos — sin ruido de float en casos reales', () => {
+    // Antes del redondeo: 89.02069999999999 (suma de tramos con floats).
+    expect(calcularIrpfAhorro(468.53)).toBe(89.02);
+  });
   it('parseTiposConfig: sin config, corrupta o inválida → defaults', () => {
     expect(parseTiposConfig(undefined)).toEqual(TIPOS_DEFECTO);
     expect(parseTiposConfig('no-json')).toEqual(TIPOS_DEFECTO);
