@@ -1,7 +1,9 @@
 -- ============================================================
 -- CryptoFolio — Schema PostgreSQL
--- Version: 3.1 — Wallets unificadas (FK, sin enum wallet_type) +
---                migraciones 002-009 horneadas (ver db/migrations/)
+-- Estado completo para instalaciones nuevas. El historial de migraciones
+-- 002-024 (pre-lanzamiento, sin instancias externas reales) está squasheado
+-- aquí por completo — ver db/migrations/README.md para el detalle y la
+-- convención de migraciones futuras sobre bases de datos ya desplegadas.
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

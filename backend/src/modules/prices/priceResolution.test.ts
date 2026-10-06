@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { Pool } from 'pg';
-import { readFileSync } from 'fs';
-import path from 'path';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
 
 // Mock del cliente DB: se configura por test. Declarado con vi.hoisted para que
@@ -10,7 +8,11 @@ const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 vi.mock('../../db/client', () => ({ db: { query: queryMock } }));
 
 // ────────────────────────────────────────────────────────────────────────────
-// 1) Mapeo LUNC → Binance LUNCUSDT (esquema + migración 017). Requiere Postgres.
+// 1) Mapeo LUNC → Binance LUNCUSDT (regresión de precio). Requiere Postgres.
+// La migración histórica que reparaba un LUNC heredado roto (017) se
+// squasheó en schema.sql — ver db/migrations/README.md. Ese escenario (BD
+// externa ya desplegada con el dato corrupto) ya no aplica; este test se
+// queda solo con la verificación del estado correcto en instalaciones nuevas.
 // ────────────────────────────────────────────────────────────────────────────
 describe('mapeo LUNC → Binance LUNCUSDT (regresión de precio)', () => {
   let testDb: TestDatabase;
@@ -35,43 +37,6 @@ describe('mapeo LUNC → Binance LUNCUSDT (regresión de precio)', () => {
       expect(rows[0].binance_usdt_pair).toBe('LUNCUSDT');
       // 'terra-luna' es la nueva LUNA 2.0 (precio ~1000x). No debe quedar.
       expect(rows[0].coingecko_id).toBeNull();
-    } finally {
-      await pool.end();
-    }
-  });
-
-  it('la migración 017 repara un LUNC heredado roto y purga sus centinelas -1', async () => {
-    const pool = new Pool({ connectionString: testDb.connectionString });
-    try {
-      // Estado heredado: LUNC mal mapeado + precio envenenado como 'no_data' (-1).
-      await pool.query(
-        `UPDATE asset_metadata
-            SET price_source = 'coingecko', coingecko_id = 'terra-luna', binance_usdt_pair = NULL
-          WHERE symbol = 'LUNC'`
-      );
-      await pool.query(
-        `INSERT INTO price_cache (asset, price_eur, price_date, source)
-         VALUES ('LUNC', -1, '2022-12-10', 'no_data')`
-      );
-
-      const sql = readFileSync(
-        path.join(__dirname, '../../db/migrations/017_lunc_binance_pair.sql'),
-        'utf-8'
-      );
-      await pool.query(sql);
-
-      const meta = await pool.query(
-        `SELECT price_source, binance_usdt_pair, coingecko_id
-         FROM asset_metadata WHERE symbol = 'LUNC'`
-      );
-      const sentinel = await pool.query(
-        `SELECT 1 FROM price_cache WHERE asset = 'LUNC' AND price_eur < 0`
-      );
-
-      expect(meta.rows[0].price_source).toBe('usdt_proxy');
-      expect(meta.rows[0].binance_usdt_pair).toBe('LUNCUSDT');
-      expect(meta.rows[0].coingecko_id).toBeNull();
-      expect(sentinel.rows).toHaveLength(0);
     } finally {
       await pool.end();
     }
