@@ -3,7 +3,7 @@ import { z, ZodError } from 'zod';
 import { db } from '../db/client';
 import { runFifoEngine } from '../modules/fifo/engine';
 import { getHistoricalPriceEur } from '../modules/prices/binance';
-import { MAX_LENGTH_LONG } from '../modules/validation/textLength';
+import { MAX_LENGTH_LONG, MAX_LENGTH_SHORT } from '../modules/validation/textLength';
 
 const router = Router();
 
@@ -20,13 +20,13 @@ function zodErrorMessage(error: ZodError): string {
 // vez de convertirlo silenciosamente a 0 (bug detectado en auditoría).
 const transactionFieldsSchema = z.object({
   operationType:        z.string().min(1, 'operationType es requerido'),
-  asset:                z.string().nullish(),
+  asset:                z.string().max(MAX_LENGTH_SHORT, `asset no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
   amount:               z.coerce.number().nullish(),
   amountNet:            z.coerce.number().nullish(),
-  costAsset:            z.string().nullish(),
+  costAsset:            z.string().max(MAX_LENGTH_SHORT, `costAsset no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
   costAmount:           z.coerce.number().nullish(),
   pricePerUnit:         z.coerce.number().nullish(),
-  feeAsset:             z.string().nullish(),
+  feeAsset:             z.string().max(MAX_LENGTH_SHORT, `feeAsset no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
   feeAmount:            z.coerce.number().nullish(),
   wallet_id:            z.string().nullish(),
   destinationWalletId:  z.string().nullish(),
