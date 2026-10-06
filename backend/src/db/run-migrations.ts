@@ -100,7 +100,7 @@ async function applyPendingMigrations(client: PoolClient, dbDir: string): Promis
 
   const files = fs.readdirSync(migrationsDir)
     .filter(f => f.endsWith('.sql'))
-    .sort(); // Orden lexicográfico: 001_, 002_, ... 024_
+    .sort(); // Orden lexicográfico: 001_, 002_, ... (ver migrations/README.md)
 
   for (const file of files) {
     if (!MIGRATION_FILENAME.test(file)) {

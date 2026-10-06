@@ -21,18 +21,17 @@ afterAll(async () => {
 });
 
 describe('runMigrations — arranque contra un esquema ya existente (simula Docker)', () => {
-  it('no reaplica schema.sql (que no es idempotente) y registra todas las migraciones sin error', async () => {
+  it('no reaplica schema.sql (que no es idempotente) y registra el schema base sin error', async () => {
     await expect(runMigrations()).resolves.not.toThrow();
 
     const { rows } = await pool.query('SELECT version FROM schema_migrations ORDER BY version');
     const versions = rows.map((r: { version: string }) => r.version);
 
-    expect(versions).toContain('000_schema_base');
-    expect(versions).toContain('002_operation_types');
-    expect(versions).toContain('015_fifo_lots_clock_timestamp');
-    // El propio schema.sql ya no lista 011/012 (reparación puntual / limpieza ya
-    // horneada) — solo los ficheros que existen hoy en migrations/ deben registrarse.
-    expect(versions.length).toBeGreaterThanOrEqual(14);
+    // El historial de migraciones pre-lanzamiento (002-024) se squasheó por
+    // completo en schema.sql — ver db/migrations/README.md. Tras el squash,
+    // un arranque contra un esquema recién aplicado (caso Docker) solo
+    // registra el schema base: no quedan migraciones pendientes que aplicar.
+    expect(versions).toEqual(['000_schema_base']);
   });
 
   it('correr runMigrations() una segunda vez es un no-op seguro (idempotencia real)', async () => {

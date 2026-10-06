@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc && npm run copy-db-assets",
-    "copy-db-assets": "mkdir -p dist/db/migrations && cp src/db/schema.sql dist/db/ && cp src/db/migrations/*.sql dist/db/migrations/",
+    "copy-db-assets": "mkdir -p dist/db/migrations && cp src/db/schema.sql dist/db/ && find src/db/migrations -maxdepth 1 -name '*.sql' -exec cp {} dist/db/migrations/ \\;",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
