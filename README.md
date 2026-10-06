@@ -325,6 +325,8 @@ Todas las opciones se configuran en el archivo `.env` (ver `.env.example` para l
 | `ETHERSCAN_API_KEY` / `BLOCKFROST_API_KEY` / `SUBSCAN_API_KEY` | API keys de proveedores on-chain (Ethereum/Cardano/Polkadot) | No — se configuran también desde Settings → Wallets | vacío |
 
 > Postgres y el backend **no exponen ningún puerto al host** — solo son alcanzables entre sí dentro de la red interna de Docker. El único punto de entrada es el frontend, en `FRONTEND_HOST_PORT`.
+>
+> ⚠️ **Si cambias `WALLET_SYNC_ENCRYPTION_KEY`** una vez en uso, las API keys de verificación on-chain ya guardadas (cifradas con la clave anterior) dejan de poder descifrarse. No se pierden datos financieros ni de portfolio — solo tendrás que volver a introducir esas API keys desde Settings → Wallets.
 
 ---
 

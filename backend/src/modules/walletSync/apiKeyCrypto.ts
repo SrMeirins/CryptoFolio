@@ -4,6 +4,13 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 
+// Sin versionado de clave: si WALLET_SYNC_ENCRYPTION_KEY cambia, las API
+// keys ya cifradas con la clave anterior quedan indescifrables para
+// siempre (decryptApiKey lanzará por authTag inválido). Asumido a
+// propósito — app monousuario autoalojada, el único impacto es tener que
+// reintroducir manualmente unas pocas API keys de verificación on-chain
+// (ver README, sección de variables de entorno), no pérdida de datos
+// financieros. Versionado/migración de claves sería sobre-ingeniería aquí.
 function loadMasterKey(): Buffer {
   const b64 = process.env.WALLET_SYNC_ENCRYPTION_KEY;
   if (!b64) {
