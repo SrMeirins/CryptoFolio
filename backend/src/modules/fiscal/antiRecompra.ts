@@ -8,10 +8,20 @@ export interface Adquisicion {
   lotId: string;
 }
 
+// setUTCMonth() desborda de forma inconsistente al desplazar meses desde un
+// día que no existe en el mes destino (ej. 31-ene -2 meses "debería" caer en
+// 30-nov, pero sin clampar desborda a 1-dic; 31-dic +2 meses desborda a
+// 3-mar en vez de 28-feb) — la ventana resultante queda más estrecha o más
+// ancha de lo debido según el caso. Clampamos al último día válido del mes
+// destino en vez de dejar que JS normalice el overflow.
 function mesesDesplazado(fecha: Date, meses: number): Date {
-  const r = new Date(fecha);
-  r.setUTCMonth(r.getUTCMonth() + meses);
-  return r;
+  const year  = fecha.getUTCFullYear();
+  const month = fecha.getUTCMonth() + meses;
+  const lastDayOfTargetMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(
+    year, month, Math.min(fecha.getUTCDate(), lastDayOfTargetMonth),
+    fecha.getUTCHours(), fecha.getUTCMinutes(), fecha.getUTCSeconds(), fecha.getUTCMilliseconds()
+  ));
 }
 
 export function hayRecompra(

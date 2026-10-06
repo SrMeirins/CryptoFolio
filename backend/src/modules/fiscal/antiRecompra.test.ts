@@ -24,4 +24,15 @@ describe('hayRecompra (art. 33.5 LIRPF, ventana de 2 meses)', () => {
   it('sin adquisiciones → false', () => {
     expect(hayRecompra('BTC', d('2025-01-10'), 'lotVendido', [])).toBe(false);
   });
+
+  // Casos límite de fin de mes: setUTCMonth() desborda si no se clampa al
+  // último día válido del mes destino (ver comentario de mesesDesplazado).
+  describe('ventana de fin de mes (sin desbordamiento)', () => {
+    it('venta el 31-ene: el límite "-2 meses" cae en 30-nov (no 1-dic) — detecta recompra el 30-nov', () => {
+      expect(hayRecompra('BTC', d('2025-01-31'), 'lotVendido', [compra('BTC', '2024-11-30')])).toBe(true);
+    });
+    it('venta el 31-dic: el límite "+2 meses" cae en 28-feb (no 3-mar) — NO detecta una recompra el 2-mar', () => {
+      expect(hayRecompra('BTC', d('2025-12-31'), 'lotVendido', [compra('BTC', '2026-03-02')])).toBe(false);
+    });
+  });
 });
