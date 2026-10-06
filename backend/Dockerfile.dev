@@ -7,7 +7,7 @@
 # La verificación de tipos sigue viva en producción (Dockerfile normal) y en CI
 # (`npm run typecheck` / `backend-test`).
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:20-alpine
+FROM node:20.20.2-alpine3.23
 
 # wget lo usa el healthcheck de docker-compose
 RUN apk add --no-cache wget
