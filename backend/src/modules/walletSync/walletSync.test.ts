@@ -209,4 +209,26 @@ describe('walletSync', () => {
     const results = await syncWalletAddress(addressId);
     expect(results[0].status).toBe('discrepancy');
   });
+
+  it('provider con requiresApiKey=true y sin key configurada: error sin llamar siquiera al provider', async () => {
+    const { syncWalletAddress } = await loadWalletSyncWithTestDb();
+
+    const addrRes = await pool.query(
+      `INSERT INTO wallet_addresses (wallet_id, network_id, address) VALUES ($1, $2, 'rTest7') RETURNING id`,
+      [walletId, networkId]
+    );
+    const addressId = addrRes.rows[0].id;
+
+    let getBalanceCalls = 0;
+    const fake: BalanceProvider = {
+      requiresApiKey: true,
+      getBalance: async () => { getBalanceCalls++; return { ok: true, balance: 1 }; },
+    };
+    registerProvider('XRP Ledger', fake); // Red de test sin entrada en ENV_KEY_BY_NETWORK ni key en BD.
+
+    const results = await syncWalletAddress(addressId);
+    expect(results[0].status).toBe('error');
+    expect(results[0].error).toMatch(/falta API key/);
+    expect(getBalanceCalls).toBe(0);
+  });
 });
