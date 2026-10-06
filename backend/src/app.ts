@@ -2,11 +2,12 @@ import 'express-async-errors';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import cors from 'cors';
-import helmet from 'helmet';
 import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
-import { db } from './db/client';
+import { securityHeaders } from './middleware/security';
+import { buildCorsMiddleware } from './middleware/cors';
+import { globalLimiter } from './middleware/rateLimit';
+import { errorHandler } from './middleware/errorHandler';
+import healthRouter from './routes/health';
 import importsRouter from './routes/imports';
 import fifoRouter from './routes/fifo';
 import pricesRouter from './routes/prices';
@@ -18,84 +19,17 @@ import walletsRouter from './routes/wallets';
 
 const app = express();
 
-// ── Security headers ───────────────────────────────────────────────────────
-app.use(helmet({
-  crossOriginEmbedderPolicy: false,
-  referrerPolicy: { policy: 'no-referrer' },
-  permittedCrossDomainPolicies: { permittedPolicies: 'none' },
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc:      ["'self'"],
-      scriptSrc:       ["'self'"],
-      styleSrc:        ["'self'", "'unsafe-inline'"],
-      imgSrc:          ["'self'", 'data:'],
-      // El frontend nunca llama a Binance/CoinGecko directamente — todo pasa
-      // por el backend (modules/prices/), que no está sujeto a esta CSP (solo
-      // rige fetch/WebSocket del navegador). connectSrc se limita a lo que el
-      // frontend sí consume: el propio origen y el WebSocket local de precios.
-      connectSrc:      [
-        "'self'",
-        // WebSocket local (dev y Electron)
-        'ws://localhost:*',
-        'wss://localhost:*',
-      ],
-      frameAncestors:  ["'none'"],
-      formAction:      ["'self'"],
-      upgradeInsecureRequests: [],
-    },
-  },
-}));
+app.use(securityHeaders);
+app.use(buildCorsMiddleware());
 
-// ── CORS ───────────────────────────────────────────────────────────────────
-// En modo Electron la ventana SIEMPRE carga http://127.0.0.1:<BACKEND_PORT>
-// (nunca file:// — el backend sirve el frontend estático desde el mismo
-// origen, ver el bloque "Frontend estático" más abajo y electron/src/main.ts).
-// Es una petición same-origin real: el navegador puede omitir la cabecera
-// Origin, o enviar exactamente ese valor — nunca otro. Antes se aceptaba
-// cualquier origen sin comprobar nada (cb(null, true) incondicional), lo que
-// habría reflejado un origen arbitrario con credentials:true si el backend
-// llegara a ser alcanzable desde fuera de Electron.
-const corsOrigin = process.env.ELECTRON_MODE === 'true'
-  ? (origin: string | undefined, cb: (e: Error | null, allow?: boolean) => void) => {
-      const ownOrigin = `http://127.0.0.1:${process.env.BACKEND_PORT ?? 3001}`;
-      cb(null, origin === undefined || origin === ownOrigin);
-    }
-  : process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
-    : ['http://localhost:5173', 'http://127.0.0.1:5173'];
-
-app.use(cors({ origin: corsOrigin, credentials: true }));
-
-// ── Logging (structured, sin datos sensibles) ──────────────────────────────
+// Logging (structured, sin datos sensibles)
 app.use(morgan('combined'));
-
-// ── Rate limiting ──────────────────────────────────────────────────────────
-// El backend escucha en 127.0.0.1 para un único usuario local (Electron).
-// El globalLimiter previene loops accidentales; no es un límite de seguridad
-// frente a terceros (no hay acceso externo).
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5000,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later.' },
-});
 
 app.use(globalLimiter);
 
-// ── Body parsing ───────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 
-// ── Health check (sin datos internos sensibles) ────────────────────────────
-app.get('/health', async (_req, res) => {
-  try {
-    await db.query('SELECT 1');
-    res.json({ status: 'ok' });
-  } catch {
-    res.status(503).json({ status: 'error' });
-  }
-});
-
+app.use('/health', healthRouter);
 app.use('/api/imports', importsRouter);
 app.use('/api/fifo', fifoRouter);
 app.use('/api/prices', pricesRouter);
@@ -118,10 +52,7 @@ if (process.env.ELECTRON_MODE === 'true') {
   }
 }
 
-// ── Error handler — nunca filtra detalles internos al cliente ─────────────
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error('[ERROR]', err.stack ?? err.message);
-  res.status(500).json({ error: 'Internal server error' });
-});
+// Error handler — nunca filtra detalles internos al cliente (ver middleware/errorHandler.ts)
+app.use(errorHandler);
 
 export default app;
