@@ -20,18 +20,18 @@ function zodErrorMessage(error: ZodError): string {
 const createAssetSchema = z.object({
   symbol:          z.string().min(1, 'El símbolo es requerido').max(20, 'El símbolo es demasiado largo'),
   name:            z.string().max(MAX_LENGTH_SHORT, `name no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
-  binanceEurPair:  z.string().nullish(),
-  binanceUsdtPair: z.string().nullish(),
-  binanceBtcPair:  z.string().nullish(),
+  binanceEurPair:  z.string().max(MAX_LENGTH_SHORT, `binanceEurPair no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
+  binanceUsdtPair: z.string().max(MAX_LENGTH_SHORT, `binanceUsdtPair no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
+  binanceBtcPair:  z.string().max(MAX_LENGTH_SHORT, `binanceBtcPair no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
   isStablecoin:    z.boolean().nullish(),
-  coingecko_id:    z.string().nullish(),
+  coingecko_id:    z.string().max(MAX_LENGTH_SHORT, `coingecko_id no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
 });
 
 const updateAssetSchema = z.object({
   name:            z.string().max(MAX_LENGTH_SHORT, `name no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
-  binanceEurPair:  z.string().nullish(),
-  binanceUsdtPair: z.string().nullish(),
-  binanceBtcPair:  z.string().nullish(),
+  binanceEurPair:  z.string().max(MAX_LENGTH_SHORT, `binanceEurPair no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
+  binanceUsdtPair: z.string().max(MAX_LENGTH_SHORT, `binanceUsdtPair no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
+  binanceBtcPair:  z.string().max(MAX_LENGTH_SHORT, `binanceBtcPair no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
   isStablecoin:    z.boolean().nullish(),
 });
 

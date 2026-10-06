@@ -24,7 +24,7 @@ const addressBodySchema = z.object({
   network_id:          z.string().uuid('network_id debe ser un UUID válido').nullish(),
   custom_network:      z.string().min(1).max(MAX_LENGTH_SHORT, `custom_network no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
   custom_explorer_url: z.string().url('custom_explorer_url debe ser una URL válida').max(MAX_LENGTH_LONG, `custom_explorer_url no puede superar ${MAX_LENGTH_LONG} caracteres`).nullish(),
-  address:             z.string().nullish(),
+  address:             z.string().max(MAX_LENGTH_SHORT, `address no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
 }).refine((data) => !!data.network_id || !!data.custom_network, {
   message: 'network_id o custom_network son requeridos',
   path: ['network_id'],
