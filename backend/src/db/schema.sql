@@ -11,16 +11,18 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- ENUMS
 -- ============================================================
 
+-- INTERNAL_TRANSFER, CONVERT_IN y CONVERT_OUT NO están aquí: eran remanentes
+-- de un diseño anterior (antes de que la transferencia interna se unificara
+-- en TRANSFER_INTERNAL) nunca escritos por ningún parser ni ruta del backend
+-- (verificado por grep en todo src/) — retirados de instalaciones nuevas.
 CREATE TYPE operation_type AS ENUM (
   'BUY', 'SELL',
   'BUY_FIAT', 'BUY_CRYPTO',
   'SELL_FIAT', 'SELL_CRYPTO',
-  'CONVERT_IN', 'CONVERT_OUT',
   'DEPOSIT_FIAT', 'DEPOSIT_CRYPTO',
   'WITHDRAW_FIAT',
   'WITHDRAW',
   'FEE', 'FEE_NETWORK', 'FEE_EXCHANGE',
-  'INTERNAL_TRANSFER',
   'TRANSFER_INTERNAL',
   'STAKING_LOCK', 'STAKING_UNLOCK', 'LAUNCHPOOL_LOCK', 'LAUNCHPOOL_UNLOCK',
   'STAKING_REWARD', 'MINING_REWARD',
@@ -43,6 +45,19 @@ CREATE TYPE wallet_kind AS ENUM (
   'software',
   'bank'
 );
+
+-- ============================================================
+-- DOMINIOS
+-- ============================================================
+
+-- Cantidad/importe (EUR o cripto) que nunca puede ser negativo — precisión
+-- 38,18 para evitar errores de redondeo en cripto. Centraliza el patrón
+-- `NUMERIC(38, 18) CHECK (col >= 0)` repetido antes en 12+ columnas. Como
+-- cualquier CHECK de columna, no rechaza NULL (solo rechaza FALSE) — las
+-- columnas nullable siguen aceptando NULL sin necesitar `col IS NULL OR ...`.
+-- No usar en columnas que sí pueden ser negativas de forma legítima
+-- (ej. raw_transactions.change, fifo_lot_consumptions.gain_loss_eur).
+CREATE DOMAIN eur_amount AS NUMERIC(38, 18) CHECK (VALUE >= 0);
 
 -- ============================================================
 -- TABLA: networks
@@ -220,15 +235,15 @@ CREATE TABLE transactions (
   operation_type        operation_type NOT NULL,
   timestamp             TIMESTAMPTZ NOT NULL,
   asset                 TEXT NOT NULL,
-  amount                NUMERIC(38, 18) NOT NULL CHECK (amount >= 0),
-  amount_net            NUMERIC(38, 18) NOT NULL CHECK (amount_net >= 0),
+  amount                eur_amount NOT NULL,
+  amount_net            eur_amount NOT NULL,
   cost_asset            TEXT,
-  cost_amount           NUMERIC(38, 18) CHECK (cost_amount IS NULL OR cost_amount >= 0),
-  price_per_unit        NUMERIC(38, 18),
-  price_eur             NUMERIC(38, 18),
+  cost_amount           eur_amount,
+  price_per_unit        eur_amount,
+  price_eur             eur_amount,
   fee_asset             TEXT,
-  fee_amount            NUMERIC(38, 18) CHECK (fee_amount IS NULL OR fee_amount >= 0),
-  fee_eur               NUMERIC(38, 18),
+  fee_amount            eur_amount,
+  fee_eur               eur_amount,
   wallet_id             UUID NOT NULL REFERENCES wallets(id) ON DELETE RESTRICT,
   account               TEXT,
   notes                 TEXT,
@@ -258,11 +273,13 @@ ALTER TABLE raw_transactions
 CREATE TABLE fifo_lots (
   id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   asset               TEXT NOT NULL,
-  quantity_original   NUMERIC(38, 18) NOT NULL CHECK (quantity_original >= 0),
-  quantity_remaining  NUMERIC(38, 18) NOT NULL CHECK (quantity_remaining >= 0 AND quantity_remaining <= quantity_original),
-  cost_basis_eur      NUMERIC(38, 18) NOT NULL CHECK (cost_basis_eur >= 0),
-  price_per_unit_eur  NUMERIC(38, 18) NOT NULL CHECK (price_per_unit_eur >= 0),
-  fee_eur             NUMERIC(38, 18) NOT NULL DEFAULT 0 CHECK (fee_eur >= 0),
+  quantity_original   eur_amount NOT NULL,
+  -- El rango [0, quantity_original] no lo cubre el dominio (solo ve su propio
+  -- valor, no puede comparar con otra columna) — queda como CHECK de tabla.
+  quantity_remaining  eur_amount NOT NULL,
+  cost_basis_eur      eur_amount NOT NULL,
+  price_per_unit_eur  eur_amount NOT NULL,
+  fee_eur             eur_amount NOT NULL DEFAULT 0,
   open_transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE RESTRICT,
   opened_at           TIMESTAMPTZ NOT NULL,
   closed_at           TIMESTAMPTZ,
@@ -272,6 +289,7 @@ CREATE TABLE fifo_lots (
   -- y NOW() devolvería el mismo valor fijo para todos los lotes de una ejecución.
   -- Se usa como desempate en getOpenLots cuando dos lotes comparten opened_at.
   created_at          TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+  CONSTRAINT chk_fifo_lots_remaining_le_original CHECK (quantity_remaining <= quantity_original),
   -- Mismo umbral que FIFO_DUST_EPSILON del motor: un lote cerrado no puede
   -- tener remanente relevante.
   CONSTRAINT chk_fifo_lots_closed_no_remaining CHECK (NOT is_closed OR quantity_remaining <= 0.000001)
@@ -288,9 +306,11 @@ CREATE TABLE fifo_lot_consumptions (
   id                       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   lot_id                   UUID NOT NULL REFERENCES fifo_lots(id) ON DELETE RESTRICT,
   consuming_transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE RESTRICT,
-  quantity_consumed        NUMERIC(38, 18) NOT NULL CHECK (quantity_consumed >= 0),
-  cost_basis_consumed_eur  NUMERIC(38, 18) NOT NULL CHECK (cost_basis_consumed_eur >= 0),
-  proceeds_eur             NUMERIC(38, 18) NOT NULL CHECK (proceeds_eur >= 0),
+  quantity_consumed        eur_amount NOT NULL,
+  cost_basis_consumed_eur  eur_amount NOT NULL,
+  proceeds_eur             eur_amount NOT NULL,
+  -- gain_loss_eur SÍ puede ser negativo (una pérdida) — se queda fuera del
+  -- dominio eur_amount a propósito.
   gain_loss_eur            NUMERIC(38, 18) NOT NULL,
   fiscal_event_type        fiscal_event_type NOT NULL,
   consumed_at              TIMESTAMPTZ NOT NULL,
@@ -367,21 +387,9 @@ INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_e
 -- ============================================================
 -- VISTAS
 -- ============================================================
-CREATE OR REPLACE VIEW v_portfolio_current AS
-SELECT
-  fl.asset,
-  fl.wallet_id,
-  w.name  AS wallet_name,
-  w.color AS wallet_color,
-  w.type  AS wallet_kind,
-  SUM(fl.quantity_remaining) AS quantity,
-  SUM(fl.cost_basis_eur * (fl.quantity_remaining / NULLIF(fl.quantity_original, 0))) AS cost_basis_eur,
-  AVG(fl.price_per_unit_eur) AS avg_buy_price_eur
-FROM fifo_lots fl
-JOIN wallets w ON w.id = fl.wallet_id
-WHERE fl.is_closed = FALSE AND fl.quantity_remaining > 0
-GROUP BY fl.asset, fl.wallet_id, w.name, w.color, w.type
-ORDER BY fl.asset, w.name;
+-- v_portfolio_current (portfolio actual agregado desde fifo_lots) existió
+-- aquí pero se confirmó sin ningún uso en todo el backend (grep en src/) —
+-- eliminada. El cálculo de portfolio real vive en otro sitio (routes/fifo.ts).
 
 CREATE OR REPLACE VIEW v_fiscal_year AS
 SELECT
