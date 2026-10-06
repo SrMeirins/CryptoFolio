@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, Eye, EyeOff, Copy } from 'lucide-react'
 import { WithdrawalSelector } from './WithdrawalSelector'
-import { DepositSection } from './DepositComponents'
+import { DepositSection } from './DepositSection'
 import { ACCOUNT_COLORS } from './types'
 import type { PreviewTransaction, DepositReview } from './types'
 
