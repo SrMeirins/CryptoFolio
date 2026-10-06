@@ -39,34 +39,46 @@ async function pacedFetch(url: string): Promise<Response> {
   return fetchWithTimeout(url);
 }
 
-async function fetchDecimals(contractAddress: string, apiKey: string): Promise<number> {
+// pacedFetch ya resuelve el throttling — no puede delegar en el fetchJson
+// compartido de types.ts sin perderlo, así que aquí se repite el mismo
+// check de res.ok que fetchJson aplica en el resto de providers (mismo
+// nivel de robustez, consistente con el resto del módulo).
+async function pacedFetchJson(url: string): Promise<{ ok: true; data: EtherscanResponse } | { ok: false; error: string }> {
+  try {
+    const res = await pacedFetch(url);
+    if (!res.ok) return { ok: false, error: `Etherscan respondió ${res.status}` };
+    return { ok: true, data: (await res.json()) as EtherscanResponse };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'fallo desconocido' };
+  }
+}
+
+async function fetchDecimals(contractAddress: string, apiKey: string): Promise<number | { ok: false; error: string }> {
   const url = `${BASE_URL}?chainid=${CHAIN_ID}&module=proxy&action=eth_call&to=${contractAddress}&data=${DECIMALS_SELECTOR}&tag=latest&apikey=${apiKey}`;
-  const res = await pacedFetch(url);
-  const data = (await res.json()) as EtherscanResponse;
-  return parseInt(data.result as string, 16);
+  const res = await pacedFetchJson(url);
+  if (!res.ok) return res;
+  return parseInt(res.data.result as string, 16);
 }
 
 export const etherscanProvider: BalanceProvider = {
   requiresApiKey: true,
   async getBalance(address, apiKey, contractAddress): Promise<BalanceResult> {
     if (!apiKey) return { ok: false, error: 'falta API key para Ethereum (Etherscan)' };
-    try {
-      if (!contractAddress) {
-        const url = `${BASE_URL}?chainid=${CHAIN_ID}&module=account&action=balance&address=${address}&tag=latest&apikey=${apiKey}`;
-        const res = await pacedFetch(url);
-        const data = (await res.json()) as EtherscanResponse;
-        if (data.status !== '1') return { ok: false, error: data.result ?? 'fallo de Etherscan' };
-        return { ok: true, balance: Number(data.result) / 1e18 };
-      }
 
-      const url = `${BASE_URL}?chainid=${CHAIN_ID}&module=account&action=tokenbalance&contractaddress=${contractAddress}&address=${address}&tag=latest&apikey=${apiKey}`;
-      const res = await pacedFetch(url);
-      const data = (await res.json()) as EtherscanResponse;
-      if (data.status !== '1') return { ok: false, error: data.result ?? 'fallo de Etherscan' };
-      const decimals = await fetchDecimals(contractAddress, apiKey);
-      return { ok: true, balance: Number(data.result) / 10 ** decimals };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : 'fallo desconocido' };
+    if (!contractAddress) {
+      const url = `${BASE_URL}?chainid=${CHAIN_ID}&module=account&action=balance&address=${address}&tag=latest&apikey=${apiKey}`;
+      const res = await pacedFetchJson(url);
+      if (!res.ok) return res;
+      if (res.data.status !== '1') return { ok: false, error: res.data.result ?? 'fallo de Etherscan' };
+      return { ok: true, balance: Number(res.data.result) / 1e18 };
     }
+
+    const url = `${BASE_URL}?chainid=${CHAIN_ID}&module=account&action=tokenbalance&contractaddress=${contractAddress}&address=${address}&tag=latest&apikey=${apiKey}`;
+    const res = await pacedFetchJson(url);
+    if (!res.ok) return res;
+    if (res.data.status !== '1') return { ok: false, error: res.data.result ?? 'fallo de Etherscan' };
+    const decimals = await fetchDecimals(contractAddress, apiKey);
+    if (typeof decimals !== 'number') return decimals;
+    return { ok: true, balance: Number(res.data.result) / 10 ** decimals };
   },
 };

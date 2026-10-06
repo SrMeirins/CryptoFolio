@@ -42,4 +42,10 @@ describe('solanaProvider', () => {
     const result = await solanaProvider.getBalance('direccion-invalida', undefined);
     expect(result.ok).toBe(false);
   });
+
+  it('devuelve ok:false con mensaje explícito si el fallo es a nivel HTTP (ej. 503)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }) as unknown as Response));
+    const result = await solanaProvider.getBalance('9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM', undefined);
+    expect(result).toEqual({ ok: false, error: 'Solana RPC respondió 503' });
+  });
 });

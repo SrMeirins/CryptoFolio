@@ -40,4 +40,10 @@ describe('subscanProvider', () => {
     const result = await subscanProvider.getBalance('1FRMM8...', 'FAKEKEY');
     expect(result.ok).toBe(false);
   });
+
+  it('devuelve ok:false con mensaje explícito si el fallo es a nivel HTTP (ej. 503)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }) as unknown as Response));
+    const result = await subscanProvider.getBalance('1FRMM8...', 'FAKEKEY');
+    expect(result).toEqual({ ok: false, error: 'PubFi/Subscan respondió 503' });
+  });
 });
