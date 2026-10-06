@@ -29,12 +29,12 @@ app.use(helmet({
       scriptSrc:       ["'self'"],
       styleSrc:        ["'self'", "'unsafe-inline'"],
       imgSrc:          ["'self'", 'data:'],
-      // Restringir connectSrc a los dominios reales usados por la app
+      // El frontend nunca llama a Binance/CoinGecko directamente — todo pasa
+      // por el backend (modules/prices/), que no está sujeto a esta CSP (solo
+      // rige fetch/WebSocket del navegador). connectSrc se limita a lo que el
+      // frontend sí consume: el propio origen y el WebSocket local de precios.
       connectSrc:      [
         "'self'",
-        'wss://stream.binance.com:9443',
-        'https://api.binance.com',
-        'https://api.coingecko.com',
         // WebSocket local (dev y Electron)
         'ws://localhost:*',
         'wss://localhost:*',
