@@ -1,7 +1,12 @@
 import { db } from '../../db/client';
 import { searchAndSaveCoinGeckoId } from './coingecko';
+import { fetchWithTimeout } from './httpTimeout';
 
 const REST_BASE = 'https://api.binance.com/api/v3';
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(r => setTimeout(r, ms));
+}
 
 export type PriceSource = 'eur_direct' | 'usdt_proxy' | 'btc_proxy' | 'eth_proxy' | 'fiat' | 'coingecko' | 'unknown';
 
@@ -41,14 +46,25 @@ export function getPairInfo(symbol: string): AssetPairInfo | null {
   return pairCache.get(symbol) ?? null;
 }
 
-// Verificar si un par existe en Binance
-async function pairExists(pair: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${REST_BASE}/ticker/price?symbol=${pair}`);
-    return res.ok;
-  } catch {
-    return false;
+// Verificar si un par existe en Binance. Distingue "confirmado que no
+// existe" (4xx real, ej. 400 símbolo inválido) de "no concluyente" (429
+// rate-limit, 5xx, red/timeout) — antes CUALQUIER fallo se trataba como
+// ausencia confirmada, así que un único fallo transitorio durante la
+// auto-detección dejaba el activo con price_source incorrecto en BD para
+// siempre (sin reintento posterior salvo borrar y re-crear el activo).
+async function pairExists(pair: string, retries = 2): Promise<boolean> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetchWithTimeout(`${REST_BASE}/ticker/price?symbol=${pair}`);
+      if (res.ok) return true;
+      if (res.status !== 429 && res.status < 500) return false; // confirmado: símbolo inválido
+      // 429/5xx: no concluyente, cae al reintento
+    } catch {
+      // red/timeout: no concluyente, cae al reintento
+    }
+    if (attempt < retries) await sleep(500 * attempt);
   }
+  return false; // agotados los reintentos sin confirmación — fallback seguro: no existe
 }
 
 // Auto-detectar el mejor par para un activo desconocido
@@ -179,7 +195,7 @@ export async function getOrDetectPairInfo(symbol: string): Promise<AssetPairInfo
 // Verificar manualmente un par específico (para la UI de Settings)
 export async function testPair(pair: string): Promise<{ exists: boolean; price?: number }> {
   try {
-    const res = await fetch(`${REST_BASE}/ticker/price?symbol=${pair}`);
+    const res = await fetchWithTimeout(`${REST_BASE}/ticker/price?symbol=${pair}`);
     if (!res.ok) return { exists: false };
     const data = await res.json() as { price: string };
     return { exists: true, price: parseFloat(data.price) };
