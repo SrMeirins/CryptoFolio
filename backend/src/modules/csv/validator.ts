@@ -6,6 +6,7 @@ import {
   SupportedLanguage,
 } from './languages';
 import { ALL_KNOWN_OPERATIONS } from './binanceAccounts';
+import { parseCsvLine, normalizeBinanceYear } from './csvUtils';
 
 export interface ValidationResult {
   valid: boolean;
@@ -119,7 +120,7 @@ export function validateCsvStructure(fileBuffer: Buffer): ValidationResult {
 
     if (timeStr) {
       try {
-        const normalized = /^\d{4}-/.test(timeStr) ? timeStr : '20' + timeStr;
+        const normalized = normalizeBinanceYear(timeStr);
         const d = new Date(normalized.replace(' ', 'T') + 'Z');
         if (!isNaN(d.getTime())) dates.push(d);
       } catch { /* ignorar */ }
@@ -170,24 +171,4 @@ export function validateCsvStructure(fileBuffer: Buffer): ValidationResult {
 
   result.valid = result.errors.length === 0;
   return result;
-}
-
-function parseCsvLine(line: string, separator: string): string[] {
-  const cells: string[] = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === separator && !inQuotes) {
-      cells.push(current.trim());
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  cells.push(current.trim());
-  return cells;
 }
