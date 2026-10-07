@@ -8,8 +8,6 @@
  *   'pending'   → reconocida pero no implementada todavía
  */
 
-export type BinanceAccount = 'Spot' | 'Funding' | 'Cross Margin' | 'Isolated Margin' | 'Futures';
-
 export type OpStatus = 'supported' | 'ignored' | 'pending';
 
 export interface BinanceOperation {
@@ -164,13 +162,3 @@ export const ALL_KNOWN_OPERATIONS = new Set(
 export const ALL_IGNORED_OPERATIONS = new Set(
   ALL_BINANCE_OPERATIONS.filter(op => op.status === 'ignored').map(op => op.csvLabel)
 );
-
-// Colores por cuenta (para la UI)
-export const ACCOUNT_COLORS: Record<string, string> = {
-  'Spot':            '#6366f1',
-  'Funding':         '#8b5cf6',
-  'Cross Margin':    '#f59e0b',
-  'Isolated Margin': '#e74c3c',
-  'Futures':         '#e74c3c',
-  'Strategy':        '#8B5CF6',
-};
