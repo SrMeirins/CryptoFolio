@@ -1,10 +1,10 @@
 import { db } from '../../db/client';
 import { BASE_URL, enqueueCoinGeckoCall, fetchWithRetry, notifyStatus } from './coingeckoClient';
 import { getCoinGeckoId, searchAndSaveCoinGeckoId } from './coingeckoIds';
+import { dedupeByKey, priceKey } from './priceDedup';
 
-// ── Deduplicación de requests in-flight ──────────────────────────────────
 // Evita que N llamadas concurrentes para el mismo par (symbol, date) generen
-// N requests a CoinGecko. Todas comparten la misma Promise.
+// N requests a CoinGecko. Todas comparten la misma Promise (ver priceDedup.ts).
 const inFlightPrices = new Map<string, Promise<number>>();
 
 // Cache en memoria de pares sin precio (symbol|date).
@@ -18,18 +18,8 @@ export async function getHistoricalPriceEur(
   date: Date
 ): Promise<number> {
   const dateStr = toDateStr(date);
-  const key = `${symbol}|${dateStr}`;
-
-  // Deduplicar: si ya hay una Promise en vuelo para este par, devolverla directamente.
-  // Esto evita que 10 requests concurrentes para ETHFI @ 2024-03-15 generen 10 queries a CoinGecko.
-  const existing = inFlightPrices.get(key);
-  if (existing) return existing;
-
-  const promise = _getHistoricalPriceEur(symbol, date, dateStr, key).finally(() => {
-    inFlightPrices.delete(key);
-  });
-  inFlightPrices.set(key, promise);
-  return promise;
+  const key = priceKey(symbol, date);
+  return dedupeByKey(inFlightPrices, key, () => _getHistoricalPriceEur(symbol, date, dateStr, key));
 }
 
 async function _getHistoricalPriceEur(

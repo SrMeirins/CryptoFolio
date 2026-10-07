@@ -1,7 +1,21 @@
 import { db } from '../../db/client';
 import { WebSocket } from 'ws';
 import { getOrDetectPairInfo, loadPairCache, getPairInfo } from './pairDetector';
-import { getHistoricalPriceEur as getCoinGeckoHistoricalPrice, searchAndSaveCoinGeckoId } from './coingecko';
+import {
+  getHistoricalPriceEur as getCoinGeckoHistoricalPrice,
+  getCurrentPricesEur,
+  loadAssetMetadata as loadCoinGeckoIdMap,
+  searchAndSaveCoinGeckoId,
+} from './coingecko';
+import { fetchWithTimeout } from './httpTimeout';
+import { dedupeByKey, priceKey } from './priceDedup';
+
+// Activos price_source='coingecko' sin ningún par de Binance: CoinGecko no
+// tiene WebSocket, así que es la única forma de que alguna vez tengan un
+// precio en vivo — sin esto, getLivePrice() les devolvía null para siempre
+// (getCurrentPricesEur y PRICE_REFRESH_INTERVAL_MS existían ya pero sin
+// conectar entre sí). Documentado en el README; 60s por defecto.
+const COINGECKO_REFRESH_MS = Number(process.env.PRICE_REFRESH_INTERVAL_MS ?? 60000);
 
 const REST_BASE = 'https://api.binance.com/api/v3';
 
@@ -39,7 +53,7 @@ async function loadInitialPrices(): Promise<void> {
     }
 
     const symbols = [...pairsToFetch].map(p => `"${p}"`).join(',');
-    const fetchRes = await fetch(`${REST_BASE}/ticker/price?symbols=[${symbols}]`);
+    const fetchRes = await fetchWithTimeout(`${REST_BASE}/ticker/price?symbols=[${symbols}]`);
     if (!fetchRes.ok) throw new Error(`HTTP ${fetchRes.status}`);
 
     const data = await fetchRes.json() as Array<{ symbol: string; price: string }>;
@@ -106,7 +120,7 @@ async function fetchKlinePrice(pair: string, date: Date, retries = 3): Promise<n
   const url = `${REST_BASE}/klines?symbol=${pair}&interval=1d&startTime=${startTime}&endTime=${endTime}&limit=1`;
 
   for (let attempt = 1; attempt <= retries; attempt++) {
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
 
     if (res.status === 429) {
       const retryAfter = parseInt(res.headers.get('retry-after') ?? '0', 10);
@@ -141,15 +155,8 @@ export async function getHistoricalPriceEur(symbol: string, date: Date): Promise
     return getHistoricalPriceEur(PRICE_ALIASES[symbol], date);
   }
 
-  const key = `${symbol}|${date.toISOString().slice(0, 10)}`;
-  const existing = inFlightPrices.get(key);
-  if (existing) return existing;
-
-  const promise = _getHistoricalPriceEur(symbol, date).finally(() => {
-    inFlightPrices.delete(key);
-  });
-  inFlightPrices.set(key, promise);
-  return promise;
+  const key = priceKey(symbol, date);
+  return dedupeByKey(inFlightPrices, key, () => _getHistoricalPriceEur(symbol, date));
 }
 
 async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<number> {
@@ -302,9 +309,42 @@ export async function prefetchHistoricalPrices(
   }
 }
 
+// ── Fallback CoinGecko para activos sin par de Binance ───────────────────
+// CoinGecko no tiene WebSocket — es la única forma de refrescar estos
+// precios. Se ejecuta tras la carga inicial y luego cada COINGECKO_REFRESH_MS.
+async function refreshCoinGeckoOnlyPrices(): Promise<void> {
+  try {
+    const res = await db.query(
+      `SELECT symbol FROM asset_metadata WHERE price_source = 'coingecko'`
+    );
+    const symbols = (res.rows as { symbol: string }[]).map(r => r.symbol);
+    if (symbols.length === 0) return;
+
+    // getCurrentPricesEur solo resuelve símbolos con coingecko_id ya cargado
+    // en memoria (coingeckoIds.ts) — nada más lo invocaba en el arranque real
+    // del servidor, así que sin esto el mapa estaba siempre vacío y el
+    // fallback no resolvía ningún precio. Recargarlo aquí (barato, una query)
+    // también mantiene el mapa al día si el usuario edita el coingecko_id.
+    await loadCoinGeckoIdMap();
+
+    const prices = await getCurrentPricesEur(symbols);
+    for (const [symbol, price] of prices) {
+      if (symbol !== 'EUR') liveCache.set(symbol, price);
+    }
+
+    if (priceUpdateCallbacks.length > 0) {
+      const snapshot = new Map(liveCache);
+      for (const cb of priceUpdateCallbacks) cb(snapshot);
+    }
+  } catch (e) {
+    console.error('[PRICES] Error refrescando precios CoinGecko-only:', (e as Error).message);
+  }
+}
+
 // ── WebSocket: precios en tiempo real ─────────────────────────────────────
 let ws: WebSocket | null = null;
 let wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let coinGeckoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 const priceUpdateCallbacks: Array<(prices: Map<string, number>) => void> = [];
 
 export function onPriceUpdate(cb: (prices: Map<string, number>) => void): void {
@@ -312,12 +352,16 @@ export function onPriceUpdate(cb: (prices: Map<string, number>) => void): void {
 }
 
 export function startLivePrices(): void {
-  loadInitialPrices().then(() => {
-    if (priceUpdateCallbacks.length > 0) {
-      const snapshot = new Map(liveCache);
-      for (const cb of priceUpdateCallbacks) cb(snapshot);
-    }
-  });
+  loadInitialPrices()
+    .then(refreshCoinGeckoOnlyPrices)
+    .then(() => {
+      if (priceUpdateCallbacks.length > 0) {
+        const snapshot = new Map(liveCache);
+        for (const cb of priceUpdateCallbacks) cb(snapshot);
+      }
+    });
+
+  coinGeckoRefreshTimer = setInterval(refreshCoinGeckoOnlyPrices, COINGECKO_REFRESH_MS);
 
   // Construir streams desde DB dinámicamente
   db.query(
@@ -401,6 +445,7 @@ function connectWebSocket(streamUrl: string): void {
 
 export function stopLivePrices(): void {
   if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+  if (coinGeckoRefreshTimer) clearInterval(coinGeckoRefreshTimer);
   if (ws) ws.close();
 }
 
@@ -434,7 +479,7 @@ export async function refreshLivePrices(symbols: string[]): Promise<void> {
 
   try {
     const syms = [...pairsToFetch].map(p => `"${p}"`).join(',');
-    const fetchRes = await fetch(`${REST_BASE}/ticker/price?symbols=[${syms}]`);
+    const fetchRes = await fetchWithTimeout(`${REST_BASE}/ticker/price?symbols=[${syms}]`);
     if (!fetchRes.ok) return;
     const data = await fetchRes.json() as Array<{ symbol: string; price: string }>;
     const priceMap = new Map(data.map(d => [d.symbol, parseFloat(d.price)]));
