@@ -1,9 +1,7 @@
 import { createHash } from 'crypto';
 import { parse } from 'csv-parse/sync';
 import { ParsedTransaction, CsvParseResult, ParseError, RawRowWithHash } from './types';
-
-// Activos fiat conocidos — depósitos/retiros de estos no llevan lote FIFO
-const FIAT_ASSETS = new Set(['EUR', 'USD', 'GBP', 'CHF']);
+import { abs, FIAT_ASSETS } from './csvUtils';
 
 // Tipos de operación de Bitvavo reconocidos por este parser.
 // Cualquier Type fuera de este set aborta el import con un error explícito
@@ -76,10 +74,6 @@ function parseNum(raw: string | undefined): number | null {
   if (raw === undefined || raw === null || raw.trim() === '') return null;
   const n = parseFloat(raw);
   return isNaN(n) ? null : n;
-}
-
-function abs(n: number): number {
-  return Math.abs(n);
 }
 
 export function parseBitvavoCsv(fileContent: Buffer | string): CsvParseResult {
