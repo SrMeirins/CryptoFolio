@@ -351,6 +351,11 @@ export function onPriceUpdate(cb: (prices: Map<string, number>) => void): void {
   priceUpdateCallbacks.push(cb);
 }
 
+export function offPriceUpdate(cb: (prices: Map<string, number>) => void): void {
+  const idx = priceUpdateCallbacks.indexOf(cb);
+  if (idx !== -1) priceUpdateCallbacks.splice(idx, 1);
+}
+
 export function startLivePrices(): void {
   loadInitialPrices()
     .then(refreshCoinGeckoOnlyPrices)

@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { getAllLivePrices, onPriceUpdate, getHistoricalPriceEur } from '../modules/prices/binance';
+import { getAllLivePrices, onPriceUpdate, offPriceUpdate, getHistoricalPriceEur } from '../modules/prices/binance';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
+import { sendInternalError } from '../middleware/errorHandler';
 
 const router = Router();
 
@@ -37,7 +38,7 @@ router.get('/historical', async (req, res) => {
     const price = await getHistoricalPriceEur(asset as string, dateObj);
     res.json({ asset, date, price_eur: price });
   } catch (e) {
-    res.status(500).json({ error: (e as Error).message });
+    sendInternalError(res, e, 'GET /api/prices/historical');
   }
 });
 
@@ -57,6 +58,7 @@ export function setupPricesWebSocket(server: Server): void {
     };
 
     onPriceUpdate(handler);
+    ws.on('close', () => offPriceUpdate(handler));
   });
 }
 
