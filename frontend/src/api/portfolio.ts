@@ -338,12 +338,16 @@ export const portfolioApi = {
     transactions: number; fifoLots: number; imports: number
     priceCache: number; wallets: number; assets: number
   }>('/settings/stats'),
-  clearPriceCache: () => api.delete<{ deleted: number }>('/settings/price-cache'),
+  // El backend exige { confirm: true } en estos dos borrados destructivos de
+  // alcance amplio (ver routes/settings/settingsShared.ts, requireConfirm) —
+  // la UI ya pide confirmación al usuario antes de llamar a estas funciones
+  // (DatosSection.tsx: resetAllData tras escribir "CONFIRMAR").
+  clearPriceCache: () => api.delete<{ deleted: number }>('/settings/price-cache', { confirm: true }),
   clearFailedPrices: (asset?: string) => api.delete<{ deleted: number }>(
     `/settings/price-cache/failed${asset ? `?asset=${encodeURIComponent(asset)}` : ''}`
   ),
   fixStaleWithdrawals: () => api.post<{ fixed: number; records: { id: string; asset: string; timestamp: string }[] }>('/settings/transactions/fix-stale-withdrawals', {}),
-  resetAllData: () => api.delete<{ success: boolean }>('/settings/data/transactions'),
+  resetAllData: () => api.delete<{ success: boolean }>('/settings/data/transactions', { confirm: true }),
   getRealizedPnl: () => api.get<{
     totalGains:  number
     totalLosses: number

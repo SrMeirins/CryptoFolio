@@ -9,10 +9,14 @@ import type { Request, Response, NextFunction } from 'express';
 // (e as Error).message })` — ese patrón, repetido en varios endpoints
 // (routes/prices.ts, fifo.ts, imports.ts, transactions.ts), filtra
 // detalles internos al cliente saltándose esta misma protección.
-export function sendInternalError(res: Response, err: unknown, context?: string) {
+// publicMessage: mensaje opcional y seguro a mostrar al cliente en vez del
+// genérico por defecto (ej. "Error al detectar el activo") — settings.ts
+// tenía 5 copias manuales de este mismo patrón con mensajes distintos por
+// endpoint; mismo criterio de seguridad, sin duplicar la lógica de logging.
+export function sendInternalError(res: Response, err: unknown, context?: string, publicMessage = 'Internal server error') {
   const detail = err instanceof Error ? err.stack ?? err.message : err;
   console.error(context ? `[ERROR] ${context}:` : '[ERROR]', detail);
-  res.status(500).json({ error: 'Internal server error' });
+  res.status(500).json({ error: publicMessage });
 }
 
 // Error handler global de Express (última pieza del middleware chain) —
