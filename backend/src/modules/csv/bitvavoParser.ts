@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { parse } from 'csv-parse/sync';
-import { ParsedTransaction, CsvParseResult, ParseError } from './types';
+import { ParsedTransaction, CsvParseResult, ParseError, RawRowWithHash } from './types';
 
 // Activos fiat conocidos — depósitos/retiros de estos no llevan lote FIFO
 const FIAT_ASSETS = new Set(['EUR', 'USD', 'GBP', 'CHF']);
@@ -98,11 +98,16 @@ export function parseBitvavoCsv(fileContent: Buffer | string): CsvParseResult {
       transactions: [],
       ignoredRows: [],
       errors: [],
+      rawRows: [],
       stats: { totalRows: 0, parsedRows: 0, ignoredRows: 0, errorRows: 0, transactionCount: 0 },
     };
   }
 
   const rows: BitvavoRow[] = [];
+  // Bitvavo es cuenta única (sin sub-wallets) — a diferencia de Binance, nada
+  // en importer.ts necesita hoy las filas crudas de Bitvavo, pero se exponen
+  // igual para cumplir el contrato común de CsvParseResult.
+  const rawRows: RawRowWithHash[] = [];
   for (const record of rawRecords) {
     try {
       const key = [
@@ -110,6 +115,7 @@ export function parseBitvavoCsv(fileContent: Buffer | string): CsvParseResult {
         record['Date'] ?? '', record['Time'] ?? '', record['Type'] ?? '',
         record['Currency'] ?? '', record['Amount'] ?? '',
       ].join('|');
+      const hash = createHash('sha256').update(key).digest('hex');
       rows.push({
         timezone:             record['Timezone'] ?? 'UTC',
         date:                 record['Date'] ?? '',
@@ -125,8 +131,9 @@ export function parseBitvavoCsv(fileContent: Buffer | string): CsvParseResult {
         feeAmount:            parseNum(record['Fee amount']),
         status:               record['Status'] ?? '',
         transactionId:        record['Transaction ID'] ?? '',
-        rowHash: createHash('sha256').update(key).digest('hex'),
+        rowHash: hash,
       });
+      rawRows.push({ record, hash });
     } catch (e) {
       errors.push({ rows: [], message: `Error parseando fila Bitvavo: ${JSON.stringify(record)} — ${(e as Error).message}` });
     }
@@ -269,6 +276,7 @@ export function parseBitvavoCsv(fileContent: Buffer | string): CsvParseResult {
     transactions,
     ignoredRows: [],
     errors,
+    rawRows,
     stats: {
       totalRows: rows.length,
       parsedRows: transactions.length,

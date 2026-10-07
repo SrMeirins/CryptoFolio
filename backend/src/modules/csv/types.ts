@@ -11,6 +11,17 @@ export interface RawCsvRow {
   rowHash: string;
 }
 
+// Fila cruda (columnas originales del CSV) emparejada con el hash que el
+// propio parser calculó UNA sola vez. Antes, importer.ts volvía a parsear
+// el CSV y recalculaba occurrenceIndex/rowHash por su cuenta para resolver
+// destinos de transferencia interna — dos fórmulas de hash para la misma
+// fila que, si se desincronizan, fallan en silencio (incidente real,
+// 2026-09-29). Exponer esto aquí hace que haya una única fuente de verdad.
+export interface RawRowWithHash {
+  record: Record<string, string>;
+  hash: string;
+}
+
 export type OperationType =
   | 'BUY'
   | 'SELL'
@@ -69,6 +80,11 @@ export interface CsvParseResult {
   transactions: ParsedTransaction[];
   ignoredRows: RawCsvRow[];
   errors: ParseError[];
+  // Filas crudas + hash, en el mismo orden de lectura del CSV. Permite a
+  // importer.ts resolver metadatos que necesitan el CSV original (ej. qué
+  // cuenta recibió una transferencia interna) sin volver a parsear el
+  // archivo ni recalcular el hash por su cuenta.
+  rawRows: RawRowWithHash[];
   stats: {
     totalRows: number;
     parsedRows: number;
