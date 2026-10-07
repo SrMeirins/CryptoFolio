@@ -22,18 +22,20 @@ export interface RawRowWithHash {
   hash: string;
 }
 
+// CONVERT_IN/CONVERT_OUT/INTERNAL_TRANSFER NO están aquí a propósito: eran
+// valores muertos que ningún parser llegó a producir nunca, y el enum
+// operation_type de la BD ya no los tiene (eliminados en el squash de
+// schema.sql, Nivel 2) — mantenerlos en este tipo permitiría construir una
+// ParsedTransaction que pase el type-check pero cuyo INSERT fallaría en BD.
 export type OperationType =
   | 'BUY'
   | 'SELL'
-  | 'CONVERT_IN'
-  | 'CONVERT_OUT'
   | 'DEPOSIT_FIAT'
   | 'DEPOSIT_CRYPTO'
   | 'WITHDRAW_FIAT'
   | 'WITHDRAW'
   | 'FEE_EXCHANGE'
   | 'FEE'
-  | 'INTERNAL_TRANSFER'
   | 'TRANSFER_INTERNAL'
   | 'STAKING_LOCK'
   | 'STAKING_UNLOCK'

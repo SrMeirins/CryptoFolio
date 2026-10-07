@@ -10,10 +10,9 @@ import {
 import { preprocess } from './preprocessor';
 import { detectLanguage, normalizeHeaders } from './languages';
 import { ALL_IGNORED_OPERATIONS } from './binanceAccounts';
-import { abs, FIAT_ASSETS, normalizeBinanceYear } from './csvUtils';
+import { abs, FIAT_ASSETS, FIAT_BUY_OPS, normalizeBinanceYear } from './csvUtils';
 import { tryInterpretLockUnlock } from './interpreters/lockUnlock';
 import {
-  FIAT_BUY_OPS,
   interpretConvert,
   interpretEthStaking,
   interpretEthStakingWithdrawals,

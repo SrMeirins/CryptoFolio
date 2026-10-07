@@ -39,3 +39,15 @@ export function parseCsvLine(line: string, separator: string): string[] {
 // legal tender para Hacienda). Mismo nombre, propósito distinto; no fusionar
 // ambas listas.
 export const FIAT_ASSETS = new Set(['EUR', 'USD', 'GBP', 'CHF']);
+
+// Operaciones de compra EUR→cripto con patrón de 2 filas (gasto + ingreso)
+// cuyos timestamps pueden no coincidir exactamente — preprocessor.ts las
+// enlaza por remark y unifica el timestamp ANTES de agrupar;
+// interpreters/trades.ts las interpreta DESPUÉS de agrupar. Antes, cada
+// fichero mantenía su propia copia idéntica de este mismo set bajo un
+// nombre distinto (REMARK_LINKED_OPS / FIAT_BUY_OPS) sin relacionarlas.
+export const FIAT_BUY_OPS = new Set([
+  'Buy Crypto With Fiat',
+  'Buy Crypto With Card',
+  'Convert Fiat to Crypto OCBS',
+]);
