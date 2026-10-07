@@ -1,4 +1,5 @@
 import { RawCsvRow } from './types';
+import { FIAT_BUY_OPS } from './csvUtils';
 
 /**
  * Pre-procesa filas especiales antes de la agrupación por timestamp.
@@ -9,16 +10,9 @@ import { RawCsvRow } from './types';
  *    Se enlazan por el remark (ID de orden) y se unifican al timestamp de la cripto.
  */
 
-// Operaciones que siguen el patrón remark-linking (EUR + cripto separadas en el tiempo)
-const REMARK_LINKED_OPS = new Set([
-  'Buy Crypto With Fiat',
-  'Buy Crypto With Card',
-  'Convert Fiat to Crypto OCBS',
-]);
-
 export function preprocess(rows: RawCsvRow[]): RawCsvRow[] {
   const result: RawCsvRow[] = [];
-  const linkedRows = rows.filter((r) => REMARK_LINKED_OPS.has(r.operation));
+  const linkedRows = rows.filter((r) => FIAT_BUY_OPS.has(r.operation));
   const linkedHashes = new Set(linkedRows.map((r) => r.rowHash));
 
   // Solo enlazar por remark cuando el remark está presente.

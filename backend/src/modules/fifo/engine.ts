@@ -220,10 +220,7 @@ async function processTransaction(tx: Transaction, result: FifoRunResult, margin
       break;
     case 'DEPOSIT_FIAT':
     case 'WITHDRAW_FIAT':   // Retiro a banco — no hay lote que mover
-    case 'INTERNAL_TRANSFER':
     case 'IGNORED':
-    case 'CONVERT_IN':
-    case 'CONVERT_OUT':
       break;
     default:
       result.errors.push(`Tipo de operación no manejado: ${tx.operation_type} (tx ${tx.id})`);

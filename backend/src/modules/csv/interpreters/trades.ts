@@ -2,13 +2,6 @@ import { RawCsvRow, ParsedTransaction } from '../types';
 import { abs, FIAT_ASSETS } from '../csvUtils';
 import { getHistoricalPriceEur } from '../../prices/binance';
 
-// Operaciones de compra EUR→cripto que siguen el patrón de dos filas (gasto + ingreso)
-export const FIAT_BUY_OPS = new Set([
-  'Buy Crypto With Fiat',
-  'Buy Crypto With Card',
-  'Convert Fiat to Crypto OCBS',
-]);
-
 // ── Swap de 2 filas (entrada + salida → BUY) ───────────────────────────────
 // Binance Convert y los dos handlers de ETH 2.0 Staking son estructuralmente
 // idénticos (1 fila de entrada + 1 de salida al mismo timestamp → permuta),
