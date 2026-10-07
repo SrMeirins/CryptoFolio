@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { parse } from 'csv-parse/sync';
 import {
   RawCsvRow,
+  RawRowWithHash,
   ParsedTransaction,
   CsvParseResult,
   ParseError,
@@ -153,6 +154,7 @@ export async function parseBinanceCsv(fileContent: Buffer | string): Promise<Csv
       transactions: [],
       ignoredRows: [],
       errors: [],
+      rawRows: [],
       stats: { totalRows: 0, parsedRows: 0, ignoredRows: 0, errorRows: 0, transactionCount: 0 },
     };
   }
@@ -173,6 +175,7 @@ export async function parseBinanceCsv(fileContent: Buffer | string): Promise<Csv
 
   // 3. Normalizar filas
   const rows: RawCsvRow[] = [];
+  const rawRows: RawRowWithHash[] = [];
   const tupleOccurrences = new Map<string, number>();
   for (const record of records) {
     try {
@@ -182,6 +185,7 @@ export async function parseBinanceCsv(fileContent: Buffer | string): Promise<Csv
       ].join('|');
       const occurrenceIndex = tupleOccurrences.get(tupleKey) ?? 0;
       tupleOccurrences.set(tupleKey, occurrenceIndex + 1);
+      const hash = rowHash(record, occurrenceIndex);
 
       rows.push({
         userId:    record['User ID'] ?? '',
@@ -191,8 +195,9 @@ export async function parseBinanceCsv(fileContent: Buffer | string): Promise<Csv
         coin:      record['Coin'] ?? '',
         change:    parseFloat(record['Change'] ?? '0'),
         remark:    record['Remark'] ?? '',
-        rowHash:   rowHash(record, occurrenceIndex),
+        rowHash:   hash,
       });
+      rawRows.push({ record, hash });
     } catch (e) {
       errors.push({
         rows: [],
@@ -314,6 +319,7 @@ export async function parseBinanceCsv(fileContent: Buffer | string): Promise<Csv
     transactions,
     ignoredRows,
     errors,
+    rawRows,
     stats: {
       totalRows: rows.length,
       parsedRows: activeRows.length,

@@ -1,14 +1,15 @@
 import { createHash, randomUUID } from 'crypto';
-import { parse } from 'csv-parse/sync';
 import { db } from '../../db/client';
 import { ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
-import { ACCOUNT_TO_WALLET, TRANSFER_DESTINATIONS } from './binanceAccounts';
-import { rowHash } from './parser';
 import { Exchange, parseExchangeCsv, validateExchangeCsv } from './exchanges';
-import { getHistoricalPriceEur, refreshLivePrices } from '../prices/binance';
-import { setCoinGeckoStatusCallback, prefetchHistoricalPrices as prefetchCoinGeckoHistoricalPrices } from '../prices/coingecko';
+import { refreshLivePrices } from '../prices/binance';
 import { getOrDetectPairInfo } from '../prices/pairDetector';
+import { enrichIncomeTransactionsWithPrices } from './importerEnrichment';
+import { buildTransferDestinationMap, resolveWalletId, resolveDestinationWalletId } from './importerTransferDestinations';
+
+export { previewCsvFile } from './importerPreview';
+export type { UnknownOperationSample, DepositReview, PreviewResult } from './importerPreview';
 
 export interface ImportResult {
   importId: string;
@@ -19,210 +20,6 @@ export interface ImportResult {
   errors: string[];
   warnings: string[];
   validation: ValidationResult;
-}
-
-export interface UnknownOperationSample {
-  timestamp: string;
-  asset: string;
-  amount: number;
-  originalLabel: string;
-}
-
-export interface DepositReview {
-  txKey: string;           // rawRowHashes[0] para nuevos, o UUID para ya importados
-  timestamp: string;
-  asset: string;
-  amount: number;
-  historicalPrice: number | null;
-  existingInDb?: boolean;  // true si ya está importado (necesita bulk-set-costs en lugar de depositCosts)
-}
-
-export interface PreviewResult {
-  validation: ValidationResult;
-  transactions: ParsedTransaction[];
-  duplicateCount: number;
-  newCount: number;
-  errors: string[];
-  unknownOperationSamples: Record<string, UnknownOperationSample>;
-  depositReviews: DepositReview[];  // depósitos externos que necesitan coste
-}
-
-export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'binance'): Promise<PreviewResult> {
-  const validation = validateExchangeCsv(exchange, fileBuffer);
-
-  if (!validation.valid) {
-    return {
-      validation,
-      transactions: [],
-      duplicateCount: 0,
-      newCount: 0,
-      errors: validation.errors,
-      unknownOperationSamples: {},
-      depositReviews: [],
-    };
-  }
-
-  const parseResult = await parseExchangeCsv(exchange, fileBuffer);
-
-  // Construir muestras de operaciones desconocidas (solo aplica a Binance:
-  // Bitvavo aborta directamente en el validator si encuentra un Type desconocido)
-  const unknownOperationSamples: Record<string, UnknownOperationSample> = {};
-
-  if (exchange === 'binance' && validation.unknownOperations.length > 0) {
-    const rawRecords: Record<string, string>[] = parse(fileBuffer, {
-      columns: true,
-      skip_empty_lines: true,
-      bom: true,
-      trim: true,
-    });
-
-    for (const unknownOp of validation.unknownOperations) {
-      const sample = rawRecords.find(r =>
-        r['Operation'] === unknownOp || r['Operación'] === unknownOp
-      );
-      if (sample) {
-        const timeRaw = sample['Time'] || sample['Tiempo'] || '';
-        let timestamp = new Date().toISOString();
-        try {
-          const normalizedTime = /^\d{4}-/.test(timeRaw) ? timeRaw : '20' + timeRaw;
-          timestamp = new Date(normalizedTime.replace(' ', 'T') + 'Z').toISOString();
-        } catch { /* usar now */ }
-
-        unknownOperationSamples[unknownOp] = {
-          timestamp,
-          asset: sample['Coin'] || sample['Moneda'] || '',
-          amount: Math.abs(parseFloat(sample['Change'] || sample['Cambio'] || '0')),
-          originalLabel: unknownOp,
-        };
-      }
-    }
-  }
-
-  // Avisar si hay income ops que necesitarán precio histórico al importar.
-  // DEPOSIT_CRYPTO se excluye: ya aparece en el panel de revisión obligatoria — no duplicar aviso.
-  const INCOME_WARNING_OPS = new Set(['STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'LENDING_INTEREST_LOCKED', 'CASHBACK', 'AIRDROP']);
-  const incomeOpsCount = parseResult.transactions.filter(
-    tx => INCOME_WARNING_OPS.has(tx.operationType) && !tx.pricePerUnit
-  ).length;
-  if (incomeOpsCount > 0) {
-    validation.info.push(
-      `${incomeOpsCount} operaciones de rendimiento (staking, interés, airdrop) necesitan precio histórico. ` +
-      `Se consultará la API al confirmar — puede tardar unos segundos adicionales.`
-    );
-  }
-
-  // Detectar gaps y solapamientos con imports existentes DEL MISMO EXCHANGE
-  // (Binance y Bitvavo son historiales independientes — comparar fechas entre
-  // ambos generaría falsos "gap sin datos" sin sentido)
-  if (validation.dateRange) {
-    const newFrom = new Date(validation.dateRange.from);
-    const newTo = new Date(validation.dateRange.to);
-
-    const existingRanges = await db.query(
-      `SELECT
-         ci.filename,
-         MIN(t.timestamp)::date AS date_from,
-         MAX(t.timestamp)::date AS date_to
-       FROM csv_imports ci
-       JOIN transactions t ON t.import_id = ci.id
-       WHERE ci.exchange = $1
-       GROUP BY ci.id, ci.filename
-       ORDER BY MIN(t.timestamp)`,
-      [exchange]
-    );
-
-    for (const range of existingRanges.rows) {
-      const existFrom = new Date(range.date_from);
-      const existTo = new Date(range.date_to);
-
-      // Gap: nuevo CSV empieza después del fin del existente con hueco
-      const daysBetween = Math.floor(
-        (newFrom.getTime() - existTo.getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      if (daysBetween > 1) {
-        validation.warnings.push(
-          `Gap de ${daysBetween} dias sin datos: "${range.filename}" cubre hasta ${range.date_to} ` +
-          `y este CSV empieza el ${validation.dateRange.from}. ` +
-          `Considera exportar ese periodo desde ${exchange === 'binance' ? 'Binance' : 'Bitvavo'}.`
-        );
-      }
-
-      // Gap inverso: CSV existente empieza después del fin del nuevo
-      const daysBetweenInverse = Math.floor(
-        (existFrom.getTime() - newTo.getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      if (daysBetweenInverse > 1) {
-        validation.warnings.push(
-          `Gap de ${daysBetweenInverse} dias sin datos: este CSV cubre hasta ${validation.dateRange.to} ` +
-          `y "${range.filename}" empieza el ${range.date_from}. ` +
-          `Considera exportar ese periodo desde ${exchange === 'binance' ? 'Binance' : 'Bitvavo'}.`
-        );
-      }
-    }
-  }
-
-  // Contar duplicados — una sola query batch en lugar de N+1
-  const allHashes = parseResult.transactions.flatMap(tx => tx.rawRowHashes);
-  const existingRes = allHashes.length > 0
-    ? await db.query('SELECT row_hash FROM raw_transactions WHERE row_hash = ANY($1)', [allHashes])
-    : { rows: [] as { row_hash: string }[] };
-  const existingHashes = new Set(existingRes.rows.map((r: { row_hash: string }) => r.row_hash));
-
-  let duplicateCount = 0;
-  let newCount = 0;
-  for (const tx of parseResult.transactions) {
-    if (tx.rawRowHashes.some(h => existingHashes.has(h))) duplicateCount++;
-    else newCount++;
-  }
-
-  // Detectar depósitos externos que necesitan revisión de coste:
-  // 1. Nuevos en este CSV
-  // 2. Ya importados en DB pero sin price_per_unit
-  const depositReviews: DepositReview[] = [];
-
-  // Caso 1: nuevos depósitos en este CSV
-  for (const tx of parseResult.transactions) {
-    if (!tx.needsCostReview) continue;
-    if (tx.rawRowHashes.some(h => existingHashes.has(h))) continue; // ya importado (ver caso 2)
-    const txKey = tx.rawRowHashes[0];
-    let historicalPrice: number | null = null;
-    try { historicalPrice = await getHistoricalPriceEur(tx.asset, tx.timestamp); } catch { /* ignorar */ }
-    depositReviews.push({ txKey, timestamp: tx.timestamp.toISOString(), asset: tx.asset, amount: tx.amount, historicalPrice });
-  }
-
-  // Caso 2: depósitos ya importados en DB pero sin coste — bloquean igual
-  const existingPendingRes = await db.query(
-    `SELECT id::text AS txkey, timestamp, asset, amount
-     FROM transactions
-     WHERE notes LIKE '%Depósito de cripto externo%' AND price_per_unit IS NULL
-     ORDER BY timestamp`
-  );
-  for (const row of existingPendingRes.rows) {
-    // No duplicar si ya está en depositReviews (txKey del CSV coincide)
-    if (depositReviews.some(d => d.txKey === row.txkey)) continue;
-    let historicalPrice: number | null = null;
-    try { historicalPrice = await getHistoricalPriceEur(row.asset, new Date(row.timestamp)); } catch { /* ignorar */ }
-    depositReviews.push({
-      txKey: row.txkey,           // id UUID de la transacción — se usa en depositCosts
-      timestamp: new Date(row.timestamp).toISOString(),
-      asset: row.asset,
-      amount: parseFloat(row.amount),
-      historicalPrice,
-      existingInDb: true,         // flag extra para distinguir en UI si hace falta
-    });
-  }
-
-  return {
-    validation,
-    transactions: parseResult.transactions,
-    duplicateCount,
-    newCount,
-    errors: parseResult.errors.map((e) => e.message),
-    unknownOperationSamples,
-    depositReviews,
-  };
 }
 
 export async function importCsvFile(
@@ -266,148 +63,12 @@ export async function importCsvFile(
     );
   }
 
-  // Enriquecer operaciones de rendimiento con precio histórico al momento de recepción.
-  // Esto garantiza que price_per_unit quede guardado en la BD para el módulo fiscal
-  // e historial (el motor FIFO tiene su propio fallback, pero la tabla transactions
-  // quedaría con NULL sin este paso, y el fiscal mostraría 0 EUR).
-  // DEPOSIT_CRYPTO se incluye para tener precio de referencia como estimación del coste
-  const INCOME_OP_TYPES = new Set(['STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'LENDING_INTEREST_LOCKED', 'CASHBACK', 'AIRDROP', 'DEPOSIT_CRYPTO']);
-  const incomeTxs = parseResult.transactions.filter(
-    tx => INCOME_OP_TYPES.has(tx.operationType) && !tx.pricePerUnit
-  );
-  if (incomeTxs.length > 0) {
-    // Deduplicar pares únicos (symbol|fecha) y agrupar las txs que los comparten
-    const uniquePairsMap = new Map<string, { symbol: string; date: Date; txList: ParsedTransaction[] }>();
-    for (const tx of incomeTxs) {
-      const key = `${tx.asset}|${tx.timestamp.toISOString().slice(0, 10)}`;
-      if (!uniquePairsMap.has(key)) {
-        uniquePairsMap.set(key, { symbol: tx.asset, date: tx.timestamp, txList: [] });
-      }
-      uniquePairsMap.get(key)!.txList.push(tx);
-    }
-    const uniquePairs = [...uniquePairsMap.values()];
+  await enrichIncomeTransactionsWithPrices(parseResult.transactions, onStatus);
 
-    const totalPairs = uniquePairs.length;
-
-    // Activar callback CoinGecko ANTES del prefetch para que rate limits y progreso
-    // aparezcan en el log de la UI desde el primer momento.
-    setCoinGeckoStatusCallback(onStatus);
-
-    // Pre-warm precios CoinGecko via market_chart/range antes del loop de enriquecimiento.
-    // Solo para activos que genuinamente usan CoinGecko como fuente (price_source='coingecko'
-    // o sin price_source conocido). eur_direct/usdt_proxy/fiat tienen precio Binance → no tocar.
-    if (uniquePairs.length > 0) {
-      const uniqueAssets = [...new Set(uniquePairs.map(p => p.symbol))];
-      const geckoOnlyRes = await db.query(
-        `SELECT symbol FROM asset_metadata
-         WHERE symbol = ANY($1) AND coingecko_id IS NOT NULL
-           AND price_source NOT IN ('eur_direct', 'usdt_proxy', 'fiat')`,
-        [uniqueAssets]
-      );
-      const geckoOnlySymbols = new Set(geckoOnlyRes.rows.map((r: { symbol: string }) => r.symbol));
-      const geckoPairs = uniquePairs.filter(p => geckoOnlySymbols.has(p.symbol));
-      if (geckoPairs.length > 0) {
-        const geckoAssets = [...new Set(geckoPairs.map(p => p.symbol))];
-        onStatus?.(`🔄 Pre-cargando precios históricos CoinGecko para: ${geckoAssets.join(', ')} (${geckoPairs.length} fechas únicas, 1 llamada API por activo)...`);
-        await prefetchCoinGeckoHistoricalPrices(geckoPairs.map(p => ({ symbol: p.symbol, date: p.date })));
-        onStatus?.(`✓ Pre-carga CoinGecko completada para ${geckoAssets.length} activo${geckoAssets.length > 1 ? 's' : ''}`);
-      }
-    }
-
-    onStatus?.(`Enriqueciendo ${incomeTxs.length} operaciones de rendimiento — ${totalPairs} pares únicos (concurrencia 10)`, 0, totalPairs);
-
-    // Concurrencia 10: Binance no tiene rate limit estricto, los pares que
-    // recaigan en CoinGecko quedan serializados automáticamente por su cola.
-    let completed = 0;
-    const PRICE_CONCURRENCY = 10;
-    for (let i = 0; i < uniquePairs.length; i += PRICE_CONCURRENCY) {
-      const batch = uniquePairs.slice(i, i + PRICE_CONCURRENCY);
-      await Promise.allSettled(
-        batch.map(async ({ symbol, date, txList }) => {
-          const dateStr = date.toISOString().slice(0, 10);
-          onStatus?.(`Consultando ${symbol} @ ${dateStr}...`);
-          try {
-            const price = await getHistoricalPriceEur(symbol, date);
-            completed++;
-            if (price > 0) {
-              onStatus?.(`✓ ${symbol} @ ${dateStr} = ${price.toFixed(4)} €`, completed, totalPairs);
-              for (const tx of txList) {
-                tx.pricePerUnit = price;
-                tx.costAsset    = 'EUR';
-                tx.costAmount   = tx.amount * price;
-              }
-            } else {
-              onStatus?.(`— ${symbol} @ ${dateStr} sin precio`, completed, totalPairs);
-            }
-          } catch (e) {
-            completed++;
-            onStatus?.(`⚠ ${symbol} @ ${dateStr} error: ${(e as Error).message}`, completed, totalPairs);
-          }
-        })
-      );
-    }
-
-    setCoinGeckoStatusCallback(undefined);
-    onStatus?.(`Precios de rendimiento completados: ${totalPairs} pares procesados`);
-  }
-
-  // Construir mapa de pares reales de transferencia interna. Solo aplica a Binance:
-  // es el único exchange con TRANSFER_INTERNAL (Bitvavo es cuenta única, sin sub-wallets).
-  // El parser solo emite la fila de SALIDA (change < 0) de cada par, pero el CSV
-  // contiene también la fila de ENTRADA (change > 0) que indica la cuenta destino real.
-  // El mapping estático TRANSFER_DESTINATIONS no cubre todos los casos
-  // (p.ej. Cross Margin → Isolated Margin) — aquí lo resolvemos desde los datos reales.
-  //
-  // Clave: hash de la fila de salida → wallet_id de la cuenta destino (obtenido de la fila de entrada).
-  const incomingByKey = new Map<string, string>(); // key → account name
-  const transferDestByHash = new Map<string, string>(); // rowHash → account name del destino
-  if (exchange === 'binance') {
-    const rawRecords: Record<string, string>[] = parse(fileBuffer, {
-      columns: true,
-      skip_empty_lines: true,
-      bom: true,
-      trim: true,
-    });
-    // occurrenceIndex por tupla, en el MISMO orden y con la MISMA clave que
-    // parser.ts — imprescindible para que el hash de aquí coincida con el
-    // rawRowHashes[0] que trae la transacción ya parseada (ver rowHash() en
-    // parser.ts: dos fórmulas de hash distintas para la misma fila nunca
-    // coinciden, y la resolución de destino fallaba en silencio para TODAS
-    // las transferencias internas — bug real encontrado 2026-09-29).
-    const tupleOccurrences = new Map<string, number>();
-    function nextOccurrenceIndex(rec: Record<string, string>): number {
-      const tupleKey = [
-        rec['User ID'], rec['Time'], rec['Account'], rec['Operation'],
-        rec['Coin'], rec['Change'],
-      ].join('|');
-      const idx = tupleOccurrences.get(tupleKey) ?? 0;
-      tupleOccurrences.set(tupleKey, idx + 1);
-      return idx;
-    }
-
-    // Indexar todas las filas de entrada (change > 0) de operaciones de transferencia interna
-    // por el identificador que comparte con su fila de salida: time|operation|coin|absChange
-    for (const rec of rawRecords) {
-      const change = parseFloat(rec['Change'] ?? '0');
-      if (change > 0 && TRANSFER_DESTINATIONS[rec['Operation']]) {
-        const key = `${rec['Time']}|${rec['Operation']}|${rec['Coin']}|${rec['Change']}`;
-        incomingByKey.set(key, rec['Account']);
-      }
-    }
-    for (const rec of rawRecords) {
-      const change = parseFloat(rec['Change'] ?? '0');
-      const occurrenceIndex = nextOccurrenceIndex(rec);
-      if (change < 0 && TRANSFER_DESTINATIONS[rec['Operation']]) {
-        const absChangeStr = rec['Change'].startsWith('-') ? rec['Change'].slice(1) : rec['Change'];
-        const key = `${rec['Time']}|${rec['Operation']}|${rec['Coin']}|${absChangeStr}`;
-        const incomingAccount = incomingByKey.get(key);
-        if (incomingAccount) {
-          const hash = rowHash(rec, occurrenceIndex);
-          transferDestByHash.set(hash, incomingAccount);
-        }
-      }
-    }
-  }
+  // Mapa de destino de transferencias internas — solo aplica a Binance:
+  // es el único exchange con TRANSFER_INTERNAL (Bitvavo es cuenta única,
+  // sin sub-wallets; su rawRows queda vacío y el mapa resultante también).
+  const transferDestByHash = buildTransferDestinationMap(parseResult.rawRows);
 
   onStatus?.('Iniciando transacción en base de datos...');
   const result = await db.transaction(async (client) => {
@@ -420,37 +81,6 @@ export async function importCsvFile(
     const walletIdByName: Record<string, string> = {};
     for (const row of walletsRes.rows as { id: string; name: string }[]) {
       walletIdByName[row.name] = row.id;
-    }
-    // Resuelve el wallet_id para una cuenta CSV. Binance usa ACCOUNT_TO_WALLET
-    // ('Spot' → 'Binance Spot', etc.); Bitvavo no tiene sub-cuentas, así que el
-    // parser ya emite el nombre de wallet literal ('Bitvavo') como account.
-    function getWalletId(account: string): string {
-      const name = ACCOUNT_TO_WALLET[account] ?? account;
-      const id = walletIdByName[name];
-      if (!id) {
-        throw new Error(
-          `Falta la wallet de sistema "${name}" (cuenta CSV "${account}"). ` +
-          `Puede que se haya borrado manualmente — créala de nuevo antes de reimportar.`
-        );
-      }
-      return id;
-    }
-
-    // Resuelve el wallet_id destino para una transferencia interna.
-    // Primero intenta el mapa dinámico (construido desde las filas de entrada del CSV),
-    // que cubre casos que el mapping estático no puede conocer (ej: Cross Margin → Isolated Margin).
-    function getDestinationWalletId(notes: string | undefined, account: string, rowHash?: string): string | null {
-      if (!notes) return null;
-      if (rowHash) {
-        const incomingAccount = transferDestByHash.get(rowHash);
-        if (incomingAccount) {
-          const walletName = ACCOUNT_TO_WALLET[incomingAccount];
-          if (walletName && walletIdByName[walletName]) return walletIdByName[walletName];
-        }
-      }
-      const destName = TRANSFER_DESTINATIONS[notes]?.[account];
-      if (!destName) return null;
-      return walletIdByName[destName] ?? null;
     }
 
     const importRes = await client.query(
@@ -526,12 +156,12 @@ export async function importCsvFile(
       }
 
       const id = randomUUID();
-      const walletId = getWalletId(tx.account);
+      const walletId = resolveWalletId(tx.account, walletIdByName);
       let destinationWalletId: string | null = null;
       let effectiveOpType = tx.operationType;
 
       if (tx.operationType === 'TRANSFER_INTERNAL') {
-        destinationWalletId = getDestinationWalletId(tx.notes, tx.account, tx.rawRowHashes[0]);
+        destinationWalletId = resolveDestinationWalletId(tx.notes, tx.account, tx.rawRowHashes[0], transferDestByHash, walletIdByName);
       } else if (tx.operationType === 'WITHDRAW') {
         const txKey = tx.rawRowHashes[0] ?? tx.asset;
         const dest  = withdrawalDestinations[txKey] ?? withdrawalDestinations[tx.asset];
@@ -726,4 +356,3 @@ export async function importCsvFile(
 
   return result;
 }
-
