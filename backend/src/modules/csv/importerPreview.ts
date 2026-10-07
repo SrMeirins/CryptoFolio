@@ -4,6 +4,7 @@ import { ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
 import { Exchange, parseExchangeCsv, validateExchangeCsv } from './exchanges';
 import { getHistoricalPriceEur } from '../prices/binance';
+import { normalizeBinanceYear } from './csvUtils';
 
 export interface UnknownOperationSample {
   timestamp: string;
@@ -68,7 +69,7 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
         const timeRaw = sample['Time'] || sample['Tiempo'] || '';
         let timestamp = new Date().toISOString();
         try {
-          const normalizedTime = /^\d{4}-/.test(timeRaw) ? timeRaw : '20' + timeRaw;
+          const normalizedTime = normalizeBinanceYear(timeRaw);
           timestamp = new Date(normalizedTime.replace(' ', 'T') + 'Z').toISOString();
         } catch { /* usar now */ }
 

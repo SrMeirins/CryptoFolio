@@ -1,4 +1,5 @@
 import { ValidationResult } from './validator';
+import { parseCsvLine } from './csvUtils';
 
 const REQUIRED_COLUMNS = [
   'Timezone', 'Date', 'Time', 'Type', 'Currency', 'Amount',
@@ -7,25 +8,6 @@ const REQUIRED_COLUMNS = [
 ];
 
 const KNOWN_TYPES = new Set(['buy', 'deposit', 'withdrawal', 'rebate']);
-
-function parseCsvLine(line: string, separator: string): string[] {
-  const cells: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === separator && !inQuotes) {
-      cells.push(current.trim());
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  cells.push(current.trim());
-  return cells;
-}
 
 export function validateBitvavoCsvStructure(fileBuffer: Buffer): ValidationResult {
   const result: ValidationResult = {
@@ -109,6 +91,14 @@ export function validateBitvavoCsvStructure(fileBuffer: Buffer): ValidationResul
     result.warnings.push(`${malformedRows} filas con formato incorrecto serán ignoradas`);
   }
   if (unknownTypes.size > 0) {
+    // Asimetría intencional frente a validateCsvStructure (Binance): ahí una
+    // operación desconocida es warning (modo degradado — se excluyen esas
+    // filas, el resto del CSV se importa igual), aquí es error bloqueante.
+    // Bitvavo tiene muchos menos tipos de operación y cambian con mucha
+    // menos frecuencia que Binance — un tipo nuevo aquí es más probable que
+    // sea una categoría fiscal real sin soporte todavía (no un simple rename)
+    // y merece bloquear el import hasta añadir soporte explícito, en vez de
+    // arriesgarse a perder esas filas en modo degradado.
     result.errors.push(
       `Tipo(s) de operación Bitvavo no reconocido(s): ${[...unknownTypes].join(', ')}. ` +
       `Requieren verificación manual antes de importar — contacta para añadir soporte.`
