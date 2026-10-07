@@ -197,3 +197,26 @@ describe('binance — prefetchHistoricalPrices', () => {
     expect(queryMock).not.toHaveBeenCalled();
   });
 });
+
+// onPriceUpdate/offPriceUpdate no tenían test propio — offPriceUpdate es
+// nueva (fix de listener leak: cada conexión WebSocket a /ws/prices
+// registraba un callback que nunca se eliminaba al desconectar). El array
+// priceUpdateCallbacks es un detalle privado del módulo sin getter público,
+// así que se verifica el contrato observable: un callback eliminado puede
+// volver a eliminarse sin lanzar (splice sobre -1 es un no-op seguro), y un
+// callback nunca registrado tampoco lanza al intentar eliminarlo.
+describe('onPriceUpdate / offPriceUpdate', () => {
+  it('offPriceUpdate es idempotente: eliminar dos veces el mismo callback no lanza', async () => {
+    const bin = await import('./binance');
+    const cb = () => {};
+
+    bin.onPriceUpdate(cb);
+    expect(() => bin.offPriceUpdate(cb)).not.toThrow();
+    expect(() => bin.offPriceUpdate(cb)).not.toThrow();
+  });
+
+  it('offPriceUpdate sobre un callback nunca registrado no lanza', async () => {
+    const bin = await import('./binance');
+    expect(() => bin.offPriceUpdate(() => {})).not.toThrow();
+  });
+});
