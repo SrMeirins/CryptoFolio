@@ -1,4 +1,4 @@
-import { BalanceProvider, BalanceResult, fetchWithTimeout } from './types';
+import { BalanceProvider, BalanceResult, fetchJson } from './types';
 
 const RPC_URL = 'https://xrplcluster.com';
 
@@ -14,23 +14,19 @@ interface XrplAccountInfo {
 export const xrplProvider: BalanceProvider = {
   requiresApiKey: false,
   async getBalance(address): Promise<BalanceResult> {
-    try {
-      const res = await fetchWithTimeout(RPC_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          method: 'account_info',
-          params: [{ account: address, ledger_index: 'validated' }],
-        }),
-      });
-      const data = (await res.json()) as XrplAccountInfo;
-      if (data?.result?.status !== 'success' || !data?.result?.account_data?.Balance) {
-        return { ok: false, error: data?.result?.error ?? 'respuesta inesperada de XRPL' };
-      }
-      const balance = data?.result?.account_data?.Balance;
-      return { ok: true, balance: Number(balance) / 1_000_000 };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : 'fallo desconocido' };
+    const res = await fetchJson<XrplAccountInfo>(RPC_URL, 'XRPL', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        method: 'account_info',
+        params: [{ account: address, ledger_index: 'validated' }],
+      }),
+    });
+    if (!res.ok) return res;
+    const { result } = res.data;
+    if (result?.status !== 'success' || !result?.account_data?.Balance) {
+      return { ok: false, error: result?.error ?? 'respuesta inesperada de XRPL' };
     }
+    return { ok: true, balance: Number(result.account_data.Balance) / 1_000_000 };
   },
 };

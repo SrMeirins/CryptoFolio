@@ -55,6 +55,13 @@ describe('etherscanProvider', () => {
     expect(result).toEqual({ ok: false, error: 'falta API key para Ethereum (Etherscan)' });
   });
 
+  it('devuelve ok:false con mensaje explícito si el fallo es a nivel HTTP (ej. 503)', async () => {
+    resetThrottleState();
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }) as unknown as Response));
+    const result = await etherscanProvider.getBalance('0x71C7656EC7ab88b098defB751B7401B5f6d8976F', 'FAKEKEY');
+    expect(result).toEqual({ ok: false, error: 'Etherscan respondió 503' });
+  });
+
   it('deja margen entre la llamada de tokenbalance y la de decimals() para no chocar con el rate limit real observado (~3/seg)', async () => {
     resetThrottleState();
     vi.useFakeTimers();

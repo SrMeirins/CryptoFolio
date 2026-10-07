@@ -31,4 +31,10 @@ describe('xrplProvider', () => {
     const result = await xrplProvider.getBalance('rN7n34b4RM8FAFGbFZapWrdMJB1qVHbXLe', undefined);
     expect(result.ok).toBe(false);
   });
+
+  it('devuelve ok:false con mensaje explícito si el fallo es a nivel HTTP (ej. 503)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }) as unknown as Response));
+    const result = await xrplProvider.getBalance('rN7n34b4RM8FAFGbFZapWrdMJB1qVHbXLe', undefined);
+    expect(result).toEqual({ ok: false, error: 'XRPL respondió 503' });
+  });
 });

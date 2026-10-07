@@ -1,4 +1,4 @@
-import { BalanceProvider, BalanceResult, fetchWithTimeout } from './types';
+import { BalanceProvider, BalanceResult, fetchJson } from './types';
 
 const BASE_URL = 'https://blockstream.info/api';
 
@@ -10,14 +10,9 @@ interface BlockstreamAddress {
 export const blockstreamProvider: BalanceProvider = {
   requiresApiKey: false,
   async getBalance(address): Promise<BalanceResult> {
-    try {
-      const res = await fetchWithTimeout(`${BASE_URL}/address/${address}`);
-      if (!res.ok) return { ok: false, error: `Esplora respondió ${res.status}` };
-      const data = (await res.json()) as BlockstreamAddress;
-      const sats = (data?.chain_stats?.funded_txo_sum ?? 0) - (data?.chain_stats?.spent_txo_sum ?? 0);
-      return { ok: true, balance: sats / 100_000_000 };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : 'fallo desconocido' };
-    }
+    const res = await fetchJson<BlockstreamAddress>(`${BASE_URL}/address/${address}`, 'Esplora');
+    if (!res.ok) return res;
+    const sats = (res.data.chain_stats?.funded_txo_sum ?? 0) - (res.data.chain_stats?.spent_txo_sum ?? 0);
+    return { ok: true, balance: sats / 100_000_000 };
   },
 };
