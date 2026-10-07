@@ -421,7 +421,7 @@ describe('FIFO_DUST_EPSILON — un lote de polvo (<1e-6) no cuenta como disponib
 });
 
 describe('processBuy — aviso visible al crear un lote sintético en una permuta', () => {
-  it('genera un aviso en result.errors cuando no hay lotes previos del activo pagado', async () => {
+  it('genera un aviso en result.warnings (no en result.errors) cuando no hay lotes previos del activo pagado', async () => {
     await clearTransactions();
     // Compra ADA pagando con SOL, sin ningún BUY/DEPOSIT previo de SOL en esta wallet.
     await insertTx({
@@ -431,8 +431,11 @@ describe('processBuy — aviso visible al crear un lote sintético en una permut
 
     const result = await runFifoEngine();
 
-    expect(result.errors).toHaveLength(1);
-    expect(result.errors[0]).toContain('Aviso: lote sintético creado para SOL');
+    // Aviso informativo, no bloqueante: vive en warnings, no en errors (errors
+    // queda reservado a problemas reales — ver constants.ts FifoRunResult).
+    expect(result.errors).toHaveLength(0);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('Aviso: lote sintético creado para SOL');
 
     // El lote sintético se crea igualmente (comportamiento existente, no cambia) —
     // el aviso es informativo, no bloqueante.
