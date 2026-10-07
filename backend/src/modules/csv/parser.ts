@@ -9,56 +9,41 @@ import {
 import { preprocess } from './preprocessor';
 import { detectLanguage, normalizeHeaders } from './languages';
 import { ALL_IGNORED_OPERATIONS } from './binanceAccounts';
-import { getHistoricalPriceEur } from '../prices/binance';
+import { abs, FIAT_ASSETS } from './csvUtils';
+import { tryInterpretLockUnlock } from './interpreters/lockUnlock';
+import {
+  FIAT_BUY_OPS,
+  interpretConvert,
+  interpretEthStaking,
+  interpretEthStakingWithdrawals,
+  interpretSoldRevenue,
+  interpretBuyCryptoWithFiat,
+  interpretSmallAssetsExchange,
+  interpretTransactionBuy,
+  interpretTransactionSell,
+  interpretTransactionRelated,
+} from './interpreters/trades';
+import {
+  INTERNAL_TRANSFER_OPS,
+  interpretDeposit,
+  interpretFiatWithdraw,
+  interpretWithdraw,
+  interpretInternalTransfer,
+} from './interpreters/transfers';
+import {
+  INCOME_OPS,
+  interpretStandaloneFee,
+  interpretBnbFeeDeduction,
+  interpretMarginFee,
+  interpretMarginBorrow,
+  interpretMarginRepay,
+  interpretCrossMarginLiquidationTakeover,
+  interpretStrategyFeeRebate,
+  interpretIncomeOp,
+} from './interpreters/marginAndFees';
 
 // Importado desde binanceAccounts.ts — fuente de verdad única
 const IGNORED_OPERATIONS = ALL_IGNORED_OPERATIONS;
-
-// Transferencias internas que se interpretan como TRANSFER_INTERNAL (negativo)
-// o IGNORED (positivo — el FIFO crea el lote destino automáticamente)
-const INTERNAL_TRANSFER_OPS = new Set([
-  'Transfer Between Main and Funding Wallet',
-  'Transfer Between Spot and Funding',
-  'Transfer Between Main Account/Futures and Margin Account',
-  'Transfer Between Spot and Strategy Account',
-  'Transfer Between Spot and Strategy',
-  'Inter-Wallet Transfer',
-]);
-
-// Fiat real — depósitos/retiros de estas monedas no tienen lote FIFO
-const FIAT_ASSETS = new Set(['EUR', 'USD', 'GBP', 'CHF', 'USDT_FIAT']);
-
-// Operaciones de compra EUR→cripto que siguen el patrón de dos filas (gasto + ingreso)
-const FIAT_BUY_OPS = new Set([
-  'Buy Crypto With Fiat',
-  'Buy Crypto With Card',
-  'Convert Fiat to Crypto OCBS',
-]);
-
-// Mapa de operaciones de Binance → tipo fiscal (income/airdrops/cashback)
-const INCOME_OPS: Record<string, 'STAKING_REWARD' | 'LENDING_INTEREST' | 'LENDING_INTEREST_LOCKED' | 'CASHBACK' | 'AIRDROP'> = {
-  'Staking Rewards':                'STAKING_REWARD',
-  'ETH 2.0 Staking Rewards':        'STAKING_REWARD',
-  'Simple Earn Flexible Interest':  'LENDING_INTEREST',
-  'Simple Earn Locked Rewards':     'LENDING_INTEREST_LOCKED',
-  'Savings Interest':               'LENDING_INTEREST',
-  'POS savings interest':           'LENDING_INTEREST',
-  'Launchpool Interest':            'STAKING_REWARD',
-  'BNB Vault Rewards':              'STAKING_REWARD',
-  'Airdrop Assets':                 'AIRDROP',
-  'Asset Recovery':                 'AIRDROP',
-  'Distribution':                   'AIRDROP',
-  'Cash Voucher Distribution':      'CASHBACK',
-  'Cashback Voucher':               'CASHBACK',
-  'Commission Rebate':              'CASHBACK',
-  'Commission History':             'CASHBACK',
-  'Referral Kickback':              'CASHBACK',
-  'Crypto Box':                     'CASHBACK',
-  'Mission Reward Distribution':    'CASHBACK',
-  'Launchpool Airdrop - User Claim Distribution': 'AIRDROP',
-  'Launchpool Airdrop - System Distribution':     'AIRDROP',
-  'Token Swap - Distribution':                    'AIRDROP',
-};
 
 function parseDate(raw: string): Date {
   const trimmed = raw.trim();
@@ -95,42 +80,6 @@ export function rowHash(row: Record<string, string>, occurrenceIndex: number): s
   return createHash('sha256').update(key).digest('hex');
 }
 
-function abs(n: number): number {
-  return Math.abs(n);
-}
-
-function groupByTimestamp(rows: RawCsvRow[]): Map<string, RawCsvRow[]> {
-  const groups = new Map<string, RawCsvRow[]>();
-
-  for (const row of rows) {
-    const ts = row.time.getTime();
-    let found = false;
-
-    for (const [key, group] of groups) {
-      const groupTs = parseInt(key.split('|')[0]);
-      const sameAccount = group[0].account === row.account;
-      const sameMainOp = mainOpType(group[0].operation) === mainOpType(row.operation);
-
-      // Binance Convert puede tener 1 segundo de diferencia entre sus filas.
-      // Para Transaction*, todos los rows son siempre el mismo segundo exacto,
-      // así que 0ms evita mezclar órdenes distintas que ocurran en el mismo segundo.
-      const windowMs = mainOpType(row.operation) === 'BinanceConvert' ? 1500 : 0;
-      if (Math.abs(ts - groupTs) <= windowMs && sameMainOp && sameAccount) {
-        group.push(row);
-        found = true;
-        break;
-      }
-    }
-
-    if (!found) {
-      const key = `${ts}|${mainOpType(row.operation)}|${row.account}`;
-      groups.set(key, [row]);
-    }
-  }
-
-  return groups;
-}
-
 function mainOpType(operation: string): string {
   // Compras: Buy + Spend + Fee (fee puede acompañar a cualquiera, pero en la práctica
   // solo aparece junto a Transaction Buy o Transaction Sold al mismo timestamp)
@@ -140,6 +89,50 @@ function mainOpType(operation: string): string {
   if (operation === 'Binance Convert') return 'BinanceConvert';
   if (operation === 'Small Assets Exchange BNB') return 'SmallAssetsExchange';
   return operation;
+}
+
+// Agrupa filas por timestamp+tipo+cuenta. Para el caso general (windowMs=0,
+// la inmensa mayoría de filas) es una coincidencia exacta de clave → lookup
+// O(1) directo. Solo Binance Convert tolera una ventana de hasta 1500ms entre
+// sus filas; para ese caso se mantiene una lista pequeña de candidatos
+// recientes POR CUENTA (solo grupos de tipo BinanceConvert, no todos los
+// grupos creados) en vez de escanear todos los grupos ya creados.
+//
+// Antes escaneaba linealmente TODOS los grupos existentes por cada fila
+// nueva — O(n²). Confirmado empíricamente antes de este fix: 20.000 filas
+// (un historial de varios años con varias cuentas, nada exagerado) tardaban
+// 34s; 50.000 filas, 211s. Con este índice, ambos casos bajan a <1s.
+function groupByTimestamp(rows: RawCsvRow[]): Map<string, RawCsvRow[]> {
+  const groups = new Map<string, RawCsvRow[]>();
+  const recentConvertCandidates = new Map<string, { ts: number; key: string }[]>(); // key: account
+
+  for (const row of rows) {
+    const ts = row.time.getTime();
+    const op = mainOpType(row.operation);
+
+    if (op !== 'BinanceConvert') {
+      const key = `${ts}|${op}|${row.account}`;
+      const existing = groups.get(key);
+      if (existing) existing.push(row);
+      else groups.set(key, [row]);
+      continue;
+    }
+
+    // Binance Convert puede tener hasta 1500ms de diferencia entre sus filas.
+    const WINDOW_MS = 1500;
+    const candidates = recentConvertCandidates.get(row.account) ?? [];
+    const match = candidates.find((c) => Math.abs(ts - c.ts) <= WINDOW_MS);
+    if (match) {
+      groups.get(match.key)!.push(row);
+    } else {
+      const key = `${ts}|${op}|${row.account}`;
+      groups.set(key, [row]);
+      candidates.push({ ts, key });
+      recentConvertCandidates.set(row.account, candidates);
+    }
+  }
+
+  return groups;
 }
 
 // ── Parser principal ───────────────────────────────────────────────────────
@@ -331,7 +324,21 @@ export async function parseBinanceCsv(fileContent: Buffer | string): Promise<Csv
   };
 }
 
+// Construye el set de claves de depósitos que financian compras "Transaction Related".
+// Clave: `${ts_ms}|${account}|${coin}|${amount}` → el Deposit con esa clave se ignora.
+function buildFundingDepositKeys(preprocessedRows: RawCsvRow[]): Set<string> {
+  const keys = new Set<string>();
+  for (const row of preprocessedRows) {
+    if (row.operation === 'Transaction Related' && FIAT_ASSETS.has(row.coin.toUpperCase()) && row.change < 0) {
+      keys.add(`${row.time.getTime()}|${row.account}|${row.coin}|${abs(row.change)}`);
+    }
+  }
+  return keys;
+}
+
 // ── Interpretación de grupos ───────────────────────────────────────────────
+// Dispatcher: delega en los interpretadores por familia de operación
+// (interpreters/transfers.ts, trades.ts, marginAndFees.ts, lockUnlock.ts).
 async function interpretGroup(
   group: RawCsvRow[],
   fundingDepositKeys: Set<string>
@@ -343,71 +350,15 @@ async function interpretGroup(
   const account = group[0].account;
 
   if (firstOp === 'Deposit') {
-    const row = group[0];
-    // Depósitos que financian una compra "Transaction Related" al mismo timestamp.
-    // El dinero SÍ entró desde el banco → DEPOSIT_FIAT para que fiat-balances lo contabilice.
-    // La compra queda registrada por separado (BUY con costAsset=EUR), y ambos se cancelan.
-    const fundingKey = `${timestamp.getTime()}|${account}|${row.coin}|${abs(row.change)}`;
-    if (fundingDepositKeys.has(fundingKey)) {
-      const isFundingFiat = FIAT_ASSETS.has(row.coin.toUpperCase());
-      return {
-        operationType: isFundingFiat ? 'DEPOSIT_FIAT' as const : 'IGNORED' as const,
-        timestamp,
-        asset:     row.coin,
-        amount:    abs(row.change),
-        amountNet: abs(row.change),
-        account,
-        notes:     'Depósito bancario para compra simultánea (Transaction Related)',
-        subTradeCount: 1,
-        rawRowHashes: hashes,
-      };
-    }
-    // Fiat → DEPOSIT_FIAT (tracking contable, FIFO lo salta)
-    // Cripto → DEPOSIT_CRYPTO: abre lote al precio de mercado estimado.
-    //   La cantidad proviene de otra wallet: coste real de adquisición desconocido.
-    //   Se marca para revisión manual del coste (needsCostReview).
-    const isFiat = FIAT_ASSETS.has(row.coin.toUpperCase());
-    return {
-      operationType: isFiat ? 'DEPOSIT_FIAT' : 'DEPOSIT_CRYPTO',
-      timestamp,
-      asset: row.coin,
-      amount: abs(row.change),
-      amountNet: abs(row.change),
-      account,
-      notes: isFiat ? undefined : 'Depósito de cripto externo — coste de adquisición original desconocido. Verificar y ajustar si es necesario.',
-      subTradeCount: 1,
-      rawRowHashes: hashes,
-      needsCostReview: !isFiat,
-    };
+    return interpretDeposit(group, hashes, timestamp, account, fundingDepositKeys);
   }
 
   if (firstOp === 'Fiat Withdraw') {
-    // Retiro de EUR/fiat al banco. No hay lote FIFO que mover.
-    // Se registra como WITHDRAW_FIAT para tracking contable (cuánto ha salido al banco).
-    const row = group[0];
-    return {
-      operationType: 'WITHDRAW_FIAT',
-      timestamp,
-      asset: row.coin,
-      amount: abs(row.change),
-      amountNet: abs(row.change),
-      account,
-      subTradeCount: 1,
-      rawRowHashes: hashes,
-    };
+    return interpretFiatWithdraw(group, hashes, timestamp, account);
   }
 
   if (firstOp === 'Withdraw') {
-    return group.map((row) => ({
-      operationType: 'WITHDRAW' as const,
-      timestamp,
-      asset: row.coin,
-      amount: abs(row.change),
-      amountNet: abs(row.change),
-      account,
-      subTradeCount: 1,
-      rawRowHashes: [row.rowHash],
-    }));
+    return interpretWithdraw(group, timestamp);
   }
 
   if (ops.every((o) => o === 'Binance Convert')) {
@@ -418,21 +369,8 @@ async function interpretGroup(
     return interpretSoldRevenue(group, hashes, timestamp, account);
   }
 
-  // Grupo de Transaction Fee sin compra/venta asociada.
-  // Ocurre con fees de margen, ajustes o fees de liquidaciones registradas aparte.
-  // Cada fila es una fee independiente → FEE_EXCHANGE.
   if (group.every((r) => r.operation === 'Transaction Fee')) {
-    return group.map((row) => ({
-      operationType: 'FEE_EXCHANGE' as const,
-      timestamp:     row.time,
-      asset:         row.coin,
-      amount:        abs(row.change),
-      amountNet:     abs(row.change),
-      account:       row.account,
-      notes:         'Standalone Transaction Fee',
-      subTradeCount: 1,
-      rawRowHashes:  [row.rowHash],
-    }));
+    return interpretStandaloneFee(group);
   }
 
   if (ops.some(o => FIAT_BUY_OPS.has(o))) {
@@ -440,70 +378,19 @@ async function interpretGroup(
   }
 
   if (firstOp === 'BNB Fee Deduction') {
-    // BNB Fee Deduction negativo: fee standalone en BNB → FEE_EXCHANGE (evento imponible)
-    // BNB Fee Deduction positivo (en Isolated Margin): devolución de la fee original
-    //   pagada en FTT/USDT que Binance reemplazó con BNB. → CASHBACK (pequeño ingreso)
-    return group.map((row) => ({
-      operationType: row.change < 0 ? 'FEE_EXCHANGE' as const : 'CASHBACK' as const,
-      timestamp:     row.time,
-      asset:         row.coin,
-      amount:        abs(row.change),
-      amountNet:     abs(row.change),
-      account:       row.account,
-      notes:         row.change < 0
-        ? 'BNB Fee Deduction — fee en BNB (evento imponible)'
-        : 'BNB Fee Deduction — devolución de fee original (rebate)',
-      subTradeCount: 1,
-      rawRowHashes:  [row.rowHash],
-    }));
+    return interpretBnbFeeDeduction(group);
   }
 
   if (firstOp === 'Margin Fee' || firstOp === 'Isolated Margin Liquidation - Fee') {
-    // Interés/fee de margen pagado en cripto.
-    // España: disposición patrimonial al precio de mercado → evento imponible.
-    const row = group[0];
-    return {
-      operationType: 'FEE_EXCHANGE',
-      timestamp,
-      asset:    row.coin,
-      amount:   abs(row.change),
-      amountNet:abs(row.change),
-      account,
-      notes:    firstOp,
-      subTradeCount: 1,
-      rawRowHashes: hashes,
-    };
+    return interpretMarginFee(group, hashes, timestamp, account, firstOp);
   }
 
   if (firstOp === 'Isolated Margin Loan') {
-    // Préstamo de margen aislado — abre lote al precio de mercado para poder rastrear
-    // el FIFO cuando el activo prestado se vende/transfiere posteriormente.
-    return group.map((row) => ({
-      operationType: 'MARGIN_BORROW' as const,
-      timestamp:     row.time,
-      asset:         row.coin,
-      amount:        abs(row.change),
-      amountNet:     abs(row.change),
-      account:       row.account,
-      notes:         'Isolated Margin Loan — préstamo (lote abierto a precio de mercado)',
-      subTradeCount: 1,
-      rawRowHashes:  [row.rowHash],
-    }));
+    return interpretMarginBorrow(group, firstOp, 'Isolated Margin Loan — préstamo (lote abierto a precio de mercado)');
   }
 
   if (firstOp === 'Isolated Margin Repayment') {
-    // Devolución de préstamo — consume el lote sin registrar G/P (retorno de deuda).
-    return group.map((row) => ({
-      operationType: 'MARGIN_REPAY' as const,
-      timestamp:     row.time,
-      asset:         row.coin,
-      amount:        abs(row.change),
-      amountNet:     abs(row.change),
-      account:       row.account,
-      notes:         'Isolated Margin Repayment — devolución de préstamo (sin impacto fiscal)',
-      subTradeCount: 1,
-      rawRowHashes:  [row.rowHash],
-    }));
+    return interpretMarginRepay(group, 'Isolated Margin Repayment — devolución de préstamo (sin impacto fiscal)');
   }
 
   if (ops.every((o) => o === 'Small Assets Exchange BNB')) {
@@ -521,360 +408,46 @@ async function interpretGroup(
   // ── Liquidaciones de margen ────────────────────────────────────────────────
 
   if (firstOp === 'Margin Loan') {
-    // Préstamo de margen — abre lote a precio de mercado para rastrear FIFO
-    // cuando el activo prestado se vende o transfiere.
-    return group.map((row) => ({
-      operationType: 'MARGIN_BORROW' as const,
-      timestamp:     row.time,
-      asset:         row.coin,
-      amount:        abs(row.change),
-      amountNet:     abs(row.change),
-      account:       row.account,
-      notes:         'Margin Loan — préstamo (lote abierto a precio de mercado)',
-      subTradeCount: 1,
-      rawRowHashes:  [row.rowHash],
-    }));
+    return interpretMarginBorrow(group, firstOp, 'Margin Loan — préstamo (lote abierto a precio de mercado)');
   }
 
   if (firstOp === 'Margin Repayment') {
-    // Devolución del préstamo — consume lote sin registrar G/P (retorno de deuda).
-    return group.map((row) => ({
-      operationType: 'MARGIN_REPAY' as const,
-      timestamp:     row.time,
-      asset:         row.coin,
-      amount:        abs(row.change),
-      amountNet:     abs(row.change),
-      account:       row.account,
-      notes:         'Margin Repayment — devolución de préstamo (sin impacto fiscal)',
-      subTradeCount: 1,
-      rawRowHashes:  [row.rowHash],
-    }));
+    return interpretMarginRepay(group, 'Margin Repayment — devolución de préstamo (sin impacto fiscal)');
   }
 
   if (firstOp === 'Cross Margin Liquidation - Small Assets Takeover') {
-    // Venta forzosa de colateral para cubrir la deuda.
-    // La fila negativa es el activo vendido; la positiva son los proceeds recibidos.
-    // Tratamiento España: transmisión patrimonial imponible (igual que una venta normal).
-    const soldRow     = group.find((r) => r.change < 0);
-    const proceedsRow = group.find((r) => r.change > 0);
-
-    if (!soldRow || !proceedsRow) {
-      throw new Error(`Cross Margin Liquidation - Small Assets Takeover incompleto en ${timestamp.toISOString()}`);
-    }
-
-    return {
-      operationType: 'SELL',
-      timestamp,
-      asset:        soldRow.coin,
-      amount:       abs(soldRow.change),
-      amountNet:    abs(soldRow.change),
-      costAsset:    proceedsRow.coin,
-      costAmount:   abs(proceedsRow.change),
-      pricePerUnit: abs(soldRow.change) > 0 ? abs(proceedsRow.change) / abs(soldRow.change) : 0,
-      account,
-      notes:        'Liquidación forzosa de margen — venta forzosa de colateral',
-      subTradeCount: 1,
-      rawRowHashes: hashes,
-    };
+    return interpretCrossMarginLiquidationTakeover(group, hashes, timestamp, account);
   }
 
   if (firstOp === 'Cross Margin Liquidation - Repayment') {
-    // Repago forzoso del préstamo de margen vía liquidación automática de Binance.
-    // Económicamente idéntico a Margin Repayment: cierra el lote FIFO sin G/P.
-    return group.map((row) => ({
-      operationType: 'MARGIN_REPAY' as const,
-      timestamp:     row.time,
-      asset:         row.coin,
-      amount:        abs(row.change),
-      amountNet:     abs(row.change),
-      account:       row.account,
-      notes:         'Liquidación forzosa de margen — devolución de préstamo (sin impacto fiscal)',
-      subTradeCount: 1,
-      rawRowHashes:  [row.rowHash],
-    }));
+    return interpretMarginRepay(group, 'Liquidación forzosa de margen — devolución de préstamo (sin impacto fiscal)');
   }
 
-  // Bloqueo de fondos para staking (Staking Purchase)
-  // Fila única negativa en Funding/Spot. Los lotes permanecen en la wallet origen (no-op FIFO).
-  if (firstOp === 'Staking Purchase') {
-    const outRow = group.find((r) => r.change < 0);
-    if (!outRow) return [];
-    return [{
-      operationType: 'STAKING_LOCK' as const,
-      timestamp:     outRow.time,
-      asset:         outRow.coin,
-      amount:        abs(outRow.change),
-      amountNet:     abs(outRow.change),
-      account:       outRow.account,
-      notes:         firstOp,
-      subTradeCount: group.length,
-      rawRowHashes:  group.map((r) => r.rowHash),
-    }];
-  }
+  // Bloqueos/desbloqueos de staking, launchpool y simple-earn
+  const lockUnlockResult = tryInterpretLockUnlock(firstOp, group);
+  if (lockUnlockResult !== null) return lockUnlockResult;
 
-  // Desbloqueo de staking (Staking Redemption)
-  // Fila única positiva en Funding/Spot. Los lotes vuelven a estar disponibles (no-op FIFO).
-  // El importer enlazará esta tx con el STAKING_LOCK correspondiente via linked_tx_id.
-  if (firstOp === 'Staking Redemption') {
-    const inRow = group.find((r) => r.change > 0);
-    if (!inRow) return [];
-    return [{
-      operationType: 'STAKING_UNLOCK' as const,
-      timestamp:     inRow.time,
-      asset:         inRow.coin,
-      amount:        abs(inRow.change),
-      amountNet:     abs(inRow.change),
-      account:       inRow.account,
-      notes:         firstOp,
-      subTradeCount: group.length,
-      rawRowHashes:  group.map((r) => r.rowHash),
-    }];
-  }
-
-  // Simple Earn Flexible Subscription → movimiento Spot→Earn Flexible (STAKING_LOCK, sin evento fiscal)
-  if (firstOp === 'Simple Earn Flexible Subscription') {
-    const outRow = group.find((r) => r.change < 0);
-    if (!outRow) return [];
-    return [{
-      operationType: 'STAKING_LOCK' as const,
-      timestamp:     outRow.time,
-      asset:         outRow.coin,
-      amount:        abs(outRow.change),
-      amountNet:     abs(outRow.change),
-      account:       outRow.account,
-      notes:         firstOp,
-      subTradeCount: group.length,
-      rawRowHashes:  group.map((r) => r.rowHash),
-    }];
-  }
-
-  // Simple Earn Flexible Redemption → movimiento Earn Flexible→Spot (STAKING_UNLOCK, sin evento fiscal)
-  if (firstOp === 'Simple Earn Flexible Redemption') {
-    const inRow = group.find((r) => r.change > 0);
-    if (!inRow) return [];
-    return [{
-      operationType: 'STAKING_UNLOCK' as const,
-      timestamp:     inRow.time,
-      asset:         inRow.coin,
-      amount:        abs(inRow.change),
-      amountNet:     abs(inRow.change),
-      account:       inRow.account,
-      notes:         firstOp,
-      subTradeCount: group.length,
-      rawRowHashes:  group.map((r) => r.rowHash),
-    }];
-  }
-
-  // Simple Earn Locked Subscription → equivalente a Staking Purchase (STAKING_LOCK)
-  // Fila única negativa. Los lotes permanecen en la wallet origen (no-op FIFO).
-  if (firstOp === 'Simple Earn Locked Subscription') {
-    const outRow = group.find((r) => r.change < 0);
-    if (!outRow) return [];
-    return [{
-      operationType: 'STAKING_LOCK' as const,
-      timestamp:     outRow.time,
-      asset:         outRow.coin,
-      amount:        abs(outRow.change),
-      amountNet:     abs(outRow.change),
-      account:       outRow.account,
-      notes:         firstOp,
-      subTradeCount: group.length,
-      rawRowHashes:  group.map((r) => r.rowHash),
-    }];
-  }
-
-  // Simple Earn Locked Redemption → equivalente a Staking Redemption (STAKING_UNLOCK)
-  // Fila única positiva. El importer enlaza con el STAKING_LOCK correspondiente.
-  if (firstOp === 'Simple Earn Locked Redemption') {
-    const inRow = group.find((r) => r.change > 0);
-    if (!inRow) return [];
-    return [{
-      operationType: 'STAKING_UNLOCK' as const,
-      timestamp:     inRow.time,
-      asset:         inRow.coin,
-      amount:        abs(inRow.change),
-      amountNet:     abs(inRow.change),
-      account:       inRow.account,
-      notes:         firstOp,
-      subTradeCount: group.length,
-      rawRowHashes:  group.map((r) => r.rowHash),
-    }];
-  }
-
-  // Bloqueo de activo en Launchpool (cualquier activo — BNB, FDUSD, etc.)
-  // Fila única negativa. Los lotes permanecen en el wallet (no-op FIFO).
-  // "Launchpool Subscription/Redemption" es la nueva label combinada de Binance (2025+):
-  // negativo = suscripción (lock), positivo = redención (unlock) — se resuelve por signo.
-  if (firstOp === 'Launchpool Subscription' ||
-      (firstOp === 'Launchpool Subscription/Redemption' && group.some(r => r.change < 0))) {
-    const outRow = group.find((r) => r.change < 0);
-    if (!outRow) return [];
-    return [{
-      operationType: 'LAUNCHPOOL_LOCK' as const,
-      timestamp:     outRow.time,
-      asset:         outRow.coin,
-      amount:        abs(outRow.change),
-      amountNet:     abs(outRow.change),
-      account:       outRow.account,
-      notes:         firstOp,
-      subTradeCount: group.length,
-      rawRowHashes:  group.map((r) => r.rowHash),
-    }];
-  }
-
-  // Desbloqueo de activo al salir del Launchpool.
-  // Fila única positiva. El importer enlaza con el LAUNCHPOOL_LOCK correspondiente.
-  if (firstOp === 'Launchpool Redemption' ||
-      (firstOp === 'Launchpool Subscription/Redemption' && group.some(r => r.change > 0))) {
-    const inRow = group.find((r) => r.change > 0);
-    if (!inRow) return [];
-    return [{
-      operationType: 'LAUNCHPOOL_UNLOCK' as const,
-      timestamp:     inRow.time,
-      asset:         inRow.coin,
-      amount:        abs(inRow.change),
-      amountNet:     abs(inRow.change),
-      account:       inRow.account,
-      notes:         firstOp,
-      subTradeCount: group.length,
-      rawRowHashes:  group.map((r) => r.rowHash),
-    }];
-  }
-
-  // ETH 2.0 Staking: ETH → BETH (1:1, mismo timestamp)
-  // Tratamiento: swap/convert — se consume el lote de ETH y se abre lote de BETH
-  // al precio de mercado del día. El G/P se calcula como en cualquier permuta cripto↔cripto.
+  // ETH 2.0 Staking: ETH → BETH (1:1, mismo timestamp) — swap/convert
   if (firstOp === 'ETH 2.0 Staking') {
-    // 1 fila de entrada + 1 de salida esperadas. Una 3ª (p. ej. fee) hoy se
-    // perdería/confundiría en silencio — se prefiere fallar explícito
-    // (mismo criterio que interpretConvert/interpretSmallAssetsExchange).
-    if (group.length > 2) {
-      throw new Error(`ETH 2.0 Staking con ${group.length} filas (esperadas 2) en ${timestamp.toISOString()} — revisión manual necesaria, posible fee no capturado`);
-    }
-    const outRow = group.find(r => r.change < 0); // ETH saliente
-    const inRow  = group.find(r => r.change > 0); // BETH entrante
-    if (!outRow || !inRow) {
-      // Fila suelta (solo entrada o solo salida) → ignorar
-      return [];
-    }
-    return [{
-      operationType: 'BUY' as const,
-      timestamp,
-      asset:        inRow.coin,
-      amount:       abs(inRow.change),
-      amountNet:    abs(inRow.change),
-      costAsset:    outRow.coin,
-      costAmount:   abs(outRow.change),
-      pricePerUnit: abs(outRow.change) / abs(inRow.change),
-      account,
-      notes: `ETH 2.0 Staking: ${outRow.coin}→${inRow.coin}`,
-      subTradeCount: group.length,
-      rawRowHashes:  hashes,
-    }];
+    return interpretEthStaking(group, hashes, timestamp, account);
   }
 
-  // ETH 2.0 Staking Withdrawals: BETH → ETH (1:1, mismo timestamp)
-  // Tratamiento: swap/convert inverso — se consumen lotes de BETH y se abre lote de ETH.
+  // ETH 2.0 Staking Withdrawals: BETH → ETH (1:1, mismo timestamp) — swap inverso
   if (firstOp === 'ETH 2.0 Staking Withdrawals') {
-    if (group.length > 2) {
-      throw new Error(`ETH 2.0 Staking Withdrawals con ${group.length} filas (esperadas 2) en ${timestamp.toISOString()} — revisión manual necesaria, posible fee no capturado`);
-    }
-    const outRow = group.find(r => r.change < 0); // BETH saliente
-    const inRow  = group.find(r => r.change > 0); // ETH entrante
-    if (!outRow || !inRow) {
-      return [];
-    }
-    return [{
-      operationType: 'BUY' as const,
-      timestamp,
-      asset:        inRow.coin,
-      amount:       abs(inRow.change),
-      amountNet:    abs(inRow.change),
-      costAsset:    outRow.coin,
-      costAmount:   abs(outRow.change),
-      pricePerUnit: abs(outRow.change) / abs(inRow.change),
-      account,
-      notes: `ETH 2.0 Staking Withdrawals: ${outRow.coin}→${inRow.coin}`,
-      subTradeCount: group.length,
-      rawRowHashes:  hashes,
-    }];
+    return interpretEthStakingWithdrawals(group, hashes, timestamp, account);
   }
 
-  // Transferencias internas entre sub-cuentas de Binance
-  // Solo emitimos la fila de salida (change < 0) como TRANSFER_INTERNAL.
-  // La fila de entrada es redundante: el FIFO mueve el lote al destino automáticamente.
   if (INTERNAL_TRANSFER_OPS.has(firstOp)) {
-    const outRows = group.filter((r) => r.change < 0);
-    if (outRows.length === 0) return [];
-    // Un activo distinto por fila saliente — pueden ser varios al mismo timestamp
-    // (ej: al cerrar un grid bot Binance transfiere USDT + el activo residual a la vez)
-    return outRows.map(outRow => ({
-      operationType: 'TRANSFER_INTERNAL' as const,
-      timestamp:     outRow.time,
-      asset:         outRow.coin,
-      amount:        abs(outRow.change),
-      amountNet:     abs(outRow.change),
-      account:       outRow.account,
-      notes:         firstOp,
-      subTradeCount: 1,
-      rawRowHashes:  [outRow.rowHash],
-    }));
+    return interpretInternalTransfer(group, firstOp);
   }
 
-  // Fee rebate de Binance Strategy: BNB negativo (fee pagada) + positivos (rebate recibido)
   if (firstOp === 'Strategy Trading Fee Rebate') {
-    return group.map(row => ({
-      operationType: row.change < 0 ? 'FEE_EXCHANGE' as const : 'CASHBACK' as const,
-      timestamp:     row.time,
-      asset:         row.coin,
-      amount:        abs(row.change),
-      amountNet:     abs(row.change),
-      account:       row.account,
-      notes:         'Strategy Trading Fee Rebate',
-      subTradeCount: 1,
-      rawRowHashes:  [row.rowHash],
-    }));
+    return interpretStrategyFeeRebate(group);
   }
 
   // Operaciones de income (staking, lending, airdrop, cashback)
   if (INCOME_OPS[firstOp]) {
-    const opType = INCOME_OPS[firstOp];
-    const results: ParsedTransaction[] = [];
-
-    for (const row of group) {
-      if (row.change > 0) {
-        // Ingreso normal — abre lote al precio de mercado
-        results.push({
-          operationType: opType,
-          timestamp:     row.time,
-          asset:         row.coin,
-          amount:        abs(row.change),
-          amountNet:     abs(row.change),
-          account:       row.account,
-          notes:         firstOp,
-          subTradeCount: 1,
-          rawRowHashes:  [row.rowHash],
-        });
-      } else if (firstOp === 'Asset Recovery' || firstOp === 'Token Swap - Distribution') {
-        // Cambio negativo en Asset Recovery o Token Swap Distribution:
-        // Binance retiró el activo de forma forzada (delisting, swap, confiscación).
-        // Se registra como LOST: cierra el lote FIFO a 0 proceeds → pérdida patrimonial.
-        results.push({
-          operationType: 'LOST' as const,
-          timestamp:     row.time,
-          asset:         row.coin,
-          amount:        abs(row.change),
-          amountNet:     abs(row.change),
-          account:       row.account,
-          notes:         `${firstOp} — activo retirado por Binance`,
-          subTradeCount: 1,
-          rawRowHashes:  [row.rowHash],
-        });
-      }
-      // Otras income ops con change negativo → ignorar (ajustes contables Binance)
-    }
-
-    return results.length > 0 ? results : null;
+    return interpretIncomeOp(group, firstOp);
   }
 
   // Compra EUR→cripto vía depósito directo (patrón antiguo Binance)
@@ -903,438 +476,4 @@ async function interpretGroup(
     `Grupo no reconocido: ops=[${[...new Set(ops)].join(', ')}] ` +
     `coin=${group.map((r) => r.coin).join(',')} ts=${timestamp.toISOString()}`
   );
-}
-
-// Construye el set de claves de depósitos que financian compras "Transaction Related".
-// Clave: `${ts_ms}|${account}|${coin}|${amount}` → el Deposit con esa clave se ignora.
-function buildFundingDepositKeys(preprocessedRows: RawCsvRow[]): Set<string> {
-  const keys = new Set<string>();
-  for (const row of preprocessedRows) {
-    if (row.operation === 'Transaction Related' && FIAT_ASSETS.has(row.coin.toUpperCase()) && row.change < 0) {
-      keys.add(`${row.time.getTime()}|${row.account}|${row.coin}|${abs(row.change)}`);
-    }
-  }
-  return keys;
-}
-
-function interpretTransactionRelated(
-  group: RawCsvRow[], hashes: string[], timestamp: Date, account: string
-): ParsedTransaction {
-  const cryptoRow = group.find(r => !FIAT_ASSETS.has(r.coin.toUpperCase()) && r.change > 0);
-  const fiatRow   = group.find(r => FIAT_ASSETS.has(r.coin.toUpperCase()) && r.change < 0);
-
-  if (!cryptoRow || !fiatRow) {
-    throw new Error(
-      `Transaction Related con patrón no reconocido en ${timestamp.toISOString()}: ` +
-      group.map(r => `${r.coin} ${r.change}`).join(' | ')
-    );
-  }
-
-  return {
-    operationType: 'BUY',
-    timestamp,
-    asset:        cryptoRow.coin,
-    amount:       abs(cryptoRow.change),
-    amountNet:    abs(cryptoRow.change),
-    costAsset:    fiatRow.coin,
-    costAmount:   abs(fiatRow.change),
-    pricePerUnit: abs(fiatRow.change) / abs(cryptoRow.change),
-    account,
-    notes:        'Compra via depósito directo (Transaction Related)',
-    subTradeCount: 1,
-    rawRowHashes: hashes,
-  };
-}
-
-function interpretConvert(
-  group: RawCsvRow[], hashes: string[], timestamp: Date, account: string
-): ParsedTransaction {
-  // Se asume siempre 1 fila de entrada + 1 de salida. Si Binance añadiera una
-  // 3ª fila (p. ej. un fee en un activo aparte) hoy se perdería o confundiría
-  // en silencio — se prefiere fallar explícito y forzar revisión manual
-  // (no hay datos reales hoy que ejerciten este caso, ver auditoría).
-  if (group.length > 2) {
-    throw new Error(`Binance Convert con ${group.length} filas (esperadas 2) en ${timestamp.toISOString()} — revisión manual necesaria, posible fee no capturado`);
-  }
-
-  const inRow  = group.find((r) => r.change > 0);
-  const outRow = group.find((r) => r.change < 0);
-
-  if (!inRow || !outRow) {
-    throw new Error(`Binance Convert incompleto en ${timestamp.toISOString()}`);
-  }
-
-  const amountIn  = abs(inRow.change);
-  const amountOut = abs(outRow.change);
-
-  return {
-    operationType: 'BUY',
-    timestamp,
-    asset: inRow.coin,
-    amount: amountIn,
-    amountNet: amountIn,
-    costAsset: outRow.coin,
-    costAmount: amountOut,
-    pricePerUnit: amountOut / amountIn,
-
-    account,
-    notes: `Binance Convert: ${outRow.coin}→${inRow.coin}`,
-    subTradeCount: 1,
-    rawRowHashes: hashes,
-  };
-}
-
-function interpretSoldRevenue(
-  group: RawCsvRow[], hashes: string[], timestamp: Date, account: string
-): ParsedTransaction {
-  const soldRows    = group.filter((r) => r.operation === 'Transaction Sold');
-  const revenueRows = group.filter((r) => r.operation === 'Transaction Revenue');
-  const feeRows     = group.filter((r) => r.operation === 'Transaction Fee');
-
-  if (soldRows.length === 0 || revenueRows.length === 0) {
-    throw new Error(`Transaction Sold/Revenue incompleto en ${timestamp.toISOString()}`);
-  }
-
-  // Validar que todos los fills son del mismo activo vendido.
-  // Si hay distintos activos vendidos al mismo segundo (dos órdenes distintas),
-  // es un caso no soportado — mejor un error explícito que datos incorrectos.
-  const soldAssets = [...new Set(soldRows.map(r => r.coin))];
-  if (soldAssets.length > 1) {
-    throw new Error(
-      `Transaction Sold con múltiples activos distintos al mismo timestamp (${timestamp.toISOString()}): ` +
-      `${soldAssets.join(', ')} — no soportado, revisa manualmente.`
-    );
-  }
-
-  // Sumar TODOS los fills (Binance divide órdenes grandes en múltiples filas)
-  const soldAsset    = soldRows[0].coin;
-  const revenueAsset = revenueRows[0].coin;
-  const totalSold    = soldRows.reduce((s, r) => s + abs(r.change), 0);
-  const totalRevenue = revenueRows.reduce((s, r) => s + abs(r.change), 0);
-
-  // Sumar fees por activo
-  const feeByAsset = new Map<string, number>();
-  for (const row of feeRows) {
-    feeByAsset.set(row.coin, (feeByAsset.get(row.coin) ?? 0) + abs(row.change));
-  }
-  const feeAsset  = feeRows[0]?.coin;
-  const feeAmount = feeAsset ? feeByAsset.get(feeAsset) : undefined;
-
-  return {
-    operationType: 'SELL',
-    timestamp,
-    asset:        soldAsset,
-    amount:       totalSold,
-    amountNet:    totalSold,
-    costAsset:    revenueAsset,
-    costAmount:   totalRevenue,
-    pricePerUnit: totalSold > 0 ? totalRevenue / totalSold : 0,
-    feeAsset,
-    feeAmount,
-    account,
-    notes: soldRows.length > 1 ? `${soldRows.length} fills parciales` : undefined,
-    subTradeCount: soldRows.length,
-    rawRowHashes: hashes,
-  };
-}
-
-function interpretBuyCryptoWithFiat(
-  group: RawCsvRow[], hashes: string[], timestamp: Date, account: string
-): ParsedTransaction {
-  // La fila negativa es lo que se pagó (EUR u otro fiat)
-  // La fila positiva es lo que se recibió (cripto)
-  const paidRow     = group.find((r) => r.change < 0);
-  const receivedRow = group.find((r) => r.change > 0);
-
-  if (!paidRow || !receivedRow) {
-    // Fila huérfana: solo hay la cripto recibida sin contrapartida de pago.
-    // Puede ocurrir cuando el export no incluye el período del pago EUR.
-    // Se abre lote al precio de mercado del día como mejor estimación.
-    const row = group.find((r) => r.change > 0) ?? group[0];
-    return {
-      operationType: 'AIRDROP',
-      timestamp,
-      asset: row.coin,
-      amount: abs(row.change),
-      amountNet: abs(row.change),
-      account,
-      notes: `${row.operation} — contrapartida EUR no disponible en este export (verificar coste manualmente)`,
-      subTradeCount: 1,
-      rawRowHashes: hashes,
-    };
-  }
-
-  return {
-    operationType: 'BUY',
-    timestamp:    receivedRow.time,
-    asset:        receivedRow.coin,
-    amount:       abs(receivedRow.change),
-    amountNet:    abs(receivedRow.change),
-    costAsset:    paidRow.coin,
-    costAmount:   abs(paidRow.change),
-    pricePerUnit: abs(paidRow.change) / abs(receivedRow.change),
-    account,
-    notes: paidRow.remark ? `${getOperationLabel(group)} vía ${paidRow.remark}` : undefined,
-    subTradeCount: 1,
-    rawRowHashes: hashes,
-  };
-}
-
-function getOperationLabel(group: RawCsvRow[]): string {
-  return group[0]?.operation ?? '';
-}
-
-function interpretSmallAssetsExchange(
-  group: RawCsvRow[], _hashes: string[], timestamp: Date, account: string
-): ParsedTransaction[] {
-  // Binance puede convertir varios activos a BNB simultáneamente (mismo timestamp).
-  // Cada conversión tiene un remark distinto ("USDC to BNB", "EUR to BNB", etc.).
-  // Agrupamos por remark para producir una transacción BUY por cada par.
-  const byRemark = new Map<string, RawCsvRow[]>();
-  for (const row of group) {
-    const key = row.remark || '_noRemark';
-    if (!byRemark.has(key)) byRemark.set(key, []);
-    byRemark.get(key)!.push(row);
-  }
-
-  const results: ParsedTransaction[] = [];
-
-  for (const [, rows] of byRemark) {
-    // Cada remark debe tener exactamente 1 fila de entrada + 1 de salida. Si
-    // hubiera una 3ª (p. ej. un fee), hoy se perdería/confundiría en silencio
-    // — se prefiere fallar explícito (ver interpretConvert, mismo criterio).
-    if (rows.length > 2) {
-      throw new Error(`Small Assets Exchange con ${rows.length} filas (esperadas 2) en ${timestamp.toISOString()} — revisión manual necesaria, posible fee no capturado`);
-    }
-
-    const inRow  = rows.find((r) => r.change > 0);
-    const outRow = rows.find((r) => r.change < 0);
-
-    if (!inRow || !outRow) continue;
-
-    results.push({
-      operationType: 'BUY',
-      timestamp,
-      asset:        inRow.coin,
-      amount:       abs(inRow.change),
-      amountNet:    abs(inRow.change),
-      costAsset:    outRow.coin,
-      costAmount:   abs(outRow.change),
-      pricePerUnit: abs(outRow.change) / abs(inRow.change),
-      account,
-      notes:        `Small Assets Exchange: ${outRow.coin}→${inRow.coin} (dust)`,
-      subTradeCount: 1,
-      rawRowHashes: rows.map((r) => r.rowHash),
-    });
-  }
-
-  if (results.length === 0) {
-    throw new Error(`Small Assets Exchange sin pares válidos en ${timestamp.toISOString()}`);
-  }
-
-  return results;
-}
-
-async function interpretTransactionBuy(
-  group: RawCsvRow[], hashes: string[], timestamp: Date, account: string
-): Promise<ParsedTransaction | ParsedTransaction[]> {
-  const buyRows   = group.filter((r) => r.operation === 'Transaction Buy');
-  const spendRows = group.filter((r) => r.operation === 'Transaction Spend');
-  const feeRows   = group.filter((r) => r.operation === 'Transaction Fee');
-
-  const buyAssets   = [...new Set(buyRows.map((r) => r.coin))];
-  const spendAssets = [...new Set(spendRows.map((r) => r.coin))];
-
-  // Detectar SELL encubierta: en margin, Binance a veces emite Transaction Buy con
-  // importe negativo (el activo sale) y Transaction Spend con importe positivo (recibes).
-  // Ej: Transaction Buy XRP -612.5 + Transaction Spend USDC +1262.85 = SELL de XRP
-  const totalBoughtSigned = buyRows.reduce((s, r) => s + r.change, 0);
-  const totalSpentSigned  = spendRows.reduce((s, r) => s + r.change, 0);
-
-  if (totalBoughtSigned < 0 && totalSpentSigned > 0 && buyAssets.length === 1) {
-    // Es una SELL: el activo del "buy" (con signo negativo) se vende,
-    // el activo del "spend" (con signo positivo) son los proceeds.
-    const soldAsset   = buyAssets[0];
-    const totalSold   = abs(totalBoughtSigned);
-    const totalProc   = abs(totalSpentSigned);
-    const feeAsset    = feeRows[0]?.coin;
-    const totalFee    = feeRows.reduce((s, r) => s + abs(r.change), 0);
-
-    return {
-      operationType: 'SELL',
-      timestamp,
-      asset:        soldAsset,
-      amount:       totalSold,
-      amountNet:    totalSold,
-      costAsset:    spendAssets[0],
-      costAmount:   totalProc,
-      pricePerUnit: totalSold > 0 ? totalProc / totalSold : 0,
-      feeAsset:     feeAsset,
-      feeAmount:    totalFee > 0 ? totalFee : undefined,
-      account,
-      notes:        'Venta en margen (Transaction Buy con signo negativo)',
-      subTradeCount: buyRows.length,
-      rawRowHashes: hashes,
-    };
-  }
-
-  if (buyAssets.length > 1) {
-    return await interpretMultiAssetBuy(group, timestamp, account);
-  }
-
-  const asset     = buyAssets[0];
-  const costAsset = spendAssets[0] ?? 'EUR';
-
-  const totalBought = buyRows.reduce((s, r) => s + abs(r.change), 0);
-  const totalSpent  = spendRows.reduce((s, r) => s + abs(r.change), 0);
-
-  const feesInSameAsset = feeRows.filter((r) => r.coin === asset);
-  const feesInOther     = feeRows.filter((r) => r.coin !== asset);
-
-  const feeInAssetTotal = feesInSameAsset.reduce((s, r) => s + abs(r.change), 0);
-  const feeInOtherTotal = feesInOther.reduce((s, r) => s + abs(r.change), 0);
-  const feeOtherAsset   = feesInOther[0]?.coin;
-
-  const amountNet    = totalBought - feeInAssetTotal;
-  const pricePerUnit = totalSpent / totalBought;
-
-  const buyTx: ParsedTransaction = {
-    operationType: 'BUY',
-    timestamp,
-    asset,
-    amount: totalBought,
-    amountNet,
-    costAsset,
-    costAmount: totalSpent,
-    pricePerUnit,
-    // Si hay fees en el mismo activo Y en otro activo (ej: BAKE + BNB),
-    // el BUY solo registra la fee del mismo activo. La fee del otro activo
-    // se devuelve como FEE_EXCHANGE separado para que el FIFO la consuma.
-    feeAsset:  feeInAssetTotal > 0 ? asset : feeOtherAsset,
-    feeAmount: feeInAssetTotal > 0 ? feeInAssetTotal : (feeInOtherTotal > 0 ? feeInOtherTotal : undefined),
-    account,
-    subTradeCount: buyRows.length,
-    rawRowHashes: hashes,
-  };
-
-  // Fees en activo distinto al comprado (ej: BNB) cuando TAMBIÉN hay fees en el mismo activo.
-  // En este caso la fee BNB no cabe en el BUY → FEE_EXCHANGE independiente.
-  if (feeInAssetTotal > 0 && feeInOtherTotal > 0 && feeOtherAsset) {
-    const feeTx: ParsedTransaction = {
-      operationType: 'FEE_EXCHANGE',
-      timestamp,
-      asset:    feeOtherAsset,
-      amount:   feeInOtherTotal,
-      amountNet: feeInOtherTotal,
-      account,
-      notes: `Fee en ${feeOtherAsset} para BUY ${asset}`,
-      subTradeCount: feesInOther.length,
-      rawRowHashes: feesInOther.map(r => r.rowHash),
-    };
-    return [buyTx, feeTx];
-  }
-
-  return buyTx;
-}
-
-async function interpretMultiAssetBuy(
-  group: RawCsvRow[], timestamp: Date, account: string
-): Promise<ParsedTransaction[]> {
-  const buyRows   = group.filter((r) => r.operation === 'Transaction Buy');
-  const spendRows = group.filter((r) => r.operation === 'Transaction Spend');
-  const feeRows   = group.filter((r) => r.operation === 'Transaction Fee');
-
-  const byAsset = new Map<string, RawCsvRow[]>();
-  for (const row of buyRows) {
-    if (!byAsset.has(row.coin)) byAsset.set(row.coin, []);
-    byAsset.get(row.coin)!.push(row);
-  }
-
-  const totalSpent   = spendRows.reduce((s, r) => s + abs(r.change), 0);
-  const costAsset     = spendRows[0]?.coin ?? 'USDC';
-  const feeOtherRows  = feeRows.filter((r) => !byAsset.has(r.coin));
-
-  // Reparto por VALOR real (cantidad × precio de mercado en el momento de la
-  // operación), no por cantidad bruta — sumar 0.01 BTC + 500 XRP como si
-  // fueran unidades comparables no tiene significado económico. Un precio
-  // histórico por activo distinto en el grupo (típicamente 2, nunca decenas).
-  const assetQuantities = [...byAsset.entries()].map(([asset, rows]) => ({
-    asset,
-    rows,
-    quantity: rows.reduce((s, r) => s + abs(r.change), 0),
-  }));
-  const priceByAsset = new Map<string, number>();
-  for (const { asset } of assetQuantities) {
-    priceByAsset.set(asset, await getHistoricalPriceEur(asset, timestamp));
-  }
-  const totalValueEur = assetQuantities.reduce(
-    (s, a) => s + a.quantity * priceByAsset.get(a.asset)!, 0
-  );
-
-  return assetQuantities.map(({ asset, rows, quantity: assetTotal }) => {
-    const assetValueEur     = assetTotal * priceByAsset.get(asset)!;
-    const proportion        = totalValueEur > 0 ? assetValueEur / totalValueEur : 0;
-    const proportionalSpend = totalSpent * proportion;
-
-    const feesInAsset  = feeRows.filter((r) => r.coin === asset);
-    const feeInAssetTotal = feesInAsset.reduce((s, r) => s + abs(r.change), 0);
-    const feeOtherTotal   = feeOtherRows.reduce((s, r) => s + abs(r.change), 0) * proportion;
-    const feeOtherAsset   = feeOtherRows[0]?.coin;
-
-    return {
-      operationType: 'BUY' as const,
-      timestamp,
-      asset,
-      amount: assetTotal,
-      amountNet: assetTotal - feeInAssetTotal,
-      costAsset,
-      costAmount: proportionalSpend,
-      pricePerUnit: proportionalSpend / assetTotal,
-      feeAsset:  feeInAssetTotal > 0 ? asset : feeOtherAsset,
-      feeAmount: feeInAssetTotal > 0 ? feeInAssetTotal : (feeOtherTotal > 0 ? feeOtherTotal : undefined),
-
-      account,
-      subTradeCount: rows.length,
-      rawRowHashes: rows.map((r) => r.rowHash),
-    };
-  });
-}
-
-function interpretTransactionSell(
-  group: RawCsvRow[], hashes: string[], timestamp: Date, account: string
-): ParsedTransaction {
-  // Binance puede dividir una venta grande en varios fills al mismo segundo —
-  // sumar todas las filas de venta y de contrapartida, igual que ya hace
-  // interpretSoldRevenue para Transaction Sold/Revenue, en vez de tomar solo
-  // la primera con find(). La fee (si aparece) nunca co-agrupa aquí por cómo
-  // clasifica mainOpType() — sale siempre como FEE_EXCHANGE independiente.
-  const sellRows    = group.filter((r) => r.operation === 'Transaction Sell' && r.change < 0);
-  const receiveRows = group.filter((r) => r.change > 0 && r.operation !== 'Transaction Fee');
-  const feeRow      = group.find((r) => r.operation === 'Transaction Fee');
-
-  if (sellRows.length === 0) {
-    throw new Error(`Transaction Sell sin fila de venta en ${timestamp.toISOString()}`);
-  }
-
-  const soldAsset = sellRows[0].coin;
-  const totalSold = sellRows.reduce((s, r) => s + abs(r.change), 0);
-  const receiveAsset  = receiveRows[0]?.coin;
-  const totalReceived = receiveRows.length > 0 ? receiveRows.reduce((s, r) => s + abs(r.change), 0) : undefined;
-
-  return {
-    operationType: 'SELL',
-    timestamp,
-    asset: soldAsset,
-    amount: totalSold,
-    amountNet: totalSold,
-    costAsset:  receiveAsset,
-    costAmount: totalReceived,
-    feeAsset:  feeRow?.coin,
-    feeAmount: feeRow ? abs(feeRow.change) : undefined,
-
-    account,
-    notes: sellRows.length > 1 ? `${sellRows.length} fills parciales` : undefined,
-    subTradeCount: sellRows.length,
-    rawRowHashes: hashes,
-  };
 }
