@@ -10,6 +10,7 @@ import { CryptoRowComponent } from './AssetTableCryptoRow'
 import { FiatRowComponent } from './AssetTableFiatRow'
 import { SortTh } from './AssetTableSortTh'
 import { valuePortfolio } from '../utils/portfolioValuation'
+import { DUST_THRESHOLD_EUR } from '../utils/topMovers'
 
 interface AssetTableProps {
   lots: FifoLot[]
@@ -17,7 +18,6 @@ interface AssetTableProps {
   onSimulate?: (asset: string, qty: number, price: number) => void
 }
 
-const DUST_THRESHOLD = 1
 // Referencia estable para el valor por defecto: un `[]` literal en la firma
 // crearía un array nuevo en cada render e invalidaría los useMemo.
 const NO_FIAT: FiatBalance[] = []
@@ -47,14 +47,14 @@ export function AssetTable({ lots, fiatBalances = NO_FIAT, onSimulate }: AssetTa
   const { mainRows, dustRows } = useMemo(() => {
     const all = buildRows(lots, prices, fiatBalances)
     const main = all.filter(r => {
-      if (r.kind === 'fiat') return r.value >= DUST_THRESHOLD
+      if (r.kind === 'fiat') return r.value >= DUST_THRESHOLD_EUR
       const price = prices[r.asset] ?? 0
-      return price === 0 || r.value >= DUST_THRESHOLD
+      return price === 0 || r.value >= DUST_THRESHOLD_EUR
     })
     const dust = all.filter(r => {
-      if (r.kind === 'fiat') return r.value > 0 && r.value < DUST_THRESHOLD
+      if (r.kind === 'fiat') return r.value > 0 && r.value < DUST_THRESHOLD_EUR
       const price = prices[r.asset] ?? 0
-      return price > 0 && r.value < DUST_THRESHOLD
+      return price > 0 && r.value < DUST_THRESHOLD_EUR
     })
     return { mainRows: main, dustRows: dust }
   }, [lots, prices, fiatBalances])
