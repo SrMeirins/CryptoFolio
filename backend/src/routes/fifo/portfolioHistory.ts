@@ -121,7 +121,15 @@ router.get('/portfolio-history', async (req, res) => {
     const days    = daysMap[period] ?? 365;
 
     // Cargar lotes y consumos
-    const lotsRes = await db.query(`SELECT asset, quantity_original::float AS qty, opened_at FROM fifo_lots ORDER BY opened_at`);
+    // Un lote creado por una transferencia entre wallets propias hereda la
+    // fecha de apertura original, pero solo existe desde la transferencia: el
+    // lote de origen se consume en esa fecha. Contarlo desde opened_at
+    // duplicaba las tenencias entre la compra y la transferencia (#165).
+    const lotsRes = await db.query(`
+      SELECT fl.asset, fl.quantity_original::float AS qty,
+             CASE WHEN t.operation_type IN ('TRANSFER_INTERNAL', 'WITHDRAW') THEN t.timestamp ELSE fl.opened_at END AS opened_at
+      FROM fifo_lots fl JOIN transactions t ON t.id = fl.open_transaction_id
+      ORDER BY 3`);
     const consRes = await db.query(`
       SELECT fl.asset, flc.quantity_consumed::float AS qty, flc.consumed_at
       FROM fifo_lot_consumptions flc JOIN fifo_lots fl ON fl.id = flc.lot_id
