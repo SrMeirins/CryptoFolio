@@ -3,14 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Precios de cierre diario a las 00:00 Europe/Madrid (#164). Sin red ni
 // Postgres reales: db, pairDetector, CoinGecko y fetch se sustituyen.
 
-const { queryMock, pairInfoMock, coinGeckoMock } = vi.hoisted(() => ({
+const { queryMock, pairInfoMock, coinGeckoMock, marketChartMock } = vi.hoisted(() => ({
   queryMock: vi.fn(),
   pairInfoMock: vi.fn(),
   coinGeckoMock: vi.fn(),
+  marketChartMock: vi.fn(),
 }));
 vi.mock('../../db/client', () => ({ db: { query: queryMock } }));
 vi.mock('./pairDetector', () => ({ getOrDetectPairInfo: pairInfoMock }));
-vi.mock('./coingecko', () => ({ getHistoricalPriceEur: coinGeckoMock }));
+vi.mock('./coingecko', () => ({ getHistoricalPriceEur: coinGeckoMock, fetchMarketChart: marketChartMock }));
 
 function pairs(overrides: Partial<Record<'binanceEurPair' | 'binanceUsdtPair' | 'binanceBtcPair' | 'binanceEthPair', string>> = {}) {
   return {
@@ -108,6 +109,12 @@ describe('closePrices — getClosePriceEur', () => {
     expect(await cp.getClosePriceEur('AAA', '2026-01-15')).toBeCloseTo(5, 10);
   });
 
+  it('USDT: precio en EUR como inverso de EURUSDT (no existe par USDTEUR)', async () => {
+    fetchMock.mockImplementation(async (u: string) => (u.includes('symbol=EURUSDT') ? kline('1.25') : empty));
+    expect(await cp.getClosePriceEur('USDT', '2026-01-15')).toBeCloseTo(0.8, 10);
+    expect(pairInfoMock).not.toHaveBeenCalled();
+  });
+
   it('usa la caché sin pedir nada a Binance', async () => {
     queryMock.mockResolvedValueOnce({ rows: [{ price_eur: '2.4' }] });
     expect(await cp.getClosePriceEur('XRP', '2026-01-15')).toBe(2.4);
@@ -161,3 +168,46 @@ describe('closePrices — getClosePriceEur', () => {
     expect(insertCalls()).toHaveLength(0);
   });
 });
+
+describe('closePrices — límite de histórico de CoinGecko y precarga por rangos', () => {
+  let cp: typeof import('./closePrices');
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-08T12:00:00Z'));
+    vi.resetModules();
+    queryMock.mockReset();
+    queryMock.mockResolvedValue({ rows: [] });
+    pairInfoMock.mockReset();
+    coinGeckoMock.mockReset();
+    marketChartMock.mockReset();
+    vi.stubGlobal('fetch', vi.fn(async () => empty));
+    cp = await import('./closePrices');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('un día de hace más de un año sin par en Binance no consulta CoinGecko y queda sin precio', async () => {
+    pairInfoMock.mockResolvedValue(pairs());
+    expect(await cp.getClosePriceEur('NFT', '2023-04-12')).toBeNull();
+    expect(coinGeckoMock).not.toHaveBeenCalled();
+    expect(insertCalls()[0][1]).toEqual(['NFT', '2023-04-12', -1, 'none']);
+  });
+
+  it('prefetchCloseRange sin par en Binance usa la serie de CoinGecko y marca lo que queda fuera de plazo', async () => {
+    pairInfoMock.mockResolvedValue(pairs());
+    marketChartMock.mockResolvedValue(new Map([['2026-09-02', 0.01]]));
+
+    await cp.prefetchCloseRange('NFT', '2025-01-01', '2025-01-01');   // fuera de plazo
+    await cp.prefetchCloseRange('NFT', '2026-09-01', '2026-09-01');   // dentro: precio del día siguiente
+
+    const bulk = queryMock.mock.calls.filter(([sql]) => String(sql).includes('unnest'));
+    expect(bulk.some(([sql, params]) => String(sql).includes("'none'") && params[1].includes('2025-01-01'))).toBe(true);
+    expect(bulk.some(([sql, params]) => String(sql).includes("'coingecko_daily'") && params[1].includes('2026-09-01') && params[2][0] === 0.01)).toBe(true);
+    expect(coinGeckoMock).not.toHaveBeenCalled();   // sin peticiones día a día
+  });
+});
+

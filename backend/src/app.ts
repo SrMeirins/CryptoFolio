@@ -11,6 +11,7 @@ import healthRouter from './routes/health';
 import importsRouter from './routes/imports';
 import fifoRouter from './routes/fifo';
 import pricesRouter from './routes/prices';
+import pnlRouter from './routes/pnl';
 import catalogRouter from './routes/catalog';
 import settingsRouter from './routes/settings';
 import transactionsRouter from './routes/transactions';
@@ -38,6 +39,7 @@ app.use('/api/settings', settingsRouter);
 app.use('/api/transactions', transactionsRouter);
 app.use('/api/fiscal', fiscalRouter);
 app.use('/api/wallets', walletsRouter);
+app.use('/api/v1/pnl', pnlRouter);
 
 // ── Frontend estático (solo en modo Electron) ──────────────────────────────
 // El frontend se sirve desde el mismo origen que el backend (127.0.0.1:3001),
