@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { portfolioApi } from '../api/portfolio'
@@ -8,26 +8,19 @@ import { FiscalSection } from './settings/FiscalSection'
 import { DatosSection } from './settings/DatosSection'
 import { GeneralSection } from './settings/GeneralSection'
 import { SetupBanner } from './settings/SetupBanner'
-import { SettingsTabs, VALID_TABS } from './settings/SettingsTabs'
+import { SettingsTabs } from './settings/SettingsTabs'
+import { VALID_TABS } from './settings/validTabs'
 import { useSetupSeen } from '../hooks/useSetupSeen'
 
 export function Settings() {
   const { setupSeen, markSetupSeen } = useSetupSeen()
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const [activeTab, setActiveTab] = useState(() =>
-    tabParam && VALID_TABS.includes(tabParam) ? tabParam : 'wallets'
-  )
-
-  // Keep URL in sync when tab changes programmatically (e.g. via ?tab= link)
-  useEffect(() => {
-    if (tabParam && VALID_TABS.includes(tabParam) && tabParam !== activeTab) {
-      setActiveTab(tabParam)
-    }
-  }, [tabParam, activeTab])
+  // La pestaña activa se deriva de la URL (?tab=), que es la única fuente de
+  // verdad: así los enlaces profundos y el botón atrás funcionan sin duplicar estado.
+  const activeTab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : 'wallets'
 
   function handleTabChange(tab: string) {
-    setActiveTab(tab)
     setSearchParams({ tab }, { replace: true })
   }
 

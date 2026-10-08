@@ -6,7 +6,7 @@ import {
   Download, PenLine, Calendar,
   ArrowUpDown, ArrowUp, ArrowDown, Package,
 } from 'lucide-react'
-import { useToast } from '../components/Toast'
+import { useToast } from '../hooks/useToast'
 import { ManualTxModal } from '../components/ManualTxModal'
 import { DateRangePicker } from '../components/DateRangePicker'
 import { formatEur } from '../utils/format'

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 
 const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
@@ -19,7 +19,8 @@ export function useModalA11y<T extends HTMLElement = HTMLDivElement>(
 ): RefObject<T> {
   const dialogRef = useRef<T>(null)
   const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  // Se actualiza tras cada render (no durante él: React prohíbe escribir refs en render).
+  useLayoutEffect(() => { onCloseRef.current = onClose })
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null

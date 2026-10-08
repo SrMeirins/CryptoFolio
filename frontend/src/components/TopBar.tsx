@@ -6,6 +6,7 @@ import { usePricesStore } from '../store/pricesStore'
 import { portfolioApi, type Notification } from '../api/portfolio'
 import { NOTIFICATION_ROUTES, NOTIFICATION_TYPE_META } from '../constants/notifications'
 import { useClickOutside } from '../hooks/useClickOutside'
+import { useNow } from '../hooks/useNow'
 
 function PriceRefreshButton() {
   const { connected, lastUpdate, setPrices } = usePricesStore(s => ({
@@ -15,6 +16,7 @@ function PriceRefreshButton() {
   }))
   const [refreshing, setRefreshing] = useState(false)
   const [done,       setDone]       = useState(false)
+  const now = useNow()
 
   async function refresh() {
     if (refreshing) return
@@ -32,7 +34,7 @@ function PriceRefreshButton() {
 
   const timeAgo = lastUpdate
     ? (() => {
-        const secs = Math.floor((Date.now() - lastUpdate.getTime()) / 1000)
+        const secs = Math.max(0, Math.floor((now - lastUpdate.getTime()) / 1000))
         if (secs < 60)  return `${secs}s`
         if (secs < 3600) return `${Math.floor(secs / 60)}m`
         return `${Math.floor(secs / 3600)}h`

@@ -29,10 +29,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: 'npm'
@@ -90,7 +90,7 @@ jobs:
 
       - name: Subir instalador de prueba como artefacto
         if: inputs.publish == false
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: CryptoFolio-${{ inputs.platform }}-test-${{ github.sha }}
           path: releases/*
@@ -98,7 +98,7 @@ jobs:
 
       - name: Subir artefactos en caso de fallo (para diagnóstico)
         if: failure() && inputs.publish == true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: releases-${{ inputs.os }}
           path: releases/

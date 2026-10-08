@@ -112,6 +112,12 @@ export function buildRows(
 export type SortKey = 'asset' | 'quantity' | 'price' | 'value' | 'cost' | 'pnl' | 'pnlpct' | 'weight' | 'breakeven'
 export type SortDir = 'asc' | 'desc'
 
+/** Siguiente orden al pulsar una columna: misma columna invierte la dirección; otra nueva empieza en descendente. */
+export function nextSort(clicked: SortKey, key: SortKey, dir: SortDir): { key: SortKey; dir: SortDir } {
+  if (clicked === key) return { key, dir: dir === 'asc' ? 'desc' : 'asc' }
+  return { key: clicked, dir: 'desc' }
+}
+
 export function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices: Record<string, number>, total: number): UnifiedRow[] {
   return [...rows].sort((a, b) => {
     let va = 0, vb = 0

@@ -1,8 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
 
-export const VALID_TABS = ['wallets', 'assets', 'fiscal', 'datos', 'general']
-
 export function SettingsTabs({ active, onChange }: { active: string; onChange: (t: string) => void }) {
   const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: portfolioApi.getAssets })
   const unknownCount = assets.filter(a => !a.is_stablecoin && a.price_source === 'unknown').length

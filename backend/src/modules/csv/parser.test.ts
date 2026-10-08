@@ -1,89 +1,63 @@
-import { readFileSync } from 'fs';
+import { describe, expect, it } from 'vitest';
 import { parseBinanceCsv } from './parser';
-import { preprocess } from './preprocessor';
-import { parse } from 'csv-parse/sync';
-import { createHash } from 'crypto';
 
-// Test directo contra el CSV real
-const CSV_PATH = process.env.TEST_CSV_PATH || '';
+// Prueba de extremo a extremo de parseBinanceCsv con un CSV sintético que
+// mezcla los casos más habituales de un export real de Binance: compra con
+// comisión, retirada a wallet externa y una operación ignorada. Los casos
+// especiales (margin, multi-activo, colisiones de hash…) tienen sus propios
+// ficheros de test en este directorio.
 
-function rawRowsFromCsv(content: Buffer) {
-  const records: Record<string, string>[] = parse(content, { columns: true, skip_empty_lines: true, bom: true, trim: true });
-  return records.map((r) => ({
-    userId: r['User ID'] ?? '',
-    time: new Date('20' + r['Time'].trim().replace(' ', 'T') + 'Z'),
-    account: r['Account'] ?? '',
-    operation: r['Operation'] ?? '',
-    coin: r['Coin'] ?? '',
-    change: parseFloat(r['Change'] ?? '0'),
-    remark: r['Remark'] ?? '',
-    rowHash: createHash('sha256').update(Object.values(r).join('|')).digest('hex'),
-  }));
+const HEADER = 'User ID,Time,Account,Operation,Coin,Change,Remark';
+
+function csv(rows: string[]): string {
+  return [HEADER, ...rows].join('\n');
 }
 
-if (!CSV_PATH) {
-  console.log('TEST_CSV_PATH no definido, saltando tests de CSV real.');
-  process.exit(0);
-}
+const ROWS = [
+  // Compra de 100 XRP pagando 50 USDC, con comisión en XRP
+  '123,2024-03-01 10:00:00,Spot,Transaction Buy,XRP,100,',
+  '123,2024-03-01 10:00:00,Spot,Transaction Spend,USDC,-50,',
+  '123,2024-03-01 10:00:00,Spot,Transaction Fee,XRP,-0.1,',
+  // Retirada de XRP fuera del exchange
+  '123,2024-03-02 12:30:00,Spot,Withdraw,XRP,-40,',
+  // Operación sin efecto fiscal que el parser descarta
+  '123,2024-03-03 08:00:00,Spot,Token Swap - Redenomination/Rebranding,XRP,0,',
+];
 
-const content = readFileSync(CSV_PATH);
+describe('parseBinanceCsv — CSV sintético de extremo a extremo', () => {
+  it('procesa compra y retirada sin errores y cuadra las estadísticas', async () => {
+    const result = await parseBinanceCsv(csv(ROWS));
 
-(async () => {
-const result = await parseBinanceCsv(content);
+    expect(result.errors).toEqual([]);
+    expect(result.stats.totalRows).toBe(ROWS.length);
+    expect(result.stats.errorRows).toBe(0);
+    expect(result.stats.ignoredRows).toBe(1);
+    expect(result.stats.transactionCount).toBe(result.transactions.length);
+  });
 
-console.log('\n=== RESULTADO DEL PARSER ===\n');
-console.log(`Total filas CSV:       ${result.stats.totalRows}`);
-console.log(`Filas procesadas:      ${result.stats.parsedRows}`);
-console.log(`Filas ignoradas:       ${result.stats.ignoredRows}`);
-console.log(`Errores:               ${result.stats.errorRows}`);
-console.log(`Transacciones salida:  ${result.stats.transactionCount}`);
+  it('registra la compra con su coste en USDC', async () => {
+    const result = await parseBinanceCsv(csv(ROWS));
 
-if (result.errors.length > 0) {
-  console.log('\n=== ERRORES ===');
-  for (const e of result.errors) {
-    console.log(`  ✗ ${e.message}`);
-    for (const r of e.rows) {
-      console.log(`    ${r.time.toISOString()} | ${r.operation} | ${r.coin} | ${r.change}`);
-    }
-  }
-}
+    const buys = result.transactions.filter(t => t.operationType === 'BUY' && t.asset === 'XRP');
+    expect(buys).toHaveLength(1);
+    expect(buys[0].costAsset).toBe('USDC');
+    expect(buys[0].costAmount).toBeCloseTo(50, 6);
+  });
 
-console.log('\n=== TRANSACCIONES PARSEADAS ===');
-const byType = new Map<string, number>();
-for (const tx of result.transactions) {
-  byType.set(tx.operationType, (byType.get(tx.operationType) ?? 0) + 1);
-}
-for (const [type, count] of [...byType.entries()].sort()) {
-  console.log(`  ${type.padEnd(20)} ${count}`);
-}
+  it('registra la retirada con su fecha en UTC', async () => {
+    const result = await parseBinanceCsv(csv(ROWS));
 
-console.log('\n=== MUESTRA (primeras 10 transacciones) ===');
-for (const tx of result.transactions.slice(0, 10)) {
-  console.log(
-    `  ${tx.timestamp.toISOString().slice(0, 16)} | ${tx.operationType.padEnd(20)} | ${tx.asset.padEnd(6)} ${String(tx.amountNet.toFixed(4)).padStart(12)} | cost: ${tx.costAsset ?? '-'} ${String((tx.costAmount ?? 0).toFixed(4)).padStart(10)}`
-  );
-}
+    const withdraws = result.transactions.filter(t => t.operationType === 'WITHDRAW');
+    expect(withdraws).toHaveLength(1);
+    expect(withdraws[0].asset).toBe('XRP');
+    expect(withdraws[0].amount).toBeCloseTo(40, 6);
+    expect(withdraws[0].timestamp.toISOString()).toBe('2024-03-02T12:30:00.000Z');
+  });
 
-console.log('\n=== COMPROBACIÓN DE TOTALES (XRP) ===');
-const xrpBuys = result.transactions.filter(
-  (tx) => tx.operationType === 'BUY' && tx.asset === 'XRP'
-);
-const totalXrp = xrpBuys.reduce((s, tx) => s + tx.amountNet, 0);
-const totalXrpCost = xrpBuys.reduce((s, tx) => s + (tx.costAmount ?? 0), 0);
-console.log(`  Compras XRP: ${xrpBuys.length} operaciones`);
-console.log(`  Total XRP neto: ${totalXrp.toFixed(4)}`);
-console.log(`  Total coste: ${totalXrpCost.toFixed(4)} USDC/EUR`);
+  it('un CSV vacío (solo cabecera) no produce transacciones ni errores', async () => {
+    const result = await parseBinanceCsv(csv([]));
 
-console.log('\n=== WITHDRAWS (→ Tangem) ===');
-const withdraws = result.transactions.filter((tx) => tx.operationType === 'WITHDRAW');
-for (const w of withdraws) {
-  console.log(`  ${w.timestamp.toISOString().slice(0, 16)} | ${w.asset.padEnd(6)} | ${w.amountNet.toFixed(6)}`);
-}
-
-if (result.errors.length === 0) {
-  console.log('\n✓ Parser completado sin errores.');
-} else {
-  console.log(`\n✗ ${result.errors.length} errores encontrados. Revisar antes de continuar.`);
-  process.exit(1);
-}
-})();
+    expect(result.errors).toEqual([]);
+    expect(result.transactions).toEqual([]);
+  });
+});

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
 import { AlertCircle, Check, RotateCcw } from 'lucide-react'
@@ -10,24 +10,25 @@ export function FiscalSection() {
   const queryClient = useQueryClient()
 
   const threshold = parseInt(config['modelo721_threshold'] ?? '50000')
-  const [thresholdInput, setThresholdInput] = useState('')
+  // Borrador local: null mientras el usuario no edita → se muestra el valor
+  // guardado (sin copiarlo a estado con un efecto). Al guardar se descarta.
+  const [thresholdDraft, setThresholdInput] = useState<string | null>(null)
+  const thresholdInput = thresholdDraft ?? String(threshold)
   const [savingThreshold, setSavingThreshold] = useState(false)
-
-  useEffect(() => { setThresholdInput(String(threshold)) }, [threshold])
 
   async function saveThreshold() {
     setSavingThreshold(true)
-    await portfolioApi.setConfig('modelo721_threshold', thresholdInput)
-    queryClient.invalidateQueries({ queryKey: ['config'] })
-    setSavingThreshold(false)
+    try {
+      await portfolioApi.setConfig('modelo721_threshold', thresholdInput)
+      await queryClient.invalidateQueries({ queryKey: ['config'] })
+      setThresholdInput(null)
+    } finally {
+      setSavingThreshold(false)
+    }
   }
 
   // ── Tramos IRPF ──────────────────────────────────────────────────────────
-  // Memoizado: envolver en useMemo (en vez de recalcular en cada render) es
-  // lo que permite incluirlo correctamente en las deps del useEffect de
-  // abajo sin romper la edición — con una referencia nueva en cada render,
-  // el efecto se dispararía con cada tecla y resetearía lo que el usuario
-  // acaba de escribir.
+  // Tipos guardados en config (o los por defecto si no hay o son inválidos).
   const storedTipos: number[] = useMemo(() => {
     const raw = config['irpf_tramos_tipos']
     if (!raw) return TRAMOS_DEFAULT.map(t => t.tipo)
@@ -38,11 +39,11 @@ export function FiscalSection() {
     return TRAMOS_DEFAULT.map(t => t.tipo)
   }, [config])
 
-  const [tramosInput, setTramosInput] = useState<string[]>([])
+  // Mismo patrón de borrador que el umbral.
+  const [tramosDraft, setTramosInput] = useState<string[] | null>(null)
+  const tramosInput = tramosDraft ?? storedTipos.map(String)
   const [savingTramos, setSavingTramos] = useState(false)
   const [savedTramos, setSavedTramos] = useState(false)
-
-  useEffect(() => { setTramosInput(storedTipos.map(String)) }, [storedTipos])
 
   const tramosModified = tramosInput.some((v, i) => parseFloat(v) !== storedTipos[i])
   const tramosValid    = tramosInput.every(v => { const n = parseFloat(v); return !isNaN(n) && n > 0 && n <= 100 })
@@ -50,12 +51,16 @@ export function FiscalSection() {
   async function saveTramos() {
     if (!tramosValid) return
     setSavingTramos(true)
-    const tipos = tramosInput.map(v => parseFloat(v))
-    await portfolioApi.setConfig('irpf_tramos_tipos', JSON.stringify(tipos))
-    queryClient.invalidateQueries({ queryKey: ['config'] })
-    setSavingTramos(false)
-    setSavedTramos(true)
-    setTimeout(() => setSavedTramos(false), 2000)
+    try {
+      const tipos = tramosInput.map(v => parseFloat(v))
+      await portfolioApi.setConfig('irpf_tramos_tipos', JSON.stringify(tipos))
+      await queryClient.invalidateQueries({ queryKey: ['config'] })
+      setTramosInput(null)
+      setSavedTramos(true)
+      setTimeout(() => setSavedTramos(false), 2000)
+    } finally {
+      setSavingTramos(false)
+    }
   }
 
   function resetTramos() {

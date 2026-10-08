@@ -13,6 +13,19 @@ const DONUT_COLORS = [
 
 type DonutItem = { name: string; value: number; pct: number }
 
+/** Tooltip del donut: definido a nivel de módulo para no recrear el componente en cada render. */
+function CustomTooltip({ active, payload }: { active?: boolean; payload?: { payload: DonutItem }[] }) {
+  if (!active || !payload?.[0]) return null
+  const item = payload[0].payload
+  return (
+    <div className="bg-gray-950/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2.5 shadow-xl text-xs">
+      <p className="font-semibold text-white mono mb-0.5">{item.name}</p>
+      <p className="text-gray-300">{formatEur(item.value)}</p>
+      <p className="text-gray-500">{item.pct.toFixed(1)}% del portfolio</p>
+    </div>
+  )
+}
+
 export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatBalances: FiatBalance[] }) {
   const prices = usePricesStore(s => s.prices)
 
@@ -45,18 +58,6 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
   if (total === 0) return null
 
   const hoveredEntry = items.find(item => item.name === hovered)
-
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: { payload: DonutItem }[] }) => {
-    if (!active || !payload?.[0]) return null
-    const item = payload[0].payload
-    return (
-      <div className="bg-gray-950/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2.5 shadow-xl text-xs">
-        <p className="font-semibold text-white mono mb-0.5">{item.name}</p>
-        <p className="text-gray-300">{formatEur(item.value)}</p>
-        <p className="text-gray-500">{item.pct.toFixed(1)}% del portfolio</p>
-      </div>
-    )
-  }
 
   return (
     <div className="bg-background-card border border-border rounded-2xl p-6 space-y-5">
