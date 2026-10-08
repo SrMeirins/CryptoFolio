@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { getAllLivePrices, onPriceUpdate, offPriceUpdate, getHistoricalPriceEur } from '../modules/prices/binance';
+import { z } from 'zod';
+import { getAllLivePrices, onPriceUpdate, offPriceUpdate, lookupHistoricalPriceEur } from '../modules/prices/binance';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { sendInternalError } from '../middleware/errorHandler';
@@ -19,23 +20,32 @@ router.get('/live', (_req: Request, res: Response) => {
   res.json(Object.fromEntries(getAllLivePrices()));
 });
 
+// Parámetros de GET /api/prices/historical. El símbolo se normaliza a
+// mayúsculas y sigue el mismo formato que el resto de rutas de activos; la
+// fecha debe ser un día real en formato YYYY-MM-DD y no posterior a hoy.
+const historicalQuerySchema = z.object({
+  asset: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,20}$/),
+  date: z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .refine(d => {
+      const parsed = new Date(`${d}T00:00:00.000Z`);
+      return !isNaN(parsed.getTime())
+        && parsed.toISOString().startsWith(d)   // descarta fechas inexistentes (2025-02-30)
+        && parsed.getTime() <= Date.now();
+    }),
+});
+
 // GET /api/prices/historical?asset=XRP&date=2025-04-09
 router.get('/historical', async (req, res) => {
-  const { asset, date } = req.query;
-
-  if (!asset || !date) {
-    res.status(400).json({ error: 'asset y date son requeridos' });
+  const parsed = historicalQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Parámetros inválidos: asset (1-20 caracteres alfanuméricos) y date (YYYY-MM-DD, no futura) son obligatorios' });
     return;
   }
+  const { asset, date } = parsed.data;
 
   try {
-    const dateObj = new Date(date as string);
-    if (isNaN(dateObj.getTime())) {
-      res.status(400).json({ error: 'Formato de fecha inválido. Usar YYYY-MM-DD' });
-      return;
-    }
-
-    const price = await getHistoricalPriceEur(asset as string, dateObj);
+    const price = await lookupHistoricalPriceEur(asset, new Date(`${date}T00:00:00.000Z`));
     res.json({ asset, date, price_eur: price });
   } catch (e) {
     sendInternalError(res, e, 'GET /api/prices/historical');

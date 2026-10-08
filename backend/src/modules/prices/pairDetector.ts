@@ -23,6 +23,20 @@ export interface AssetPairInfo {
 // Cache en memoria para no consultar la DB en cada precio
 const pairCache = new Map<string, AssetPairInfo>();
 
+export interface DetectOptions {
+  // false → un símbolo sin par en Binance ni en CoinGecko NO se registra en
+  // asset_metadata. Lo usan las consultas públicas de solo lectura (p. ej.
+  // GET /api/prices/historical), que no deben crear activos (#146). La
+  // importación y las transacciones sí registran (por defecto true): son
+  // posiciones reales que el usuario debe poder configurar en Ajustes.
+  persistUnknown?: boolean;
+}
+
+// Símbolos desconocidos NO persistidos: caché negativa con caducidad para que
+// repetir la consulta no relance 4 peticiones a Binance + búsqueda en CoinGecko.
+const UNKNOWN_TTL_MS = 10 * 60_000;
+const unknownCache = new Map<string, number>(); // símbolo → expira (epoch ms)
+
 export async function loadPairCache(): Promise<void> {
   const res = await db.query(
     `SELECT symbol, binance_eur_pair, binance_usdt_pair, binance_btc_pair,
@@ -68,7 +82,10 @@ async function pairExists(pair: string, retries = 2): Promise<boolean> {
 }
 
 // Auto-detectar el mejor par para un activo desconocido
-export async function autoDetectPair(symbol: string): Promise<AssetPairInfo> {
+export async function autoDetectPair(
+  symbol: string,
+  { persistUnknown = true }: DetectOptions = {},
+): Promise<AssetPairInfo> {
 
   // Candidatos en orden de preferencia
   const eurPair  = `${symbol}EUR`;
@@ -76,15 +93,7 @@ export async function autoDetectPair(symbol: string): Promise<AssetPairInfo> {
   const btcPair  = `${symbol}BTC`;
   const ethPair  = `${symbol}ETH`;
 
-  const info: AssetPairInfo = {
-    symbol,
-    binanceEurPair: null,
-    binanceUsdtPair: null,
-    binanceBtcPair: null,
-    binanceEthPair: null,
-    priceSource: 'unknown',
-    isStablecoin: false,
-  };
+  const info = unknownPairInfo(symbol);
 
   // Probar en paralelo
   const [hasEur, hasUsdt, hasBtc, hasEth] = await Promise.all([
@@ -122,11 +131,29 @@ export async function autoDetectPair(symbol: string): Promise<AssetPairInfo> {
     if (geckoId) info.priceSource = 'coingecko';
   }
 
+  if (info.priceSource === 'unknown' && !persistUnknown) {
+    unknownCache.set(symbol, Date.now() + UNKNOWN_TTL_MS);
+    return info;
+  }
+
   // Guardar en DB y cache
   await upsertAssetMetadata(info, geckoId);
   pairCache.set(symbol, info);
+  unknownCache.delete(symbol);
 
   return info;
+}
+
+function unknownPairInfo(symbol: string): AssetPairInfo {
+  return {
+    symbol,
+    binanceEurPair: null,
+    binanceUsdtPair: null,
+    binanceBtcPair: null,
+    binanceEthPair: null,
+    priceSource: 'unknown',
+    isStablecoin: false,
+  };
 }
 
 async function upsertAssetMetadata(info: AssetPairInfo, geckoId: string | null = null): Promise<void> {
@@ -160,7 +187,7 @@ async function upsertAssetMetadata(info: AssetPairInfo, geckoId: string | null =
 }
 
 // Obtener o auto-detectar info de un activo
-export async function getOrDetectPairInfo(symbol: string): Promise<AssetPairInfo> {
+export async function getOrDetectPairInfo(symbol: string, options: DetectOptions = {}): Promise<AssetPairInfo> {
   // 1. Cache en memoria
   const cached = pairCache.get(symbol);
   if (cached) return cached;
@@ -188,8 +215,12 @@ export async function getOrDetectPairInfo(symbol: string): Promise<AssetPairInfo
     return info;
   }
 
-  // 3. Auto-detectar si no existe
-  return autoDetectPair(symbol);
+  // 3. Auto-detectar si no existe (salvo símbolo desconocido consultado hace poco)
+  const unknownUntil = unknownCache.get(symbol);
+  if (options.persistUnknown === false && unknownUntil !== undefined && unknownUntil > Date.now()) {
+    return unknownPairInfo(symbol);
+  }
+  return autoDetectPair(symbol, options);
 }
 
 // Verificar manualmente un par específico (para la UI de Settings)

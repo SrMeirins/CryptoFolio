@@ -159,6 +159,20 @@ export async function getHistoricalPriceEur(symbol: string, date: Date): Promise
   return dedupeByKey(inFlightPrices, key, () => _getHistoricalPriceEur(symbol, date));
 }
 
+// Consulta de precio histórico para la API pública (GET /api/prices/historical).
+// A diferencia de getHistoricalPriceEur, no tiene efectos secundarios para
+// símbolos desconocidos: no los registra en asset_metadata ni persiste el
+// sentinela -1 en price_cache (#146). Los activos registrados o con par
+// detectado siguen el camino normal, con su caché.
+export async function lookupHistoricalPriceEur(symbol: string, date: Date): Promise<number> {
+  if (symbol === 'EUR' || PRICE_ALIASES[symbol]) return getHistoricalPriceEur(symbol, date);
+
+  const info = await getOrDetectPairInfo(symbol, { persistUnknown: false });
+  if (info.priceSource === 'unknown' && !getPairInfo(symbol)) return 0;
+
+  return getHistoricalPriceEur(symbol, date);
+}
+
 async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<number> {
   const dateStr = date.toISOString().slice(0, 10);
   const key = `${symbol}|${dateStr}`;
