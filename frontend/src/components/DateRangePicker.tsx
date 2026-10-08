@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react'
 import { useClickOutside } from '../hooks/useClickOutside'
 import {
@@ -83,9 +83,6 @@ export function DateRangePicker({ from, to, onChange }: Props) {
 
   // Cerrar al clicar fuera
   useClickOutside(ref, close, open)
-
-  // Sincronizar estado interno cuando cambian los props
-  useEffect(() => { setTmpFrom(from); setTmpTo(to) }, [from, to])
 
   function openPicker() {
     setTmpFrom(from); setTmpTo(to); setPicking('from')

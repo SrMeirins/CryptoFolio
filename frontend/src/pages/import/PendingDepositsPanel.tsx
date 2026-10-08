@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Check, RefreshCw } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
-import { useToast } from '../../components/Toast'
+import { useToast } from '../../hooks/useToast'
 import { PendingDepositRow } from './PendingDepositRow'
 
 export type PendingDeposit = {

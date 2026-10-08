@@ -61,5 +61,5 @@ export function useLivePrices() {
       clearTimeout(reconnectTimer)
       ws?.close()
     }
-  }, [setPrices, setConnected])
+  }, [mergePrices, setConnected])
 }

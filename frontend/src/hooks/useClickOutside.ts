@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 
 /**
  * Ejecuta `onOutside` al hacer click/mousedown fuera del elemento referenciado
@@ -17,7 +17,8 @@ export function useClickOutside(
   enabled = true,
 ) {
   const onOutsideRef = useRef(onOutside)
-  onOutsideRef.current = onOutside
+  // Se actualiza tras cada render (no durante él: React prohíbe escribir refs en render).
+  useLayoutEffect(() => { onOutsideRef.current = onOutside })
 
   useEffect(() => {
     if (!enabled) return

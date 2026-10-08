@@ -4,9 +4,10 @@ import {
   TrendingUp, TrendingDown, ArrowLeftRight, Coins, Receipt, Settings,
   ChevronRight, ChevronLeft, ChevronDown, Info, AlertCircle, CheckCircle, X, Zap,
 } from 'lucide-react'
-import { portfolioApi, type OperationType } from '../api/portfolio'
+import { portfolioApi, type OperationType, type CatalogData } from '../api/portfolio'
 import { DynamicField } from './DynamicField'
 import { WalletLabel } from './WalletPicker'
+import { buildInitialFields } from '../utils/operationWizardFields'
 
 interface OperationWizardProps {
   unknownOperation?: {
@@ -54,55 +55,44 @@ const BADGE_COLORS: Record<string, string> = {
 const CATEGORIES_ORDER = ['ACQUISITION', 'DISPOSITION', 'INCOME', 'MOVEMENT', 'FEE', 'SPECIAL']
 
 // ── Componente principal ───────────────────────────────────────────────────
-export function OperationWizard({ unknownOperation, initialValues, onComplete, onCancel }: OperationWizardProps) {
+// Espera al catálogo y monta el formulario solo cuando está disponible.
+export function OperationWizard(props: OperationWizardProps) {
   const { data: catalog } = useQuery({ queryKey: ['operation-catalog'], queryFn: portfolioApi.getCatalog })
-  const [step, setStep]                 = useState<'type' | 'fields' | 'confirm'>('type')
-  const [selectedType, setSelectedType] = useState<OperationType | null>(null)
+
+  if (!catalog) {
+    return (
+      <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
+        Cargando catálogo...
+      </div>
+    )
+  }
+  return <OperationWizardForm {...props} catalog={catalog} />
+}
+
+function OperationWizardForm({ catalog, unknownOperation, initialValues, onComplete, onCancel }: OperationWizardProps & { catalog: CatalogData }) {
+  // Modo edición: tipo y campos precargados desde initialValues.
+  const initialType = initialValues
+    ? catalog.operations.find(op => op.id === initialValues.operationTypeId) ?? null
+    : null
+  const [step, setStep]                 = useState<'type' | 'fields' | 'confirm'>(initialType ? 'fields' : 'type')
+  const [selectedType, setSelectedType] = useState<OperationType | null>(initialType)
   const [expandedCat, setExpandedCat]   = useState<string | null>('ACQUISITION')
-  const [fieldValues, setFieldValues]   = useState<Record<string, unknown>>({})
+  const [fieldValues, setFieldValues]   = useState<Record<string, unknown>>(
+    () => buildInitialFields(initialType && initialValues ? initialValues.fields : {}, unknownOperation),
+  )
   const [showHelper, setShowHelper]     = useState(false)
   const [applyToAll, setApplyToAll]     = useState(false)
   const [autoPrice, setAutoPrice]       = useState<number | null>(null)
   const [autoPriceLoading, setAutoPriceLoading] = useState(false)
 
-  // Pre-popular desde initialValues (modo edición) una vez cargado el catálogo.
-  // Deps intencionalmente solo [catalog]: debe correr una única vez al
-  // llegar el catálogo, no en cada cambio de initialValues (prop estable
-  // durante la vida del wizard en modo edición).
-  useEffect(() => {
-    if (!catalog || !initialValues) return
-    const opType = catalog.operations.find(op => op.id === initialValues.operationTypeId)
-    if (opType) {
-      setSelectedType(opType)
-      setFieldValues(initialValues.fields)
-      setStep('fields')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalog])
-
-  useEffect(() => {
-    if (unknownOperation) {
-      setFieldValues(prev => ({
-        ...prev,
-        timestamp: unknownOperation.timestamp,
-        asset:     unknownOperation.asset,
-        amount:    unknownOperation.amount,
-      }))
-    }
-  }, [unknownOperation])
-
-  // Default timestamp a "ahora" si no viene prefijado. Deps solo [step]:
-  // se evalúa una vez por paso, usando el valor actual de fieldValues.timestamp
-  // sin disparar el efecto cada vez que el usuario edita el campo.
-  useEffect(() => {
+  // Al cambiar de paso, si el usuario vació la fecha, vuelve a "ahora"
+  // (salvo que la operación venga de un CSV, que ya trae su propia fecha).
+  function goToStep(next: 'type' | 'fields' | 'confirm') {
+    setStep(next)
     if (!fieldValues.timestamp && !unknownOperation) {
-      setFieldValues(prev => ({
-        ...prev,
-        timestamp: new Date().toISOString(),
-      }))
+      setFieldValues(prev => ({ ...prev, timestamp: new Date().toISOString() }))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step])
+  }
 
   // Auto-precio en tiempo real. Deps sin fieldValues.price_eur a propósito:
   // el guard `if (fieldValues.price_eur) return` ya cubre no pisar un precio
@@ -131,14 +121,6 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fieldValues.asset, fieldValues.timestamp, selectedType])
 
-  if (!catalog) {
-    return (
-      <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
-        Cargando catálogo...
-      </div>
-    )
-  }
-
   function handleFieldChange(name: string, value: unknown) {
     setFieldValues(prev => ({ ...prev, [name]: value }))
     if (name === 'price_eur') setAutoPrice(null)
@@ -147,7 +129,7 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
   function handleSelectType(op: OperationType) {
     setSelectedType(op)
     setAutoPrice(null)
-    setStep('fields')
+    goToStep('fields')
   }
 
   function handleComplete() {
@@ -443,8 +425,8 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
           type="button"
           onClick={() => {
             if (step === 'type')    onCancel()
-            if (step === 'fields')  setStep('type')
-            if (step === 'confirm') setStep('fields')
+            if (step === 'fields')  goToStep('type')
+            if (step === 'confirm') goToStep('fields')
           }}
           className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-400 hover:text-white transition-colors"
         >
@@ -455,7 +437,7 @@ export function OperationWizard({ unknownOperation, initialValues, onComplete, o
         {step === 'fields' && (
           <button
             type="button"
-            onClick={() => setStep('confirm')}
+            onClick={() => goToStep('confirm')}
             disabled={!isFormValid()}
             className="flex items-center gap-2 px-5 py-2 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
           >

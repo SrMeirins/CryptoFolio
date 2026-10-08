@@ -1,13 +1,14 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, Settings, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { ChevronDown, ChevronRight, Settings, ArrowUpDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { type FifoLot, type FiatBalance, portfolioApi } from '../api/portfolio'
 import { usePricesStore } from '../store/pricesStore'
 import { formatEur } from '../utils/format'
-import { buildRows, sortRows, type CryptoRow, type UnifiedRow, type SortKey, type SortDir } from '../utils/assetTable'
+import { buildRows, sortRows, nextSort, type CryptoRow, type UnifiedRow, type SortKey, type SortDir } from '../utils/assetTable'
 import { CryptoRowComponent } from './AssetTableCryptoRow'
 import { FiatRowComponent } from './AssetTableFiatRow'
+import { SortTh } from './AssetTableSortTh'
 
 interface AssetTableProps {
   lots: FifoLot[]
@@ -16,8 +17,11 @@ interface AssetTableProps {
 }
 
 const DUST_THRESHOLD = 1
+// Referencia estable para el valor por defecto: un `[]` literal en la firma
+// crearía un array nuevo en cada render e invalidaría los useMemo.
+const NO_FIAT: FiatBalance[] = []
 
-export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTableProps) {
+export function AssetTable({ lots, fiatBalances = NO_FIAT, onSimulate }: AssetTableProps) {
   const prices   = usePricesStore(s => s.prices)
   const { data: ydayData } = useQuery({
     queryKey: ['yesterday-prices'],
@@ -35,25 +39,28 @@ export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTablePr
   const [sortKey,   setSortKey]   = useState<SortKey>('value')
   const [sortDir,   setSortDir]   = useState<SortDir>('desc')
 
-  const handleSort = useCallback((key: SortKey) => {
-    setSortKey(prev => {
-      if (prev === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-      else { setSortDir('desc') }
-      return key
-    })
-  }, [])
+  // Se calcula a partir del estado actual (no dentro de un updater): los
+  // updaters deben ser puros y StrictMode los ejecuta dos veces en desarrollo.
+  function handleSort(key: SortKey) {
+    const next = nextSort(key, sortKey, sortDir)
+    setSortKey(next.key)
+    setSortDir(next.dir)
+  }
 
-  const allRows  = buildRows(lots, prices, fiatBalances)
-  const mainRows = allRows.filter(r => {
-    if (r.kind === 'fiat') return r.value >= DUST_THRESHOLD
-    const price = prices[r.asset] ?? 0
-    return price === 0 || r.value >= DUST_THRESHOLD
-  })
-  const dustRows = allRows.filter(r => {
-    if (r.kind === 'fiat') return r.value > 0 && r.value < DUST_THRESHOLD
-    const price = prices[r.asset] ?? 0
-    return price > 0 && r.value < DUST_THRESHOLD
-  })
+  const { allRows, mainRows, dustRows } = useMemo(() => {
+    const all = buildRows(lots, prices, fiatBalances)
+    const main = all.filter(r => {
+      if (r.kind === 'fiat') return r.value >= DUST_THRESHOLD
+      const price = prices[r.asset] ?? 0
+      return price === 0 || r.value >= DUST_THRESHOLD
+    })
+    const dust = all.filter(r => {
+      if (r.kind === 'fiat') return r.value > 0 && r.value < DUST_THRESHOLD
+      const price = prices[r.asset] ?? 0
+      return price > 0 && r.value < DUST_THRESHOLD
+    })
+    return { allRows: all, mainRows: main, dustRows: dust }
+  }, [lots, prices, fiatBalances])
 
   const totalValue = allRows.reduce((s, r) => s + r.value, 0)
   const dustValue  = dustRows.reduce((s, r) => s + r.value, 0)
@@ -68,39 +75,19 @@ export function AssetTable({ lots, fiatBalances = [], onSimulate }: AssetTablePr
     [dustRows, sortKey, sortDir, prices, totalValue]
   )
 
-  // Cabecera ordenable: closure local sobre sortKey/sortDir/handleSort — no
-  // se extrae a un fichero propio porque necesita acceso directo a ambos
-  // para elegir el icono de dirección, y no se reutiliza fuera de esta tabla.
-  function SortTh({ label, sk, right = true, title }: { label: string; sk: SortKey; right?: boolean; title?: string }) {
-    const active = sortKey === sk
-    const Icon = active ? (sortDir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
-    return (
-      <th
-        className={`px-4 py-3 cursor-pointer select-none group ${right ? 'text-right' : 'text-left'}`}
-        onClick={() => handleSort(sk)}
-        title={title}
-      >
-        <span className="inline-flex items-center gap-1 hover:text-gray-300 transition-colors">
-          {right && <Icon size={10} className={active ? 'text-accent-blue' : 'text-gray-700 group-hover:text-gray-500'} />}
-          <span className={active ? 'text-accent-blue' : ''}>{label}</span>
-          {!right && <Icon size={10} className={active ? 'text-accent-blue' : 'text-gray-700 group-hover:text-gray-500'} />}
-        </span>
-      </th>
-    )
-  }
-
+  const sortProps = { sortKey, sortDir, onSort: handleSort }
   const tableHeader = (
     <thead>
       <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-border">
-        <SortTh label="Activo"     sk="asset"    right={false} />
-        <SortTh label="Cantidad"   sk="quantity"  />
-        <SortTh label="Precio"     sk="price"     />
-        {!compact && <SortTh label="P. medio" sk="breakeven" title="Precio medio de compra (break-even)" />}
-        <SortTh label="Valor EUR"  sk="value"     />
-        {!compact && <SortTh label="Coste base" sk="cost" />}
-        {!compact && <SortTh label="P&L"        sk="pnl"  />}
-        <SortTh label="P&L %"      sk="pnlpct"   />
-        <SortTh label="% Cartera"  sk="weight"   />
+        <SortTh {...sortProps} label="Activo"     sk="asset"    right={false} />
+        <SortTh {...sortProps} label="Cantidad"   sk="quantity"  />
+        <SortTh {...sortProps} label="Precio"     sk="price"     />
+        {!compact && <SortTh {...sortProps} label="P. medio" sk="breakeven" title="Precio medio de compra (break-even)" />}
+        <SortTh {...sortProps} label="Valor EUR"  sk="value"     />
+        {!compact && <SortTh {...sortProps} label="Coste base" sk="cost" />}
+        {!compact && <SortTh {...sortProps} label="P&L"        sk="pnl"  />}
+        <SortTh {...sortProps} label="P&L %"      sk="pnlpct"   />
+        <SortTh {...sortProps} label="% Cartera"  sk="weight"   />
       </tr>
     </thead>
   )

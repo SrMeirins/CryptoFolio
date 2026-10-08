@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { RefreshCw, CheckCircle, AlertCircle, X } from 'lucide-react'
 import { portfolioApi, type AssetMetadata } from '../../../api/portfolio'
 import { Toggle } from '../../../components/Toggle'
@@ -17,18 +17,22 @@ export function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSa
   const [isStable,   setIsStable]   = useState(false)
   const [status,     setStatus]     = useState<DetectStatus>('idle')
   const [saving,     setSaving]     = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  // Al teclear se resetea lo detectado y se marca el estado de forma síncrona
+  // (en el handler, no en un efecto); la detección remota va en el efecto.
+  function handleSymbolChange(raw: string) {
+    const next = raw.toUpperCase()
+    setSymbol(next)
+    setEurPair(''); setUsdtPair(''); setBtcPair(''); setGeckoId(null)
+    setStatus(next.trim().length < 2 ? 'idle' : 'detecting')
+  }
 
+  // Detección con debounce de 600 ms. `cancelled` descarta respuestas de un
+  // símbolo anterior que lleguen después de que el usuario siga escribiendo.
   useEffect(() => {
     const sym = symbol.trim()
-    if (sym.length < 2) {
-      setStatus('idle')
-      setEurPair(''); setUsdtPair(''); setBtcPair(''); setGeckoId(null)
-      return
-    }
-    clearTimeout(debounceRef.current)
-    setStatus('detecting')
-    debounceRef.current = setTimeout(async () => {
+    if (sym.length < 2) return
+    let cancelled = false
+    const timer = setTimeout(async () => {
       try {
         // 1. Buscar en Binance
         const [eur, usdt, btc] = await Promise.all([
@@ -36,6 +40,7 @@ export function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSa
           portfolioApi.testPair(`${sym}USDT`),
           portfolioApi.testPair(`${sym}BTC`),
         ])
+        if (cancelled) return
         if (eur.exists || usdt.exists || btc.exists) {
           setEurPair(eur.exists  ? `${sym}EUR`  : '')
           setUsdtPair(usdt.exists ? `${sym}USDT` : '')
@@ -47,6 +52,7 @@ export function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSa
 
         // 2. Fallback a CoinGecko
         const cg = await portfolioApi.searchCoinGecko(sym)
+        if (cancelled) return
         if (cg.found && cg.coingecko_id) {
           setGeckoId(cg.coingecko_id)
           setEurPair(''); setUsdtPair(''); setBtcPair('')
@@ -55,9 +61,9 @@ export function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSa
           setGeckoId(null)
           setStatus('notfound')
         }
-      } catch { setStatus('notfound') }
+      } catch { if (!cancelled) setStatus('notfound') }
     }, 600)
-    return () => clearTimeout(debounceRef.current)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [symbol])
 
   async function handleSave() {
@@ -93,7 +99,7 @@ export function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSa
           <label className="text-xs text-gray-500">Símbolo *</label>
           <div className="relative">
             <input autoFocus value={symbol}
-              onChange={e => { setSymbol(e.target.value.toUpperCase()); setEurPair(''); setUsdtPair(''); setBtcPair(''); setGeckoId(null) }}
+              onChange={e => handleSymbolChange(e.target.value)}
               placeholder="BTC, ETH, PEPE..." className={`${inputClass} pr-8`} />
             {statusIcon}
           </div>

@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback, useId } from 'react'
+import { useState, useCallback, useId } from 'react'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { X, Calculator, AlertCircle } from 'lucide-react'
 import { formatAmount, formatPrice } from '../utils/format'
 import { useTramos } from '../hooks/useTramos'
 import { calcularTramos, type TramoDesglose } from '../utils/tramosIrpf'
-import { portfolioApi, type SimulationResult } from '../api/portfolio'
+import { portfolioApi } from '../api/portfolio'
 import { useDebounce } from '../hooks/useDebounce'
 import { useModalA11y } from '../hooks/useModalA11y'
-import { calcStep, StepButton } from './StepButton'
+import { StepButton } from './StepButton'
+import { calcStep } from '../utils/calcStep'
 import { SaleSimulatorResults } from './SaleSimulatorResults'
 
 interface Props {
@@ -29,9 +31,6 @@ const wrapCls = `
 export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: Props) {
   const [qty,   setQty]   = useState(totalQty.toString())
   const [price, setPrice] = useState(currentPrice > 0 ? currentPrice.toFixed(4) : '')
-  const [result,   setResult]   = useState<SimulationResult | null>(null)
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState<string | null>(null)
 
   const titleId = useId()
   const dialogRef = useModalA11y<HTMLDivElement>(onClose)
@@ -39,26 +38,21 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
   const debouncedQty   = useDebounce(qty,   400)
   const debouncedPrice = useDebounce(price, 400)
 
-  const simulate = useCallback(async (q: string, p: string) => {
-    const qNum = parseFloat(q)
-    const pNum = parseFloat(p)
-    if (!qNum || qNum <= 0 || isNaN(pNum) || pNum < 0) {
-      setResult(null)
-      return
-    }
-    setLoading(true)
-    setError(null)
-    try {
-      setResult(await portfolioApi.simulateSale(asset, qNum, pNum))
-    } catch (e) {
-      setError((e as Error).message)
-      setResult(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [asset])
-
-  useEffect(() => { simulate(debouncedQty, debouncedPrice) }, [debouncedQty, debouncedPrice, simulate])
+  // Simulación vía react-query: la clave incluye cantidad y precio, así que una
+  // respuesta lenta de una consulta anterior nunca pisa a la más reciente.
+  const qNum  = parseFloat(debouncedQty)
+  const pNum  = parseFloat(debouncedPrice)
+  const valid = qNum > 0 && !isNaN(pNum) && pNum >= 0
+  const { data, isFetching: loading, error: queryError } = useQuery({
+    queryKey: ['simulate-sale', asset, qNum, pNum],
+    queryFn: () => portfolioApi.simulateSale(asset, qNum, pNum),
+    enabled: valid,
+    retry: false,
+    // Mantiene el resultado anterior visible mientras se recalcula.
+    placeholderData: keepPreviousData,
+  })
+  const result = valid && !queryError ? data ?? null : null
+  const error  = valid && queryError ? queryError.message : null
 
   // Handlers de paso para cantidad
   const decQty = useCallback(() => {

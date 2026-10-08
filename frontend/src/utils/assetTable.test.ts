@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRows, sortRows, walletShortName } from './assetTable'
+import { buildRows, nextSort, sortRows, walletShortName } from './assetTable'
 import type { FifoLot as ApiFifoLot, FiatBalance as ApiFiatBalance } from '../api/portfolio'
 
 function lot(overrides: Partial<ApiFifoLot> = {}): ApiFifoLot {
@@ -103,5 +103,16 @@ describe('walletShortName', () => {
 
   it('devuelve el nombre completo para wallets frías', () => {
     expect(walletShortName('Mi Ledger', 'cold')).toBe('Mi Ledger')
+  })
+})
+
+describe('nextSort', () => {
+  it('misma columna: invierte la dirección', () => {
+    expect(nextSort('value', 'value', 'desc')).toEqual({ key: 'value', dir: 'asc' })
+    expect(nextSort('value', 'value', 'asc')).toEqual({ key: 'value', dir: 'desc' })
+  })
+
+  it('columna nueva: empieza en descendente aunque la anterior fuera ascendente', () => {
+    expect(nextSort('pnl', 'value', 'asc')).toEqual({ key: 'pnl', dir: 'desc' })
   })
 })
