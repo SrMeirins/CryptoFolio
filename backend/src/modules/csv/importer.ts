@@ -4,6 +4,7 @@ import { ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
 import { Exchange, parseExchangeCsv, validateExchangeCsv } from './exchanges';
 import { refreshLivePrices } from '../prices/binance';
+import { requestLivePriceResync } from '../prices/liveFeed';
 import { getOrDetectPairInfo } from '../prices/pairDetector';
 import { enrichIncomeTransactionsWithPrices } from './importerEnrichment';
 import { buildTransferDestinationMap, resolveWalletId, resolveDestinationWalletId } from './importerTransferDestinations';
@@ -352,6 +353,8 @@ export async function importCsvFile(
     // refreshLivePrices carga el precio actual en el liveCache del proceso.
     await Promise.allSettled(allAssets.map(a => getOrDetectPairInfo(a)));
     await refreshLivePrices(allAssets);
+    // Suscribir en el WebSocket los pares de los activos nuevos (#149)
+    requestLivePriceResync();
   }
 
   return result;

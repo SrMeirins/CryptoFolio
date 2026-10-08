@@ -37,12 +37,15 @@ export interface DetectOptions {
 const UNKNOWN_TTL_MS = 10 * 60_000;
 const unknownCache = new Map<string, number>(); // símbolo → expira (epoch ms)
 
+// Recarga completa desde asset_metadata: se vacía antes para que los pares
+// editados o los activos borrados no queden con datos antiguos en memoria.
 export async function loadPairCache(): Promise<void> {
   const res = await db.query(
     `SELECT symbol, binance_eur_pair, binance_usdt_pair, binance_btc_pair,
             binance_eth_pair, price_source, is_stablecoin
      FROM asset_metadata`
   );
+  pairCache.clear();
   for (const row of res.rows) {
     pairCache.set(row.symbol, {
       symbol: row.symbol,
