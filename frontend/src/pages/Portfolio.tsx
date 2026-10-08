@@ -4,7 +4,7 @@ import { portfolioApi } from '../api/portfolio'
 import { SaleSimulatorModal } from '../components/SaleSimulatorModal'
 import { usePricesStore } from '../store/pricesStore'
 import { RefreshCw, Wallet, Search, X } from 'lucide-react'
-import { usePortfolioTotals } from './portfolio/usePortfolioTotals'
+import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
 import { AllocationDonut } from './portfolio/AllocationDonut'
 import { WalletSections } from './portfolio/WalletSections'
 
@@ -30,7 +30,8 @@ export function Portfolio() {
   const filteredFiats = q ? fiatBalances.filter(b => b.asset.includes(q)) : fiatBalances
 
   // Recuento de activos y de activos sin precio para la cabecera (sobre todo el portfolio)
-  const { assetsTotal, pricesMissing } = usePortfolioTotals(lots, fiatBalances)
+  const { assetCount: assetsTotal, unpricedAssets } = usePortfolioValuation(lots, fiatBalances)
+  const pricesMissing = unpricedAssets.length
 
   const hasPrices = Object.keys(prices).length > 0
 

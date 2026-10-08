@@ -5,6 +5,7 @@ import { usePricesStore } from '../store/pricesStore'
 import { formatEur } from '../utils/format'
 import { type Change24h } from '../components/MetricCard'
 import { PortfolioSummaryCards } from '../components/PortfolioSummaryCards'
+import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
 import { TopMovers } from './dashboard/TopMovers'
 import { RecentActivity } from './dashboard/RecentActivity'
 import { PortfolioHistoryChart } from './dashboard/PortfolioHistoryChart'
@@ -44,18 +45,11 @@ export function Dashboard() {
     staleTime: 10 * 60_000,
   })
 
-  const totalFiat = fiatBalances.reduce((sum, bal) => sum + parseFloat(bal.balance), 0)
-
-  const cryptoValue = lots.reduce((sum, lot) => {
-    const price = prices[lot.asset] ?? 0
-    return sum + parseFloat(lot.quantity) * price
-  }, 0)
-  const totalValue = cryptoValue + totalFiat
+  const {
+    cryptoValue, fiatValue: totalFiat, totalValue, totalCost,
+    pnl: totalPnl, pnlPct: totalPnlPct,
+  } = usePortfolioValuation(lots, fiatBalances)
   const hasPrices = Object.keys(prices).length > 0
-
-  const totalCost = lots.reduce((sum, lot) => sum + parseFloat(lot.cost_basis_eur), 0)
-  const totalPnl = cryptoValue - totalCost
-  const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0
 
   const change24h = useMemo((): Change24h | null => {
     if (!ydayData?.prices || !lots.length || !hasPrices) return null

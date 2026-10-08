@@ -9,6 +9,7 @@ import { buildRows, sortRows, nextSort, type CryptoRow, type UnifiedRow, type So
 import { CryptoRowComponent } from './AssetTableCryptoRow'
 import { FiatRowComponent } from './AssetTableFiatRow'
 import { SortTh } from './AssetTableSortTh'
+import { valuePortfolio } from '../utils/portfolioValuation'
 
 interface AssetTableProps {
   lots: FifoLot[]
@@ -47,7 +48,7 @@ export function AssetTable({ lots, fiatBalances = NO_FIAT, onSimulate }: AssetTa
     setSortDir(next.dir)
   }
 
-  const { allRows, mainRows, dustRows } = useMemo(() => {
+  const { mainRows, dustRows } = useMemo(() => {
     const all = buildRows(lots, prices, fiatBalances)
     const main = all.filter(r => {
       if (r.kind === 'fiat') return r.value >= DUST_THRESHOLD
@@ -59,10 +60,14 @@ export function AssetTable({ lots, fiatBalances = NO_FIAT, onSimulate }: AssetTa
       const price = prices[r.asset] ?? 0
       return price > 0 && r.value < DUST_THRESHOLD
     })
-    return { allRows: all, mainRows: main, dustRows: dust }
+    return { mainRows: main, dustRows: dust }
   }, [lots, prices, fiatBalances])
 
-  const totalValue = allRows.reduce((s, r) => s + r.value, 0)
+  // Total de la tabla con la valoración común (#150); coincide con la suma de filas.
+  const totalValue = useMemo(
+    () => valuePortfolio(lots, prices, fiatBalances).totalValue,
+    [lots, prices, fiatBalances],
+  )
   const dustValue  = dustRows.reduce((s, r) => s + r.value, 0)
   const onlyDust   = mainRows.length === 0 && dustRows.length > 0
 
