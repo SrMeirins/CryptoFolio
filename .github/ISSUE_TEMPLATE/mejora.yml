@@ -1,0 +1,56 @@
+name: Mejora o funcionalidad nueva
+description: Propón una mejora de algo existente o una funcionalidad nueva
+title: "[Mejora] "
+labels: ["tipo/mejora"]
+projects: ["SrMeirins/1"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Cuéntanos qué problema resolvería, no solo la solución: ayuda a valorar alternativas.
+        Si es una funcionalidad completamente nueva se reetiquetará como `tipo/feature` al revisarla.
+
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qué problema resuelve
+      description: ¿Qué quieres conseguir y por qué ahora no se puede (o cuesta)?
+    validations:
+      required: true
+
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Propuesta
+      description: Cómo te imaginas que funcionaría.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas consideradas
+      description: Opcional.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Fiscal (IRPF, Modelo 721, exportaciones)
+        - Portfolio, precios y wallets
+        - Importación de CSV
+        - Motor FIFO
+        - App de escritorio
+        - Docker / instalación
+        - Otra
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: privacidad
+    attributes:
+      label: Privacidad
+      options:
+        - label: He revisado que esta issue no contiene datos personales ni financieros reales.
+          required: true

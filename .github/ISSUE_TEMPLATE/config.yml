@@ -1,0 +1,6 @@
+# Sin issues en blanco: todas pasan por una plantilla para mantener el formato.
+blank_issues_enabled: false
+contact_links:
+  - name: Reportar una vulnerabilidad de seguridad
+    url: https://github.com/SrMeirins/CryptoFolio/security/advisories/new
+    about: Nunca en una issue pública. Repórtala en privado; solo la ve el mantenedor.
