@@ -27,11 +27,11 @@ describe('runMigrations — arranque contra un esquema ya existente (simula Dock
     const { rows } = await pool.query('SELECT version FROM schema_migrations ORDER BY version');
     const versions = rows.map((r: { version: string }) => r.version);
 
-    // El historial de migraciones pre-lanzamiento (002-024) se squasheó por
-    // completo en schema.sql — ver db/migrations/README.md. Tras el squash,
-    // un arranque contra un esquema recién aplicado (caso Docker) solo
-    // registra el schema base: no quedan migraciones pendientes que aplicar.
-    expect(versions).toEqual(['000_schema_base']);
+    // El historial pre-lanzamiento (002-024) se squasheó en schema.sql — ver
+    // db/migrations/README.md. Las migraciones posteriores son idempotentes:
+    // sobre un esquema recién aplicado (caso Docker, que ya incluye sus
+    // tablas) se aplican sin error y quedan registradas.
+    expect(versions).toEqual(['000_schema_base', '001_price_close_madrid']);
   });
 
   it('correr runMigrations() una segunda vez es un no-op seguro (idempotencia real)', async () => {
