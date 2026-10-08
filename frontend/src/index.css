@@ -64,6 +64,14 @@
   .mono { @apply font-mono; }
 }
 
+/* ── Tarjetas de métricas: chip de 24h según el ancho de la tarjeta (#152) ── */
+/* El umbral se mide sobre el área de contenido de la tarjeta (sin padding). */
+.metric-card { container-type: inline-size; }
+.change24h-full { display: none; }
+@container (min-width: 180px) {
+  .change24h-full { display: inline; }
+}
+
 /* ── Page transition ──────────────────────────────────────────────────────── */
 @keyframes pageIn {
   from { opacity: 0; transform: translateY(8px); }

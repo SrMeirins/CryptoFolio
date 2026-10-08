@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { portfolioApi } from '../api/portfolio'
 import { usePricesStore } from '../store/pricesStore'
-import { formatEur } from '../utils/format'
+import { formatEur, formatEurCompact } from '../utils/format'
 import { type Change24h } from '../components/MetricCard'
 import { PortfolioSummaryCards } from '../components/PortfolioSummaryCards'
 import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
@@ -63,6 +63,8 @@ export function Dashboard() {
       kind: 'value',
       eur: (result.eur >= 0 ? '+' : '') + formatEur(result.eur),
       pct: (result.pct >= 0 ? '+' : '') + result.pct.toFixed(2) + '%',
+      eurCompact: (result.eur >= 0 ? '+' : '') + formatEurCompact(result.eur),
+      pctCompact: (result.pct >= 0 ? '+' : '') + result.pct.toFixed(1) + '%',
       positive: result.eur >= 0,
       note: result.excluded.length > 0
         ? <p>Sin precio de hace 24h, excluidos del cálculo: <span className="mono text-white">{result.excluded.join(', ')}</span></p>

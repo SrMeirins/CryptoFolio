@@ -34,9 +34,12 @@ export function PortfolioSummaryCards({
   change24h?: Change24h
 }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+    // Ancho mínimo por tarjeta y paso a la fila siguiente según el espacio real
+    // (descontando la barra lateral): antes las columnas dependían del ancho de
+    // la ventana y a 1024 px los valores desbordaban la tarjeta (#152).
+    <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(13.5rem,1fr))]">
       <MetricCard
-        label="Valor actual"
+        label="Valor"
         value={hasPrices ? formatEur(totalValue) : '—'}
         rawValue={hasPrices ? totalValue : undefined}
         format={formatEur}

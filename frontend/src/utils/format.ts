@@ -78,3 +78,13 @@ export function pnlColor(value: number): string {
 export function formatPct(value: number): string {
   return (value >= 0 ? '+' : '') + value.toFixed(2) + '%'
 }
+
+/** Importe en EUR sin decimales, para espacios reducidos (p. ej. "-203 €"). */
+export function formatEurCompact(value: number): string {
+  return new Intl.NumberFormat('es-ES', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value)
+}

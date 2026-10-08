@@ -1,9 +1,13 @@
 import { useId, useState } from 'react'
 
-export function InfoTooltip({ label, children, direction = 'down' }: {
+export function InfoTooltip({ label, children, direction = 'down', trigger, triggerLabel }: {
   label: string
   children: React.ReactNode
   direction?: 'up' | 'down'
+  // Contenido visible del disparador en lugar del "?" (p. ej. el chip de 24h).
+  trigger?: React.ReactNode
+  // Nombre accesible del disparador; por defecto, `label`.
+  triggerLabel?: string
 }) {
   const [visible, setVisible] = useState(false)
   const tooltipId = useId()
@@ -12,6 +16,17 @@ export function InfoTooltip({ label, children, direction = 'down' }: {
     <div className="relative inline-flex items-center"
       onMouseEnter={() => setVisible(true)}
       onMouseLeave={() => setVisible(false)}>
+      {trigger ? (
+        <button
+          type="button"
+          aria-label={triggerLabel ?? label}
+          aria-describedby={visible ? tooltipId : undefined}
+          onFocus={() => setVisible(true)}
+          onBlur={() => setVisible(false)}
+          className="cursor-default rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60">
+          {trigger}
+        </button>
+      ) : (
       <button
         type="button"
         aria-label={label}
@@ -25,6 +40,7 @@ export function InfoTooltip({ label, children, direction = 'down' }: {
         }`}>
         ?
       </button>
+      )}
 
       {visible && (
         <div
