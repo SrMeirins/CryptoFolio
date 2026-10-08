@@ -1,8 +1,7 @@
 import { useState, useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import type { FifoLot, FiatBalance } from '../../api/portfolio'
-import { usePricesStore } from '../../store/pricesStore'
-import { aggregateLotsByAsset } from '../../utils/assetTable'
+import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
 import { formatEur } from '../../utils/format'
 
 const DONUT_COLORS = [
@@ -27,33 +26,19 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: { payl
 }
 
 export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatBalances: FiatBalance[] }) {
-  const prices = usePricesStore(s => s.prices)
-
   const [hovered, setHovered] = useState<string | null>(null)
 
-  const { total, items } = useMemo<{ total: number; items: DonutItem[] }>(() => {
-    const byAsset = new Map<string, number>()
-    for (const [asset, { qty }] of aggregateLotsByAsset(lots)) {
-      const price = prices[asset] ?? 0
-      if (price > 0) byAsset.set(asset, qty * price)
-    }
-    for (const bal of fiatBalances) {
-      const val = parseFloat(bal.balance)
-      if (val > 0) byAsset.set(bal.asset, (byAsset.get(bal.asset) ?? 0) + val)
-    }
-    const total = [...byAsset.values()].reduce((sum, val) => sum + val, 0)
-    if (total === 0) return { total: 0, items: [] }
-    const sorted = [...byAsset.entries()].sort((a, b) => b[1] - a[1])
-    const top = sorted.slice(0, 8)
-    const restVal = sorted.slice(8).reduce((sum, [, val]) => sum + val, 0)
-    return {
-      total,
-      items: [
-        ...top.map(([name, value]) => ({ name, value, pct: (value / total) * 100 })),
-        ...(restVal > 0 ? [{ name: 'Otros', value: restVal, pct: (restVal / total) * 100 }] : []),
-      ],
-    }
-  }, [lots, fiatBalances, prices])
+  const { assets, totalValue: total } = usePortfolioValuation(lots, fiatBalances)
+  const items = useMemo<DonutItem[]>(() => {
+    if (total === 0) return []
+    const valued = assets.filter(a => a.value > 0)   // ya ordenados por valor
+    const top = valued.slice(0, 8)
+    const restVal = valued.slice(8).reduce((sum, a) => sum + a.value, 0)
+    return [
+      ...top.map(a => ({ name: a.asset, value: a.value, pct: (a.value / total) * 100 })),
+      ...(restVal > 0 ? [{ name: 'Otros', value: restVal, pct: (restVal / total) * 100 }] : []),
+    ]
+  }, [assets, total])
 
   if (total === 0) return null
 

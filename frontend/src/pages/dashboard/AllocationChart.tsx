@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
 import type { FifoLot, FiatBalance } from '../../api/portfolio'
-import { usePricesStore } from '../../store/pricesStore'
-import { aggregateLotsByAsset } from '../../utils/assetTable'
+import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
 import { formatEur } from '../../utils/format'
 
 const ALLOC_COLORS = [
@@ -18,29 +17,15 @@ function colorForItem(item: AllocItem, idx: number): string {
 }
 
 export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatBalances: FiatBalance[] }) {
-  const prices  = usePricesStore((s) => s.prices)
   const [hovered, setHovered] = useState<string | null>(null)
 
-  const allocation = useMemo(() => {
-    const fiatByAsset = fiatBalances.reduce((acc, bal) => {
-      acc[bal.asset] = (acc[bal.asset] ?? 0) + parseFloat(bal.balance)
-      return acc
-    }, {} as Record<string, number>)
-
-    const cryptoValues = Array.from(aggregateLotsByAsset(lots), ([asset, { qty }]) =>
-      [asset, qty * (prices[asset] ?? 0)] as const
-    ).filter(([, value]) => value > 0)
-
-    const items: AllocItem[] = [
-      ...cryptoValues.map(([name, value]) => ({ name, value, isFiat: false })),
-      ...Object.entries(fiatByAsset).filter(([, v]) => v > 0).map(([name, value]) => ({ name, value, isFiat: true })),
-    ].sort((a, b) => b.value - a.value)
-
-    const total = items.reduce((sum, item) => sum + item.value, 0)
-    return { items, total }
-  }, [lots, fiatBalances, prices])
-
-  const { items, total } = allocation
+  const { assets, totalValue: total } = usePortfolioValuation(lots, fiatBalances)
+  const items = useMemo<AllocItem[]>(
+    () => assets
+      .filter(a => a.value > 0)
+      .map(a => ({ name: a.asset, value: a.value, isFiat: a.kind === 'fiat' })),
+    [assets],
+  )
   const top = items.slice(0, 10)
 
   if (total === 0) return null
