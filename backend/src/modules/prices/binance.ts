@@ -6,6 +6,7 @@ import {
 } from './coingecko';
 import { fetchWithTimeout } from './httpTimeout';
 import { dedupeByKey, priceKey } from './priceDedup';
+import { PRICE_ALIASES } from './priceAliases';
 
 // Precios históricos (velas diarias de Binance con respaldo en CoinGecko).
 // El feed de precios en vivo vive en liveFeed.ts; se reexporta aquí para no
@@ -19,14 +20,6 @@ export {
 
 const REST_BASE = 'https://api.binance.com/api/v3';
 
-// Tokens cuyo precio es equivalente al de otro activo (1:1 o redemption peg).
-// Se resuelven antes de tocar caché o APIs externas.
-const PRICE_ALIASES: Record<string, string> = {
-  'BETH':  'ETH',   // Binance staked ETH (1:1 ETH, retirado en 2023)
-  'WETH':  'ETH',   // Wrapped ETH
-  'WBTC':  'BTC',   // Wrapped BTC
-  'BTCB':  'BTC',   // Binance-pegged BTC
-};
 
 function sleep(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms));

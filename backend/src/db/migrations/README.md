@@ -29,3 +29,11 @@ desplegada con datos reales empieza de nuevo en `001_descripcion.sql`
 (formato `NNN_descripcion.sql`, validado por `run-migrations.ts`) — **y debe
 reflejarse también en `schema.sql`** para que las instalaciones nuevas no
 dependan de reproducir el historial de migraciones.
+
+## Reversión
+
+Cada migración `NNN_descripcion.sql` tiene su script de reversión en
+`down/NNN_descripcion.sql`. El runner no lee ese subdirectorio: la reversión
+se aplica a mano y se cubre con un test (p. ej.
+`src/db/migrationPriceCloseMadrid.test.ts`).
+
