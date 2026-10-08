@@ -1,20 +1,53 @@
-name: Mejora o funcionalidad nueva
-description: Propón una mejora de algo existente o una funcionalidad nueva
-title: "[Mejora] "
+name: Mejora o funcionalidad
+description: Mejora de una funcionalidad existente o propuesta de una nueva
 labels: ["tipo/mejora"]
 projects: ["SrMeirins/1"]
 body:
   - type: markdown
     attributes:
       value: |
-        Cuéntanos qué problema resolvería, no solo la solución: ayuda a valorar alternativas.
-        Si es una funcionalidad completamente nueva se reetiquetará como `tipo/feature` al revisarla.
+        **Repositorio público:** no incluyas datos reales. Las funcionalidades completamente nuevas se reetiquetan como `tipo/feature` al triar.
 
   - type: textarea
-    id: problema
+    id: resumen
     attributes:
-      label: Qué problema resuelve
-      description: ¿Qué quieres conseguir y por qué ahora no se puede (o cuesta)?
+      label: Resumen
+      description: Qué se propone, en una o dos frases.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tipo-cambio
+    attributes:
+      label: Tipo de cambio
+      options:
+        - Mejora de una funcionalidad existente
+        - Funcionalidad nueva
+    validations:
+      required: true
+
+  - type: dropdown
+    id: componentes
+    attributes:
+      label: Componentes afectados
+      multiple: true
+      options:
+        - Backend / API
+        - Interfaz web
+        - Aplicación de escritorio
+        - Fiscal (IRPF, Modelo 721, exportaciones)
+        - Motor FIFO
+        - Importación de CSV
+        - Portfolio, precios y wallets
+        - Infraestructura (Docker, CI/CD)
+    validations:
+      required: true
+
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto y motivación
+      description: Problema o necesidad que resuelve y a quién afecta.
     validations:
       required: true
 
@@ -22,7 +55,31 @@ body:
     id: propuesta
     attributes:
       label: Propuesta
-      description: Cómo te imaginas que funcionaría.
+      description: Comportamiento deseado y, si aplica, enfoque técnico.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alcance
+    attributes:
+      label: Alcance
+      value: |
+        **Incluido:**
+        -
+
+        **Fuera de alcance:**
+        -
+    validations:
+      required: true
+
+  - type: textarea
+    id: aceptacion
+    attributes:
+      label: Criterios de aceptación
+      description: Condiciones verificables para dar la issue por completada.
+      value: |
+        - [ ]
+        - [ ] Tests unitarios y, si aplica, de seguridad que cubren el cambio.
     validations:
       required: true
 
@@ -32,25 +89,16 @@ body:
       label: Alternativas consideradas
       description: Opcional.
 
-  - type: dropdown
-    id: area
+  - type: textarea
+    id: dependencias
     attributes:
-      label: Área
-      options:
-        - Fiscal (IRPF, Modelo 721, exportaciones)
-        - Portfolio, precios y wallets
-        - Importación de CSV
-        - Motor FIFO
-        - App de escritorio
-        - Docker / instalación
-        - Otra
-    validations:
-      required: true
+      label: Dependencias y riesgos
+      description: Opcional. Migraciones, cambios de API, impacto en datos existentes, servicios externos.
 
   - type: checkboxes
     id: privacidad
     attributes:
       label: Privacidad
       options:
-        - label: He revisado que esta issue no contiene datos personales ni financieros reales.
+        - label: Confirmo que esta issue no contiene datos personales ni financieros reales.
           required: true
