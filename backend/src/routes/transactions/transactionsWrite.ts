@@ -5,6 +5,7 @@ import {
   isFeeOperation, resolveFinalAssetAmount, resolveFinalPricePerUnit,
   resolveCostAsset, resolveFinalCostAmount, respondWithFifoRecalc,
 } from './transactionsShared';
+import { requestLivePriceResync } from '../../modules/prices/liveFeed';
 
 const router = Router();
 
@@ -110,6 +111,9 @@ router.post('/manual', async (req: Request, res: Response) => {
     ]
   );
 
+  // Un activo nuevo dado de alta por la transacción debe entrar en el feed en vivo (#149)
+  requestLivePriceResync();
+
   // Recalcular FIFO de forma síncrona → devolvemos resultado al cliente
   await respondWithFifoRecalc(res, 'POST /api/transactions/manual');
 });
@@ -196,6 +200,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     ]
   );
 
+  requestLivePriceResync();
   await respondWithFifoRecalc(res, 'PUT /api/transactions/:id');
 });
 

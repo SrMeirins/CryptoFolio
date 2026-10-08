@@ -6,6 +6,7 @@ import { updateCoinGeckoId } from '../../modules/prices/coingecko';
 import { MAX_LENGTH_SHORT } from '../../modules/validation/textLength';
 import { sendZodError, validateSymbol } from './settingsShared';
 import { sendInternalError } from '../../middleware/errorHandler';
+import { requestLivePriceResync } from '../../modules/prices/liveFeed';
 
 const router = Router();
 
@@ -84,6 +85,7 @@ router.post('/assets', async (req: Request, res: Response) => {
     await updateCoinGeckoId(upperSymbol, coingecko_id);
   }
 
+  requestLivePriceResync(); // nuevo activo o pares modificados → feed en vivo (#149)
   res.json({ success: true, symbol: upperSymbol });
 });
 
@@ -118,6 +120,7 @@ router.put('/assets/:symbol', async (req: Request, res: Response) => {
      binanceUsdtPair || null, binanceBtcPair || null, priceSource, symbol.toUpperCase()]
   );
 
+  requestLivePriceResync();
   res.json({ success: true });
 });
 
@@ -149,6 +152,7 @@ router.delete('/assets/:symbol', async (req: Request, res: Response) => {
     return;
   }
 
+  requestLivePriceResync();
   res.json({ success: true, symbol });
 });
 
@@ -174,6 +178,7 @@ router.post('/assets/detect-all', async (_req: Request, res: Response) => {
     await new Promise(r => setTimeout(r, 250));
   }
 
+  requestLivePriceResync();
   res.json({ detected, failed, total: unknownRes.rows.length });
 });
 
@@ -199,6 +204,7 @@ router.post('/assets/:symbol/detect', async (req: Request, res: Response) => {
       res.status(404).json({ error: 'Activo no encontrado tras detección' });
       return;
     }
+    requestLivePriceResync();
     res.json(result.rows[0]);
   } catch (err) {
     sendInternalError(res, err, '/assets/:symbol/detect', 'Error al detectar el activo');
