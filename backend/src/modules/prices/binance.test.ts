@@ -6,11 +6,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 vi.mock('../../db/client', () => ({ db: { query: queryMock } }));
 
-const { getOrDetectPairInfoMock } = vi.hoisted(() => ({ getOrDetectPairInfoMock: vi.fn() }));
+const { getOrDetectPairInfoMock, getPairInfoMock } = vi.hoisted(() => ({
+  getOrDetectPairInfoMock: vi.fn(),
+  getPairInfoMock: vi.fn(),
+}));
 vi.mock('./pairDetector', () => ({
   getOrDetectPairInfo: getOrDetectPairInfoMock,
   loadPairCache: vi.fn(),
-  getPairInfo: vi.fn(),
+  getPairInfo: getPairInfoMock,
 }));
 
 const { getCoinGeckoHistoricalPriceMock, getCurrentPricesEurMock, searchAndSaveCoinGeckoIdMock } = vi.hoisted(() => ({
@@ -152,6 +155,52 @@ describe('binance — getHistoricalPriceEur (cascada EUR>USDT>BTC>ETH>CoinGecko)
     expect(a).toBe(5);
     expect(b).toBe(5);
     expect(getOrDetectPairInfoMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('binance — lookupHistoricalPriceEur (consulta pública sin efectos secundarios, #146)', () => {
+  let bin: typeof import('./binance');
+
+  beforeEach(async () => {
+    vi.resetModules();
+    queryMock.mockReset();
+    getOrDetectPairInfoMock.mockReset();
+    getPairInfoMock.mockReset();
+    getCoinGeckoHistoricalPriceMock.mockReset();
+    searchAndSaveCoinGeckoIdMock.mockReset();
+    bin = await import('./binance');
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('símbolo desconocido y no registrado: devuelve 0 sin escribir en price_cache', async () => {
+    queryMock.mockResolvedValue({ rows: [] });
+    getOrDetectPairInfoMock.mockResolvedValue(pairInfo({ priceSource: 'unknown' }));
+    getPairInfoMock.mockReturnValue(null);
+
+    const price = await bin.lookupHistoricalPriceEur('NOEXISTE', new Date('2025-04-09'));
+
+    expect(price).toBe(0);
+    expect(getOrDetectPairInfoMock).toHaveBeenCalledWith('NOEXISTE', { persistUnknown: false });
+    const writes = queryMock.mock.calls.filter(([sql]) => String(sql).includes('INSERT INTO price_cache'));
+    expect(writes).toHaveLength(0);
+  });
+
+  it('activo registrado: delega en getHistoricalPriceEur', async () => {
+    queryMock.mockResolvedValue({ rows: [{ price_eur: '0.5' }] });
+    getOrDetectPairInfoMock.mockResolvedValue(pairInfo({ priceSource: 'eur_direct', binanceEurPair: 'XRPEUR' }));
+    getPairInfoMock.mockReturnValue(pairInfo({ priceSource: 'eur_direct' }));
+
+    const price = await bin.lookupHistoricalPriceEur('XRP', new Date('2024-01-15'));
+    expect(price).toBe(0.5);
+  });
+
+  it('alias (WBTC) y EUR se resuelven sin pasar por la detección', async () => {
+    queryMock.mockResolvedValue({ rows: [{ price_eur: '50000' }] });
+
+    expect(await bin.lookupHistoricalPriceEur('WBTC', new Date('2024-01-15'))).toBe(50000);
+    expect(await bin.lookupHistoricalPriceEur('EUR', new Date('2024-01-15'))).toBe(1);
+    expect(getOrDetectPairInfoMock).not.toHaveBeenCalled();
   });
 });
 

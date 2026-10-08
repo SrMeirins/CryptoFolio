@@ -155,3 +155,58 @@ describe('pairDetector — testPair', () => {
     expect(result).toEqual({ exists: false });
   });
 });
+
+describe('pairDetector — detección sin persistir símbolos desconocidos (#146)', () => {
+  let pd: typeof import('./pairDetector');
+
+  beforeEach(async () => {
+    vi.resetModules();
+    queryMock.mockReset();
+    searchAndSaveCoinGeckoIdMock.mockReset();
+    queryMock.mockResolvedValue({ rows: [] });
+    searchAndSaveCoinGeckoIdMock.mockResolvedValue(null);
+    pd = await import('./pairDetector');
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  const insertCalls = () =>
+    queryMock.mock.calls.filter(([sql]) => String(sql).includes('INSERT INTO asset_metadata'));
+
+  it('persistUnknown:false con un símbolo sin par ni CoinGecko: no inserta en asset_metadata ni lo cachea', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => notFound));
+    const info = await pd.getOrDetectPairInfo('NOEXISTE', { persistUnknown: false });
+
+    expect(info.priceSource).toBe('unknown');
+    expect(insertCalls()).toHaveLength(0);
+    expect(pd.getPairInfo('NOEXISTE')).toBeNull();
+  });
+
+  it('persistUnknown:false: repetir la consulta dentro del TTL no vuelve a llamar a Binance', async () => {
+    const fetchMock = vi.fn(async () => notFound);
+    vi.stubGlobal('fetch', fetchMock);
+
+    await pd.getOrDetectPairInfo('NOEXISTE', { persistUnknown: false });
+    const callsAfterFirst = fetchMock.mock.calls.length;
+    await pd.getOrDetectPairInfo('NOEXISTE', { persistUnknown: false });
+
+    expect(callsAfterFirst).toBeGreaterThan(0);
+    expect(fetchMock.mock.calls.length).toBe(callsAfterFirst);
+  });
+
+  it('persistUnknown:false con par encontrado: sí persiste (activo real)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => (url.includes('XYZEUR') ? ok() : notFound)));
+    const info = await pd.getOrDetectPairInfo('XYZ', { persistUnknown: false });
+
+    expect(info.priceSource).toBe('eur_direct');
+    expect(insertCalls()).toHaveLength(1);
+    expect(pd.getPairInfo('XYZ')).not.toBeNull();
+  });
+
+  it('por defecto (importación, transacciones) un símbolo sin par se sigue registrando', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => notFound));
+    await pd.getOrDetectPairInfo('NUEVO');
+
+    expect(insertCalls()).toHaveLength(1);
+  });
+});
