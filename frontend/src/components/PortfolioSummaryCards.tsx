@@ -9,14 +9,9 @@ interface EurFlow {
 }
 
 /**
- * Las 4-5 tarjetas de resumen (Valor actual / Coste / P&L / Rentabilidad /
- * EUR neto) que Dashboard.tsx y Portfolio.tsx mostraban cada una con su
- * propia copia casi idéntica del grid y el markup de cada MetricCard —
- * antes ~150 líneas duplicadas entre ambas páginas. El contenido de cada
- * tooltip se deja como prop (no se fuerza el mismo texto en las dos
- * páginas: cada una enfatiza algo distinto — Dashboard el desglose
- * cripto/fiat, Portfolio el aviso de activos sin precio — y forzar un
- * único texto habría sido fusionar contenido real sin necesidad).
+ * Las 4-5 tarjetas de resumen del Dashboard (Valor actual / Coste / P&L /
+ * Rentabilidad / EUR neto). Portfolio dejó de mostrarlas para no duplicar
+ * información (#151). El contenido de cada tooltip se recibe como prop.
  */
 export function PortfolioSummaryCards({
   totalValue, totalCost, pnl, pnlPct, hasPrices, loading,
