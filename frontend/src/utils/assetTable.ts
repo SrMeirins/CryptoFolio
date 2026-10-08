@@ -31,7 +31,7 @@ export type UnifiedRow = CryptoRow | FiatRow
 /**
  * Agrupa lotes FIFO por activo, sumando cantidad y coste base — sin
  * desglose por wallet ni fiat (para eso usa `buildRows`). Es la base de la
- * valoración común (`utils/portfolioValuation.ts`) y del ranking de TopMovers.
+ * valoración común (`utils/portfolioValuation.ts`).
  */
 export function aggregateLotsByAsset(lots: FifoLot[]): Map<string, { qty: number; cost: number }> {
   const byAsset = new Map<string, { qty: number; cost: number }>()

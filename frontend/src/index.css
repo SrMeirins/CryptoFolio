@@ -72,6 +72,15 @@
   .change24h-full { display: inline; }
 }
 
+/* ── Destello al actualizarse un valor en vivo (#153) ─────────────────────── */
+@keyframes flashUp   { from { background-color: rgba(0, 200, 150, 0.28); } to { background-color: transparent; } }
+@keyframes flashDown { from { background-color: rgba(231, 76, 60, 0.28); }  to { background-color: transparent; } }
+.flash-up   { animation: flashUp 0.7s ease-out; }
+.flash-down { animation: flashDown 0.7s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .flash-up, .flash-down { animation: none; }
+}
+
 /* ── Page transition ──────────────────────────────────────────────────────── */
 @keyframes pageIn {
   from { opacity: 0; transform: translateY(8px); }
