@@ -3,8 +3,6 @@ import { useQuery } from '@tanstack/react-query'
 import { portfolioApi } from '../api/portfolio'
 import { SaleSimulatorModal } from '../components/SaleSimulatorModal'
 import { usePricesStore } from '../store/pricesStore'
-import { formatEur } from '../utils/format'
-import { PortfolioSummaryCards } from '../components/PortfolioSummaryCards'
 import { RefreshCw, Wallet, Search, X } from 'lucide-react'
 import { usePortfolioTotals } from './portfolio/usePortfolioTotals'
 import { AllocationDonut } from './portfolio/AllocationDonut'
@@ -21,10 +19,6 @@ export function Portfolio() {
     queryKey: ['fiat-balances'],
     queryFn: portfolioApi.getFiatBalances,
   })
-  const { data: eurFlow } = useQuery({
-    queryKey: ['eur-flow'],
-    queryFn: portfolioApi.getEurFlow,
-  })
 
   const [search, setSearch] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
@@ -35,8 +29,8 @@ export function Portfolio() {
   const filteredLots  = q ? lots.filter(l => l.asset.includes(q)) : lots
   const filteredFiats = q ? fiatBalances.filter(b => b.asset.includes(q)) : fiatBalances
 
-  const { totalValue, totalCost, pnl, pnlPct, assetsTotal, pricesMissing } =
-    usePortfolioTotals(lots, fiatBalances)   // totales siempre sobre todo el portfolio
+  // Recuento de activos y de activos sin precio para la cabecera (sobre todo el portfolio)
+  const { assetsTotal, pricesMissing } = usePortfolioTotals(lots, fiatBalances)
 
   const hasPrices = Object.keys(prices).length > 0
 
@@ -89,70 +83,6 @@ export function Portfolio() {
           )}
         </div>
       </div>
-
-      {/* Totales globales */}
-      <PortfolioSummaryCards
-        totalValue={totalValue}
-        totalCost={totalCost}
-        pnl={pnl}
-        pnlPct={pnlPct}
-        hasPrices={hasPrices}
-        loading={isLoading}
-        eurFlow={eurFlow}
-        valueTooltip={
-          <>
-            <p>Valoración de mercado de la cartera en tiempo real, calculada multiplicando la cantidad de cada activo por su cotización actual en Binance.</p>
-            {pricesMissing > 0
-              ? <p className="text-accent-amber/90">⚠ {pricesMissing} activo{pricesMissing > 1 ? 's no tienen' : ' no tiene'} precio configurado y no {pricesMissing > 1 ? 'se incluyen' : 'se incluye'} en este total.</p>
-              : <p className="text-gray-500">Los precios se actualizan automáticamente cada 60 s vía WebSocket.</p>
-            }
-          </>
-        }
-        costTooltip={
-          <>
-            <p>Importe total pagado para adquirir los activos que <span className="text-white">aún mantienes en cartera</span>, según el método FIFO (First In, First Out).</p>
-            <p>Cada venta reduce este valor en proporción al lote consumido. No refleja lo invertido históricamente, sino únicamente el coste de las posiciones abiertas.</p>
-          </>
-        }
-        pnlTooltip={
-          <>
-            <p>Diferencia entre la valoración actual de la cartera y su coste de adquisición FIFO. Refleja el resultado <span className="text-white">latente</span> de las posiciones abiertas.</p>
-            <p className="font-mono text-[10px] bg-white/5 px-2.5 py-1.5 rounded-lg text-gray-400">
-              Valor actual − Coste de adquisición
-            </p>
-            <p className="text-gray-500">Este beneficio o pérdida no es definitivo hasta que se materialice con una venta. No tiene impacto fiscal hasta entonces.</p>
-          </>
-        }
-        pnlPctTooltip={
-          <>
-            <p>Rendimiento porcentual de la cartera sobre el capital invertido en las posiciones actuales.</p>
-            <p className="font-mono text-[10px] bg-white/5 px-2.5 py-1.5 rounded-lg text-gray-400">
-              (Valor actual − Coste) ÷ Coste × 100
-            </p>
-            <p className="text-gray-500">No incluye beneficios ya realizados en ventas anteriores.</p>
-          </>
-        }
-        eurFlowTooltip={eurFlow && (
-          <>
-            <p>Capital neto comprometido en el mercado cripto: total ingresado al exchange desde tu cuenta bancaria, descontando lo que ya has recuperado.</p>
-            <div className="bg-white/5 rounded-lg px-3 py-2.5 space-y-1.5 text-[10px]">
-              <div className="flex justify-between text-gray-400">
-                <span>Depósitos al exchange</span>
-                <span className="mono text-gray-200">{formatEur(eurFlow.deposited)}</span>
-              </div>
-              <div className="flex justify-between text-gray-400">
-                <span>Retiradas al banco</span>
-                <span className="mono text-gray-200">− {formatEur(eurFlow.withdrawn)}</span>
-              </div>
-              <div className="flex justify-between border-t border-white/10 pt-1.5 font-semibold">
-                <span className="text-white">Capital neto</span>
-                <span className="mono text-white">{formatEur(eurFlow.netFromBank)}</span>
-              </div>
-            </div>
-            <p className="text-gray-500">Del total neto, {formatEur(eurFlow.eurSpentBuying)} se han convertido en criptoactivos.</p>
-          </>
-        )}
-      />
 
       {/* Gráfico de distribución — solo con precios disponibles */}
       {hasPrices && !isLoading && lots.length > 0 && (
