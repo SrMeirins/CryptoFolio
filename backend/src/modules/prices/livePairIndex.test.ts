@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPairIndex, resolveTick, streamPairs, type AssetPairsRow } from './livePairIndex';
+import { buildPairIndex, priceFromPairMap, resolveTick, streamPairs, type AssetPairsRow } from './livePairIndex';
 
 function row(symbol: string, pairs: Partial<Omit<AssetPairsRow, 'symbol'>> = {}): AssetPairsRow {
   return {
@@ -95,3 +95,26 @@ describe('livePairIndex — resolveTick', () => {
     expect(resolveTick(index, 'XRPEUR', NaN, rates)).toEqual([]);
   });
 });
+
+describe('livePairIndex — priceFromPairMap (precios REST, #147)', () => {
+  const prices = new Map([['XRPEUR', 2], ['XRPUSDT', 2.5], ['HBARUSDT', 0.2], ['AAABTC', 0.0001]]);
+
+  it('respeta la cascada EUR > USDT > BTC > ETH', () => {
+    expect(priceFromPairMap(row('XRP', { binance_eur_pair: 'XRPEUR', binance_usdt_pair: 'XRPUSDT' }), prices, rates)).toBe(2);
+  });
+
+  it('cae al par USDT convertido si no hay precio del par EUR', () => {
+    const p = priceFromPairMap(row('HBAR', { binance_eur_pair: 'HBAREUR', binance_usdt_pair: 'HBARUSDT' }), prices, rates);
+    expect(p).toBeCloseTo(0.18, 10);
+  });
+
+  it('convierte pares BTC con la referencia indicada y devuelve null si falta', () => {
+    expect(priceFromPairMap(row('AAA', { binance_btc_pair: 'AAABTC' }), prices, rates)).toBe(5);
+    expect(priceFromPairMap(row('AAA', { binance_btc_pair: 'AAABTC' }), prices, { ...rates, btcEur: undefined })).toBeNull();
+  });
+
+  it('sin ningún precio disponible devuelve null', () => {
+    expect(priceFromPairMap(row('NFT'), prices, rates)).toBeNull();
+  });
+});
+

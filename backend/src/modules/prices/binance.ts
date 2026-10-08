@@ -14,6 +14,7 @@ export {
   startLivePrices, stopLivePrices, onPriceUpdate, offPriceUpdate,
   getLivePrice, getAllLivePrices, refreshLivePrices, refreshPairIndex,
   handleTickerMessage, syncLivePriceSubscriptions, requestLivePriceResync,
+  onOpen24Update, offOpen24Update, getAllOpen24Prices,
 } from './liveFeed';
 
 const REST_BASE = 'https://api.binance.com/api/v3';

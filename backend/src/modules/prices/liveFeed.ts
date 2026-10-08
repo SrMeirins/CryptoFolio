@@ -3,7 +3,7 @@ import { WebSocket } from 'ws';
 import { getOrDetectPairInfo, loadPairCache, getPairInfo } from './pairDetector';
 import { getCurrentPricesEur, loadAssetMetadata as loadCoinGeckoIdMap } from './coingecko';
 import { fetchWithTimeout } from './httpTimeout';
-import { buildPairIndex, resolveTick, streamPairs, EURUSDT_PAIR, type AssetPairsRow, type PairIndex } from './livePairIndex';
+import { buildPairIndex, resolveTick, streamPairs, priceFromPairMap, EURUSDT_PAIR, type AssetPairsRow, type PairIndex } from './livePairIndex';
 import { createPriceBroadcaster, type PriceListener } from './priceBroadcaster';
 
 // Feed de precios en vivo: carga inicial por REST, WebSocket de Binance con
@@ -34,6 +34,58 @@ function setLivePrice(symbol: string, price: number): void {
   broadcaster.queue(symbol, price);
 }
 
+// Precio de hace 24h (apertura de la ventana móvil de 24h de Binance) en EUR,
+// por activo, para la variación de 24h en tiempo real (#147). Llega en el
+// campo `o` de los mismos mensajes miniTicker: sin peticiones adicionales.
+const open24Cache = new Map<string, number>();
+const open24Broadcaster = createPriceBroadcaster();
+let eurUsdtOpenRate: number | undefined;
+
+function setOpen24Price(symbol: string, price: number): void {
+  if (open24Cache.get(symbol) === price) return;
+  open24Cache.set(symbol, price);
+  open24Broadcaster.queue(symbol, price);
+}
+
+// Últimos precios y precios de apertura de 24h de un conjunto de pares, en
+// una sola llamada REST (ticker 24hr, formato MINI).
+async function fetchMiniTickers(pairs: Iterable<string>): Promise<{ last: Map<string, number>; open: Map<string, number> }> {
+  const symbols = encodeURIComponent(JSON.stringify([...pairs]));
+  const res = await fetchWithTimeout(`${REST_BASE}/ticker/24hr?symbols=${symbols}&type=MINI`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json() as Array<{ symbol: string; lastPrice: string; openPrice: string }>;
+  return {
+    last: new Map(data.map(d => [d.symbol, parseFloat(d.lastPrice)])),
+    open: new Map(data.map(d => [d.symbol, parseFloat(d.openPrice)])),
+  };
+}
+
+// Aplica a los dos cachés (último y apertura 24h) los precios REST de un
+// conjunto de activos, con la misma cascada de pares que el WebSocket.
+function applyRestTickers(rows: Array<AssetPairsRow & { price_source?: string }>, tickers: { last: Map<string, number>; open: Map<string, number> }): void {
+  const lastEurUsdt = tickers.last.get(EURUSDT_PAIR);
+  const openEurUsdt = tickers.open.get(EURUSDT_PAIR);
+  if (lastEurUsdt) { eurUsdtRate = 1 / lastEurUsdt; setLivePrice('USDT', eurUsdtRate); }
+  if (openEurUsdt) { eurUsdtOpenRate = 1 / openEurUsdt; setOpen24Price('USDT', eurUsdtOpenRate); }
+
+  const liveRates = () => ({ eurUsdtRate, btcEur: tickers.last.get('BTCEUR') ?? liveCache.get('BTC'), ethEur: tickers.last.get('ETHEUR') ?? liveCache.get('ETH') });
+  const openRates = () => ({ eurUsdtRate: eurUsdtOpenRate ?? 0, btcEur: tickers.open.get('BTCEUR') ?? open24Cache.get('BTC'), ethEur: tickers.open.get('ETHEUR') ?? open24Cache.get('ETH') });
+
+  for (const row of rows) {
+    if (row.price_source === 'fiat') {
+      setLivePrice(row.symbol, row.symbol === 'EUR' ? 1 : eurUsdtRate);
+      setOpen24Price(row.symbol, row.symbol === 'EUR' ? 1 : (eurUsdtOpenRate ?? eurUsdtRate));
+      continue;
+    }
+    const last = priceFromPairMap(row, tickers.last, liveRates());
+    if (last) setLivePrice(row.symbol, last);
+    const open = priceFromPairMap(row, tickers.open, openRates());
+    if (open) setOpen24Price(row.symbol, open);
+  }
+  setLivePrice('EUR', 1);
+  setOpen24Price('EUR', 1);
+}
+
 // ── Carga inicial de precios via REST ─────────────────────────────────────
 async function loadInitialPrices(): Promise<void> {
   try {
@@ -55,55 +107,7 @@ async function loadInitialPrices(): Promise<void> {
       if (row.binance_eth_pair)  pairsToFetch.add(row.binance_eth_pair);
     }
 
-    const symbols = [...pairsToFetch].map(p => `"${p}"`).join(',');
-    const fetchRes = await fetchWithTimeout(`${REST_BASE}/ticker/price?symbols=[${symbols}]`);
-    if (!fetchRes.ok) throw new Error(`HTTP ${fetchRes.status}`);
-
-    const data = await fetchRes.json() as Array<{ symbol: string; price: string }>;
-    const priceMap = new Map(data.map(d => [d.symbol, parseFloat(d.price)]));
-
-    // EURUSDT primero
-    const eurusdt = priceMap.get('EURUSDT');
-    if (eurusdt) {
-      eurUsdtRate = 1 / eurusdt;
-      setLivePrice('USDT', eurUsdtRate);
-    }
-
-    // Procesar cada activo
-    for (const row of res.rows) {
-      if (row.price_source === 'fiat') {
-        setLivePrice(row.symbol, row.symbol === 'EUR' ? 1 : eurUsdtRate);
-        continue;
-      }
-
-      let priceEur: number | null = null;
-
-      if (row.binance_eur_pair) {
-        const p = priceMap.get(row.binance_eur_pair);
-        if (p) priceEur = p;
-      }
-
-      if (!priceEur && row.binance_usdt_pair) {
-        const p = priceMap.get(row.binance_usdt_pair);
-        if (p) priceEur = p * eurUsdtRate;
-      }
-
-      if (!priceEur && row.binance_btc_pair) {
-        const p = priceMap.get(row.binance_btc_pair);
-        const btcEur = priceMap.get('BTCEUR') ?? liveCache.get('BTC') ?? 0;
-        if (p && btcEur) priceEur = p * btcEur;
-      }
-
-      if (!priceEur && row.binance_eth_pair) {
-        const p = priceMap.get(row.binance_eth_pair);
-        const ethEur = priceMap.get('ETHEUR') ?? liveCache.get('ETH') ?? 0;
-        if (p && ethEur) priceEur = p * ethEur;
-      }
-
-      if (priceEur) setLivePrice(row.symbol, priceEur);
-    }
-
-    setLivePrice('EUR', 1);
+    applyRestTickers(res.rows, await fetchMiniTickers(pairsToFetch));
   } catch (e) {
     console.error('[PRICES] Error cargando precios iniciales:', (e as Error).message);
   }
@@ -153,6 +157,21 @@ export function offPriceUpdate(cb: PriceListener): void {
   broadcaster.unsubscribe(cb);
 }
 
+// Mismo mecanismo para el precio de hace 24h (solo cambios, agrupados).
+export function onOpen24Update(cb: PriceListener): void {
+  open24Broadcaster.subscribe(cb);
+}
+
+export function offOpen24Update(cb: PriceListener): void {
+  open24Broadcaster.unsubscribe(cb);
+}
+
+export function getAllOpen24Prices(): Map<string, number> {
+  const result = new Map(open24Cache);
+  result.set('EUR', 1);
+  return result;
+}
+
 export function startLivePrices(): void {
   loadInitialPrices().then(refreshCoinGeckoOnlyPrices);
 
@@ -179,16 +198,18 @@ export async function refreshPairIndex(): Promise<PairIndex> {
 // Procesa un mensaje miniTicker del stream combinado de Binance. Sin acceso a
 // base de datos: resuelve el par contra el índice en memoria.
 export function handleTickerMessage(raw: string): void {
-  let msg: { data?: { s?: unknown; c?: unknown } };
+  let msg: { data?: { s?: unknown; c?: unknown; o?: unknown } };
   try { msg = JSON.parse(raw); } catch { return; }
 
   const pair = typeof msg.data?.s === 'string' ? msg.data.s : null;
   const price = typeof msg.data?.c === 'string' ? parseFloat(msg.data.c) : NaN;
+  const open = typeof msg.data?.o === 'string' ? parseFloat(msg.data.o) : NaN;
   if (!pair || !(price > 0)) return;
 
   if (pair === EURUSDT_PAIR) {
     eurUsdtRate = 1 / price;
     setLivePrice('USDT', eurUsdtRate);
+    if (open > 0) { eurUsdtOpenRate = 1 / open; setOpen24Price('USDT', eurUsdtOpenRate); }
   }
 
   const updates = resolveTick(pairIndex, pair, price, {
@@ -197,6 +218,17 @@ export function handleTickerMessage(raw: string): void {
     ethEur: liveCache.get('ETH'),
   });
   for (const [asset, priceEur] of updates) setLivePrice(asset, priceEur);
+
+  // Apertura de 24h: misma conversión, con las referencias también de hace 24h
+  // (el `o` de EURUSDT, BTC y ETH), para que ambos precios sean de la misma ventana.
+  if (open > 0) {
+    const openUpdates = resolveTick(pairIndex, pair, open, {
+      eurUsdtRate: eurUsdtOpenRate ?? 0,
+      btcEur: open24Cache.get('BTC'),
+      ethEur: open24Cache.get('ETH'),
+    });
+    for (const [asset, openEur] of openUpdates) setOpen24Price(asset, openEur);
+  }
 }
 
 // ── Conexión y suscripciones dinámicas (#149) ─────────────────────────────
@@ -282,6 +314,7 @@ export function stopLivePrices(): void {
   if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
   if (coinGeckoRefreshTimer) clearInterval(coinGeckoRefreshTimer);
   broadcaster.stop();
+  open24Broadcaster.stop();
   if (ws) ws.close();
 }
 
@@ -310,25 +343,15 @@ export async function refreshLivePrices(symbols: string[]): Promise<void> {
   }
 
   try {
-    const syms = [...pairsToFetch].map(p => `"${p}"`).join(',');
-    const fetchRes = await fetchWithTimeout(`${REST_BASE}/ticker/price?symbols=[${syms}]`);
-    if (!fetchRes.ok) return;
-    const data = await fetchRes.json() as Array<{ symbol: string; price: string }>;
-    const priceMap = new Map(data.map(d => [d.symbol, parseFloat(d.price)]));
-
-    const eurusdt = priceMap.get('EURUSDT');
-    const localEurUsdtRate = eurusdt ? 1 / eurusdt : eurUsdtRate;
-
-    for (const symbol of symbols) {
+    const rows = symbols.flatMap(symbol => {
       const info = getPairInfo(symbol);
-      if (!info) continue;
-      let priceEur: number | null = null;
-      if (info.binanceEurPair)  priceEur = priceMap.get(info.binanceEurPair) ?? null;
-      if (!priceEur && info.binanceUsdtPair) {
-        const p = priceMap.get(info.binanceUsdtPair);
-        if (p) priceEur = p * localEurUsdtRate;
-      }
-      if (priceEur) setLivePrice(symbol, priceEur);
-    }
+      return info ? [{
+        symbol,
+        binance_eur_pair: info.binanceEurPair, binance_usdt_pair: info.binanceUsdtPair,
+        binance_btc_pair: info.binanceBtcPair, binance_eth_pair: info.binanceEthPair,
+        price_source: info.priceSource,
+      }] : [];
+    });
+    applyRestTickers(rows, await fetchMiniTickers(pairsToFetch));
   } catch { /* silencioso — se reintentará en el siguiente ciclo WebSocket */ }
 }

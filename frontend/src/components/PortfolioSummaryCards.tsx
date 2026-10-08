@@ -17,7 +17,7 @@ export function PortfolioSummaryCards({
   totalValue, totalCost, pnl, pnlPct, hasPrices, loading,
   valueTooltip, costTooltip, pnlTooltip, pnlPctTooltip,
   eurFlow, eurFlowTooltip,
-  change24h, change24hLoading,
+  change24h,
 }: {
   totalValue: number
   totalCost:  number
@@ -31,8 +31,7 @@ export function PortfolioSummaryCards({
   pnlPctTooltip: ReactNode
   eurFlow?: EurFlow | null
   eurFlowTooltip?: ReactNode
-  change24h?: Change24h | null
-  change24hLoading?: boolean
+  change24h?: Change24h
 }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -42,8 +41,7 @@ export function PortfolioSummaryCards({
         rawValue={hasPrices ? totalValue : undefined}
         format={formatEur}
         loading={loading}
-        change24h={hasPrices ? change24h : null}
-        change24hLoading={change24hLoading}
+        change24h={change24h}
         tooltip={valueTooltip}
       />
 
