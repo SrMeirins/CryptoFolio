@@ -1,6 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { getAllLivePrices, onPriceUpdate, offPriceUpdate, lookupHistoricalPriceEur } from '../modules/prices/binance';
+import {
+  getAllLivePrices, onPriceUpdate, offPriceUpdate,
+  getAllOpen24Prices, onOpen24Update, offOpen24Update,
+  lookupHistoricalPriceEur,
+} from '../modules/prices/binance';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { sendInternalError } from '../middleware/errorHandler';
@@ -52,25 +56,34 @@ router.get('/historical', async (req, res) => {
   }
 });
 
+// Canales difundidos por el WebSocket de la app:
+// - `prices`: último precio en EUR por activo.
+// - `open24`: precio en EUR de hace 24h (apertura de la ventana móvil de
+//   Binance), para la variación de 24h en tiempo real (#147).
+// Al conectar se envía el snapshot de cada canal; después, solo los precios
+// que cambian, agrupados como mucho una vez por segundo.
 export function setupPricesWebSocket(server: Server): void {
   const wss = new WebSocketServer({ server, path: '/ws/prices' });
 
   wss.on('connection', (ws: WebSocket) => {
-    const current = getAllLivePrices();
-    if (current.size > 0) {
-      ws.send(JSON.stringify({ type: 'prices', payload: Object.fromEntries(current) }));
-    }
-
-    // Tras el snapshot inicial, solo llegan los precios que han cambiado,
-    // agrupados como mucho una vez por segundo; el frontend los fusiona.
-    const handler = (prices: Map<string, number>) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'prices', payload: Object.fromEntries(prices) }));
+    const send = (type: 'prices' | 'open24', prices: Map<string, number>) => {
+      if (ws.readyState === WebSocket.OPEN && prices.size > 0) {
+        ws.send(JSON.stringify({ type, payload: Object.fromEntries(prices) }));
       }
     };
 
-    onPriceUpdate(handler);
-    ws.on('close', () => offPriceUpdate(handler));
+    send('prices', getAllLivePrices());
+    send('open24', getAllOpen24Prices());
+
+    const onPrices = (prices: Map<string, number>) => send('prices', prices);
+    const onOpen24 = (prices: Map<string, number>) => send('open24', prices);
+
+    onPriceUpdate(onPrices);
+    onOpen24Update(onOpen24);
+    ws.on('close', () => {
+      offPriceUpdate(onPrices);
+      offOpen24Update(onOpen24);
+    });
   });
 }
 

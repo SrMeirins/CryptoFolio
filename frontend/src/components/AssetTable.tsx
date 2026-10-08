@@ -24,17 +24,13 @@ const NO_FIAT: FiatBalance[] = []
 
 export function AssetTable({ lots, fiatBalances = NO_FIAT, onSimulate }: AssetTableProps) {
   const prices   = usePricesStore(s => s.prices)
-  const { data: ydayData } = useQuery({
-    queryKey: ['yesterday-prices'],
-    queryFn: portfolioApi.getYesterdayPrices,
-    staleTime: 10 * 60_000,
-  })
+  // Precio de hace 24h en vivo (WebSocket), el mismo que usa el Dashboard (#147)
+  const yesterdayPrices = usePricesStore(s => s.open24)
   const { data: lockedAmounts = [] } = useQuery({
     queryKey: ['locked-amounts'],
     queryFn: portfolioApi.getLockedAmounts,
     staleTime: 60_000,
   })
-  const yesterdayPrices = ydayData?.prices ?? {}
   const [dustOpen,  setDustOpen]  = useState(false)
   const [compact,   setCompact]   = useState(false)
   const [sortKey,   setSortKey]   = useState<SortKey>('value')

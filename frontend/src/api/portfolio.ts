@@ -372,7 +372,6 @@ export const portfolioApi = {
     netInvested: number
   }>('/fifo/eur-flow'),
   getNotifications: () => api.get<Notification[]>('/settings/notifications'),
-  getYesterdayPrices: () => api.get<{ prices: Record<string, number> }>('/fifo/yesterday-prices'),
   getPortfolioHistory: (period: string) => api.get<{
     points: { date: string; value: number }[]
     period: string

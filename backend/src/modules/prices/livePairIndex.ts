@@ -98,3 +98,26 @@ export function resolveTick(
   }
   return result;
 }
+
+// Precio en EUR de un activo a partir de un mapa par → precio obtenido por
+// REST (carga inicial, activos nuevos), con la misma cascada de pares que el
+// WebSocket. Sirve igual para el último precio y para el de apertura de 24h.
+export function priceFromPairMap(
+  row: AssetPairsRow,
+  prices: ReadonlyMap<string, number>,
+  rates: LiveRates,
+): number | null {
+  const at = (pair: string | null) => (pair ? prices.get(pair.toUpperCase()) : undefined);
+  const candidates: Array<number | undefined> = [
+    at(row.binance_eur_pair),
+    mul(at(row.binance_usdt_pair), rates.eurUsdtRate),
+    mul(at(row.binance_btc_pair), rates.btcEur),
+    mul(at(row.binance_eth_pair), rates.ethEur),
+  ];
+  const found = candidates.find(p => p !== undefined && p > 0);
+  return found ?? null;
+}
+
+function mul(a: number | undefined, b: number | undefined): number | undefined {
+  return a !== undefined && b !== undefined ? a * b : undefined;
+}

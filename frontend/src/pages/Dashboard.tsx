@@ -6,6 +6,7 @@ import { formatEur } from '../utils/format'
 import { type Change24h } from '../components/MetricCard'
 import { PortfolioSummaryCards } from '../components/PortfolioSummaryCards'
 import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
+import { computeChange24h } from '../utils/change24h'
 import { TopMovers } from './dashboard/TopMovers'
 import { RecentActivity } from './dashboard/RecentActivity'
 import { PortfolioHistoryChart } from './dashboard/PortfolioHistoryChart'
@@ -14,6 +15,7 @@ import { FiscalCard } from './dashboard/FiscalCard'
 
 export function Dashboard() {
   const prices = usePricesStore((s) => s.prices)
+  const open24 = usePricesStore((s) => s.open24)
   const connected = usePricesStore((s) => s.connected)
   const lastUpdate = usePricesStore((s) => s.lastUpdate)
 
@@ -39,41 +41,34 @@ export function Dashboard() {
     queryFn: portfolioApi.getEurFlow,
   })
 
-  const { data: ydayData, isLoading: ydayLoading } = useQuery({
-    queryKey: ['yesterday-prices'],
-    queryFn: portfolioApi.getYesterdayPrices,
-    staleTime: 10 * 60_000,
-  })
 
   const {
-    cryptoValue, fiatValue: totalFiat, totalValue, totalCost,
+    assets, cryptoValue, fiatValue: totalFiat, totalValue, totalCost,
     pnl: totalPnl, pnlPct: totalPnlPct,
   } = usePortfolioValuation(lots, fiatBalances)
   const hasPrices = Object.keys(prices).length > 0
 
-  const change24h = useMemo((): Change24h | null => {
-    if (!ydayData?.prices || !lots.length || !hasPrices) return null
-    const yday = ydayData.prices
-    let todayCovered = 0, ydayCovered = 0
-    for (const lot of lots) {
-      const qty      = parseFloat(lot.quantity)
-      const today    = prices[lot.asset]
-      const yesterday = yday[lot.asset]
-      if (!today || !yesterday) continue
-      todayCovered += qty * today
-      ydayCovered  += qty * yesterday
+  // Variación de 24h en tiempo real con el precio de hace 24h del WebSocket (#147).
+  const change24h = useMemo((): Change24h => {
+    const waiting = 'Esperando los precios en vivo. Aparecerá en cuanto llegue el primer dato.'
+    if (!hasPrices) return { kind: 'unavailable', reason: waiting }
+    const result = computeChange24h(assets, open24)
+    if (result.status === 'unavailable') {
+      return {
+        kind: 'unavailable',
+        reason: result.reason === 'no-prices' ? waiting : 'Aún no se ha recibido el precio de hace 24h de Binance.',
+      }
     }
-    if (cryptoValue > 0 && todayCovered / cryptoValue < 0.8) return null
-    const total24hToday = todayCovered + totalFiat
-    const total24hYday  = ydayCovered  + totalFiat
-    const delta    = total24hToday - total24hYday
-    const deltaPct = total24hYday > 0 ? (delta / total24hYday) * 100 : 0
     return {
-      eur:      (delta >= 0 ? '+' : '') + formatEur(delta),
-      pct:      (deltaPct >= 0 ? '+' : '') + deltaPct.toFixed(2) + '%',
-      positive: delta >= 0,
+      kind: 'value',
+      eur: (result.eur >= 0 ? '+' : '') + formatEur(result.eur),
+      pct: (result.pct >= 0 ? '+' : '') + result.pct.toFixed(2) + '%',
+      positive: result.eur >= 0,
+      note: result.excluded.length > 0
+        ? <p>Sin precio de hace 24h, excluidos del cálculo: <span className="mono text-white">{result.excluded.join(', ')}</span></p>
+        : undefined,
     }
-  }, [ydayData, lots, prices, cryptoValue, totalFiat, hasPrices])
+  }, [assets, open24, hasPrices])
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -100,7 +95,6 @@ export function Dashboard() {
         hasPrices={hasPrices}
         loading={lotsLoading}
         change24h={change24h}
-        change24hLoading={ydayLoading}
         eurFlow={eurFlow}
         valueTooltip={
           <>

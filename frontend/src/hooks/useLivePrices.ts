@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { usePricesStore } from '../store/pricesStore'
 
 export function useLivePrices() {
-  const { setPrices, mergePrices, setConnected } = usePricesStore()
+  const { setPrices, mergePrices, mergeOpen24, setConnected } = usePricesStore()
 
   // Carga inicial via REST — instantáneo, sin esperar WebSocket
   useEffect(() => {
@@ -39,6 +39,8 @@ export function useLivePrices() {
           const data = JSON.parse(event.data)
           if (data.type === 'prices') {
             mergePrices(data.payload)
+          } else if (data.type === 'open24') {
+            mergeOpen24(data.payload)
           }
         } catch {
           // ignorar
@@ -61,5 +63,5 @@ export function useLivePrices() {
       clearTimeout(reconnectTimer)
       ws?.close()
     }
-  }, [mergePrices, setConnected])
+  }, [mergePrices, mergeOpen24, setConnected])
 }

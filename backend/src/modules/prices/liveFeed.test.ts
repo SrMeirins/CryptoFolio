@@ -111,13 +111,17 @@ describe('liveFeed — suscripciones dinámicas (#149)', () => {
   it('el activo añadido recibe un precio inmediato por REST, sin esperar al primer tick', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
-      json: async () => [{ symbol: 'EURUSDT', price: '1.25' }, { symbol: 'HBARUSDT', price: '0.2' }],
+      json: async () => [
+        { symbol: 'EURUSDT', lastPrice: '1.25', openPrice: '1.1' },
+        { symbol: 'HBARUSDT', lastPrice: '0.2', openPrice: '0.22' },
+      ],
     })));
     assetRows.current = [...assetRows.current, asset('HBAR', { binance_usdt_pair: 'HBARUSDT' })];
 
     await feed.syncLivePriceSubscriptions();
 
-    expect(feed.getLivePrice('HBAR')).toBeCloseTo(0.16, 10);
+    expect(feed.getLivePrice('HBAR')).toBeCloseTo(0.16, 10);          // 0.2 / 1.25
+    expect(feed.getAllOpen24Prices().get('HBAR')).toBeCloseTo(0.2, 10); // 0.22 / 1.1 (#147)
   });
 
   it('editar los pares de un activo cambia la suscripción', async () => {

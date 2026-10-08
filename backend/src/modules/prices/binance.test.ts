@@ -332,3 +332,50 @@ describe('binance — handleTickerMessage (feed en vivo sin consultas por tick, 
   });
 });
 
+describe('binance — handleTickerMessage: precio de hace 24h (campo o, #147)', () => {
+  let bin: typeof import('./binance');
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    queryMock.mockReset();
+    queryMock.mockResolvedValue({ rows: [
+      { symbol: 'XRP',  binance_eur_pair: 'XRPEUR', binance_usdt_pair: null, binance_btc_pair: null, binance_eth_pair: null },
+      { symbol: 'HBAR', binance_eur_pair: null, binance_usdt_pair: 'HBARUSDT', binance_btc_pair: null, binance_eth_pair: null },
+    ] });
+    bin = await import('./binance');
+    await bin.refreshPairIndex();
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  const tick = (s: string, c: string, o: string) => JSON.stringify({ data: { s, c, o } });
+
+  it('guarda el precio de apertura de 24h en EUR, separado del precio actual', () => {
+    bin.handleTickerMessage(tick('XRPEUR', '2.2', '2'));
+    expect(bin.getLivePrice('XRP')).toBe(2.2);
+    expect(bin.getAllOpen24Prices().get('XRP')).toBe(2);
+  });
+
+  it('convierte la apertura de los pares USDT con la apertura de EURUSDT (misma ventana)', () => {
+    bin.handleTickerMessage(tick('EURUSDT', '1.25', '1.1'));
+    bin.handleTickerMessage(tick('HBARUSDT', '0.25', '0.22'));
+    expect(bin.getLivePrice('HBAR')).toBeCloseTo(0.2, 10);                 // 0.25 / 1.25
+    expect(bin.getAllOpen24Prices().get('HBAR')).toBeCloseTo(0.2, 10);     // 0.22 / 1.1
+  });
+
+  it('sin apertura de EURUSDT todavía no inventa la apertura de un par USDT', () => {
+    bin.handleTickerMessage(tick('HBARUSDT', '0.25', '0.22'));
+    expect(bin.getAllOpen24Prices().has('HBAR')).toBe(false);
+  });
+
+  it('difunde los cambios de apertura por su propio canal', () => {
+    const listener = vi.fn();
+    bin.onOpen24Update(listener);
+    bin.handleTickerMessage(tick('XRPEUR', '2.2', '2'));
+    vi.advanceTimersByTime(1000);
+    expect(listener).toHaveBeenCalledWith(new Map([['XRP', 2]]));
+    bin.offOpen24Update(listener);
+  });
+});
+

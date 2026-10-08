@@ -10,10 +10,15 @@ import { createTestDatabase, TestDatabase } from '../test/setup-test-db';
 // aquí (fetch directo a CoinGecko, eliminada en este mismo turno).
 const onPriceUpdateMock = vi.fn();
 const offPriceUpdateMock = vi.fn();
+const onOpen24UpdateMock = vi.fn();
+const offOpen24UpdateMock = vi.fn();
 vi.mock('../modules/prices/binance', () => ({
   getAllLivePrices: () => new Map([['BTC', 50000], ['EUR', 1], ['NFT', 0.0012]]),
   onPriceUpdate: onPriceUpdateMock,
   offPriceUpdate: offPriceUpdateMock,
+  getAllOpen24Prices: () => new Map([['BTC', 49000], ['EUR', 1]]),
+  onOpen24Update: onOpen24UpdateMock,
+  offOpen24Update: offOpen24UpdateMock,
   getHistoricalPriceEur: vi.fn(),
   lookupHistoricalPriceEur: vi.fn(),
 }));
@@ -134,6 +139,40 @@ describe('setupPricesWebSocket — ciclo de vida del listener de precios', () =>
     await new Promise(resolve => setTimeout(resolve, 50));
 
     expect(offPriceUpdateMock).toHaveBeenCalledWith(registeredHandler);
+    httpServer.close();
+  });
+});
+
+describe('setupPricesWebSocket — canal open24 (#147)', () => {
+  it('al conectar envía el snapshot de precios y de apertura 24h, y al desconectar se desuscribe de ambos', async () => {
+    const { setupPricesWebSocket } = await import('./prices');
+    onOpen24UpdateMock.mockClear();
+    offOpen24UpdateMock.mockClear();
+
+    const httpServer = createServer();
+    setupPricesWebSocket(httpServer);
+    await new Promise<void>(resolve => httpServer.listen(0, resolve));
+    const port = (httpServer.address() as { port: number }).port;
+
+    const client = new WebSocket(`ws://127.0.0.1:${port}/ws/prices`);
+    const received: Array<{ type: string; payload: Record<string, number> }> = [];
+    client.on('message', d => received.push(JSON.parse(d.toString())));
+    await new Promise<void>((resolve, reject) => { client.on('open', resolve); client.on('error', reject); });
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(received.map(m => m.type)).toEqual(['prices', 'open24']);
+    expect(received[1].payload).toEqual({ BTC: 49000, EUR: 1 });
+
+    // Un cambio difundido por el canal open24 llega al cliente con su tipo.
+    const open24Handler = onOpen24UpdateMock.mock.calls[0][0];
+    open24Handler(new Map([['BTC', 49500]]));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(received[2]).toEqual({ type: 'open24', payload: { BTC: 49500 } });
+
+    client.close();
+    await new Promise<void>(resolve => client.on('close', resolve));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(offOpen24UpdateMock).toHaveBeenCalledWith(open24Handler);
     httpServer.close();
   });
 });
