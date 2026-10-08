@@ -269,3 +269,66 @@ describe('onPriceUpdate / offPriceUpdate', () => {
     expect(() => bin.offPriceUpdate(() => {})).not.toThrow();
   });
 });
+
+describe('binance — handleTickerMessage (feed en vivo sin consultas por tick, #148)', () => {
+  let bin: typeof import('./binance');
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    queryMock.mockReset();
+    queryMock.mockResolvedValue({ rows: [
+      { symbol: 'XRP',  binance_eur_pair: 'XRPEUR', binance_usdt_pair: 'XRPUSDT', binance_btc_pair: 'XRPBTC', binance_eth_pair: null },
+      { symbol: 'HBAR', binance_eur_pair: null, binance_usdt_pair: 'HBARUSDT', binance_btc_pair: null, binance_eth_pair: null },
+    ] });
+    bin = await import('./binance');
+    await bin.refreshPairIndex();
+    queryMock.mockClear();
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  const tick = (s: string, c: string) => JSON.stringify({ stream: `${s.toLowerCase()}@miniTicker`, data: { s, c } });
+
+  it('no consulta la base de datos al procesar mensajes', () => {
+    bin.handleTickerMessage(tick('XRPEUR', '2'));
+    bin.handleTickerMessage(tick('HBARUSDT', '0.2'));
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it('un activo con varios pares toma el precio solo de su par preferido', () => {
+    bin.handleTickerMessage(tick('XRPEUR', '2'));
+    bin.handleTickerMessage(tick('XRPUSDT', '2.5'));
+    bin.handleTickerMessage(tick('XRPBTC', '0.00004'));
+    expect(bin.getLivePrice('XRP')).toBe(2);
+  });
+
+  it('convierte los pares USDT con el último EURUSDT recibido', () => {
+    bin.handleTickerMessage(tick('EURUSDT', '1.25'));
+    bin.handleTickerMessage(tick('HBARUSDT', '0.2'));
+    expect(bin.getLivePrice('HBAR')).toBeCloseTo(0.16, 10);
+  });
+
+  it('agrupa la difusión: una emisión con solo los precios modificados', () => {
+    const listener = vi.fn();
+    bin.onPriceUpdate(listener);
+
+    bin.handleTickerMessage(tick('XRPEUR', '2'));
+    vi.advanceTimersByTime(0);
+    bin.handleTickerMessage(tick('XRPEUR', '2.1'));
+    bin.handleTickerMessage(tick('XRPEUR', '2.2'));
+    bin.handleTickerMessage(tick('XRPEUR', '2.2'));
+    vi.advanceTimersByTime(1000);
+
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(listener).toHaveBeenLastCalledWith(new Map([['XRP', 2.2]]));
+    bin.offPriceUpdate(listener);
+  });
+
+  it('ignora mensajes mal formados sin lanzar', () => {
+    expect(() => bin.handleTickerMessage('no es json')).not.toThrow();
+    expect(() => bin.handleTickerMessage(JSON.stringify({ data: { s: 'XRPEUR', c: 'abc' } }))).not.toThrow();
+    expect(bin.getLivePrice('XRP')).toBeNull();
+  });
+});
+
