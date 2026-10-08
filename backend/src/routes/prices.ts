@@ -61,6 +61,8 @@ export function setupPricesWebSocket(server: Server): void {
       ws.send(JSON.stringify({ type: 'prices', payload: Object.fromEntries(current) }));
     }
 
+    // Tras el snapshot inicial, solo llegan los precios que han cambiado,
+    // agrupados como mucho una vez por segundo; el frontend los fusiona.
     const handler = (prices: Map<string, number>) => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'prices', payload: Object.fromEntries(prices) }));

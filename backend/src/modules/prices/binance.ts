@@ -9,6 +9,8 @@ import {
 } from './coingecko';
 import { fetchWithTimeout } from './httpTimeout';
 import { dedupeByKey, priceKey } from './priceDedup';
+import { buildPairIndex, resolveTick, streamPairs, EURUSDT_PAIR, type AssetPairsRow, type PairIndex } from './livePairIndex';
+import { createPriceBroadcaster, type PriceListener } from './priceBroadcaster';
 
 // Activos price_source='coingecko' sin ningún par de Binance: CoinGecko no
 // tiene WebSocket, así que es la única forma de que alguna vez tengan un
@@ -30,6 +32,18 @@ const PRICE_ALIASES: Record<string, string> = {
 
 const liveCache = new Map<string, number>();
 let eurUsdtRate = 1.0;
+
+// Emite a los suscriptores (WebSocket de la app) los cambios agrupados, como
+// mucho una vez por segundo (#148).
+const broadcaster = createPriceBroadcaster();
+
+// Único punto de escritura del caché en vivo: registra el cambio para la
+// siguiente emisión agrupada.
+function setLivePrice(symbol: string, price: number): void {
+  if (liveCache.get(symbol) === price) return;
+  liveCache.set(symbol, price);
+  broadcaster.queue(symbol, price);
+}
 
 // ── Carga inicial de precios via REST ─────────────────────────────────────
 async function loadInitialPrices(): Promise<void> {
@@ -63,13 +77,13 @@ async function loadInitialPrices(): Promise<void> {
     const eurusdt = priceMap.get('EURUSDT');
     if (eurusdt) {
       eurUsdtRate = 1 / eurusdt;
-      liveCache.set('USDT', eurUsdtRate);
+      setLivePrice('USDT', eurUsdtRate);
     }
 
     // Procesar cada activo
     for (const row of res.rows) {
       if (row.price_source === 'fiat') {
-        liveCache.set(row.symbol, row.symbol === 'EUR' ? 1 : eurUsdtRate);
+        setLivePrice(row.symbol, row.symbol === 'EUR' ? 1 : eurUsdtRate);
         continue;
       }
 
@@ -97,10 +111,10 @@ async function loadInitialPrices(): Promise<void> {
         if (p && ethEur) priceEur = p * ethEur;
       }
 
-      if (priceEur) liveCache.set(row.symbol, priceEur);
+      if (priceEur) setLivePrice(row.symbol, priceEur);
     }
 
-    liveCache.set('EUR', 1);
+    setLivePrice('EUR', 1);
   } catch (e) {
     console.error('[PRICES] Error cargando precios iniciales:', (e as Error).message);
   }
@@ -343,12 +357,7 @@ async function refreshCoinGeckoOnlyPrices(): Promise<void> {
 
     const prices = await getCurrentPricesEur(symbols);
     for (const [symbol, price] of prices) {
-      if (symbol !== 'EUR') liveCache.set(symbol, price);
-    }
-
-    if (priceUpdateCallbacks.length > 0) {
-      const snapshot = new Map(liveCache);
-      for (const cb of priceUpdateCallbacks) cb(snapshot);
+      if (symbol !== 'EUR') setLivePrice(symbol, price);
     }
   } catch (e) {
     console.error('[PRICES] Error refrescando precios CoinGecko-only:', (e as Error).message);
@@ -359,100 +368,71 @@ async function refreshCoinGeckoOnlyPrices(): Promise<void> {
 let ws: WebSocket | null = null;
 let wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let coinGeckoRefreshTimer: ReturnType<typeof setInterval> | null = null;
-const priceUpdateCallbacks: Array<(prices: Map<string, number>) => void> = [];
+let pairIndex: PairIndex = new Map();
 
-export function onPriceUpdate(cb: (prices: Map<string, number>) => void): void {
-  priceUpdateCallbacks.push(cb);
+// Los suscriptores reciben solo los precios que han cambiado (delta),
+// agrupados como mucho una vez por segundo. El snapshot completo se obtiene
+// con getAllLivePrices() (p. ej. al conectar un cliente).
+export function onPriceUpdate(cb: PriceListener): void {
+  broadcaster.subscribe(cb);
 }
 
-export function offPriceUpdate(cb: (prices: Map<string, number>) => void): void {
-  const idx = priceUpdateCallbacks.indexOf(cb);
-  if (idx !== -1) priceUpdateCallbacks.splice(idx, 1);
+export function offPriceUpdate(cb: PriceListener): void {
+  broadcaster.unsubscribe(cb);
 }
 
 export function startLivePrices(): void {
-  loadInitialPrices()
-    .then(refreshCoinGeckoOnlyPrices)
-    .then(() => {
-      if (priceUpdateCallbacks.length > 0) {
-        const snapshot = new Map(liveCache);
-        for (const cb of priceUpdateCallbacks) cb(snapshot);
-      }
-    });
+  loadInitialPrices().then(refreshCoinGeckoOnlyPrices);
 
   coinGeckoRefreshTimer = setInterval(refreshCoinGeckoOnlyPrices, COINGECKO_REFRESH_MS);
 
-  // Construir streams desde DB dinámicamente
-  db.query(
-    `SELECT binance_eur_pair, binance_usdt_pair, binance_btc_pair, binance_eth_pair
+  refreshPairIndex()
+    .then(index => {
+      const streams = streamPairs(index).map(p => `${p.toLowerCase()}@miniTicker`).join('/');
+      connectWebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+    })
+    .catch(e => console.error('[WS] No se pudo construir el índice de pares:', (e as Error).message));
+}
+
+// (Re)construye el índice par → activos a partir de asset_metadata: una
+// consulta al arrancar o cuando cambian los activos, no una por tick.
+export async function refreshPairIndex(): Promise<PairIndex> {
+  const res = await db.query(
+    `SELECT symbol, binance_eur_pair, binance_usdt_pair, binance_btc_pair, binance_eth_pair
      FROM asset_metadata
      WHERE price_source NOT IN ('fiat', 'unknown')`
-  ).then(res => {
-    const pairs = new Set<string>(['eurusdt']);
-    for (const row of res.rows) {
-      if (row.binance_eur_pair)  pairs.add(row.binance_eur_pair.toLowerCase());
-      if (row.binance_usdt_pair) pairs.add(row.binance_usdt_pair.toLowerCase());
-      if (row.binance_btc_pair)  pairs.add(row.binance_btc_pair.toLowerCase());
-      if (row.binance_eth_pair)  pairs.add(row.binance_eth_pair.toLowerCase());
-    }
+  );
+  pairIndex = buildPairIndex(res.rows as AssetPairsRow[]);
+  return pairIndex;
+}
 
-    const streams = [...pairs].map(p => `${p}@miniTicker`).join('/');
-    const streamUrl = `wss://stream.binance.com:9443/stream?streams=${streams}`;
-    connectWebSocket(streamUrl);
+// Procesa un mensaje miniTicker del stream combinado de Binance. Sin acceso a
+// base de datos: resuelve el par contra el índice en memoria.
+export function handleTickerMessage(raw: string): void {
+  let msg: { data?: { s?: unknown; c?: unknown } };
+  try { msg = JSON.parse(raw); } catch { return; }
+
+  const pair = typeof msg.data?.s === 'string' ? msg.data.s : null;
+  const price = typeof msg.data?.c === 'string' ? parseFloat(msg.data.c) : NaN;
+  if (!pair || !(price > 0)) return;
+
+  if (pair === EURUSDT_PAIR) {
+    eurUsdtRate = 1 / price;
+    setLivePrice('USDT', eurUsdtRate);
+  }
+
+  const updates = resolveTick(pairIndex, pair, price, {
+    eurUsdtRate,
+    btcEur: liveCache.get('BTC'),
+    ethEur: liveCache.get('ETH'),
   });
+  for (const [asset, priceEur] of updates) setLivePrice(asset, priceEur);
 }
 
 function connectWebSocket(streamUrl: string): void {
   ws = new WebSocket(streamUrl);
 
-  ws.on('message', async (data: Buffer) => {
-    try {
-      const msg = JSON.parse(data.toString()) as {
-        data: { s: string; c: string }
-      };
-      const symbol = msg.data.s;
-      const price = parseFloat(msg.data.c);
-
-      if (symbol === 'EURUSDT') {
-        eurUsdtRate = 1 / price;
-        liveCache.set('USDT', eurUsdtRate);
-      }
-
-      // Buscar qué activo corresponde a este par
-      const allAssets = await db.query(
-        `SELECT symbol, binance_eur_pair, binance_usdt_pair, binance_btc_pair, binance_eth_pair
-         FROM asset_metadata
-         WHERE binance_eur_pair = $1 OR binance_usdt_pair = $1
-            OR binance_btc_pair = $1 OR binance_eth_pair = $1`,
-        [symbol]
-      );
-
-      for (const row of allAssets.rows) {
-        let priceEur: number | null = null;
-
-        if (row.binance_eur_pair === symbol) {
-          priceEur = price;
-        } else if (row.binance_usdt_pair === symbol) {
-          priceEur = price * eurUsdtRate;
-        } else if (row.binance_btc_pair === symbol) {
-          const btcEur = liveCache.get('BTC') ?? 0;
-          if (btcEur) priceEur = price * btcEur;
-        } else if (row.binance_eth_pair === symbol) {
-          const ethEur = liveCache.get('ETH') ?? 0;
-          if (ethEur) priceEur = price * ethEur;
-        }
-
-        if (priceEur) liveCache.set(row.symbol, priceEur);
-      }
-
-      liveCache.set('EUR', 1);
-
-      if (priceUpdateCallbacks.length > 0) {
-        const snapshot = new Map(liveCache);
-        for (const cb of priceUpdateCallbacks) cb(snapshot);
-      }
-    } catch { /* ignorar */ }
-  });
+  ws.on('message', (data: Buffer) => handleTickerMessage(data.toString()));
 
   ws.on('close', () => {
     console.warn('[WS] Desconectado. Reconectando en 5s...');
@@ -465,6 +445,7 @@ function connectWebSocket(streamUrl: string): void {
 export function stopLivePrices(): void {
   if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
   if (coinGeckoRefreshTimer) clearInterval(coinGeckoRefreshTimer);
+  broadcaster.stop();
   if (ws) ws.close();
 }
 
@@ -515,7 +496,7 @@ export async function refreshLivePrices(symbols: string[]): Promise<void> {
         const p = priceMap.get(info.binanceUsdtPair);
         if (p) priceEur = p * localEurUsdtRate;
       }
-      if (priceEur) liveCache.set(symbol, priceEur);
+      if (priceEur) setLivePrice(symbol, priceEur);
     }
   } catch { /* silencioso — se reintentará en el siguiente ciclo WebSocket */ }
 }
