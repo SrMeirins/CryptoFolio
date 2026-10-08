@@ -1,23 +1,58 @@
 name: Deuda técnica
-description: Refactor, limpieza, tests o dependencias, sin cambio funcional visible
-title: "[Deuda] "
+description: Refactor, limpieza, tests o dependencias sin cambio funcional visible
 labels: ["tipo/deuda-tecnica"]
 projects: ["SrMeirins/1"]
 body:
   - type: textarea
-    id: situacion
+    id: resumen
     attributes:
-      label: Situación actual
-      description: Qué hay ahora y por qué es un problema (mantenimiento, rendimiento, riesgo…).
+      label: Resumen
+      description: Qué hay que mejorar, en una o dos frases.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: componentes
+    attributes:
+      label: Componentes afectados
+      multiple: true
+      options:
+        - Backend / API
+        - Interfaz web
+        - Aplicación de escritorio
+        - Fiscal (IRPF, Modelo 721, exportaciones)
+        - Motor FIFO
+        - Importación de CSV
+        - Portfolio, precios y wallets
+        - Infraestructura (Docker, CI/CD)
     validations:
       required: true
 
   - type: textarea
     id: ubicacion
     attributes:
-      label: Dónde
-      description: Ficheros o módulos afectados.
+      label: Ubicación
+      description: Ficheros o módulos implicados.
       placeholder: backend/src/modules/fifo/engine.ts
+    validations:
+      required: true
+
+  - type: textarea
+    id: situacion
+    attributes:
+      label: Situación actual
+      description: Qué hay ahora y por qué es un problema.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: riesgo
+    attributes:
+      label: Riesgo de no abordarlo
+      options:
+        - Alto — puede provocar errores en datos o cálculos
+        - Medio — frena el desarrollo o aumenta el riesgo de regresiones
+        - Bajo — limpieza o coherencia de estilo
     validations:
       required: true
 
@@ -25,17 +60,24 @@ body:
     id: propuesta
     attributes:
       label: Propuesta
-      description: Cómo se resolvería y cómo se valida (tests, lint, benchmark…).
+      description: Cambio planteado y enfoque.
     validations:
       required: true
 
-  - type: dropdown
-    id: impacto
+  - type: textarea
+    id: aceptacion
     attributes:
-      label: Impacto si no se aborda
-      options:
-        - Alto — puede provocar errores en datos o cálculos
-        - Medio — frena el desarrollo o añade riesgo
-        - Bajo — limpieza o estilo
+      label: Criterios de aceptación
+      description: Condiciones verificables para dar la issue por completada.
+      value: |
+        - [ ]
+        - [ ] Sin cambios de comportamiento: la suite de tests existente pasa sin modificaciones funcionales.
+        - [ ] Lint y typecheck sin avisos nuevos.
     validations:
       required: true
+
+  - type: textarea
+    id: validacion
+    attributes:
+      label: Estrategia de validación
+      description: Opcional. Tests nuevos, benchmarks o comprobaciones manuales.
