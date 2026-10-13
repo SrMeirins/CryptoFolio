@@ -60,6 +60,26 @@ describe('routes/settings — config y stats', () => {
     });
   });
 
+  describe('PUT /config — display_currency (#176)', () => {
+    it('acepta EUR y USD y GET /config lo refleja', async () => {
+      for (const currency of ['USD', 'EUR']) {
+        const put = await request(app).put('/api/settings/config').send({ key: 'display_currency', value: currency });
+        expect(put.status).toBe(200);
+        const get = await request(app).get('/api/settings/config');
+        expect(get.body.display_currency).toBe(currency);
+      }
+    });
+
+    it('rechaza una moneda no soportada con 400 y no la guarda', async () => {
+      for (const value of ['GBP', 'usd', 1, true]) {
+        const put = await request(app).put('/api/settings/config').send({ key: 'display_currency', value });
+        expect(put.status).toBe(400);
+      }
+      const get = await request(app).get('/api/settings/config');
+      expect(get.body.display_currency).toBe('EUR');
+    });
+  });
+
   describe('GET /stats', () => {
     it('devuelve los 6 contadores esperados', async () => {
       const res = await request(app).get('/api/settings/stats');
