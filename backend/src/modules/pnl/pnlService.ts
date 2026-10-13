@@ -6,6 +6,7 @@ import {
 } from '../prices/closePrices';
 import { PRICE_ALIASES } from '../prices/priceAliases';
 import { getAllLivePrices } from '../prices/liveFeed';
+import type { DisplayCurrency } from '../fiat/displayCurrency';
 
 // Orquestación del P&L diario (#165): tenencias al cierre de cada día local
 // (Europe/Madrid), precios de cierre en caché, flujos de capital y día en
@@ -13,6 +14,7 @@ import { getAllLivePrices } from '../prices/liveFeed';
 // cierres, marca `refreshing` y los descarga en segundo plano.
 
 export interface PnlResponse {
+  currency: DisplayCurrency;
   from: string;
   to: string;
   timezone: 'Europe/Madrid';
@@ -31,7 +33,10 @@ function previousDay(day: string): string {
 
 const priceAsset = (asset: string) => PRICE_ALIASES[asset] ?? asset;
 
-export async function getDailyPnl(query: { from?: string; to?: string } = {}): Promise<PnlResponse> {
+export async function getDailyPnl(
+  query: { from?: string; to?: string; currency?: DisplayCurrency } = {},
+): Promise<PnlResponse> {
+  const currency: DisplayCurrency = query.currency ?? 'EUR';
   const now = Date.now();
   const today = madridDateOf(now);
   const [events, flows] = await Promise.all([loadPositionEvents(), loadCapitalFlows()]);
@@ -39,7 +44,7 @@ export async function getDailyPnl(query: { from?: string; to?: string } = {}): P
   const to = query.to ?? today;
   const firstActivity = events.length > 0 ? madridDateOf(events.reduce((min, e) => Math.min(min, e.at), Infinity)) : to;
   const from = !query.from || query.from < firstActivity ? (firstActivity <= to ? firstActivity : to) : query.from;
-  const empty: PnlResponse = { from, to, timezone: 'Europe/Madrid', refreshing: false, totalPnl: 0, twrPct: 0, dietzPct: 0, peakCapitalPct: 0, days: [] };
+  const empty: PnlResponse = { currency, from, to, timezone: 'Europe/Madrid', refreshing: false, totalPnl: 0, twrPct: 0, dietzPct: 0, peakCapitalPct: 0, days: [] };
   if (events.length === 0 || from > to) return empty;
 
   // Día anterior (base) + días pedidos. El día de hoy se valora en este instante.
@@ -51,6 +56,8 @@ export async function getDailyPnl(query: { from?: string; to?: string } = {}): P
   const assets = new Set<string>();
   for (const h of holdings) for (const a of h.keys()) if (a !== 'EUR') assets.add(priceAsset(a));
   for (const f of flows) if (f.asset !== 'EUR') assets.add(priceAsset(f.asset));
+  // En USD hace falta el cierre de USDT de todos los días: es el tipo USD por EUR.
+  if (currency === 'USD') assets.add('USDT');
   const cache = await getCachedCloses([...assets], allDays[0], to);
   const live = getAllLivePrices();
 
@@ -73,14 +80,27 @@ export async function getDailyPnl(query: { from?: string; to?: string } = {}): P
       }
       const cached = closes?.get(day);
       if (cached === undefined) {
-        if (heldOn(holdings[i], asset)) { markPending(asset, day); pendingDay[i] = true; }
+        if (heldOn(holdings[i], asset) || (currency === 'USD' && asset === 'USDT')) { markPending(asset, day); pendingDay[i] = true; }
         return last;
       }
       if (cached > 0) last = cached;
       return last;
     }));
   }
-  const priceOf = (asset: string, i: number) => priceTable.get(priceAsset(asset))?.[i] ?? null;
+  // Moneda de visualización (#175): en USD cada importe en EUR del día i se
+  // divide por el precio de 1 USDT en EUR de ese mismo cierre (o en vivo hoy).
+  const usdtEur = priceTable.get('USDT');
+  const fxAt = (i: number): number | null => {
+    if (currency === 'EUR') return 1;
+    const rate = usdtEur?.[i];
+    return rate && rate > 0 ? 1 / rate : null;
+  };
+  const priceOf = (asset: string, i: number) => {
+    const eur = priceTable.get(priceAsset(asset))?.[i] ?? null;
+    const fx = fxAt(i);
+    return eur === null || fx === null ? null : eur * fx;
+  };
+  for (let i = 0; i < allDays.length; i++) if (fxAt(i) === null) pendingDay[i] = true;
 
   // ── Flujos de capital agrupados por día (cierre anterior, cierre] ──
   const inflow = new Array<number>(allDays.length).fill(0);
@@ -89,7 +109,7 @@ export async function getDailyPnl(query: { from?: string; to?: string } = {}): P
   for (const f of flows) {
     const i = dayIndexFor(f.at, instants);
     if (i <= 0) continue; // anterior al rango o del propio día base
-    const price = f.asset === 'EUR' ? 1 : priceOf(f.asset, i);
+    const price = f.asset === 'EUR' ? fxAt(i) : priceOf(f.asset, i);
     if (f.asset !== 'EUR' && allDays[i] !== today && cache.get(priceAsset(f.asset))?.get(allDays[i]) === undefined) {
       markPending(priceAsset(f.asset), allDays[i]);
       pendingDay[i] = true;
@@ -101,7 +121,7 @@ export async function getDailyPnl(query: { from?: string; to?: string } = {}): P
   }
 
   // ── Valoración y P&L ──
-  const valueAt = (i: number) => valueHoldings(holdings[i], a => priceOf(a, i)).value;
+  const valueAt = (i: number) => valueHoldings(holdings[i], a => priceOf(a, i), fxAt(i) ?? 0).value;
   const valuations: DayValuation[] = allDays.slice(1).map((date, k) => {
     const i = k + 1;
     return {
@@ -113,7 +133,7 @@ export async function getDailyPnl(query: { from?: string; to?: string } = {}): P
 
   const refreshing = pending.size > 0;
   if (refreshing) schedulePrefetch(pending);
-  return { from, to, timezone: 'Europe/Madrid', refreshing, totalPnl, twrPct, dietzPct, peakCapitalPct, days };
+  return { currency, from, to, timezone: 'Europe/Madrid', refreshing, totalPnl, twrPct, dietzPct, peakCapitalPct, days };
 }
 
 function heldOn(h: ReadonlyMap<string, number>, asset: string): boolean {

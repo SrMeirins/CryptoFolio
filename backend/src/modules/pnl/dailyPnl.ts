@@ -94,17 +94,19 @@ export function computeDailyPnl(
 }
 
 /**
- * Valor de unas tenencias con una función de precio. EUR vale 1. Los activos
- * sin precio se excluyen y se devuelven en `missing`.
+ * Valor de unas tenencias con una función de precio. EUR vale `eurPrice` (1 en
+ * EUR; el tipo USD por EUR en USD). Los activos sin precio se excluyen y se
+ * devuelven en `missing`.
  */
 export function valueHoldings(
   holdings: ReadonlyMap<string, number>,
   priceOf: (asset: string) => number | null,
+  eurPrice = 1,
 ): { value: number; missing: string[] } {
   let value = 0;
   const missing: string[] = [];
   for (const [asset, qty] of holdings) {
-    if (asset === 'EUR') { value += qty; continue; }
+    if (asset === 'EUR') { value += qty * eurPrice; continue; }
     const price = priceOf(asset);
     if (price === null) { missing.push(asset); continue; }
     value += qty * price;

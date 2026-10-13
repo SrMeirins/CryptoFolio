@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { getDailyPnl } from '../modules/pnl/pnlService';
 import { madridDateOf } from '../modules/prices/closePrices';
+import { currencySchema } from '../modules/fiat/displayCurrency';
 import { sendInternalError } from '../middleware/errorHandler';
 
 const router = Router();
@@ -18,6 +19,7 @@ const daySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(isRealDay);
 const querySchema = z.object({
   from: daySchema.optional(),
   to: daySchema.optional(),
+  currency: currencySchema,
 }).strict().superRefine((q, ctx) => {
   const today = madridDateOf(Date.now());
   if (q.to && q.to > today) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'to no puede ser futura' });
@@ -30,7 +32,7 @@ const querySchema = z.object({
   }
 });
 
-// GET /api/v1/pnl/daily?from=YYYY-MM-DD&to=YYYY-MM-DD
+// GET /api/v1/pnl/daily?from=YYYY-MM-DD&to=YYYY-MM-DD&currency=EUR|USD
 // P&L diario por día local (Europe/Madrid) y rentabilidad acumulada (TWR).
 // Sin `from`: desde la primera actividad; sin `to`: hasta hoy (en vivo).
 router.get('/daily', async (req: Request, res: Response) => {

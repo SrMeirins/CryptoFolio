@@ -1,28 +1,33 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../../db/client';
+import { currencySchema, fxSql, usdPerEurSql } from '../../modules/fiat/displayCurrency';
 
 const router = Router();
 
 // ── GET /api/transactions/stats ───────────────────────────────────────────
-router.get('/stats', async (_req: Request, res: Response) => {
+router.get('/stats', async (req: Request, res: Response) => {
+  // ?currency=USD: cada importe en EUR se convierte con el tipo de su fecha (#175).
+  const currency = currencySchema.safeParse(req.query.currency);
+  if (!currency.success) { res.status(400).json({ error: 'currency debe ser EUR o USD' }); return; }
+  const transactions = `(SELECT tx.*, ${fxSql(currency.data, 'tx.timestamp')} AS fx FROM transactions tx) transactions`;
   const [totalsRes, monthlyRes, topAssetsRes, feesRes] = await Promise.all([
     db.query(`
       SELECT
         COUNT(*)::int                                                                  AS total_ops,
         COUNT(DISTINCT asset)::int                                                     AS unique_assets,
-        COALESCE(SUM(CASE WHEN cost_asset='EUR' AND operation_type='BUY' THEN cost_amount ELSE 0 END), 0) AS total_invested,
+        COALESCE(SUM(CASE WHEN cost_asset='EUR' AND operation_type='BUY' THEN cost_amount * fx ELSE 0 END), 0) AS total_invested,
         COUNT(CASE WHEN operation_type IN ('FEE_EXCHANGE','FEE_NETWORK','FEE') THEN 1 END)::int           AS total_fee_ops,
         COALESCE(SUM(
           CASE
-            WHEN fee_asset = 'EUR'                                  THEN fee_amount
-            WHEN fee_asset = asset AND price_per_unit IS NOT NULL   THEN fee_amount * price_per_unit
+            WHEN fee_asset = 'EUR'                                  THEN fee_amount * fx
+            WHEN fee_asset = asset AND price_per_unit IS NOT NULL   THEN fee_amount * price_per_unit * fx
             ELSE 0
           END
         ), 0)::float                                                                   AS total_fees_eur,
         COUNT(CASE WHEN operation_type = 'BUY' THEN 1 END)::int                       AS total_buys,
         COUNT(CASE WHEN operation_type = 'SELL' THEN 1 END)::int                      AS total_sells,
         COUNT(CASE WHEN manually_added = true THEN 1 END)::int                        AS total_manual
-      FROM transactions
+      FROM ${transactions}
     `),
     db.query(`
       SELECT
@@ -32,16 +37,16 @@ router.get('/stats', async (_req: Request, res: Response) => {
         COUNT(CASE WHEN operation_type IN ('SELL','SELL_FIAT','SELL_CRYPTO','GIFT_SENT','LOST')                   THEN 1 END)::int AS ventas,
         COUNT(CASE WHEN operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP','FORK') THEN 1 END)::int AS ingresos,
         COUNT(CASE WHEN operation_type IN ('TRANSFER_INTERNAL','WITHDRAW','WITHDRAW_FIAT','DEPOSIT_FIAT','DEPOSIT_CRYPTO') THEN 1 END)::int AS transferencias,
-        COALESCE(SUM(CASE WHEN cost_asset='EUR' AND operation_type IN ('BUY','BUY_FIAT','BUY_CRYPTO') THEN cost_amount ELSE 0 END), 0)::float AS eur_invertido
-      FROM transactions
+        COALESCE(SUM(CASE WHEN cost_asset='EUR' AND operation_type IN ('BUY','BUY_FIAT','BUY_CRYPTO') THEN cost_amount * fx ELSE 0 END), 0)::float AS eur_invertido
+      FROM ${transactions}
       WHERE timestamp >= NOW() - INTERVAL '18 months'
       GROUP BY DATE_TRUNC('month', timestamp)
       ORDER BY DATE_TRUNC('month', timestamp) ASC
     `),
     db.query(`
       SELECT asset, COUNT(*)::int AS ops,
-        COALESCE(SUM(CASE WHEN cost_asset='EUR' THEN cost_amount ELSE 0 END), 0)::float AS eur_volume
-      FROM transactions
+        COALESCE(SUM(CASE WHEN cost_asset='EUR' THEN cost_amount * fx ELSE 0 END), 0)::float AS eur_volume
+      FROM ${transactions}
       WHERE operation_type IN ('BUY','SELL','BUY_FIAT','SELL_FIAT','BUY_CRYPTO','SELL_CRYPTO')
         AND timestamp >= NOW() - INTERVAL '1 year'
       GROUP BY asset ORDER BY ops DESC LIMIT 10
@@ -53,12 +58,12 @@ router.get('/stats', async (_req: Request, res: Response) => {
         COALESCE(SUM(fee_amount), 0)::float AS total_amount,
         COALESCE(SUM(
           CASE
-            WHEN fee_asset = 'EUR'                                THEN fee_amount
-            WHEN fee_asset = asset AND price_per_unit IS NOT NULL THEN fee_amount * price_per_unit
+            WHEN fee_asset = 'EUR'                                THEN fee_amount * fx
+            WHEN fee_asset = asset AND price_per_unit IS NOT NULL THEN fee_amount * price_per_unit * fx
             ELSE 0
           END
         ), 0)::float AS total_eur
-      FROM transactions
+      FROM ${transactions}
       WHERE fee_asset IS NOT NULL AND fee_amount > 0
         AND timestamp >= NOW() - INTERVAL '1 year'
       GROUP BY fee_asset ORDER BY total_eur DESC LIMIT 6
@@ -66,6 +71,7 @@ router.get('/stats', async (_req: Request, res: Response) => {
   ]);
 
   res.json({
+    currency:  currency.data,
     totals:    totalsRes.rows[0],
     monthly:   monthlyRes.rows,
     topAssets: topAssetsRes.rows,
@@ -75,6 +81,8 @@ router.get('/stats', async (_req: Request, res: Response) => {
 
 // ── GET /api/transactions ──────────────────────────────────────────────────
 router.get('/', async (req: Request, res: Response) => {
+  const currency = currencySchema.safeParse(req.query.currency);
+  if (!currency.success) { res.status(400).json({ error: 'currency debe ser EUR o USD' }); return; }
   const {
     asset, type, wallet_id, account, manually_added,
     date_from, date_to, search,
@@ -117,7 +125,8 @@ router.get('/', async (req: Request, res: Response) => {
        lt.timestamp AS linked_tx_timestamp,
        lt.operation_type AS linked_tx_operation_type,
        lt.amount AS linked_tx_amount,
-       lt.asset AS linked_tx_asset
+       lt.asset AS linked_tx_asset,
+       ${usdPerEurSql('t.timestamp')} AS usd_per_eur
      FROM transactions t
      JOIN wallets w ON w.id = t.wallet_id
      LEFT JOIN wallets dw ON dw.id = t.destination_wallet_id
@@ -135,14 +144,19 @@ router.get('/', async (req: Request, res: Response) => {
       filterParams
     ),
     db.query(
-      `SELECT COALESCE(SUM(
-         CASE
-           WHEN t.cost_asset = 'EUR' THEN ABS(t.cost_amount)
-           WHEN t.price_per_unit IS NOT NULL THEN ABS(t.amount_net) * t.price_per_unit
-           ELSE 0
-         END
-       ), 0)::float AS total_eur
-       FROM transactions t JOIN wallets w ON w.id = t.wallet_id ${where}`,
+      `SELECT
+         COALESCE(SUM(value_eur), 0)::float      AS total_eur,
+         COALESCE(SUM(value_eur * fx), 0)::float AS total_amount
+       FROM (
+         SELECT
+           CASE
+             WHEN t.cost_asset = 'EUR' THEN ABS(t.cost_amount)
+             WHEN t.price_per_unit IS NOT NULL THEN ABS(t.amount_net) * t.price_per_unit
+             ELSE 0
+           END AS value_eur,
+           ${fxSql(currency.data, 't.timestamp')} AS fx
+         FROM transactions t JOIN wallets w ON w.id = t.wallet_id ${where}
+       ) v`,
       filterParams
     ),
   ]);
@@ -151,6 +165,9 @@ router.get('/', async (req: Request, res: Response) => {
     transactions: result.rows,
     total:     parseInt(totalRes.rows[0].count),
     total_eur: sumRes.rows[0].total_eur,
+    // Total en la moneda pedida (?currency=EUR|USD, #175)
+    currency:  currency.data,
+    total_amount: sumRes.rows[0].total_amount,
     limit:     parseInt(limit as string),
     offset:    parseInt(offset as string),
   });

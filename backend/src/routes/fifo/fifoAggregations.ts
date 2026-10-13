@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/client';
 import { EUR_MOVEMENTS_SQL } from '../../modules/fiat/eurMovements';
+import { currencySchema, fxSql } from '../../modules/fiat/displayCurrency';
 
 const router = Router();
 
@@ -44,16 +45,20 @@ router.get('/fiat-balances', async (_req, res) => {
 });
 
 // GET /api/fifo/eur-flow — Euros depositados, retirados y neto invertido en cripto
-router.get('/eur-flow', async (_req, res) => {
+router.get('/eur-flow', async (req, res) => {
   // Movimientos de EUR: EUR_MOVEMENTS_SQL. Comprar cripto con EUR incluye las
   // ventas cuyo activo es EUR; recibir EUR incluye las compras de EUR.
+  // ?currency=USD convierte cada movimiento con el tipo de su fecha (#175).
+  const currency = currencySchema.safeParse(req.query.currency);
+  if (!currency.success) { res.status(400).json({ error: 'currency debe ser EUR o USD' }); return; }
+  const fx = fxSql(currency.data, 'timestamp');
   const result = await db.query(`
     SELECT
-      COALESCE(SUM(CASE WHEN kind = 'deposit'                       THEN  amount ELSE 0 END), 0) AS deposited,
-      COALESCE(SUM(CASE WHEN kind = 'withdraw'                      THEN -amount ELSE 0 END), 0) AS withdrawn,
-      COALESCE(SUM(CASE WHEN kind IN ('buy', 'eur_to_crypto')       THEN -amount ELSE 0 END), 0) AS eur_spent_buying,
-      COALESCE(SUM(CASE WHEN kind IN ('sell', 'crypto_to_eur')      THEN  amount ELSE 0 END), 0) AS eur_received_selling
-    FROM (${EUR_MOVEMENTS_SQL}) movements
+      COALESCE(SUM(CASE WHEN kind = 'deposit'                       THEN  amount * fx ELSE 0 END), 0) AS deposited,
+      COALESCE(SUM(CASE WHEN kind = 'withdraw'                      THEN -amount * fx ELSE 0 END), 0) AS withdrawn,
+      COALESCE(SUM(CASE WHEN kind IN ('buy', 'eur_to_crypto')       THEN -amount * fx ELSE 0 END), 0) AS eur_spent_buying,
+      COALESCE(SUM(CASE WHEN kind IN ('sell', 'crypto_to_eur')      THEN  amount * fx ELSE 0 END), 0) AS eur_received_selling
+    FROM (SELECT m.*, ${fx} AS fx FROM (${EUR_MOVEMENTS_SQL}) m) movements
   `);
   const row = result.rows[0];
   const deposited          = parseFloat(row.deposited);
@@ -61,6 +66,7 @@ router.get('/eur-flow', async (_req, res) => {
   const eurSpentBuying     = parseFloat(row.eur_spent_buying);
   const eurReceivedSelling = parseFloat(row.eur_received_selling);
   res.json({
+    currency: currency.data,
     deposited,
     withdrawn,
     netFromBank: deposited - withdrawn,         // EUR neto desde el banco
@@ -110,7 +116,12 @@ router.get('/lots', async (_req, res) => {
        SUM(fl.cost_basis_eur)      AS cost_basis_eur,
        -- Media ponderada por cantidad (no media simple)
        SUM(fl.quantity_remaining * fl.price_per_unit_eur)
-         / NULLIF(SUM(fl.quantity_remaining), 0) AS avg_price_eur
+         / NULLIF(SUM(fl.quantity_remaining), 0) AS avg_price_eur,
+       -- Coste en USD con el tipo de apertura de cada lote (#174/#175); NULL si
+       -- algún lote no tiene tipo
+       SUM(fl.cost_basis_eur * fl.usd_per_eur) AS cost_basis_usd,
+       SUM(fl.quantity_remaining * fl.price_per_unit_eur * fl.usd_per_eur)
+         / NULLIF(SUM(fl.quantity_remaining), 0) AS avg_price_usd
      FROM fifo_lots fl
      JOIN wallets w ON w.id = fl.wallet_id
      WHERE fl.is_closed = FALSE AND fl.quantity_remaining > 0

@@ -145,6 +145,22 @@ describe('getDailyPnl — flujos de capital y rendimiento', () => {
     ]);
   });
 
+  it('en USD valora con el cierre de USDT de cada día y el P&L cumple la misma identidad', async () => {
+    await reset();
+    await tx('DEPOSIT_FIAT', '2026-06-01T10:00:00Z', 'EUR', 100);
+    await tx('BUY', '2026-06-01T11:00:00Z', 'XRP', 100, { cost_asset: 'EUR', cost_amount: 100 });
+    await runFifoEngine();
+    await closes('XRP', { '2026-05-31': 1, '2026-06-01': 1, '2026-06-02': 1.1 });
+    await closes('USDT', { '2026-05-31': 0.8, '2026-06-01': 0.8, '2026-06-02': 0.5 }); // 1,25 $/€ y luego 2 $/€
+
+    const r = await getDailyPnl({ from: '2026-06-01', to: '2026-06-02', currency: 'USD' });
+    expect(r.currency).toBe('USD');
+    expect(r.days.map(x => [x.date, x.value, x.inflow])).toEqual([['2026-06-01', 125, 125], ['2026-06-02', 220, 0]]);
+    expect(r.days[1].pnl).toBe(95);   // 220 − 125: incluye el efecto divisa
+    const inflow = r.days.reduce((s, x) => s + x.inflow, 0);
+    expect(r.totalPnl).toBeCloseTo(r.days[1].value - inflow, 6);
+  });
+
   it('si faltan cierres, marca los días incompletos y la precarga', async () => {
     await reset();
     await tx('DEPOSIT_FIAT', '2026-04-01T10:00:00Z', 'EUR', 100);
