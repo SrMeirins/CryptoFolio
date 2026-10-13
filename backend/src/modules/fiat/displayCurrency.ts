@@ -14,11 +14,17 @@ export type DisplayCurrency = z.infer<typeof currencySchema>;
  * día a otro. NULL si no hay ningún precio de USDT.
  */
 export function usdPerEurSql(timestampExpr: string): string {
-  return `(
-    SELECT 1 / pc.price_eur FROM price_cache pc
-    WHERE pc.asset = 'USDT' AND pc.price_eur > 0
-    ORDER BY abs(pc.price_date - (${timestampExpr} AT TIME ZONE 'UTC')::date), pc.price_date DESC
-    LIMIT 1
+  const day = `(${timestampExpr} AT TIME ZONE 'UTC')::date`;
+  // Rendimiento: primero la fecha exacta (búsqueda por índice); solo si falta
+  // se recorre el histórico buscando la más cercana. COALESCE no evalúa la
+  // segunda subconsulta cuando la primera da valor.
+  return `COALESCE(
+    (SELECT 1 / pc.price_eur FROM price_cache pc
+     WHERE pc.asset = 'USDT' AND pc.price_date = ${day} AND pc.price_eur > 0),
+    (SELECT 1 / pc.price_eur FROM price_cache pc
+     WHERE pc.asset = 'USDT' AND pc.price_eur > 0
+     ORDER BY abs(pc.price_date - ${day}), pc.price_date DESC
+     LIMIT 1)
   )`;
 }
 
