@@ -8,6 +8,7 @@ export interface FifoLot {
   openedAt: Date;
   walletId: string;
   openTransactionId: string;
+  usdPerEur: number | null; // tipo USD por EUR de la apertura (#174)
 }
 
 export interface Transaction {

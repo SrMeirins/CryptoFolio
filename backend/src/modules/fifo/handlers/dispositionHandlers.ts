@@ -218,13 +218,15 @@ export async function processTransfer(tx: Transaction, result: FifoRunResult, cl
       [lot.id, tx.id, consumed, costMoved, tx.timestamp]
     );
 
+    // El lote destino hereda fecha de apertura y tipo USD del lote de origen:
+    // una transferencia entre wallets propias no cambia el coste (#174).
     await client.query(
       `INSERT INTO fifo_lots (
         asset, quantity_original, quantity_remaining,
         cost_basis_eur, price_per_unit_eur, fee_eur,
-        open_transaction_id, opened_at, wallet_id
-      ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8)`,
-      [tx.asset, consumed, consumed, costMoved, lot.pricePerUnitEur, tx.id, lot.openedAt, toWalletId]
+        open_transaction_id, opened_at, wallet_id, usd_per_eur
+      ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9)`,
+      [tx.asset, consumed, consumed, costMoved, lot.pricePerUnitEur, tx.id, lot.openedAt, toWalletId, lot.usdPerEur]
     );
 
     quantityToMove -= consumed;
