@@ -400,7 +400,13 @@ export const portfolioApi = {
   }>('/fifo/eur-flow'),
   getNotifications: () => api.get<Notification[]>('/settings/notifications'),
   // P&L diario por día local (Europe/Madrid), #165/#166. Sin `from`: desde la primera actividad.
-  getDailyPnl: (from?: string) => api.get<DailyPnlResponse>(`/v1/pnl/daily${from ? `?from=${from}` : ''}`),
+  getDailyPnl: (from?: string, to?: string) => {
+    const params = new URLSearchParams()
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    const query = params.toString()
+    return api.get<DailyPnlResponse>(`/v1/pnl/daily${query ? `?${query}` : ''}`)
+  },
   getPortfolioHistory: (period: string) => api.get<{
     points: { date: string; value: number }[]
     period: string
