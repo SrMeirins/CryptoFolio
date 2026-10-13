@@ -10,6 +10,7 @@ import { useModalA11y } from '../hooks/useModalA11y'
 import { StepButton } from './StepButton'
 import { calcStep } from '../utils/calcStep'
 import { SaleSimulatorResults } from './SaleSimulatorResults'
+import { EurOnlyBadge } from './EurOnlyBadge'
 
 interface Props {
   asset:        string
@@ -112,6 +113,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
               <div className="flex items-center gap-2 mb-0.5">
                 <Calculator size={15} className="text-accent-blue" />
                 <span className="text-[11px] font-medium text-accent-blue tracking-wide uppercase">Simulador de venta</span>
+                <EurOnlyBadge />
               </div>
               <h2 id={titleId} className="text-xl font-bold tracking-tight">{asset}</h2>
               <p className="text-xs text-gray-500 mt-0.5">

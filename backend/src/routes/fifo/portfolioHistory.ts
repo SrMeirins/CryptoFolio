@@ -2,14 +2,27 @@ import { Router } from 'express';
 import { db } from '../../db/client';
 import { sendInternalError } from '../../middleware/errorHandler';
 import { fetchMarketChart, loadAssetMetadata as loadCoinGeckoMetadata } from '../../modules/prices/coingecko';
+import { currencySchema, type DisplayCurrency } from '../../modules/fiat/displayCurrency';
 
 const router = Router();
+
+// Precio de un activo en una fecha o, si falta, en alguno de los 7 días anteriores.
+function priceOnOrBefore(assetPrices: Map<string, number> | undefined, date: Date): number | undefined {
+  for (let offset = 0; offset <= 7; offset++) {
+    const d = new Date(date);
+    d.setDate(d.getDate() - offset);
+    const price = assetPrices?.get(d.toISOString().slice(0, 10));
+    if (price !== undefined) return price;
+  }
+  return undefined;
+}
 
 // ── Helper: cómputo de puntos desde price_cache (sin red) ────────────────────
 async function computeHistoryFromCache(
   days: number,
   lots: { asset: string; qty: number; opened_at: Date }[],
   consumptions: { asset: string; qty: number; consumed_at: Date }[],
+  currency: DisplayCurrency = 'EUR',
 ): Promise<{ points: { date: string; value: number }[]; refreshing: boolean }> {
   const endDate   = new Date();
   const startDate = new Date();
@@ -18,12 +31,15 @@ async function computeHistoryFromCache(
 
   // Cargar todos los precios del rango desde caché en una sola query
   const allAssets = [...new Set(lots.map(l => l.asset))].filter(a => a !== 'EUR');
+  // En USD se carga también USDT: el valor de cada día se divide por su precio
+  // en EUR (mismo criterio que el resto de la API, #175).
+  const queryAssets = currency === 'USD' ? [...new Set([...allAssets, 'USDT'])] : allAssets;
   const cacheRes  = await db.query(
     `SELECT asset, price_date::text AS d, price_eur::float AS price
      FROM price_cache
      WHERE asset = ANY($1) AND price_date >= $2
      ORDER BY asset, price_date`,
-    [allAssets, startStr]
+    [queryAssets, startStr]
   );
 
   const pricesByAsset = new Map<string, Map<string, number>>();
@@ -87,22 +103,21 @@ async function computeHistoryFromCache(
       totalAssets++;
       if (asset === 'EUR') { totalValue += qty; pricedAssets++; continue; }
 
-      const assetPrices = pricesByAsset.get(asset);
-      let price = assetPrices?.get(dateStr);
-
-      if (price === undefined) {
-        for (let offset = 1; offset <= 7 && price === undefined; offset++) {
-          const prev = new Date(date);
-          prev.setDate(prev.getDate() - offset);
-          price = assetPrices?.get(prev.toISOString().slice(0, 10));
-        }
-      }
-
+      const price = priceOnOrBefore(pricesByAsset.get(asset), date);
       if (price !== undefined) { totalValue += qty * price; pricedAssets++; }
     }
 
+    // EUR → USD con el USDT del día; sin tipo, el punto se omite antes que
+    // mostrar euros como si fueran dólares.
+    let fx = 1;
+    if (currency === 'USD') {
+      const usdt = priceOnOrBefore(pricesByAsset.get('USDT'), date);
+      if (usdt === undefined || !(usdt > 0)) continue;
+      fx = 1 / usdt;
+    }
+
     if (totalAssets > 0 && pricedAssets / totalAssets >= 0.6)
-      points.push({ date: dateStr, value: Math.round(totalValue * 100) / 100 });
+      points.push({ date: dateStr, value: Math.round(totalValue * fx * 100) / 100 });
   }
 
   return { points, refreshing };
@@ -113,9 +128,15 @@ const refreshingPeriods = new Set<string>();
 const lastFetchAttempt  = new Map<string, number>(); // period → timestamp ms
 const REFETCH_COOLDOWN  = 2 * 60 * 1000; // 2 minutos entre intentos
 
-// GET /api/fifo/portfolio-history?period=1m|3m|6m|1y|all
+// GET /api/fifo/portfolio-history?period=1m|3m|6m|1y|all&currency=EUR|USD
 router.get('/portfolio-history', async (req, res) => {
   try {
+    const parsedCurrency = currencySchema.safeParse(req.query.currency);
+    if (!parsedCurrency.success) {
+      res.status(400).json({ error: 'currency debe ser EUR o USD' });
+      return;
+    }
+    const currency = parsedCurrency.data;
     const period  = (req.query.period as string) ?? '1y';
     const daysMap: Record<string, number> = { '1m': 30, '3m': 90, '6m': 180, '1y': 365, 'all': 1825 };
     const days    = daysMap[period] ?? 365;
@@ -140,8 +161,8 @@ router.get('/portfolio-history', async (req, res) => {
     const allAssets   = [...new Set(lots.map((l: { asset: string }) => l.asset))].filter((a: string) => a !== 'EUR');
 
     // 1. Responder con datos de caché inmediatamente
-    const { points, refreshing } = await computeHistoryFromCache(days, lots, consumptions);
-    res.json({ points, period, refreshing });
+    const { points, refreshing } = await computeHistoryFromCache(days, lots, consumptions, currency);
+    res.json({ points, period, currency, refreshing });
 
     // 2. Si faltan precios, fetch en background con cooldown para evitar bucles
     const lastAttempt = lastFetchAttempt.get(period) ?? 0;

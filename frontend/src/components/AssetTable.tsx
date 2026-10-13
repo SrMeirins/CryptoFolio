@@ -3,14 +3,14 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, Settings, ArrowUpDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { type FifoLot, type FiatBalance, portfolioApi } from '../api/portfolio'
+import { formatMoney } from '../utils/format'
+import { useDisplayLots, useDisplayMarket } from '../hooks/useDisplayMarket'
 import { usePricesStore } from '../store/pricesStore'
-import { formatEur } from '../utils/format'
 import { buildRows, sortRows, nextSort, type CryptoRow, type UnifiedRow, type SortKey, type SortDir } from '../utils/assetTable'
 import { CryptoRowComponent } from './AssetTableCryptoRow'
 import { FiatRowComponent } from './AssetTableFiatRow'
 import { SortTh } from './AssetTableSortTh'
 import { valuePortfolio } from '../utils/portfolioValuation'
-import { DUST_THRESHOLD_EUR } from '../utils/topMovers'
 
 interface AssetTableProps {
   lots: FifoLot[]
@@ -22,10 +22,18 @@ interface AssetTableProps {
 // crearía un array nuevo en cada render e invalidaría los useMemo.
 const NO_FIAT: FiatBalance[] = []
 
-export function AssetTable({ lots, fiatBalances = NO_FIAT, onSimulate }: AssetTableProps) {
-  const prices   = usePricesStore(s => s.prices)
-  // Precio de hace 24h en vivo (WebSocket), el mismo que usa el Dashboard (#147)
-  const yesterdayPrices = usePricesStore(s => s.open24)
+export function AssetTable({ lots: rawLots, fiatBalances = NO_FIAT, onSimulate }: AssetTableProps) {
+  // Precios en vivo y de hace 24h (WebSocket, #147) y coste de los lotes, en la
+  // moneda de visualización (#177).
+  const market = useDisplayMarket()
+  const { currency, prices, open24: yesterdayPrices, rate, dustThreshold } = market
+  const lots = useDisplayLots(rawLots, market)
+  const fiatPrice = rate ?? 0
+  // El simulador de venta es fiscal y trabaja siempre en EUR: recibe el precio
+  // en EUR del store en el momento del clic, sea cual sea la moneda mostrada.
+  const simulate = onSimulate
+    ? (asset: string, qty: number) => onSimulate(asset, qty, usePricesStore.getState().prices[asset] ?? 0)
+    : undefined
   const { data: lockedAmounts = [] } = useQuery({
     queryKey: ['locked-amounts'],
     queryFn: portfolioApi.getLockedAmounts,
@@ -45,24 +53,24 @@ export function AssetTable({ lots, fiatBalances = NO_FIAT, onSimulate }: AssetTa
   }
 
   const { mainRows, dustRows } = useMemo(() => {
-    const all = buildRows(lots, prices, fiatBalances)
+    const all = buildRows(lots, prices, fiatBalances, fiatPrice)
     const main = all.filter(r => {
-      if (r.kind === 'fiat') return r.value >= DUST_THRESHOLD_EUR
+      if (r.kind === 'fiat') return r.value >= dustThreshold
       const price = prices[r.asset] ?? 0
-      return price === 0 || r.value >= DUST_THRESHOLD_EUR
+      return price === 0 || r.value >= dustThreshold
     })
     const dust = all.filter(r => {
-      if (r.kind === 'fiat') return r.value > 0 && r.value < DUST_THRESHOLD_EUR
+      if (r.kind === 'fiat') return r.value > 0 && r.value < dustThreshold
       const price = prices[r.asset] ?? 0
-      return price > 0 && r.value < DUST_THRESHOLD_EUR
+      return price > 0 && r.value < dustThreshold
     })
     return { mainRows: main, dustRows: dust }
-  }, [lots, prices, fiatBalances])
+  }, [lots, prices, fiatBalances, fiatPrice, dustThreshold])
 
   // Total de la tabla con la valoración común (#150); coincide con la suma de filas.
   const totalValue = useMemo(
-    () => valuePortfolio(lots, prices, fiatBalances).totalValue,
-    [lots, prices, fiatBalances],
+    () => valuePortfolio(lots, prices, fiatBalances, fiatPrice).totalValue,
+    [lots, prices, fiatBalances, fiatPrice],
   )
   const dustValue  = dustRows.reduce((s, r) => s + r.value, 0)
   const onlyDust   = mainRows.length === 0 && dustRows.length > 0
@@ -84,7 +92,7 @@ export function AssetTable({ lots, fiatBalances = NO_FIAT, onSimulate }: AssetTa
         <SortTh {...sortProps} label="Cantidad"   sk="quantity"  />
         <SortTh {...sortProps} label="Precio"     sk="price"     />
         {!compact && <SortTh {...sortProps} label="P. medio" sk="breakeven" title="Precio medio de compra (break-even)" />}
-        <SortTh {...sortProps} label="Valor EUR"  sk="value"     />
+        <SortTh {...sortProps} label={`Valor ${currency}`} sk="value" />
         {!compact && <SortTh {...sortProps} label="Coste base" sk="cost" />}
         {!compact && <SortTh {...sortProps} label="P&L"        sk="pnl"  />}
         <SortTh {...sortProps} label="P&L %"      sk="pnlpct"   />
@@ -95,8 +103,8 @@ export function AssetTable({ lots, fiatBalances = NO_FIAT, onSimulate }: AssetTa
 
   const renderRow = (row: UnifiedRow) =>
     row.kind === 'fiat'
-      ? <FiatRowComponent key={`fiat-${row.asset}`} row={row} totalPortfolioValue={totalValue} compact={compact} />
-      : <CryptoRowComponent key={row.asset} row={row} prices={prices} yesterdayPrices={yesterdayPrices} totalPortfolioValue={totalValue} compact={compact} onSimulate={onSimulate} lockedAmounts={lockedAmounts.filter(l => l.asset === row.asset)} />
+      ? <FiatRowComponent key={`fiat-${row.asset}-${currency}`} row={row} totalPortfolioValue={totalValue} compact={compact} />
+      : <CryptoRowComponent key={`${row.asset}-${currency}`} row={row} prices={prices} yesterdayPrices={yesterdayPrices} totalPortfolioValue={totalValue} compact={compact} onSimulate={simulate} lockedAmounts={lockedAmounts.filter(l => l.asset === row.asset)} />
 
   // Activos sin precio configurado
   const noPriceAssets = mainRows
@@ -155,7 +163,7 @@ export function AssetTable({ lots, fiatBalances = NO_FIAT, onSimulate }: AssetTa
               {compact ? '⊞ Expandir' : '⊟ Compacto'}
             </button>
             <span className="text-xs text-gray-500">
-              Valor total: <span className="text-white mono">{formatEur(totalValue)}</span>
+              Valor total: <span className="text-white mono">{formatMoney(totalValue, currency)}</span>
             </span>
           </div>
         </div>
@@ -195,7 +203,7 @@ export function AssetTable({ lots, fiatBalances = NO_FIAT, onSimulate }: AssetTa
               )}
             </div>
             <span className={`text-xs mono font-medium ${onlyDust ? 'text-amber-500/70' : 'text-gray-600'}`}>
-              {formatEur(dustValue)}
+              {formatMoney(dustValue, currency)}
             </span>
           </button>
           {(dustOpen || onlyDust) && (

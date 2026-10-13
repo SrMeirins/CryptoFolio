@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import type { FifoLot, FiatBalance } from '../../api/portfolio'
 import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
-import { formatEur } from '../../utils/format'
+import { formatMoney } from '../../utils/format'
+import { useCurrency } from '../../hooks/useDisplayCurrency'
 
 const DONUT_COLORS = [
   '#6366f1','#F0B90B','#00c896','#e74c3c','#8b5cf6',
@@ -14,18 +15,20 @@ type DonutItem = { name: string; value: number; pct: number }
 
 /** Tooltip del donut: definido a nivel de módulo para no recrear el componente en cada render. */
 function CustomTooltip({ active, payload }: { active?: boolean; payload?: { payload: DonutItem }[] }) {
+  const currency = useCurrency()
   if (!active || !payload?.[0]) return null
   const item = payload[0].payload
   return (
     <div className="bg-gray-950/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2.5 shadow-xl text-xs">
       <p className="font-semibold text-white mono mb-0.5">{item.name}</p>
-      <p className="text-gray-300">{formatEur(item.value)}</p>
+      <p className="text-gray-300">{formatMoney(item.value, currency)}</p>
       <p className="text-gray-500">{item.pct.toFixed(1)}% del portfolio</p>
     </div>
   )
 }
 
 export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatBalances: FiatBalance[] }) {
+  const currency = useCurrency()
   const [hovered, setHovered] = useState<string | null>(null)
 
   const { assets, totalValue: total } = usePortfolioValuation(lots, fiatBalances)
@@ -52,7 +55,7 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
           <h3 className="text-sm font-semibold text-white">Distribución del portfolio</h3>
           <p className="text-xs text-gray-600 mt-0.5">{items.length} activos · actualización cada 5 s</p>
         </div>
-        <p className="text-xl font-semibold mono text-white">{formatEur(total)}</p>
+        <p className="text-xl font-semibold mono text-white">{formatMoney(total, currency)}</p>
       </div>
 
       <div className="flex items-center gap-8">
@@ -89,12 +92,12 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
               <>
                 <p className="text-base font-bold text-white mono tracking-tight">{hoveredEntry.name}</p>
                 <p className="text-2xl font-semibold mono text-white">{hoveredEntry.pct.toFixed(1)}%</p>
-                <p className="text-xs text-gray-500 mono">{formatEur(hoveredEntry.value)}</p>
+                <p className="text-xs text-gray-500 mono">{formatMoney(hoveredEntry.value, currency)}</p>
               </>
             ) : (
               <>
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest">portfolio</p>
-                <p className="text-lg font-bold mono text-white leading-tight">{formatEur(total)}</p>
+                <p className="text-lg font-bold mono text-white leading-tight">{formatMoney(total, currency)}</p>
               </>
             )}
           </div>
@@ -119,7 +122,7 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
                     <span className="text-xs font-medium text-gray-200 truncate">{entry.name}</span>
                   </div>
                   <div className="flex items-center gap-3 shrink-0 ml-2">
-                    <span className="text-xs text-gray-500 mono">{formatEur(entry.value)}</span>
+                    <span className="text-xs text-gray-500 mono">{formatMoney(entry.value, currency)}</span>
                     <span className="text-xs font-semibold mono w-10 text-right" style={{ color }}>{entry.pct.toFixed(1)}%</span>
                   </div>
                 </div>

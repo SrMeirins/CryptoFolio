@@ -116,3 +116,16 @@ describe('nextSort', () => {
     expect(nextSort('pnl', 'value', 'asc')).toEqual({ key: 'pnl', dir: 'desc' })
   })
 })
+
+describe('buildRows — moneda de visualización (#177)', () => {
+  it('la fila fiat conserva la cantidad en su moneda y valora con fiatPrice', () => {
+    const rows = buildRows([], {}, [fiat({ balance: '50' }), fiat({ wallet_id: 'w2', balance: '30' })], 1.25)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ kind: 'fiat', asset: 'EUR', quantity: 80, price: 1.25, value: 100 })
+  })
+
+  it('sin fiatPrice (EUR) la cantidad y el valor coinciden', () => {
+    const [row] = buildRows([], {}, [fiat({ balance: '50' })])
+    expect(row).toMatchObject({ quantity: 50, price: 1, value: 50 })
+  })
+})

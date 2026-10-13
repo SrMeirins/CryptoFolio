@@ -82,3 +82,13 @@ describe('rankMovers — filtros y reparto', () => {
     expect(names(rankMovers(assets, {}, 'total').top)).toEqual(['XRP'])
   })
 })
+
+describe('rankMovers — umbral de polvo en la moneda de visualización (#177)', () => {
+  it('aplica el umbral recibido en lugar de 1', () => {
+    const assets = [crypto('A', 1, 1.1, 1), crypto('B', 1, 2, 1)]
+    // En USD con 1 € = 1,2 $, un activo de 1,10 $ (< 1 €) es polvo.
+    expect(names(rankMovers(assets, {}, 'total', 1.2).top)).toEqual(['B'])
+    expect(names(rankMovers(assets, {}, 'total').top)).toEqual(['B'])
+    expect(rankMovers(assets, {}, 'total').bottom.map(i => i.asset)).toEqual(['A'])
+  })
+})

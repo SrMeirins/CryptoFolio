@@ -62,3 +62,14 @@ describe('valuePortfolio', () => {
     expect(v.assets.map(a => a.asset)).toEqual(['B', 'EUR', 'A'])
   })
 })
+
+describe('valuePortfolio — moneda de visualización (#177)', () => {
+  it('el saldo fiat se valora con fiatPrice (tipo en vivo) sin cambiar su cantidad; no cuenta en el P&L', () => {
+    const v = valuePortfolio([lot('BTC', 1, 100)], { BTC: 150 }, [fiat('EUR', 200)], 1.25)
+    const eur = v.assets.find(a => a.asset === 'EUR')!
+    expect(eur).toMatchObject({ kind: 'fiat', quantity: 200, price: 1.25, value: 250 })
+    expect(v.fiatValue).toBe(250)
+    expect(v.totalValue).toBe(400)
+    expect(v.pnl).toBe(50)
+  })
+})

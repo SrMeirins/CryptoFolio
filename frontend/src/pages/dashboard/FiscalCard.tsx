@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { FiscalYear } from '../../api/portfolio'
 import { formatEur } from '../../utils/format'
+import { EurOnlyBadge } from '../../components/EurOnlyBadge'
 
 export function FiscalCard({ data }: { data: FiscalYear[] }) {
   const currentYear = new Date().getFullYear()
@@ -23,6 +24,7 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
           <span className="text-[11px] font-bold text-white bg-white/6 border border-white/10 px-2 py-0.5 rounded-md">
             {current.fiscal_year}
           </span>
+          <EurOnlyBadge />
         </div>
         <Link to="/fiscal" className="text-xs text-accent-blue hover:underline">Detalle →</Link>
       </div>

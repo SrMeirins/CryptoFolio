@@ -1,4 +1,5 @@
 import { api } from './client'
+import type { Currency } from '../utils/format'
 // Tipos del módulo fiscal detallado (pages/fiscal/) — viven ahí por ser
 // específicos de ese dominio, no en api/portfolio.ts; se importan aquí solo
 // para tipar los métodos de red, igual que ya se hacía desde pages/fiscal/
@@ -35,6 +36,7 @@ export interface DailyPnlDay {
 }
 
 export interface DailyPnlResponse {
+  currency: Currency
   from: string
   to: string
   timezone: 'Europe/Madrid'
@@ -55,6 +57,9 @@ export interface FifoLot {
   quantity: string
   cost_basis_eur: string
   avg_price_eur: string
+  // Coste y precio medio en USD con el tipo de apertura de cada lote (#174/#175).
+  cost_basis_usd?: string | null
+  avg_price_usd?: string | null
 }
 
 export interface LockedAmount {
@@ -138,6 +143,8 @@ export interface Transaction {
   cost_asset: string | null
   cost_amount: string | null
   price_per_unit: string | null
+  // USD por EUR en la fecha de la operación (#175), para mostrar importes en EUR en dólares.
+  usd_per_eur?: number | string | null
   fee_asset: string | null
   fee_amount: string | null
   wallet_id: string
@@ -322,14 +329,19 @@ export const portfolioApi = {
     api.put<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>(`/transactions/${id}`, data),
   deleteManualTx: (id: string) =>
     api.delete<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>(`/transactions/${id}`),
-  getTransactions: (params?: Record<string, string | undefined>) => {
+  getTransactions: (params?: Record<string, string | undefined>, currency: Currency = 'EUR') => {
     const filtered = params
       ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][])
       : {}
+    if (currency !== 'EUR') filtered.currency = currency
     const qs = Object.keys(filtered).length ? '?' + new URLSearchParams(filtered).toString() : ''
-    return api.get<{ transactions: Transaction[]; total: number; total_eur: number; limit: number; offset: number }>(`/transactions${qs}`)
+    return api.get<{
+      transactions: Transaction[]; total: number; total_eur: number; limit: number; offset: number
+      currency?: Currency; total_amount?: number
+    }>(`/transactions${qs}`)
   },
-  getTransactionStats: () => api.get<{
+  getTransactionStats: (currency: Currency = 'EUR') => api.get<{
+    currency?: Currency
     totals: {
       total_ops: number; unique_assets: number; total_invested: number
       total_fee_ops: number; total_fees_eur: number; total_buys: number; total_sells: number; total_manual: number
@@ -337,7 +349,7 @@ export const portfolioApi = {
     monthly: { mes: string; total_ops: number; compras: number; ventas: number; ingresos: number; transferencias: number; eur_invertido: number }[]
     topAssets: { asset: string; ops: number; eur_volume: number }[]
     fees: { asset: string; ops: number; total_amount: number; total_eur: number }[]
-  }>('/transactions/stats'),
+  }>(`/transactions/stats?currency=${currency}`),
   getWallets: () => api.get<Wallet[]>('/wallets'),
   getWalletsFull: () => api.get<WalletFull[]>('/wallets'),
   getCatalog: () => api.get<CatalogData>('/catalog'),
@@ -390,28 +402,30 @@ export const portfolioApi = {
       last_sale:      string
     }[]
   }>('/fifo/realized-pnl'),
-  getEurFlow: () => api.get<{
+  getEurFlow: (currency: Currency = 'EUR') => api.get<{
+    currency?: Currency
     deposited: number
     withdrawn: number
     netFromBank: number
     eurSpentBuying: number
     eurReceivedSelling: number
     netInvested: number
-  }>('/fifo/eur-flow'),
+  }>(`/fifo/eur-flow?currency=${currency}`),
   getNotifications: () => api.get<Notification[]>('/settings/notifications'),
   // P&L diario por día local (Europe/Madrid), #165/#166. Sin `from`: desde la primera actividad.
-  getDailyPnl: (from?: string, to?: string) => {
-    const params = new URLSearchParams()
+  getDailyPnl: (from?: string, to?: string, currency: Currency = 'EUR') => {
+    const params = new URLSearchParams({ currency })
     if (from) params.set('from', from)
     if (to) params.set('to', to)
     const query = params.toString()
     return api.get<DailyPnlResponse>(`/v1/pnl/daily${query ? `?${query}` : ''}`)
   },
-  getPortfolioHistory: (period: string) => api.get<{
+  getPortfolioHistory: (period: string, currency: Currency = 'EUR') => api.get<{
     points: { date: string; value: number }[]
     period: string
+    currency?: Currency
     refreshing: boolean
-  }>(`/fifo/portfolio-history?period=${period}`),
+  }>(`/fifo/portfolio-history?${new URLSearchParams({ period, currency })}`),
   getPendingDeposits: () => api.get<Array<{
     id: string; timestamp: string; asset: string; amount: string;
     wallet_name: string; historicalPrice: number | null;

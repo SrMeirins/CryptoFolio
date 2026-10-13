@@ -1,11 +1,11 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ReferenceLine, ResponsiveContainer,
 } from 'recharts'
-import { portfolioApi } from '../../api/portfolio'
 import { InfoTooltip } from '../../components/InfoTooltip'
-import { formatEur } from '../../utils/format'
+import { formatMoney, type Currency } from '../../utils/format'
+import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
+import { dailyPnlQuery } from '../../queries/currencyQueries'
 import {
   PNL_PERIODS, METRIC_LABELS, buildPnlSeries, madridToday, metricFor, periodFrom, type PnlPeriod, type PnlPoint,
 } from '../../utils/pnlChart'
@@ -15,7 +15,7 @@ import {
 // (`refreshing`) se reconsulta cada 5 s; después, cada minuto para el día en curso.
 
 const signed = (n: number, digits = 2) => `${n >= 0 ? '+' : ''}${n.toFixed(digits)}%`
-const signedEur = (n: number) => `${n >= 0 ? '+' : ''}${formatEur(n)}`
+const signedMoney = (n: number, currency: Currency) => `${n >= 0 ? '+' : ''}${formatMoney(n, currency)}`
 
 function fmtAxisDate(date: string, period: PnlPeriod): string {
   const d = new Date(`${date}T12:00:00Z`)
@@ -28,7 +28,7 @@ function fmtLongDate(date: string): string {
   return new Date(`${date}T12:00:00Z`).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Madrid' })
 }
 
-function ChartTooltip({ active, payload }: { active?: boolean; payload?: { payload: PnlPoint }[] }) {
+function ChartTooltip({ active, payload, currency }: { active?: boolean; payload?: { payload: PnlPoint }[]; currency: Currency }) {
   if (!active || !payload?.[0]) return null
   const p = payload[0].payload
   const color = p.pct >= 0 ? 'text-accent-green' : 'text-accent-red'
@@ -36,7 +36,7 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: { paylo
     <div className="bg-gray-950/95 border border-white/10 rounded-xl px-3 py-2.5 shadow-xl text-xs space-y-0.5">
       <p className="text-gray-400">{fmtLongDate(p.date)}{p.live ? ' · en vivo' : ''}</p>
       <p className={`mono font-semibold ${color}`}>{signed(p.pct)}</p>
-      <p className="text-gray-300 mono">{signedEur(p.pnl)} acumulado</p>
+      <p className="text-gray-300 mono">{signedMoney(p.pnl, currency)} acumulado</p>
     </div>
   )
 }
@@ -45,11 +45,12 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
   const [period, setPeriod] = useState<PnlPeriod>('Todo')
   const from = periodFrom(period, madridToday())
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['daily-pnl', from ?? 'all'],
-    queryFn: () => portfolioApi.getDailyPnl(from),
-    refetchInterval: (query) => (query.state.data?.refreshing ? 5_000 : 60_000),
-  })
+  // En la moneda de visualización; la otra se precarga para que el toggle sea instantáneo (#177).
+  const { data, isLoading, isError, currency: requested } = useCurrencyQuery(
+    currency => dailyPnlQuery(currency, from),
+    { refetchInterval: (query) => (query.state.data?.refreshing ? 5_000 : 60_000) },
+  )
+  const currency = data?.currency ?? requested
 
   const series = useMemo(() => buildPnlSeries(data?.days ?? [], period), [data, period])
   const metric = METRIC_LABELS[metricFor(period)]
@@ -82,7 +83,7 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
         {last && (
           <p className={`text-sm font-mono font-semibold ${positive ? 'text-accent-green' : 'text-accent-red'}`}>
             <span aria-hidden="true">{positive ? '▲' : '▼'} </span>
-            {signed(last.pct)} <span className="text-xs font-normal opacity-80">({signedEur(last.pnl)})</span>
+            {signed(last.pct)} <span className="text-xs font-normal opacity-80">({signedMoney(last.pnl, currency)})</span>
           </p>
         )}
         <span className="inline-flex items-center gap-1 text-[10px] text-gray-500">
@@ -134,7 +135,7 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
                 width={44}
               />
               <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" strokeDasharray="3 3" />
-              <RechartsTooltip content={<ChartTooltip />} />
+              <RechartsTooltip content={<ChartTooltip currency={currency} />} />
               <Area
                 type="monotone"
                 dataKey="pct"

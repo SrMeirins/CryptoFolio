@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 
-// Las 4 queries que cualquier cambio en transacciones (crear/editar/borrar
+// Las queries que cualquier cambio en transacciones (crear/editar/borrar
 // una manual, importar un CSV) puede dejar desactualizadas. Antes cada
 // página invalidaba su propio subconjunto copiado a mano, con huecos reales:
 // History.tsx no invalidaba 'fiscal-summary' (el Dashboard y la página
@@ -8,7 +8,11 @@ import type { QueryClient } from '@tanstack/react-query'
 // Historial) e Import.tsx no invalidaba 'tx-stats' (la barra de
 // estadísticas de Historial podía quedarse obsoleta hasta 5 min tras
 // importar, su staleTime).
-const TRANSACTION_AFFECTED_KEYS = ['transactions', 'tx-stats', 'fifo-lots', 'fiscal-summary'] as const
+// Las consultas por moneda (#177) se cachean 5 min: también se invalidan aquí
+// (el prefijo cubre las dos monedas).
+const TRANSACTION_AFFECTED_KEYS = [
+  'transactions', 'tx-stats', 'fifo-lots', 'fiscal-summary', 'eur-flow', 'daily-pnl', 'portfolio-history',
+] as const
 
 /**
  * Invalida las queries afectadas por un cambio en transacciones.

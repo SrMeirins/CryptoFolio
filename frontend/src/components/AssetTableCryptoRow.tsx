@@ -2,7 +2,8 @@ import { Fragment, useState } from 'react'
 import { ChevronDown, ChevronRight, Settings, Calculator, Lock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { type LockedAmount } from '../api/portfolio'
-import { formatEur, formatPrice, formatAmount, pnlColor } from '../utils/format'
+import { formatMoney, formatPrice, formatAmount, pnlColor } from '../utils/format'
+import { useCurrency } from '../hooks/useDisplayCurrency'
 import { type CryptoRow, walletShortName } from '../utils/assetTable'
 import { CryptoIcon } from './CryptoIcon'
 
@@ -12,9 +13,10 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
   yesterdayPrices: Record<string, number>
   totalPortfolioValue: number
   compact?: boolean
-  onSimulate?: (asset: string, qty: number, price: number) => void
+  onSimulate?: (asset: string, qty: number) => void
   lockedAmounts?: LockedAmount[]
 }) {
+  const currency = useCurrency()
   const [expanded, setExpanded] = useState(false)
   const price      = prices[row.asset] ?? 0
   const pnl        = row.value - row.totalCostBasis
@@ -78,7 +80,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
             {onSimulate && (
               <button
                 type="button"
-                onClick={e => { e.stopPropagation(); onSimulate(row.asset, row.totalQuantity, prices[row.asset] ?? 0) }}
+                onClick={e => { e.stopPropagation(); onSimulate(row.asset, row.totalQuantity) }}
                 className="ml-auto p-1 text-gray-600 hover:text-accent-blue hover:bg-accent-blue/10 rounded-md transition-colors shrink-0"
                 title="Simular venta"
               >
@@ -95,7 +97,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
         <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono`}>
           {hasPrice ? (
             <div className="flex flex-col items-end gap-0.5">
-              <span>{formatPrice(price)}</span>
+              <span>{formatPrice(price, currency)}</span>
               {change24h !== null && (
                 <span className={`text-[10px] font-semibold px-1.5 py-px rounded-full ${
                   change24h >= 0
@@ -119,25 +121,25 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
         {/* Break-even — oculto en compacto */}
         {!compact && (
           <td className="px-4 py-3 text-right mono text-gray-400">
-            {breakEvenPrice !== null ? formatPrice(breakEvenPrice) : <span className="text-gray-600">—</span>}
+            {breakEvenPrice !== null ? formatPrice(breakEvenPrice, currency) : <span className="text-gray-600">—</span>}
           </td>
         )}
 
-        {/* Valor EUR */}
+        {/* Valor en la moneda de visualización */}
         <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono font-medium`}>
-          {hasPrice ? formatEur(row.value)
+          {hasPrice ? formatMoney(row.value, currency)
             : <span className="text-gray-600 text-xs">—</span>}
         </td>
 
         {/* Coste base — oculto en compacto */}
         {!compact && (
-          <td className="px-4 py-3 text-right mono text-gray-400">{formatEur(row.totalCostBasis)}</td>
+          <td className="px-4 py-3 text-right mono text-gray-400">{formatMoney(row.totalCostBasis, currency)}</td>
         )}
 
         {/* P&L € — oculto en compacto */}
         {!compact && (
           <td className={`px-4 py-3 text-right mono font-medium ${hasPrice ? pnlColor(pnl) : 'text-gray-600'}`}>
-            {hasPrice ? (pnl >= 0 ? '+' : '') + formatEur(pnl) : '—'}
+            {hasPrice ? (pnl >= 0 ? '+' : '') + formatMoney(pnl, currency) : '—'}
           </td>
         )}
 
@@ -189,12 +191,12 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
               <td className="px-4 py-2 text-right mono text-xs text-gray-600">—</td>
               {!compact && <td className="px-4 py-2 text-right mono text-xs text-gray-600">—</td>}
               <td className="px-4 py-2 text-right mono text-xs">
-                {hasPrice ? <span className="text-gray-300">{formatEur(wValue)}</span> : <span className="text-gray-600">—</span>}
+                {hasPrice ? <span className="text-gray-300">{formatMoney(wValue, currency)}</span> : <span className="text-gray-600">—</span>}
               </td>
-              {!compact && <td className="px-4 py-2 text-right mono text-xs text-gray-500">{formatEur(w.costBasis)}</td>}
+              {!compact && <td className="px-4 py-2 text-right mono text-xs text-gray-500">{formatMoney(w.costBasis, currency)}</td>}
               {!compact && (
                 <td className={`px-4 py-2 text-right mono text-xs ${wPnl !== null ? pnlColor(wPnl) : 'text-gray-600'}`}>
-                  {wPnl !== null ? (wPnl >= 0 ? '+' : '') + formatEur(wPnl) : '—'}
+                  {wPnl !== null ? (wPnl >= 0 ? '+' : '') + formatMoney(wPnl, currency) : '—'}
                 </td>
               )}
               <td className={`px-4 py-2 text-right mono text-xs ${wPnlPct !== null ? pnlColor(wPnlPct) : 'text-gray-600'}`}>

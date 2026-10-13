@@ -22,6 +22,8 @@ export interface CryptoRow {
 export interface FiatRow {
   kind:    'fiat'
   asset:   string
+  quantity: number  // saldo en su propia moneda
+  price:    number  // valor de una unidad en la moneda de visualización
   value:   number
   wallets: { wallet_id: string; wallet_name: string; wallet_color: string }[]
 }
@@ -48,8 +50,9 @@ export function aggregateLotsByAsset(lots: FifoLot[]): Map<string, { qty: number
 /** Agrupa lotes FIFO y saldos fiat en filas unificadas por activo, ordenadas por valor descendente. */
 export function buildRows(
   lots: FifoLot[],
-  prices: Record<string, number>,
-  fiatBalances: FiatBalance[]
+  prices: Readonly<Record<string, number>>,
+  fiatBalances: FiatBalance[],
+  fiatPrice = 1,
 ): UnifiedRow[] {
   const cryptoMap = new Map<string, CryptoRow>()
 
@@ -92,10 +95,11 @@ export function buildRows(
   for (const b of fiatBalances) {
     const bal = parseFloat(b.balance)
     if (!fiatMap.has(b.asset)) {
-      fiatMap.set(b.asset, { kind: 'fiat', asset: b.asset, value: 0, wallets: [] })
+      fiatMap.set(b.asset, { kind: 'fiat', asset: b.asset, quantity: 0, price: fiatPrice, value: 0, wallets: [] })
     }
     const row = fiatMap.get(b.asset)!
-    row.value += bal
+    row.quantity += bal
+    row.value += bal * fiatPrice
     if (!row.wallets.find(w => w.wallet_id === b.wallet_id)) {
       row.wallets.push({ wallet_id: b.wallet_id, wallet_name: b.wallet_name, wallet_color: b.wallet_color })
     }
@@ -116,7 +120,7 @@ export function nextSort(clicked: SortKey, key: SortKey, dir: SortDir): { key: S
   return { key: clicked, dir: 'desc' }
 }
 
-export function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices: Record<string, number>, total: number): UnifiedRow[] {
+export function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices: Readonly<Record<string, number>>, total: number): UnifiedRow[] {
   return [...rows].sort((a, b) => {
     let va = 0, vb = 0
     if (key === 'asset') {
@@ -127,8 +131,8 @@ export function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices:
       va = a.kind === 'crypto' ? a.totalQuantity : 0
       vb = b.kind === 'crypto' ? b.totalQuantity : 0
     } else if (key === 'price') {
-      va = a.kind === 'crypto' ? (prices[a.asset] ?? 0) : 1
-      vb = b.kind === 'crypto' ? (prices[b.asset] ?? 0) : 1
+      va = a.kind === 'crypto' ? (prices[a.asset] ?? 0) : a.price
+      vb = b.kind === 'crypto' ? (prices[b.asset] ?? 0) : b.price
     } else if (key === 'value') {
       va = a.value; vb = b.value
     } else if (key === 'cost') {

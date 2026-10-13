@@ -1,10 +1,17 @@
 import { type FiatRow } from '../utils/assetTable'
-import { formatEur, formatPrice } from '../utils/format'
+import { formatAmount, formatMoney, formatPrice } from '../utils/format'
+import { useCurrency } from '../hooks/useDisplayCurrency'
 
 const FIAT_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', CHF: '₣' }
 
 export function FiatRowComponent({ row, totalPortfolioValue, compact = false }: { row: FiatRow; totalPortfolioValue: number; compact?: boolean }) {
+  const currency = useCurrency()
   const symbol = FIAT_SYMBOLS[row.asset] ?? row.asset[0]
+  // Cantidad en la propia moneda del saldo (un saldo en EUR sigue siendo euros
+  // aunque se muestre en USD); precio y valor, en la moneda de visualización.
+  const quantityLabel = row.asset === 'EUR' || row.asset === 'USD'
+    ? formatMoney(row.quantity, row.asset)
+    : `${formatAmount(row.quantity, 2)} ${row.asset}`
 
   return (
     <tr className="hover:bg-background-tertiary/30 transition-colors">
@@ -22,10 +29,10 @@ export function FiatRowComponent({ row, totalPortfolioValue, compact = false }: 
           </div>
         </div>
       </td>
-      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-gray-300`}>{formatEur(row.value)}</td>
-      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-gray-500`}>{formatPrice(1)}</td>
+      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-gray-300`}>{quantityLabel}</td>
+      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-gray-500`}>{formatPrice(row.price, currency)}</td>
       {!compact && <td className="px-4 py-3 text-right mono text-gray-600">—</td>}
-      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono font-medium text-white`}>{formatEur(row.value)}</td>
+      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono font-medium text-white`}>{formatMoney(row.value, currency)}</td>
       {!compact && <td className="px-4 py-3 text-right mono text-gray-600">—</td>}
       {!compact && <td className="px-4 py-3 text-right mono text-gray-600">—</td>}
       <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-gray-600`}>—</td>

@@ -78,6 +78,40 @@ describe('GET /api/fifo/portfolio-history', () => {
     expect(Array.isArray(res.body.points)).toBe(true);
   });
 
+  describe('moneda de visualización (#177)', () => {
+    beforeAll(async () => {
+      // BTC a 200 € y USDT a 0,80 € los últimos 12 días: 1 BTC = 200 € = 250 $.
+      await pool.query(
+        `INSERT INTO price_cache (asset, price_eur, source, price_date)
+         SELECT a.asset, a.price, 'test', d::date
+         FROM (VALUES ('BTC', 200), ('USDT', 0.8)) AS a(asset, price),
+              generate_series(CURRENT_DATE - 12, CURRENT_DATE, interval '1 day') d
+         ON CONFLICT (asset, price_date) DO UPDATE SET price_eur = EXCLUDED.price_eur`
+      );
+    });
+
+    it('en EUR (por defecto) valora con el precio en EUR', async () => {
+      const res = await request(app).get('/api/fifo/portfolio-history?period=1m');
+      expect(res.body.currency).toBe('EUR');
+      const last = res.body.points.at(-1);
+      expect(last.value).toBe(200);
+    });
+
+    it('en USD divide el valor de cada día por el precio de USDT de ese día', async () => {
+      const res = await request(app).get('/api/fifo/portfolio-history?period=1m&currency=USD');
+      expect(res.status).toBe(200);
+      expect(res.body.currency).toBe('USD');
+      const eur = await request(app).get('/api/fifo/portfolio-history?period=1m');
+      expect(res.body.points.map((p: { date: string }) => p.date)).toEqual(eur.body.points.map((p: { date: string }) => p.date));
+      for (const p of res.body.points) expect(p.value).toBe(250);
+    });
+
+    it('rechaza una moneda no soportada con 400', async () => {
+      const res = await request(app).get('/api/fifo/portfolio-history?period=1m&currency=GBP');
+      expect(res.status).toBe(400);
+    });
+  });
+
   it('un fallo interno devuelve un mensaje genérico, no (err as Error).message', async () => {
     const spy = vi.spyOn(db, 'query').mockRejectedValueOnce(new Error('detalle interno sensible: fallo de Postgres'));
 

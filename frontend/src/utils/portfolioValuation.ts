@@ -8,7 +8,7 @@ import { aggregateLotsByAsset } from './assetTable'
 // - Cripto: cantidad agregada de los lotes abiertos × precio en vivo. Un
 //   activo sin precio (ausente, 0 o negativo) vale 0 y se lista en
 //   `unpricedAssets`; su coste sí cuenta en `totalCost`.
-// - Fiat: suma de saldos tal cual. El backend (/api/fifo/fiat-balances) solo
+// - Fiat: suma de saldos × `fiatPrice` (1 en EUR; el tipo en vivo en USD, #177). El backend (/api/fifo/fiat-balances) solo
 //   devuelve saldos positivos (> 0,005 €), así que no se filtra aquí.
 // - P&L: valor cripto − coste. El saldo fiat no es ganancia ni pérdida.
 
@@ -37,6 +37,7 @@ export function valuePortfolio(
   lots: readonly FifoLot[],
   prices: Readonly<Record<string, number>>,
   fiatBalances: readonly FiatBalance[],
+  fiatPrice = 1,
 ): PortfolioValuation {
   const assets: AssetValuation[] = []
   const unpricedAssets: string[] = []
@@ -59,8 +60,9 @@ export function valuePortfolio(
   }
   let fiatValue = 0
   for (const [asset, balance] of fiatByAsset) {
-    fiatValue += balance
-    assets.push({ asset, kind: 'fiat', quantity: balance, cost: balance, price: 1, value: balance })
+    const value = balance * fiatPrice
+    fiatValue += value
+    assets.push({ asset, kind: 'fiat', quantity: balance, cost: value, price: fiatPrice, value })
   }
 
   const pnl = cryptoValue - totalCost

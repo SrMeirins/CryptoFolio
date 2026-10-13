@@ -1,5 +1,5 @@
 import { TrendingUp, BarChart2, Zap, TrendingDown } from 'lucide-react'
-import { formatEur } from '../../utils/format'
+import { formatMoney, type Currency } from '../../utils/format'
 
 const CARD_META = {
   invested: { icon: TrendingUp,   iconColor: '#10b981', bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.2)'  },
@@ -10,6 +10,8 @@ const CARD_META = {
 
 export function StatsBar({ stats }: {
   stats: {
+    // Moneda de los importes (#177); los campos *_eur la siguen aunque se llamen así.
+    currency?: Currency
     totals: {
       total_ops: number; unique_assets: number; total_invested: number
       total_fee_ops: number; total_fees_eur: number; total_buys: number; total_sells: number; total_manual: number
@@ -17,10 +19,11 @@ export function StatsBar({ stats }: {
   }
 }) {
   const { totals } = stats
+  const money = (v: number) => formatMoney(v, stats.currency ?? 'EUR')
   const cards = [
-    { ...CARD_META.invested, title: 'Invertido',    value: formatEur(totals.total_invested),  sub: `${totals.total_buys} compras`        },
+    { ...CARD_META.invested, title: 'Invertido',    value: money(totals.total_invested),  sub: `${totals.total_buys} compras`        },
     { ...CARD_META.ops,      title: 'Operaciones',  value: totals.total_ops.toLocaleString('es-ES'), sub: `${totals.unique_assets} activos únicos` },
-    { ...CARD_META.fees,     title: 'Comisiones',   value: formatEur(totals.total_fees_eur),   sub: `${totals.total_fee_ops} ops con fee` },
+    { ...CARD_META.fees,     title: 'Comisiones',   value: money(totals.total_fees_eur),   sub: `${totals.total_fee_ops} ops con fee` },
     { ...CARD_META.sells,    title: 'Ventas',       value: totals.total_sells.toLocaleString('es-ES'), sub: `${totals.total_manual} manuales`    },
   ]
   return (
