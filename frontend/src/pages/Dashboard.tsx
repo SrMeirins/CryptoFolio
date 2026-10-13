@@ -10,6 +10,7 @@ import { computeChange24h } from '../utils/change24h'
 import { TopMovers } from './dashboard/TopMovers'
 import { RecentActivity } from './dashboard/RecentActivity'
 import { EvolutionCard } from './dashboard/EvolutionCard'
+import { PnlCalendar } from './dashboard/PnlCalendar'
 import { AllocationChart } from './dashboard/AllocationChart'
 import { FiscalCard } from './dashboard/FiscalCard'
 
@@ -158,6 +159,9 @@ export function Dashboard() {
 
       {/* Gráfico histórico */}
       <EvolutionCard currentValue={hasPrices ? cryptoValue : undefined} />
+
+      {/* Calendario de P&L diario */}
+      <PnlCalendar />
 
       {/* Distribución + Fiscal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
