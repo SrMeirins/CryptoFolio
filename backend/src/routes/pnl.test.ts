@@ -28,6 +28,7 @@ describe('GET /api/v1/pnl/daily', () => {
     ['rango de más de ~10 años', '?from=2010-01-01&to=2026-01-01'],
     ['parámetro desconocido', '?desde=2026-01-01'],
     ['parámetro repetido', '?from=2026-01-01&from=2026-01-02'],
+    ['moneda no soportada', '?currency=GBP'],
   ])('400 con %s, sin calcular', async (_caso, query) => {
     getDailyPnlMock.mockClear();
     const res = await request(app).get(`/api/v1/pnl/daily${query}`);
@@ -41,7 +42,7 @@ describe('GET /api/v1/pnl/daily', () => {
     const res = await request(app).get('/api/v1/pnl/daily?from=2026-01-01&to=2026-01-31');
     expect(res.status).toBe(200);
     expect(res.body).toEqual(body);
-    expect(getDailyPnlMock).toHaveBeenCalledWith({ from: '2026-01-01', to: '2026-01-31' });
+    expect(getDailyPnlMock).toHaveBeenCalledWith({ from: '2026-01-01', to: '2026-01-31', currency: 'EUR' });
   });
 
   it('un error interno devuelve un mensaje genérico', async () => {
