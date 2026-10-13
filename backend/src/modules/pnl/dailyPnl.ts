@@ -7,7 +7,12 @@
 // Dietz   = P&L acumulado / (V0 + Σ Fₖ · (m − k)/m)  (Dietz modificado hasta el día m:
 //           cada flujo neto Fₖ pesa por la fracción del periodo que estuvo invertido).
 //           A diferencia del TWR, no se hunde para siempre tras una pérdida total
-//           puntual; se usa para periodos largos ("Todo").
+//           puntual.
+// Capital = P&L acumulado / máximo capital neto aportado hasta ese día (V0 +
+//           Σ flujos de capital netos, sin margen). Se usa el máximo y no el
+//           saldo actual: tras retirar casi todo, dividir por lo que queda
+//           dispararía el % (-12,93 € sobre 12,94 € restantes = -99,98 %, cuando
+//           se perdió un 20 % de lo aportado). Es el % de "Todo" (#166).
 //
 // Los flujos de capital se valoran al mismo precio que la cartera ese día,
 // así que un depósito o una retirada no altera el P&L del día.
@@ -17,6 +22,7 @@ export interface DayValuation {
   value: number;     // valor de la cartera al cierre (o en vivo si es hoy)
   inflow: number;    // entradas de capital del día, en EUR (≥ 0)
   outflow: number;   // salidas de capital del día, en EUR (≥ 0)
+  netCapitalFlow: number; // entradas − salidas sin contar el margen, en EUR
   complete: boolean; // false si falta algún precio de cierre (aún descargándose)
   live: boolean;     // día en curso, con precios en vivo
 }
@@ -26,6 +32,7 @@ export interface DayPnl extends DayValuation {
   pct: number | null;
   cumulativePct: number;       // TWR acumulado desde el inicio del rango
   cumulativeDietzPct: number;  // Dietz modificado acumulado desde el inicio del rango
+  cumulativePeakCapitalPct: number; // P&L acumulado sobre el máximo capital neto aportado
 }
 
 const MIN_BASE_EUR = 1;
@@ -35,13 +42,16 @@ const round4 = (n: number) => Math.round(n * 10_000) / 10_000;
 export function computeDailyPnl(
   previousValue: number,
   days: readonly DayValuation[],
-): { days: DayPnl[]; totalPnl: number; twrPct: number; dietzPct: number } {
+): { days: DayPnl[]; totalPnl: number; twrPct: number; dietzPct: number; peakCapitalPct: number } {
   let prev = previousValue;
   let growth = 1;
   let totalPnl = 0;
   let dietz = 0;
   let sumFlows = 0;           // Σ Fₖ
   let sumIndexedFlows = 0;    // Σ k · Fₖ
+  let netCapital = previousValue;
+  let peakCapital = previousValue;
+  let peakCapitalPct = 0;
   const result: DayPnl[] = [];
 
   for (const [index, day] of days.entries()) {
@@ -58,6 +68,10 @@ export function computeDailyPnl(
     const dietzBase = previousValue + (m * sumFlows - sumIndexedFlows) / m;
     if (dietzBase >= MIN_BASE_EUR) dietz = (totalPnl / dietzBase) * 100;
 
+    netCapital += day.netCapitalFlow;
+    peakCapital = Math.max(peakCapital, netCapital);
+    if (peakCapital >= MIN_BASE_EUR) peakCapitalPct = (totalPnl / peakCapital) * 100;
+
     result.push({
       ...day,
       value: round2(day.value),
@@ -67,11 +81,16 @@ export function computeDailyPnl(
       pct: pct === null ? null : round4(pct),
       cumulativePct: round4((growth - 1) * 100),
       cumulativeDietzPct: round4(dietz),
+      cumulativePeakCapitalPct: round4(peakCapitalPct),
+      netCapitalFlow: round2(day.netCapitalFlow),
     });
     prev = day.value;
   }
 
-  return { days: result, totalPnl: round2(totalPnl), twrPct: round4((growth - 1) * 100), dietzPct: round4(dietz) };
+  return {
+    days: result, totalPnl: round2(totalPnl), twrPct: round4((growth - 1) * 100),
+    dietzPct: round4(dietz), peakCapitalPct: round4(peakCapitalPct),
+  };
 }
 
 /**

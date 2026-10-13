@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
@@ -22,7 +22,8 @@ function fmtChartDate(dateStr: string, period: string): string {
   return d.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
 }
 
-export function PortfolioHistoryChart({ currentValue }: { currentValue?: number }) {
+// `headerLeft` sustituye al título (lo usa EvolutionCard para poner las pestañas).
+export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentValue?: number; headerLeft?: ReactNode }) {
   const [period, setPeriod] = useState('1y')
 
   const { data, isLoading } = useQuery({
@@ -66,14 +67,13 @@ export function PortfolioHistoryChart({ currentValue }: { currentValue?: number 
     <div className="bg-background-card border border-border rounded-2xl px-5 py-5">
       {/* Header */}
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-[11px] text-gray-600 font-medium uppercase tracking-widest">Evolución del portfolio</h3>
-        <div className="flex gap-1" role="tablist">
+        {headerLeft ?? <h3 className="text-[11px] text-gray-600 font-medium uppercase tracking-widest">Evolución del portfolio</h3>}
+        <div className="flex gap-1" role="group" aria-label="Periodo del gráfico de valor">
           {PERIODS.map(p => (
             <button
               key={p.key}
               type="button"
-              role="tab"
-              aria-selected={period === p.key}
+              aria-pressed={period === p.key}
               onClick={() => setPeriod(p.key)}
               className={`text-[11px] font-medium px-2.5 py-1 rounded-lg transition-colors ${
                 period === p.key

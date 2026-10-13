@@ -19,7 +19,8 @@ export interface PnlResponse {
   refreshing: boolean;
   totalPnl: number;
   twrPct: number;    // rentabilidad ponderada en el tiempo del rango
-  dietzPct: number;  // Dietz modificado del rango (recomendado para periodos largos)
+  dietzPct: number;  // Dietz modificado del rango
+  peakCapitalPct: number; // P&L sobre el máximo capital neto aportado, sin margen (periodo completo)
   days: DayPnl[];
 }
 
@@ -38,7 +39,7 @@ export async function getDailyPnl(query: { from?: string; to?: string } = {}): P
   const to = query.to ?? today;
   const firstActivity = events.length > 0 ? madridDateOf(events.reduce((min, e) => Math.min(min, e.at), Infinity)) : to;
   const from = !query.from || query.from < firstActivity ? (firstActivity <= to ? firstActivity : to) : query.from;
-  const empty: PnlResponse = { from, to, timezone: 'Europe/Madrid', refreshing: false, totalPnl: 0, twrPct: 0, dietzPct: 0, days: [] };
+  const empty: PnlResponse = { from, to, timezone: 'Europe/Madrid', refreshing: false, totalPnl: 0, twrPct: 0, dietzPct: 0, peakCapitalPct: 0, days: [] };
   if (events.length === 0 || from > to) return empty;
 
   // Día anterior (base) + días pedidos. El día de hoy se valora en este instante.
@@ -84,6 +85,7 @@ export async function getDailyPnl(query: { from?: string; to?: string } = {}): P
   // ── Flujos de capital agrupados por día (cierre anterior, cierre] ──
   const inflow = new Array<number>(allDays.length).fill(0);
   const outflow = new Array<number>(allDays.length).fill(0);
+  const netCapitalFlow = new Array<number>(allDays.length).fill(0);
   for (const f of flows) {
     const i = dayIndexFor(f.at, instants);
     if (i <= 0) continue; // anterior al rango o del propio día base
@@ -95,19 +97,23 @@ export async function getDailyPnl(query: { from?: string; to?: string } = {}): P
     if (price === null) { pendingDay[i] = true; continue; }
     const eur = Math.abs(f.quantity) * price;
     if (f.quantity > 0) inflow[i] += eur; else outflow[i] += eur;
+    if (f.kind === 'capital') netCapitalFlow[i] += f.quantity > 0 ? eur : -eur;
   }
 
   // ── Valoración y P&L ──
   const valueAt = (i: number) => valueHoldings(holdings[i], a => priceOf(a, i)).value;
   const valuations: DayValuation[] = allDays.slice(1).map((date, k) => {
     const i = k + 1;
-    return { date, value: valueAt(i), inflow: inflow[i], outflow: outflow[i], complete: !pendingDay[i], live: date === today };
+    return {
+      date, value: valueAt(i), inflow: inflow[i], outflow: outflow[i], netCapitalFlow: netCapitalFlow[i],
+      complete: !pendingDay[i], live: date === today,
+    };
   });
-  const { days, totalPnl, twrPct, dietzPct } = computeDailyPnl(valueAt(0), valuations);
+  const { days, totalPnl, twrPct, dietzPct, peakCapitalPct } = computeDailyPnl(valueAt(0), valuations);
 
   const refreshing = pending.size > 0;
   if (refreshing) schedulePrefetch(pending);
-  return { from, to, timezone: 'Europe/Madrid', refreshing, totalPnl, twrPct, dietzPct, days };
+  return { from, to, timezone: 'Europe/Madrid', refreshing, totalPnl, twrPct, dietzPct, peakCapitalPct, days };
 }
 
 function heldOn(h: ReadonlyMap<string, number>, asset: string): boolean {
