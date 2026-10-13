@@ -1,5 +1,33 @@
 import { PoolClient } from 'pg';
 import { FifoLot, FifoRunResult, FIFO_DUST_EPSILON, FIFO_SHORTFALL_EPSILON } from './constants';
+import { getHistoricalPriceEur } from '../prices/binance';
+
+// Fechas cuyo tipo no se pudo obtener, para no repetir la petición en cada lote.
+const FAILED_RATE_TTL_MS = 10 * 60_000;
+const failedRateDays = new Map<string, number>(); // YYYY-MM-DD → expira (epoch ms)
+
+/**
+ * Tipo USD por EUR de una fecha, con USDT como referencia del dólar (#174):
+ * 1 / (precio de 1 USDT en EUR). Es el mismo precio diario con el que el motor
+ * valora en EUR una compra pagada en USDT, así que su coste en USD sale exacto.
+ *
+ * Nunca lanza: el coste en USD es un dato secundario y un fallo al obtenerlo
+ * (sin conexión, Binance caído o bloqueado) no debe impedir el recálculo FIFO.
+ * En ese caso devuelve null y el lote queda sin coste en USD.
+ */
+export async function usdPerEurAt(timestamp: Date): Promise<number | null> {
+  const day = timestamp.toISOString().slice(0, 10);
+  const failedUntil = failedRateDays.get(day);
+  if (failedUntil !== undefined && failedUntil > Date.now()) return null;
+  try {
+    const usdtEur = await getHistoricalPriceEur('USDT', timestamp);
+    if (usdtEur > 0) return 1 / usdtEur;
+  } catch (e) {
+    console.warn(`[FIFO] Sin tipo EUR/USD para ${day}; el lote queda sin coste en USD:`, (e as Error).message);
+  }
+  failedRateDays.set(day, Date.now() + FAILED_RATE_TTL_MS);
+  return null;
+}
 
 export async function openLot(
   asset: string,
@@ -12,13 +40,14 @@ export async function openLot(
   walletId: string,
   client: PoolClient
 ): Promise<void> {
+  const usdPerEur = await usdPerEurAt(timestamp);
   await client.query(
     `INSERT INTO fifo_lots (
       asset, quantity_original, quantity_remaining,
       cost_basis_eur, price_per_unit_eur, fee_eur,
-      open_transaction_id, opened_at, wallet_id
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-    [asset, quantity, quantity, costBasisEur, pricePerUnitEur, feeEur, txId, timestamp, walletId]
+      open_transaction_id, opened_at, wallet_id, usd_per_eur
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [asset, quantity, quantity, costBasisEur, pricePerUnitEur, feeEur, txId, timestamp, walletId, usdPerEur]
   );
 }
 
@@ -89,7 +118,7 @@ export async function consumeLots(
 export async function getOpenLots(asset: string, walletId: string, client: PoolClient): Promise<FifoLot[]> {
   const res = await client.query(
     `SELECT id, asset, quantity_original, quantity_remaining,
-            cost_basis_eur, price_per_unit_eur, opened_at, wallet_id, open_transaction_id
+            cost_basis_eur, price_per_unit_eur, opened_at, wallet_id, open_transaction_id, usd_per_eur
      FROM fifo_lots
      WHERE asset = $1
        AND wallet_id = $2
@@ -108,6 +137,7 @@ export async function getOpenLots(asset: string, walletId: string, client: PoolC
     openedAt: r.opened_at as Date,
     walletId: r.wallet_id as string,
     openTransactionId: r.open_transaction_id as string,
+    usdPerEur: r.usd_per_eur === null ? null : parseFloat(r.usd_per_eur as string),
   }));
 }
 

@@ -282,6 +282,11 @@ CREATE TABLE fifo_lots (
   cost_basis_eur      eur_amount NOT NULL,
   price_per_unit_eur  eur_amount NOT NULL,
   fee_eur             eur_amount NOT NULL DEFAULT 0,
+  -- Tipo USD por EUR (vía USDT) de la fecha de apertura (#174). El coste en USD
+  -- de un lote es cost_basis_eur × usd_per_eur: como el coste se consume en
+  -- proporción, la relación se mantiene durante toda la vida del lote. NULL si
+  -- no hubo tipo disponible para esa fecha.
+  usd_per_eur         NUMERIC(38, 18),
   open_transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE RESTRICT,
   opened_at           TIMESTAMPTZ NOT NULL,
   closed_at           TIMESTAMPTZ,
@@ -294,7 +299,8 @@ CREATE TABLE fifo_lots (
   CONSTRAINT chk_fifo_lots_remaining_le_original CHECK (quantity_remaining <= quantity_original),
   -- Mismo umbral que FIFO_DUST_EPSILON del motor: un lote cerrado no puede
   -- tener remanente relevante.
-  CONSTRAINT chk_fifo_lots_closed_no_remaining CHECK (NOT is_closed OR quantity_remaining <= 0.000001)
+  CONSTRAINT chk_fifo_lots_closed_no_remaining CHECK (NOT is_closed OR quantity_remaining <= 0.000001),
+  CONSTRAINT chk_fifo_lots_usd_per_eur_pos CHECK (usd_per_eur IS NULL OR usd_per_eur > 0)
 );
 
 CREATE INDEX idx_fifo_lots_asset      ON fifo_lots(asset);
