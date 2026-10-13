@@ -78,3 +78,18 @@ describe('motor FIFO — coste en USD por lote (#174)', () => {
     expect(eth.rows[0].eur).toBeCloseTo(40, 6); // 50 USDT × 0,80 €
   });
 });
+
+describe('motor FIFO — sin tipo EUR/USD disponible (#174)', () => {
+  it('si el precio de USDT falla, el lote se crea igualmente sin coste en USD', async () => {
+    const { getHistoricalPriceEur } = await import('../prices/binance') as unknown as { getHistoricalPriceEur: ReturnType<typeof vi.fn> };
+    const { usdPerEurAt } = await import('./lotPrimitives');
+    getHistoricalPriceEur.mockRejectedValueOnce(new Error('Binance klines HTTP 451'));
+
+    await expect(usdPerEurAt(new Date('2026-02-01T10:00:00Z'))).resolves.toBeNull();
+    // La fecha fallida no se vuelve a pedir durante un tiempo.
+    getHistoricalPriceEur.mockClear();
+    await expect(usdPerEurAt(new Date('2026-02-01T18:00:00Z'))).resolves.toBeNull();
+    expect(getHistoricalPriceEur).not.toHaveBeenCalled();
+  });
+});
+
