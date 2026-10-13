@@ -9,7 +9,7 @@ import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
 import { computeChange24h } from '../utils/change24h'
 import { TopMovers } from './dashboard/TopMovers'
 import { RecentActivity } from './dashboard/RecentActivity'
-import { PortfolioHistoryChart } from './dashboard/PortfolioHistoryChart'
+import { EvolutionCard } from './dashboard/EvolutionCard'
 import { AllocationChart } from './dashboard/AllocationChart'
 import { FiscalCard } from './dashboard/FiscalCard'
 
@@ -157,7 +157,7 @@ export function Dashboard() {
       <TopMovers lots={lots} />
 
       {/* Gráfico histórico */}
-      <PortfolioHistoryChart currentValue={hasPrices ? cryptoValue : undefined} />
+      <EvolutionCard currentValue={hasPrices ? cryptoValue : undefined} />
 
       {/* Distribución + Fiscal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

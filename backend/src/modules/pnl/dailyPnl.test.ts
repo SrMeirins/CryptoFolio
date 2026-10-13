@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { computeDailyPnl, valueHoldings, type DayValuation } from './dailyPnl';
 import { holdingsAtInstants } from './positions';
 
-const day = (date: string, value: number, inflow = 0, outflow = 0): DayValuation =>
-  ({ date, value, inflow, outflow, complete: true, live: false });
+const day = (date: string, value: number, inflow = 0, outflow = 0, netCapitalFlow = inflow - outflow): DayValuation =>
+  ({ date, value, inflow, outflow, netCapitalFlow, complete: true, live: false });
 
 describe('computeDailyPnl', () => {
   it('un depósito de capital no cuenta como ganancia', () => {
@@ -51,6 +51,28 @@ describe('computeDailyPnl', () => {
     ]);
     expect(twrPct).toBeLessThan(-99);
     expect(dietzPct).toBeGreaterThan(-15);
+  });
+
+  it('% sobre capital: P&L acumulado entre lo aportado, sin contar el margen', () => {
+    const { days, peakCapitalPct } = computeDailyPnl(0, [
+      day('2026-01-10', 1000, 1000),           // aporta 1000
+      day('2026-01-11', 1500, 400, 0, 0),      // préstamo de margen de 400: no es capital aportado
+      day('2026-01-12', 1300, 0, 400, 0),      // devuelve el margen
+      day('2026-01-13', 1200, 0, 0, 0),        // −100
+    ]);
+    expect(days[1].cumulativePeakCapitalPct).toBeCloseTo(100 / 1000 * 100, 4); // +100 sobre 1000
+    expect(peakCapitalPct).toBeCloseTo(200 / 1000 * 100, 4);
+  });
+
+  it('% sobre capital: tras retirar casi todo, divide por el máximo aportado y no por lo que queda', () => {
+    // Caso real (feb. 2022): aporta 63,49 €, pierde 12,93 € y retira 50,55 €.
+    const { days, peakCapitalPct } = computeDailyPnl(0, [
+      day('2022-02-16', 63.49, 63.49),
+      day('2022-02-19', 50.56),
+      day('2022-02-20', 0.01, 0, 50.55),
+    ]);
+    expect(days[2].cumulativePeakCapitalPct).toBeCloseTo(-12.93 / 63.49 * 100, 2); // ≈ -20 %, no -99,98 %
+    expect(peakCapitalPct).toBeCloseTo(-12.93 / 63.49 * 100, 2);
   });
 
   it('sin base positiva el % es null y no altera la rentabilidad acumulada', () => {

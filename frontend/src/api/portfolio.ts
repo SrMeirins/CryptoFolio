@@ -19,6 +19,33 @@ export interface FifoRunResult {
   totalLossEur: number
 }
 
+export interface DailyPnlDay {
+  date: string
+  value: number
+  inflow: number
+  outflow: number
+  netCapitalFlow: number
+  pnl: number
+  pct: number | null
+  cumulativePct: number
+  cumulativeDietzPct: number
+  cumulativePeakCapitalPct: number
+  complete: boolean
+  live: boolean
+}
+
+export interface DailyPnlResponse {
+  from: string
+  to: string
+  timezone: 'Europe/Madrid'
+  refreshing: boolean
+  totalPnl: number
+  twrPct: number
+  dietzPct: number
+  peakCapitalPct: number
+  days: DailyPnlDay[]
+}
+
 export interface FifoLot {
   asset: string
   wallet_id: string
@@ -372,6 +399,8 @@ export const portfolioApi = {
     netInvested: number
   }>('/fifo/eur-flow'),
   getNotifications: () => api.get<Notification[]>('/settings/notifications'),
+  // P&L diario por día local (Europe/Madrid), #165/#166. Sin `from`: desde la primera actividad.
+  getDailyPnl: (from?: string) => api.get<DailyPnlResponse>(`/v1/pnl/daily${from ? `?from=${from}` : ''}`),
   getPortfolioHistory: (period: string) => api.get<{
     points: { date: string; value: number }[]
     period: string

@@ -23,11 +23,14 @@ export interface CapitalFlow {
   asset: string;
   at: number;        // instante (ms epoch)
   quantity: number;  // + entrada, − salida
+  // 'margin' para préstamos y devoluciones de margen: no son capital aportado
+  // por el usuario y se excluyen del % sobre capital neto (#166).
+  kind: 'capital' | 'margin';
 }
 
 export async function loadCapitalFlows(): Promise<CapitalFlow[]> {
   const res = await db.query(
-    `SELECT asset, timestamp,
+    `SELECT asset, timestamp, operation_type IN ('MARGIN_BORROW', 'MARGIN_REPAY') AS is_margin,
             CASE operation_type
               WHEN 'DEPOSIT_FIAT'   THEN  amount
               WHEN 'IGNORED'        THEN  amount
@@ -43,7 +46,7 @@ export async function loadCapitalFlows(): Promise<CapitalFlow[]> {
     [OCBS_DEPOSIT_LABELS],
   );
   return res.rows
-    .map((r: { asset: string; timestamp: string; quantity: number }) =>
-      ({ asset: r.asset, at: new Date(r.timestamp).getTime(), quantity: r.quantity }))
+    .map((r: { asset: string; timestamp: string; quantity: number; is_margin: boolean }) =>
+      ({ asset: r.asset, at: new Date(r.timestamp).getTime(), quantity: r.quantity, kind: r.is_margin ? 'margin' as const : 'capital' as const }))
     .filter((f: CapitalFlow) => f.quantity !== 0);
 }
