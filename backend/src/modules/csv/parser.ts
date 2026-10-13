@@ -343,6 +343,10 @@ function buildFundingDepositKeys(preprocessedRows: RawCsvRow[]): Set<string> {
 // ── Interpretación de grupos ───────────────────────────────────────────────
 // Dispatcher: delega en los interpretadores por familia de operación
 // (interpreters/transfers.ts, trades.ts, marginAndFees.ts, lockUnlock.ts).
+// Depósitos con tarjeta de Binance (OCBS): se interpretan como un depósito
+// normal (DEPOSIT_FIAT), #169.
+const OCBS_DEPOSIT_OPS = new Set(['Deposit Fiat OCBS', 'Fiat OCBS - Add Fiat and Fees']);
+
 async function interpretGroup(
   group: RawCsvRow[],
   fundingDepositKeys: Set<string>
@@ -353,7 +357,7 @@ async function interpretGroup(
   const timestamp = group[0].time;
   const account = group[0].account;
 
-  if (firstOp === 'Deposit') {
+  if (firstOp === 'Deposit' || OCBS_DEPOSIT_OPS.has(firstOp)) {
     return interpretDeposit(group, hashes, timestamp, account, fundingDepositKeys);
   }
 

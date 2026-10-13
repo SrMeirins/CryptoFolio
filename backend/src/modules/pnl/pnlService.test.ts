@@ -129,7 +129,7 @@ describe('getDailyPnl — flujos de capital y rendimiento', () => {
     await reset();
     await db.query(
       `INSERT INTO transactions (id, operation_type, timestamp, asset, amount, amount_net, wallet_id, account, notes)
-       VALUES ($1, 'IGNORED', '2026-05-01T10:00:00Z', 'EUR', 100, 100, $2, 'Spot', 'Deposit Fiat OCBS')`,
+       VALUES ($1, 'DEPOSIT_FIAT', '2026-05-01T10:00:00Z', 'EUR', 100, 100, $2, 'Spot', 'Deposit Fiat OCBS')`,
       [randomUUID(), spot],
     );
     await tx('BUY', '2026-05-01T10:00:01Z', 'XRP', 100, { cost_asset: 'EUR', cost_amount: 100 });   // gasta los 100 €

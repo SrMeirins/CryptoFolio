@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { db } from '../../db/client';
+import { EUR_MOVEMENTS_SQL } from '../../modules/fiat/eurMovements';
 
 const router = Router();
 
@@ -12,43 +13,10 @@ router.get('/summary', async (_req, res) => {
 // GET /api/fifo/fiat-balances — Saldo de activos fiat (EUR) por wallet
 // Calcula: depósitos + conversiones cripto→EUR - compras con EUR - retiradas
 router.get('/fiat-balances', async (_req, res) => {
-  const FIAT_ASSETS = ['EUR'];
-  // EUR balance neto por wallet: suma de todos los flujos EUR (en/out) por wallet.
-  // Se combinan las dos "perspectivas" del EUR: cuando es asset directo (depósito,
-  // recepción de venta cripto→EUR) y cuando es cost_asset (pago por compra de cripto).
-  const fiatClause = FIAT_ASSETS.map((_, i) => `$${i + 1}`).join(', ');
-  // EUR es fungible entre sub-wallets (Spot, Funding…) → agrupamos por wallet_kind.
-  // Solo se consideran salidas de EUR desde la fecha del primer depósito registrado:
-  // los gastos previos al CSV se financiaron con depósitos externos no rastreados.
+  // EUR es fungible entre sub-wallets (Spot, Funding…) → se agrupa por tipo de
+  // wallet y se muestra en la wallet representante. Movimientos: EUR_MOVEMENTS_SQL.
   const result = await db.query(
-    `WITH fiat_flows AS (
-       -- Flujos donde EUR es el activo directo (depósitos, retiradas, conversiones cripto→EUR)
-       SELECT w.type AS wallet_kind, asset AS fiat_asset,
-              CASE
-                WHEN operation_type = 'DEPOSIT_FIAT'  THEN  amount
-                WHEN operation_type = 'BUY'           THEN  amount_net
-                WHEN operation_type = 'WITHDRAW_FIAT' THEN -amount
-                WHEN operation_type = 'CASHBACK'      THEN  amount_net
-                ELSE 0
-              END AS flow
-       FROM transactions t JOIN wallets w ON w.id = t.wallet_id
-       WHERE asset IN (${fiatClause})
-         AND operation_type IN ('DEPOSIT_FIAT', 'BUY', 'WITHDRAW_FIAT', 'CASHBACK')
-
-       UNION ALL
-
-       -- Flujos donde EUR es el activo de coste (pagos con EUR para BUY, EUR recibido en SELL)
-       SELECT w.type AS wallet_kind, cost_asset AS fiat_asset,
-              CASE
-                WHEN operation_type IN ('BUY','BUY_FIAT','BUY_CRYPTO','FEE_EXCHANGE') THEN -COALESCE(cost_amount, 0)
-                WHEN operation_type IN ('SELL','SELL_FIAT')                           THEN  COALESCE(cost_amount, 0)
-                ELSE 0
-              END AS flow
-       FROM transactions t
-       JOIN wallets w ON w.id = t.wallet_id
-       WHERE cost_asset IN (${fiatClause})
-         AND operation_type IN ('BUY','BUY_FIAT','BUY_CRYPTO','SELL','SELL_FIAT','FEE_EXCHANGE')
-     ),
+    `WITH movements AS (${EUR_MOVEMENTS_SQL}),
      wallet_rep AS (
        -- Wallet representante de cada tipo (la que tiene el depósito fiat = la principal)
        SELECT DISTINCT ON (type)
@@ -63,27 +31,29 @@ router.get('/fiat-balances', async (_req, res) => {
        wr.name  AS wallet_name,
        wr.color AS wallet_color,
        wr.type  AS wallet_kind,
-       f.fiat_asset AS asset,
-       ROUND(SUM(f.flow)::numeric, 2) AS balance
-     FROM fiat_flows f
-     JOIN wallet_rep wr ON wr.type = f.wallet_kind
-     GROUP BY wr.id, wr.name, wr.color, wr.type, f.fiat_asset
-     HAVING ROUND(SUM(f.flow)::numeric, 2) > 0.005
+       'EUR'    AS asset,
+       ROUND(SUM(m.amount)::numeric, 2) AS balance
+     FROM movements m
+     JOIN wallets w ON w.id = m.wallet_id
+     JOIN wallet_rep wr ON wr.type = w.type
+     GROUP BY wr.id, wr.name, wr.color, wr.type
+     HAVING ROUND(SUM(m.amount)::numeric, 2) > 0.005
      ORDER BY balance DESC`,
-    FIAT_ASSETS
   );
   res.json(result.rows);
 });
 
 // GET /api/fifo/eur-flow — Euros depositados, retirados y neto invertido en cripto
 router.get('/eur-flow', async (_req, res) => {
+  // Movimientos de EUR: EUR_MOVEMENTS_SQL. Comprar cripto con EUR incluye las
+  // ventas cuyo activo es EUR; recibir EUR incluye las compras de EUR.
   const result = await db.query(`
     SELECT
-      COALESCE(SUM(CASE WHEN operation_type = 'DEPOSIT_FIAT'  AND asset = 'EUR' THEN amount     ELSE 0 END), 0) AS deposited,
-      COALESCE(SUM(CASE WHEN operation_type = 'WITHDRAW_FIAT' AND asset = 'EUR' THEN amount     ELSE 0 END), 0) AS withdrawn,
-      COALESCE(SUM(CASE WHEN operation_type IN ('BUY','BUY_FIAT') AND cost_asset = 'EUR'        THEN cost_amount ELSE 0 END), 0) AS eur_spent_buying,
-      COALESCE(SUM(CASE WHEN operation_type IN ('SELL','SELL_FIAT') AND cost_asset = 'EUR'      THEN cost_amount ELSE 0 END), 0) AS eur_received_selling
-    FROM transactions
+      COALESCE(SUM(CASE WHEN kind = 'deposit'                       THEN  amount ELSE 0 END), 0) AS deposited,
+      COALESCE(SUM(CASE WHEN kind = 'withdraw'                      THEN -amount ELSE 0 END), 0) AS withdrawn,
+      COALESCE(SUM(CASE WHEN kind IN ('buy', 'eur_to_crypto')       THEN -amount ELSE 0 END), 0) AS eur_spent_buying,
+      COALESCE(SUM(CASE WHEN kind IN ('sell', 'crypto_to_eur')      THEN  amount ELSE 0 END), 0) AS eur_received_selling
+    FROM (${EUR_MOVEMENTS_SQL}) movements
   `);
   const row = result.rows[0];
   const deposited          = parseFloat(row.deposited);

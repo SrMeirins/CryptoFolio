@@ -3,9 +3,9 @@ import { db } from '../../db/client';
 // Flujos de capital (#165): dinero o activos que entran o salen de la cartera
 // sin ser rendimiento. Se restan del cambio de valor para obtener el P&L.
 //
-// Entradas: DEPOSIT_FIAT (EUR), depósitos con tarjeta OCBS (IGNORED en el
-//           importador, ver OCBS_DEPOSIT_LABELS), DEPOSIT_CRYPTO, MARGIN_BORROW
-//           (el préstamo no es ganancia; la deuda se refleja al devolverlo).
+// Entradas: DEPOSIT_FIAT (EUR, incluidos los depósitos con tarjeta OCBS desde
+//           #169), DEPOSIT_CRYPTO, MARGIN_BORROW (el préstamo no es ganancia;
+//           la deuda se refleja al devolverlo).
 // Salidas:  WITHDRAW_FIAT (EUR), GIFT_SENT, MARGIN_REPAY.
 // No son flujos: transferencias entre wallets propias (TRANSFER_INTERNAL y
 // WITHDRAW, incluidas las retiradas a "Wallets externas"), compras y ventas.
@@ -13,11 +13,6 @@ import { db } from '../../db/client';
 //
 // Las cantidades coinciden con las que usa el motor FIFO: amount_net en las
 // entradas que abren lote y amount en las salidas que consumen lote.
-
-// Etiquetas del CSV de Binance de los depósitos con tarjeta (OCBS). El
-// importador los guarda como IGNORED ("asiento redundante"), pero son la
-// entrada de los EUR que se gastan en la compra inmediatamente posterior.
-export const OCBS_DEPOSIT_LABELS = ['Deposit Fiat OCBS', 'Fiat OCBS - Add Fiat and Fees'];
 
 export interface CapitalFlow {
   asset: string;
@@ -33,7 +28,6 @@ export async function loadCapitalFlows(): Promise<CapitalFlow[]> {
     `SELECT asset, timestamp, operation_type IN ('MARGIN_BORROW', 'MARGIN_REPAY') AS is_margin,
             CASE operation_type
               WHEN 'DEPOSIT_FIAT'   THEN  amount
-              WHEN 'IGNORED'        THEN  amount
               WHEN 'WITHDRAW_FIAT'  THEN -amount
               WHEN 'DEPOSIT_CRYPTO' THEN  amount_net
               WHEN 'MARGIN_BORROW'  THEN  amount_net
@@ -41,9 +35,7 @@ export async function loadCapitalFlows(): Promise<CapitalFlow[]> {
               WHEN 'MARGIN_REPAY'   THEN -amount
             END::float AS quantity
      FROM transactions
-     WHERE operation_type IN ('DEPOSIT_FIAT','WITHDRAW_FIAT','DEPOSIT_CRYPTO','MARGIN_BORROW','GIFT_SENT','MARGIN_REPAY')
-        OR (operation_type = 'IGNORED' AND asset = 'EUR' AND notes = ANY($1))`,
-    [OCBS_DEPOSIT_LABELS],
+     WHERE operation_type IN ('DEPOSIT_FIAT','WITHDRAW_FIAT','DEPOSIT_CRYPTO','MARGIN_BORROW','GIFT_SENT','MARGIN_REPAY')`,
   );
   return res.rows
     .map((r: { asset: string; timestamp: string; quantity: number; is_margin: boolean }) =>
