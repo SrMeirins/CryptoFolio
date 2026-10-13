@@ -9,7 +9,10 @@ import {
 import { useToast } from '../hooks/useToast'
 import { ManualTxModal } from '../components/ManualTxModal'
 import { DateRangePicker } from '../components/DateRangePicker'
-import { formatEur } from '../utils/format'
+import { formatMoney } from '../utils/format'
+import { useCurrency } from '../hooks/useDisplayCurrency'
+import { useCurrencyQuery } from '../hooks/useCurrencyQuery'
+import { txStatsQuery } from '../queries/currencyQueries'
 import { invalidateTransactionQueries } from '../utils/queryInvalidation'
 import { useWalletsQuery } from '../hooks/useWallets'
 import { OP_META } from '../constants/operations'
@@ -57,11 +60,9 @@ export function History() {
 
   const walletList = useWalletsQuery()
 
-  const { data: stats } = useQuery({
-    queryKey: ['tx-stats'],
-    queryFn:  () => portfolioApi.getTransactionStats(),
-    staleTime: 5 * 60_000,
-  })
+  const currency = useCurrency()
+  // Estadísticas en la moneda de visualización; la otra se precarga (#177).
+  const { data: stats } = useCurrencyQuery(txStatsQuery)
 
   const queryParams = useMemo(() => ({
     limit:  String(PAGE_SIZE),
@@ -78,7 +79,9 @@ export function History() {
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['transactions', queryParams],
-    queryFn:  () => portfolioApi.getTransactions(queryParams),
+    // Siempre en USD: la respuesta trae el total en ambas monedas y el tipo
+    // de cada fila, así que el cambio EUR ↔ USD no necesita otra petición (#177).
+    queryFn:  () => portfolioApi.getTransactions(queryParams, 'USD'),
     placeholderData: prev => prev,
   })
 
@@ -88,7 +91,7 @@ export function History() {
   // vez de solo cuando cambian los datos reales.
   const rawTransactions = useMemo(() => data?.transactions ?? [], [data])
   const total      = data?.total ?? 0
-  const totalEur   = data?.total_eur ?? 0
+  const totalAmount = (currency === 'EUR' ? data?.total_eur : data?.total_amount) ?? 0
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const currentPage = Math.floor(filters.offset / PAGE_SIZE)
 
@@ -180,8 +183,8 @@ export function History() {
               {total > 0
                 ? `${total.toLocaleString('es-ES')} transacciones${hasActiveFilters ? ' filtradas' : ''}`
                 : 'Sin transacciones importadas'}
-              {hasActiveFilters && totalEur > 0 && (
-                <span className="ml-2 text-accent-blue font-semibold mono">· {formatEur(totalEur)} total</span>
+              {hasActiveFilters && totalAmount > 0 && (
+                <span className="ml-2 text-accent-blue font-semibold mono">· {formatMoney(totalAmount, currency)} total</span>
               )}
             </p>
           </div>
@@ -308,7 +311,7 @@ export function History() {
                     </th>
                     <th className="text-right px-3 py-2.5 font-medium">
                       <button type="button" onClick={() => toggleSort('eur')} className="flex items-center ml-auto hover:text-gray-300 transition-colors">
-                        Valor EUR <SortIcon col="eur" sortKey={sortKey} sortDir={sortDir} />
+                        Valor {currency} <SortIcon col="eur" sortKey={sortKey} sortDir={sortDir} />
                       </button>
                     </th>
                     <th className="text-left px-3 py-2.5 font-medium">Fee</th>
@@ -340,6 +343,7 @@ export function History() {
                           onEdit={setEditingTx}
                           isDeleting={deletingId === tx.id}
                           searchTerm={filters.search}
+                          currency={currency}
                         />
                       ))}
                     </Fragment>

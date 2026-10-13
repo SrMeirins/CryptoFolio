@@ -1,11 +1,11 @@
 import { useState, useMemo, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { portfolioApi } from '../../api/portfolio'
-import { formatEur } from '../../utils/format'
+import { formatMoney } from '../../utils/format'
+import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
+import { portfolioHistoryQuery } from '../../queries/currencyQueries'
 
 const PERIODS = [
   { key: '1m', label: '1M' },
@@ -26,16 +26,18 @@ function fmtChartDate(dateStr: string, period: string): string {
 export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentValue?: number; headerLeft?: ReactNode }) {
   const [period, setPeriod] = useState('1y')
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['portfolio-history', period],
-    queryFn: () => portfolioApi.getPortfolioHistory(period),
-    staleTime: 5 * 60_000,
-    // Solo reintenta si hay pocos puntos (primera carga sin caché)
-    refetchInterval: (query) => {
-      const d = query.state.data as { points: {date:string;value:number}[]; refreshing: boolean } | undefined
-      return (d?.refreshing && (d?.points?.length ?? 0) < 5) ? 30_000 : false
+  // En la moneda de visualización (#177); `currentValue` llega ya en esa moneda.
+  const { data, isLoading, currency: requested } = useCurrencyQuery(
+    currency => portfolioHistoryQuery(currency, period),
+    {
+      // Solo reintenta si hay pocos puntos (primera carga sin caché)
+      refetchInterval: (query) => {
+        const d = query.state.data
+        return (d?.refreshing && (d?.points?.length ?? 0) < 5) ? 30_000 : false
+      },
     },
-  })
+  )
+  const currency = data?.currency ?? requested
 
   // Envuelto en su propio useMemo: `data?.points ?? []` crea un array nuevo
   // en cada render donde `data.points` es undefined, lo que invalidaría la
@@ -91,7 +93,7 @@ export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentVal
       <div className="flex items-center gap-3 mb-4">
         {points.length >= 2 && (
           <p className={`text-xs font-mono ${isPositive ? 'text-accent-green' : 'text-accent-red'}`}>
-            {isPositive ? '▲' : '▼'} {eurChange >= 0 ? '+' : ''}{formatEur(eurChange)} en el periodo
+            {isPositive ? '▲' : '▼'} {eurChange >= 0 ? '+' : ''}{formatMoney(eurChange, currency)} en el periodo
           </p>
         )}
         {data?.refreshing && !isLoading && points.length < 5 && (
@@ -141,7 +143,7 @@ export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentVal
                 tick={{ fontSize: 10, fill: '#4b5563' }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(v: number) => formatEur(v)}
+                tickFormatter={(v: number) => formatMoney(v, currency)}
                 width={72}
               />
               <RechartsTooltip
@@ -152,7 +154,7 @@ export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentVal
                   fontSize: 12,
                 }}
                 labelStyle={{ color: '#9ca3af', marginBottom: 4 }}
-                formatter={(v: number) => [formatEur(v), 'Valor']}
+                formatter={(v: number) => [formatMoney(v, currency), 'Valor']}
               />
               <Area
                 type="monotone"

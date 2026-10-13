@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { portfolioApi } from '../../api/portfolio'
-import { formatEur } from '../../utils/format'
+import { formatMoney, type Currency } from '../../utils/format'
+import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
+import { dailyPnlQuery } from '../../queries/currencyQueries'
 import { madridToday } from '../../utils/pnlChart'
 import {
   WEEKDAYS, addMonths, compareYm, intensity, monthGrid, monthLabel, monthRange, monthSummary, ymOf,
@@ -16,14 +16,16 @@ const WEEKDAY_NAMES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 's�
 const GREEN_BG = ['', 'bg-accent-green/[0.07]', 'bg-accent-green/[0.13]', 'bg-accent-green/[0.2]', 'bg-accent-green/[0.3]']
 const RED_BG = ['', 'bg-accent-red/[0.07]', 'bg-accent-red/[0.13]', 'bg-accent-red/[0.2]', 'bg-accent-red/[0.3]']
 
-const signedEur = (n: number) => `${n > 0 ? '+' : ''}${formatEur(n)}`
+const signedMoney = (n: number, currency: Currency) => `${n > 0 ? '+' : ''}${formatMoney(n, currency)}`
 const signedPct = (n: number) => `${n > 0 ? '+' : ''}${n.toFixed(2)}%`
 
 function longDate(date: string): string {
   return new Date(`${date}T12:00:00Z`).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
 }
 
-function DayCell({ date, data, today, maxAbs }: { date: string | null; data?: CalendarDay; today: string; maxAbs: number }) {
+function DayCell({ date, data, today, maxAbs, currency }: {
+  date: string | null; data?: CalendarDay; today: string; maxAbs: number; currency: Currency
+}) {
   if (!date) return <td className="p-1" aria-hidden="true" />
   const dayNumber = Number(date.slice(8))
   const future = date > today
@@ -51,13 +53,13 @@ function DayCell({ date, data, today, maxAbs }: { date: string | null; data?: Ca
     <td className="p-1 align-top">
       <div className={`h-16 rounded-lg border px-2 py-1.5 ${bg} ${data.live ? 'border-accent-blue/60' : 'border-border/40'}`}>
         <span className="sr-only">
-          {`${longDate(date)}${data.live ? ' (hoy, en vivo)' : ''}: ${signedEur(data.pnl)}${data.pct === null ? '' : `, ${pctText}`}`}
+          {`${longDate(date)}${data.live ? ' (hoy, en vivo)' : ''}: ${signedMoney(data.pnl, currency)}${data.pct === null ? '' : `, ${pctText}`}`}
         </span>
         <div className="flex items-center justify-between text-[10px] font-mono text-gray-500" aria-hidden="true">
           <span>{dayNumber}</span>
           {data.live && <span className="text-accent-blue">● en vivo</span>}
         </div>
-        <p className={`text-[11px] font-mono font-semibold leading-tight mt-1 truncate ${tone}`} aria-hidden="true">{signedEur(data.pnl)}</p>
+        <p className={`text-[11px] font-mono font-semibold leading-tight mt-1 truncate ${tone}`} aria-hidden="true">{signedMoney(data.pnl, currency)}</p>
         <p className={`text-[10px] font-mono leading-tight opacity-80 ${tone}`} aria-hidden="true">{pctText}</p>
       </div>
     </td>
@@ -71,15 +73,20 @@ export function PnlCalendar() {
   const range = monthRange(ym, today)
 
   // Primer mes con actividad: se toma de la consulta de "Todo" que ya hace el gráfico (misma caché).
-  const { data: all } = useQuery({ queryKey: ['daily-pnl', 'all'], queryFn: () => portfolioApi.getDailyPnl() })
+  const { data: all } = useCurrencyQuery(currency => dailyPnlQuery(currency))
   const firstYm = all ? ymOf(all.from) : null
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['daily-pnl-month', range?.from, range?.to],
-    queryFn: () => portfolioApi.getDailyPnl(range!.from, range!.to),
-    enabled: range !== null,
-    refetchInterval: (query) => (query.state.data?.refreshing ? 5_000 : compareYm(ym, current) === 0 ? 60_000 : false),
-  })
+  // Mes en la moneda de visualización; la otra se precarga para que el toggle sea instantáneo (#177).
+  const { data: monthData, isLoading, isError, currency: requested } = useCurrencyQuery(
+    currency => dailyPnlQuery(currency, range?.from, range?.to),
+    {
+      enabled: range !== null,
+      refetchInterval: (query) => (query.state.data?.refreshing ? 5_000 : compareYm(ym, current) === 0 ? 60_000 : false),
+    },
+  )
+  // Un mes futuro (sin rango) compartiría clave con "Todo": se descarta.
+  const data = range ? monthData : undefined
+  const currency = data?.currency ?? requested
 
   const byDate = useMemo(() => new Map((data?.days ?? []).map(d => [d.date, d])), [data])
   const complete = useMemo(() => (data?.days ?? []).filter(d => d.complete), [data])
@@ -108,7 +115,7 @@ export function PnlCalendar() {
         </div>
         {complete.length > 0 && (
           <p className={`text-xs font-mono ${summaryTone}`}>
-            Mes: <span className="font-semibold">{signedEur(summary.pnl)}</span> ({signedPct(summary.pct)})
+            Mes: <span className="font-semibold">{signedMoney(summary.pnl, currency)}</span> ({signedPct(summary.pct)})
           </p>
         )}
         {data?.refreshing && <span className="text-[10px] text-gray-500">Descargando precios de cierre…</span>}
@@ -132,7 +139,7 @@ export function PnlCalendar() {
               {weeks.map((week, wi) => (
                 <tr key={week.find(Boolean) ?? `semana-${wi}`}>
                   {week.map((date, i) => (
-                    <DayCell key={date ?? `vacío-${i}`} date={date} data={date ? byDate.get(date) : undefined} today={today} maxAbs={maxAbs} />
+                    <DayCell key={date ?? `vacío-${i}`} date={date} data={date ? byDate.get(date) : undefined} today={today} maxAbs={maxAbs} currency={currency} />
                   ))}
                 </tr>
               ))}

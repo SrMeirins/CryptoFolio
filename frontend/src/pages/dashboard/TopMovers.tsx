@@ -1,15 +1,17 @@
 import { useState, useMemo } from 'react'
 import type { FifoLot, FiatBalance } from '../../api/portfolio'
-import { usePricesStore } from '../../store/pricesStore'
 import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
+import { useDisplayMarket } from '../../hooks/useDisplayMarket'
 import { useFlashOnChange, type FlashDirection } from '../../hooks/useFlashOnChange'
 import { rankMovers, type MoverItem, type MoversMode } from '../../utils/topMovers'
-import { formatEur } from '../../utils/format'
+import { formatMoney } from '../../utils/format'
+import { useCurrency } from '../../hooks/useDisplayCurrency'
 
 // Escala de la barra: el % de 24h suele ser mucho menor que el total.
 const BAR_SCALE: Record<MoversMode, number> = { '24h': 10, total: 2 }
 
 function MoverRow({ asset, pct, value, rank, mode }: MoverItem & { mode: MoversMode }) {
+  const currency = useCurrency()
   const [imgOk, setImgOk] = useState(true)
   const pctFlash   = useFlashOnChange(pct)
   const valueFlash = useFlashOnChange(value)
@@ -42,7 +44,7 @@ function MoverRow({ asset, pct, value, rank, mode }: MoverItem & { mode: MoversM
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-bold leading-tight" style={{ color }}>{asset}</p>
         <p className="text-[10px] text-gray-600 font-mono leading-tight mt-0.5">
-          <span className={`rounded ${flashClass(valueFlash)}`}>{formatEur(value)}</span>
+          <span className={`rounded ${flashClass(valueFlash)}`}>{formatMoney(value, currency)}</span>
         </p>
       </div>
       <div className="flex flex-col items-end gap-1 shrink-0">
@@ -81,11 +83,12 @@ const MODE_LABELS: Record<MoversMode, { short: string; title: string }> = {
 }
 
 export function TopMovers({ lots }: { lots: FifoLot[] }) {
-  const open24 = usePricesStore(s => s.open24)
+  // Precio de hace 24h y umbral de polvo en la moneda de visualización (#177).
+  const { currency, open24, dustThreshold } = useDisplayMarket()
   const { assets } = usePortfolioValuation(lots, NO_FIAT)
   const [mode, setMode] = useState<MoversMode>(readMode)
 
-  const { top, bottom } = useMemo(() => rankMovers(assets, open24, mode), [assets, open24, mode])
+  const { top, bottom } = useMemo(() => rankMovers(assets, open24, mode, dustThreshold), [assets, open24, mode, dustThreshold])
 
   if (lots.length === 0) return null
 
@@ -133,13 +136,13 @@ export function TopMovers({ lots }: { lots: FifoLot[] }) {
           <div>
             {header('Mejores', 'bg-accent-green', '#00c896', 'text-accent-green/80')}
             <div className="divide-y divide-border/30">
-              {top.map(item => <MoverRow key={item.asset} {...item} mode={mode} />)}
+              {top.map(item => <MoverRow key={`${item.asset}-${currency}`} {...item} mode={mode} />)}
             </div>
           </div>
           <div>
             {header('Peores', 'bg-accent-red', '#e74c3c', 'text-accent-red/80')}
             <div className="divide-y divide-border/30">
-              {bottom.map(item => <MoverRow key={item.asset} {...item} mode={mode} />)}
+              {bottom.map(item => <MoverRow key={`${item.asset}-${currency}`} {...item} mode={mode} />)}
             </div>
           </div>
         </div>

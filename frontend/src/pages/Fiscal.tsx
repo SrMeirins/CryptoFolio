@@ -12,6 +12,7 @@ import { TablaRendimientos } from './fiscal/TablaRendimientos'
 import { ExportPanel } from './fiscal/ExportPanel'
 import { YearTabs } from './fiscal/YearTabs'
 import { FiscalSummaryCards, FiscalSummaryCardsSkeleton } from './fiscal/FiscalSummaryCards'
+import { EurOnlyBadge } from '../components/EurOnlyBadge'
 
 export function Fiscal() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
@@ -110,8 +111,11 @@ export function Fiscal() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Módulo Fiscal</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Método FIFO · Normativa española vigente</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold">Módulo Fiscal</h1>
+            <EurOnlyBadge />
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">Método FIFO · Normativa española vigente · Importes en EUR</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 text-[11px] text-gray-600">

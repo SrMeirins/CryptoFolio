@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
 import type { FifoLot, FiatBalance } from '../../api/portfolio'
 import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
-import { formatEur } from '../../utils/format'
+import { formatMoney } from '../../utils/format'
+import { useCurrency } from '../../hooks/useDisplayCurrency'
 
 const ALLOC_COLORS = [
   '#6366f1','#F0B90B','#00c896','#e74c3c','#8b5cf6',
@@ -17,6 +18,7 @@ function colorForItem(item: AllocItem, idx: number): string {
 }
 
 export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatBalances: FiatBalance[] }) {
+  const currency = useCurrency()
   const [hovered, setHovered] = useState<string | null>(null)
 
   const { assets, totalValue: total } = usePortfolioValuation(lots, fiatBalances)
@@ -81,7 +83,7 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
             </div>
             <div className="flex items-center gap-4">
               <span className="text-xs text-gray-500 font-mono">{hoveredPct.toFixed(2)}%</span>
-              <span className="text-sm font-semibold font-mono text-white">{formatEur(hoveredItem.value)}</span>
+              <span className="text-sm font-semibold font-mono text-white">{formatMoney(hoveredItem.value, currency)}</span>
             </div>
           </div>
         )}
@@ -119,7 +121,7 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
                 />
               </div>
               <span className="text-[11px] text-gray-500 font-mono w-10 text-right shrink-0">{pct.toFixed(1)}%</span>
-              <span className="text-[11px] text-gray-400 font-mono w-20 text-right shrink-0">{formatEur(item.value)}</span>
+              <span className="text-[11px] text-gray-400 font-mono w-20 text-right shrink-0">{formatMoney(item.value, currency)}</span>
             </div>
           )
         })}

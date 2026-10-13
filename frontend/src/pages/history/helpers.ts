@@ -1,4 +1,5 @@
 import type { Transaction } from '../../api/portfolio'
+import type { Currency } from '../../utils/format'
 
 export function fmtDate(ts: string): { date: string; time: string } {
   const d = new Date(ts)
@@ -29,6 +30,17 @@ export function calcEurValue(tx: Transaction): number | null {
     if (!isNaN(p) && !isNaN(a) && p > 0 && a > 0) return p * a
   }
   return null
+}
+
+/**
+ * Importe en EUR de una operación en la moneda de visualización (#177): en
+ * USD, con el tipo de la fecha de la operación que envía el backend. null si
+ * no hay importe o, en USD, si falta el tipo (no se muestran euros como dólares).
+ */
+export function toDisplayAmount(eur: number | null, tx: Pick<Transaction, 'usd_per_eur'>, currency: Currency): number | null {
+  if (eur === null || currency === 'EUR') return eur
+  const rate = tx.usd_per_eur === null || tx.usd_per_eur === undefined ? NaN : Number(tx.usd_per_eur)
+  return rate > 0 ? eur * rate : null
 }
 
 export function calcFeeEur(tx: Transaction): number | null {

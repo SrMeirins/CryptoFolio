@@ -11,6 +11,12 @@ type Config = Record<string, string>
 
 const storage = typeof window !== 'undefined' ? window.localStorage : undefined
 
+/** Solo lectura de la moneda de visualización, para las vistas que formatean importes. */
+export function useCurrency(): Currency {
+  const { data: config } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
+  return resolveCurrency(config, readStoredCurrency(storage))
+}
+
 /**
  * Moneda de visualización (#176). El cambio es optimista: se aplica en la
  * caché de ['config'] al instante (todas las vistas reaccionan en el mismo
@@ -19,8 +25,7 @@ const storage = typeof window !== 'undefined' ? window.localStorage : undefined
 export function useDisplayCurrency() {
   const queryClient = useQueryClient()
   const toast = useToast()
-  const { data: config } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
-  const currency = resolveCurrency(config, readStoredCurrency(storage))
+  const currency = useCurrency()
 
   const mutation = useMutation({
     mutationFn: (next: Currency) => portfolioApi.setConfig(DISPLAY_CURRENCY_KEY, next),

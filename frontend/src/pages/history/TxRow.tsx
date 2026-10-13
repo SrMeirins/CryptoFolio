@@ -5,9 +5,9 @@ import {
 import type { Transaction } from '../../api/portfolio'
 import { CopyButton } from '../../components/CopyButton'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import { formatEur, formatPrice, formatAmount } from '../../utils/format'
+import { formatMoney, formatPrice, formatAmount, type Currency } from '../../utils/format'
 import { OP_META } from '../../constants/operations'
-import { fmtDate, calcEurValue, calcFeeEur, formatPriceLine } from './helpers'
+import { fmtDate, calcEurValue, calcFeeEur, formatPriceLine, toDisplayAmount } from './helpers'
 
 function Highlight({ text, query }: { text: string; query: string }) {
   if (!query.trim()) return <>{text}</>
@@ -35,9 +35,10 @@ function OpChip({ type }: { type: string }) {
 }
 
 export function TxRow({
-  tx, onDelete, onEdit, isDeleting, searchTerm,
+  tx, onDelete, onEdit, isDeleting, searchTerm, currency,
 }: {
   tx: Transaction
+  currency: Currency
   onDelete: (id: string) => void
   onEdit:   (tx: Transaction) => void
   isDeleting: boolean
@@ -51,8 +52,9 @@ export function TxRow({
   const isSell = meta.group === 'sell'
 
   const { date, time } = fmtDate(tx.timestamp)
-  const eurValue = calcEurValue(tx)
-  const feeEur   = calcFeeEur(tx)
+  // Valor y comisión en la moneda de visualización, con el tipo de la fecha de la operación (#177).
+  const eurValue = toDisplayAmount(calcEurValue(tx), tx, currency)
+  const feeEur   = toDisplayAmount(calcFeeEur(tx), tx, currency)
   const priceLine = formatPriceLine(tx)
 
   const hasCost  = tx.cost_asset && tx.cost_amount && parseFloat(tx.cost_amount) !== 0
@@ -100,11 +102,11 @@ export function TxRow({
           </div>
         </td>
 
-        {/* Valor EUR */}
+        {/* Valor en la moneda de visualización */}
         <td className="px-3 py-2.5 text-right align-middle">
           {eurValue != null ? (
             <>
-              <div className="text-sm mono font-semibold text-white">{formatPrice(eurValue)}</div>
+              <div className="text-sm mono font-semibold text-white">{formatPrice(eurValue, currency)}</div>
               {priceLine && <div className="text-[10px] text-gray-600 mono mt-0.5">@ {priceLine}</div>}
             </>
           ) : hasCost ? (
@@ -126,7 +128,7 @@ export function TxRow({
                 <div className="text-xs mono text-gray-400">
                   {formatAmount(tx.fee_amount, 6)} <span className="text-gray-600 text-[10px]">{tx.fee_asset}</span>
                 </div>
-                {feeEur != null && <div className="text-[10px] text-gray-600 mono">{formatEur(feeEur)}</div>}
+                {feeEur != null && <div className="text-[10px] text-gray-600 mono">{formatMoney(feeEur, currency)}</div>}
               </div>
             </div>
           ) : (

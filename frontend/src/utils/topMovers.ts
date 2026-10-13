@@ -21,18 +21,20 @@ const MAX_PER_LIST = 3
 //   (coste / cantidad). Requiere coste > 0.
 // - 24h: variación frente al precio de hace 24h (`open24`). Los activos sin
 //   ese precio se excluyen.
-// Solo cripto con precio actual y valor ≥ DUST_THRESHOLD_EUR. Cada activo
+// Solo cripto con precio actual y valor ≥ dustThreshold (1 € expresado en la
+// moneda de visualización). Cada activo
 // aparece como mucho en una lista: con menos de seis, se reparten por mitades
 // (el sobrante va a Mejores).
 export function rankMovers(
   assets: readonly AssetValuation[],
   open24: Readonly<Record<string, number>>,
   mode: MoversMode,
+  dustThreshold = DUST_THRESHOLD_EUR,
 ): { top: MoverItem[]; bottom: MoverItem[] } {
   const items: Omit<MoverItem, 'rank'>[] = []
 
   for (const a of assets) {
-    if (a.kind !== 'crypto' || a.price === null || a.value < DUST_THRESHOLD_EUR) continue
+    if (a.kind !== 'crypto' || a.price === null || a.value < dustThreshold) continue
 
     let reference: number | undefined
     if (mode === 'total') {

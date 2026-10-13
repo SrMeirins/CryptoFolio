@@ -2,10 +2,13 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { portfolioApi } from '../api/portfolio'
 import { usePricesStore } from '../store/pricesStore'
-import { formatEur, formatEurCompact } from '../utils/format'
+import { formatMoney, formatMoneyCompact } from '../utils/format'
 import { type Change24h } from '../components/MetricCard'
 import { PortfolioSummaryCards } from '../components/PortfolioSummaryCards'
 import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
+import { useDisplayMarket } from '../hooks/useDisplayMarket'
+import { useCurrencyQuery } from '../hooks/useCurrencyQuery'
+import { eurFlowQuery } from '../queries/currencyQueries'
 import { computeChange24h } from '../utils/change24h'
 import { TopMovers } from './dashboard/TopMovers'
 import { RecentActivity } from './dashboard/RecentActivity'
@@ -15,8 +18,8 @@ import { AllocationChart } from './dashboard/AllocationChart'
 import { FiscalCard } from './dashboard/FiscalCard'
 
 export function Dashboard() {
-  const prices = usePricesStore((s) => s.prices)
-  const open24 = usePricesStore((s) => s.open24)
+  // Precios en la moneda de visualización (#177): en USD sin USDT aún, vacíos.
+  const { currency, prices, open24 } = useDisplayMarket()
   const connected = usePricesStore((s) => s.connected)
   const lastUpdate = usePricesStore((s) => s.lastUpdate)
 
@@ -37,10 +40,8 @@ export function Dashboard() {
     refetchInterval: 60_000,
   })
 
-  const { data: eurFlow } = useQuery({
-    queryKey: ['eur-flow'],
-    queryFn: portfolioApi.getEurFlow,
-  })
+  const { data: eurFlow } = useCurrencyQuery(eurFlowQuery)
+  const flowCurrency = eurFlow?.currency ?? currency
 
 
   const {
@@ -62,16 +63,16 @@ export function Dashboard() {
     }
     return {
       kind: 'value',
-      eur: (result.eur >= 0 ? '+' : '') + formatEur(result.eur),
+      eur: (result.eur >= 0 ? '+' : '') + formatMoney(result.eur, currency),
       pct: (result.pct >= 0 ? '+' : '') + result.pct.toFixed(2) + '%',
-      eurCompact: (result.eur >= 0 ? '+' : '') + formatEurCompact(result.eur),
+      eurCompact: (result.eur >= 0 ? '+' : '') + formatMoneyCompact(result.eur, currency),
       pctCompact: (result.pct >= 0 ? '+' : '') + result.pct.toFixed(1) + '%',
       positive: result.eur >= 0,
       note: result.excluded.length > 0
         ? <p>Sin precio de hace 24h, excluidos del cálculo: <span className="mono text-white">{result.excluded.join(', ')}</span></p>
         : undefined,
     }
-  }, [assets, open24, hasPrices])
+  }, [assets, open24, hasPrices, currency])
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -98,6 +99,7 @@ export function Dashboard() {
         hasPrices={hasPrices}
         loading={lotsLoading}
         change24h={change24h}
+        currency={currency}
         eurFlow={eurFlow}
         valueTooltip={
           <>
@@ -105,11 +107,11 @@ export function Dashboard() {
             <div className="bg-white/5 rounded-lg px-3 py-2.5 space-y-1.5 text-[10px]">
               <div className="flex justify-between text-gray-400">
                 <span>Cripto</span>
-                <span className="mono text-gray-200">{formatEur(cryptoValue)}</span>
+                <span className="mono text-gray-200">{formatMoney(cryptoValue, currency)}</span>
               </div>
               <div className="flex justify-between text-gray-400">
                 <span>Cash / Fiat</span>
-                <span className="mono text-gray-200">{formatEur(totalFiat)}</span>
+                <span className="mono text-gray-200">{formatMoney(totalFiat, currency)}</span>
               </div>
             </div>
           </>
@@ -140,14 +142,15 @@ export function Dashboard() {
         eurFlowTooltip={eurFlow && (
           <>
             <p>Capital real comprometido en cripto: euros ingresados al exchange desde tu banco, menos lo retirado.</p>
+            {flowCurrency === 'USD' && <p className="text-gray-500">En dólares, cada movimiento se convierte con el tipo de su fecha.</p>}
             <div className="bg-white/5 rounded-lg px-3 py-2.5 space-y-1.5 text-[10px]">
               <div className="flex justify-between text-gray-400">
                 <span>Depósitos al exchange</span>
-                <span className="mono text-gray-200">{formatEur(eurFlow.deposited)}</span>
+                <span className="mono text-gray-200">{formatMoney(eurFlow.deposited, flowCurrency)}</span>
               </div>
               <div className="flex justify-between text-gray-400">
                 <span>Retiradas al banco</span>
-                <span className="mono text-gray-200">− {formatEur(eurFlow.withdrawn)}</span>
+                <span className="mono text-gray-200">− {formatMoney(eurFlow.withdrawn, flowCurrency)}</span>
               </div>
             </div>
           </>

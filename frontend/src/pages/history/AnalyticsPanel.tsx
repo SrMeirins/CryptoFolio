@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { BarChart2, ChevronDown, ChevronUp } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import { formatEur, formatAmount } from '../../utils/format'
+import { formatMoney, formatAmount, type Currency } from '../../utils/format'
 import { fmtMonthLabel } from './helpers'
 
 function ChartTooltip({ active, payload, label }: {
@@ -21,6 +21,7 @@ function ChartTooltip({ active, payload, label }: {
 
 export function AnalyticsPanel({ stats, onAssetClick }: {
   stats: {
+    currency?: Currency
     monthly:   { mes: string; total_ops: number; compras: number; ventas: number; ingresos: number; transferencias: number; eur_invertido: number }[]
     topAssets: { asset: string; ops: number; eur_volume: number }[]
     fees:      { asset: string; ops: number; total_amount: number; total_eur: number }[]
@@ -125,7 +126,7 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
                           style={{ width: `${(row.total_eur / (stats.fees[0]?.total_eur ?? 1)) * 100}%` }} />
                       </div>
                       {row.total_eur > 0
-                        ? <span className="text-[11px] text-gray-400 mono font-semibold shrink-0">{formatEur(row.total_eur)}</span>
+                        ? <span className="text-[11px] text-gray-400 mono font-semibold shrink-0">{formatMoney(row.total_eur, stats.currency ?? 'EUR')}</span>
                         : <span className="text-[10px] text-gray-600 mono shrink-0">{formatAmount(row.total_amount, 4)}</span>
                       }
                     </div>
