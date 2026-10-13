@@ -4,7 +4,8 @@ import { z } from 'zod';
 // se convierten con el tipo USD por EUR de su fecha, con USDT como referencia
 // del dólar (el mismo criterio que el coste por lote del motor FIFO, #174).
 
-export const currencySchema = z.enum(['EUR', 'USD']).default('EUR');
+export const DISPLAY_CURRENCIES = ['EUR', 'USD'] as const;
+export const currencySchema = z.enum(DISPLAY_CURRENCIES).default('EUR');
 export type DisplayCurrency = z.infer<typeof currencySchema>;
 
 /**

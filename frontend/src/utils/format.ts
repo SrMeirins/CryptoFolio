@@ -1,10 +1,35 @@
+/** Moneda de visualización (#155): los importes se guardan en EUR; USD se convierte con USDT. */
+export type Currency = 'EUR' | 'USD'
+
+// Formatters cacheados por moneda y decimales: crear un Intl.NumberFormat es
+// caro y estos formateadores se llaman en cada tick de precios.
+const _moneyFormatters = new Map<string, Intl.NumberFormat>()
+function moneyFmt(currency: Currency, decimals: number): Intl.NumberFormat {
+  const key = `${currency}:${decimals}`
+  let fmt = _moneyFormatters.get(key)
+  if (!fmt) {
+    // narrowSymbol: "$" en lugar de "US$" en es-ES.
+    fmt = new Intl.NumberFormat('es-ES', {
+      style: 'currency', currency, currencyDisplay: 'narrowSymbol',
+      minimumFractionDigits: decimals, maximumFractionDigits: decimals,
+    })
+    _moneyFormatters.set(key, fmt)
+  }
+  return fmt
+}
+
+/** Importe con 2 decimales en la moneda indicada (p. ej. "1234,56 €", "-10,00 $"). */
+export function formatMoney(value: number, currency: Currency = 'EUR'): string {
+  return moneyFmt(currency, 2).format(value)
+}
+
+/** Importe sin decimales en la moneda indicada, para espacios reducidos (p. ej. "-203 $"). */
+export function formatMoneyCompact(value: number, currency: Currency = 'EUR'): string {
+  return moneyFmt(currency, 0).format(value)
+}
+
 export function formatEur(value: number): string {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
+  return formatMoney(value, 'EUR')
 }
 
 /**
@@ -18,25 +43,12 @@ export function formatEur(value: number): string {
  *   ≥ 0.01   → 6 dec
  *   < 0.01   → 8 dec   (LUNC: 0,00007123 €)
  */
-// Instancias cacheadas de Intl.NumberFormat — evita crear nuevos objetos en cada render
-const _priceFormatters = new Map<number, Intl.NumberFormat>()
-function _getPriceFmt(decimals: number): Intl.NumberFormat {
-  if (!_priceFormatters.has(decimals)) {
-    _priceFormatters.set(decimals, new Intl.NumberFormat('es-ES', {
-      style: 'currency', currency: 'EUR',
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    }))
-  }
-  return _priceFormatters.get(decimals)!
-}
-
 /**
- * Precio unitario con decimales adaptativos según magnitud.
- * Usa formatters cacheados para evitar GC pressure en renders frecuentes.
+ * Precio unitario con decimales adaptativos según magnitud, en la moneda
+ * indicada. Usa los formatters cacheados para evitar GC pressure en renders frecuentes.
  */
-export function formatPrice(value: number): string {
-  if (!isFinite(value) || value === 0) return '0,00 €'
+export function formatPrice(value: number, currency: Currency = 'EUR'): string {
+  if (!isFinite(value) || value === 0) return moneyFmt(currency, 2).format(0)
   const abs = Math.abs(value)
   let d: number
   if (abs >= 1000)      d = 2
@@ -45,7 +57,7 @@ export function formatPrice(value: number): string {
   else if (abs >= 0.1)  d = 5
   else if (abs >= 0.01) d = 6
   else                  d = 8
-  return _getPriceFmt(d).format(value)
+  return moneyFmt(currency, d).format(value)
 }
 
 /**
@@ -81,10 +93,5 @@ export function formatPct(value: number): string {
 
 /** Importe en EUR sin decimales, para espacios reducidos (p. ej. "-203 €"). */
 export function formatEurCompact(value: number): string {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value)
+  return formatMoneyCompact(value, 'EUR')
 }

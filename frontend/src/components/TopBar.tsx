@@ -7,6 +7,7 @@ import { portfolioApi, type Notification } from '../api/portfolio'
 import { NOTIFICATION_ROUTES, NOTIFICATION_TYPE_META } from '../constants/notifications'
 import { useClickOutside } from '../hooks/useClickOutside'
 import { useNow } from '../hooks/useNow'
+import { CurrencyToggle } from './CurrencyToggle'
 
 function PriceRefreshButton() {
   const { connected, lastUpdate, setPrices } = usePricesStore(s => ({
@@ -165,6 +166,8 @@ function NotificationsButton() {
 export function TopBar() {
   return (
     <div className="shrink-0 h-12 flex items-center justify-end gap-1 px-4 border-b border-border bg-background-secondary">
+      <CurrencyToggle />
+      <div className="w-2" aria-hidden="true" />
       <PriceRefreshButton />
       <NotificationsButton />
     </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { portfolioApi } from '../../api/portfolio'
 import { Bell, BellOff, X, ArrowRight, Wrench } from 'lucide-react'
 import { NOTIFICATION_ROUTES, NOTIFICATION_TYPE_META } from '../../constants/notifications'
+import { CurrencyToggle } from '../../components/CurrencyToggle'
 
 const NOTIFICATION_LABELS: Record<string, string> = {
   'no-price':            'Ir a Activos',
@@ -47,6 +48,20 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
 
   return (
     <div className="space-y-6 max-w-2xl">
+
+      {/* Moneda de visualización (#176) */}
+      <div className="rounded-xl border border-border bg-background-card p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h3 className="font-semibold text-sm">Moneda de visualización</h3>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+              Moneda en la que se muestran precios, valores y P&amp;L. El dólar se toma del precio de USDT
+              en cada fecha. La sección Fiscal se muestra siempre en EUR. También puedes cambiarla desde la barra superior.
+            </p>
+          </div>
+          <CurrencyToggle size="md" />
+        </div>
+      </div>
 
       {/* Notificaciones */}
       <div className="rounded-xl border border-border bg-background-card p-5 space-y-4">

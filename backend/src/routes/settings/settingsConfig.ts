@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../../db/client';
 import { MAX_LENGTH_SHORT } from '../../modules/validation/textLength';
+import { DISPLAY_CURRENCIES } from '../../modules/fiat/displayCurrency';
 import { sendZodError } from './settingsShared';
 
 const router = Router();
@@ -10,6 +11,12 @@ const configSchema = z.object({
   key:   z.string().min(1, 'key es requerido').max(MAX_LENGTH_SHORT, `key no puede superar ${MAX_LENGTH_SHORT} caracteres`),
   value: z.union([z.string(), z.number(), z.boolean()], { message: 'value es requerido' }),
 });
+
+// Claves con un conjunto cerrado de valores: se valida el valor antes de
+// guardarlo para que un cliente no deje la app en un estado inválido.
+const restrictedValues: Record<string, z.ZodType<string>> = {
+  display_currency: z.enum(DISPLAY_CURRENCIES, { message: 'display_currency debe ser EUR o USD' }),
+};
 
 // ── GET /api/settings/config ───────────────────────────────────────────────
 router.get('/config', async (_req: Request, res: Response) => {
@@ -27,6 +34,11 @@ router.put('/config', async (req: Request, res: Response) => {
     return;
   }
   const { key, value } = validation.data;
+  const restricted = restrictedValues[key]?.safeParse(value);
+  if (restricted && !restricted.success) {
+    sendZodError(res, restricted.error);
+    return;
+  }
   await db.query(
     `INSERT INTO app_config (key, value) VALUES ($1, $2)
      ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
