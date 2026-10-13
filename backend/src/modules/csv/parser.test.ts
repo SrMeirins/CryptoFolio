@@ -61,3 +61,25 @@ describe('parseBinanceCsv — CSV sintético de extremo a extremo', () => {
     expect(result.transactions).toEqual([]);
   });
 });
+
+describe('parseBinanceCsv — depósitos con tarjeta OCBS (#169)', () => {
+  it('cada depósito OCBS se importa como DEPOSIT_FIAT junto a su compra, sin duplicar', async () => {
+    const rows = [
+      '123,2022-12-07 00:56:49,Spot,Fiat OCBS - Add Fiat and Fees,EUR,58.86,',
+      '123,2022-12-07 00:56:50,Spot,Buy Crypto With Card,TRX,1139.3,Ref - N1',
+      '123,2022-12-07 00:56:50,Spot,Buy Crypto With Card,EUR,-58.86,Ref - N1',
+      '123,2022-12-07 01:18:42,Spot,Convert Fiat to Crypto OCBS,MATIC,93.3,',
+      '123,2022-12-07 01:18:42,Spot,Convert Fiat to Crypto OCBS,EUR,-82.57,',
+      '123,2022-12-07 01:18:42,Spot,Deposit Fiat OCBS,EUR,82.57,',
+    ];
+    const result = await parseBinanceCsv(csv(rows));
+
+    expect(result.errors).toEqual([]);
+    const deposits = result.transactions.filter(t => t.operationType === 'DEPOSIT_FIAT');
+    expect(deposits.map(t => [t.asset, t.amount])).toEqual([['EUR', 58.86], ['EUR', 82.57]]);
+    const buys = result.transactions.filter(t => t.operationType === 'BUY');
+    expect(buys.map(t => [t.asset, t.costAsset, t.costAmount])).toEqual([['TRX', 'EUR', 58.86], ['MATIC', 'EUR', 82.57]]);
+    expect(result.transactions.some(t => t.operationType === 'IGNORED')).toBe(false);
+  });
+});
+

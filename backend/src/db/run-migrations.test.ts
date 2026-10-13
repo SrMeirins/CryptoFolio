@@ -31,7 +31,7 @@ describe('runMigrations — arranque contra un esquema ya existente (simula Dock
     // db/migrations/README.md. Las migraciones posteriores son idempotentes:
     // sobre un esquema recién aplicado (caso Docker, que ya incluye sus
     // tablas) se aplican sin error y quedan registradas.
-    expect(versions).toEqual(['000_schema_base', '001_price_close_madrid']);
+    expect(versions).toEqual(['000_schema_base', '001_price_close_madrid', '002_ocbs_deposits_as_deposit_fiat']);
   });
 
   it('correr runMigrations() una segunda vez es un no-op seguro (idempotencia real)', async () => {

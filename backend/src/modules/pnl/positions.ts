@@ -1,6 +1,6 @@
 import { db } from '../../db/client';
 import { FIAT_NO_LOT } from '../fifo/constants';
-import { OCBS_DEPOSIT_LABELS } from './capitalFlows';
+import { EUR_MOVEMENTS_SQL } from '../fiat/eurMovements';
 
 // Reconstrucción de tenencias históricas a partir de los lotes FIFO (#165).
 //
@@ -11,11 +11,8 @@ import { OCBS_DEPOSIT_LABELS } from './capitalFlows';
 // aquí un lote creado por TRANSFER_INTERNAL o WITHDRAW empieza a contar en la
 // fecha de la transferencia.
 //
-// El saldo en EUR no tiene lotes: se reconstruye con los movimientos de EUR de
-// las transacciones (depósitos, retiradas, compras y ventas contra EUR), más:
-// - ventas cuyo activo es EUR (EUR entregados a cambio de una cripto);
-// - depósitos con tarjeta OCBS, que el importador marca como IGNORED aunque
-//   son la entrada de los EUR que se gastan justo después.
+// El saldo en EUR no tiene lotes: se reconstruye con la definición común de
+// movimientos de EUR (modules/fiat/eurMovements, #169).
 
 export interface PositionEvent {
   asset: string;
@@ -53,36 +50,11 @@ export async function loadPositionEvents(): Promise<PositionEvent[]> {
   ];
 }
 
-// Movimientos del saldo en EUR, uno por transacción.
+// Movimientos del saldo en EUR (definición común: modules/fiat/eurMovements).
 async function loadEurBalanceEvents(): Promise<PositionEvent[]> {
-  const res = await db.query(
-    `SELECT timestamp, flow::float AS flow FROM (
-       SELECT timestamp,
-              CASE
-                WHEN operation_type IN ('DEPOSIT_FIAT', 'IGNORED')                           THEN  amount
-                WHEN operation_type IN ('BUY', 'CASHBACK')                                   THEN  amount_net
-                WHEN operation_type IN ('WITHDRAW_FIAT', 'SELL', 'SELL_FIAT', 'SELL_CRYPTO') THEN -amount
-                ELSE 0
-              END AS flow
-       FROM transactions
-       WHERE asset = 'EUR'
-         AND (operation_type IN ('DEPOSIT_FIAT', 'BUY', 'CASHBACK', 'WITHDRAW_FIAT', 'SELL', 'SELL_FIAT', 'SELL_CRYPTO')
-              OR (operation_type = 'IGNORED' AND notes = ANY($1)))
-       UNION ALL
-       SELECT timestamp,
-              CASE
-                WHEN operation_type IN ('BUY','BUY_FIAT','BUY_CRYPTO','FEE_EXCHANGE') THEN -COALESCE(cost_amount, 0)
-                WHEN operation_type IN ('SELL','SELL_FIAT')                           THEN  COALESCE(cost_amount, 0)
-                ELSE 0
-              END AS flow
-       FROM transactions
-       WHERE cost_asset = 'EUR' AND operation_type IN ('BUY','BUY_FIAT','BUY_CRYPTO','SELL','SELL_FIAT','FEE_EXCHANGE')
-     ) f
-     WHERE flow <> 0`,
-    [OCBS_DEPOSIT_LABELS],
-  );
-  return res.rows.map((r: { timestamp: string; flow: number }) =>
-    ({ asset: 'EUR', at: new Date(r.timestamp).getTime(), delta: r.flow }));
+  const res = await db.query(`SELECT timestamp, amount FROM (${EUR_MOVEMENTS_SQL}) m`);
+  return res.rows.map((r: { timestamp: string; amount: number }) =>
+    ({ asset: 'EUR', at: new Date(r.timestamp).getTime(), delta: r.amount }));
 }
 
 /**

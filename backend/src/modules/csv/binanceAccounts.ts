@@ -24,6 +24,11 @@ export interface BinanceOperation {
 export const ALL_BINANCE_OPERATIONS: BinanceOperation[] = [
   // Compras / ventas
   { csvLabel: 'Deposit',                              internalType: 'DEPOSIT_FIAT',      status: 'supported' },
+  // Depósitos con tarjeta (OCBS): entrada de los EUR que se gastan en la compra
+  // inmediata ("Buy Crypto With Card" / "Convert Fiat to Crypto OCBS"). El CSV no
+  // trae otro "Deposit" para ese dinero (antes se ignoraban como redundantes, #169).
+  { csvLabel: 'Fiat OCBS - Add Fiat and Fees',        internalType: 'DEPOSIT_FIAT',      status: 'supported',  notes: 'Depósito con tarjeta (OCBS)' },
+  { csvLabel: 'Deposit Fiat OCBS',                    internalType: 'DEPOSIT_FIAT',      status: 'supported',  notes: 'Depósito con tarjeta (OCBS)' },
   { csvLabel: 'Withdraw',                             internalType: 'WITHDRAW',           status: 'supported' },
   { csvLabel: 'Buy Crypto With Fiat',                 internalType: 'BUY',               status: 'supported' },
   { csvLabel: 'Buy Crypto With Card',                 internalType: 'BUY',               status: 'supported' },
@@ -108,8 +113,7 @@ export const ALL_BINANCE_OPERATIONS: BinanceOperation[] = [
   { csvLabel: 'Token Swap - Redenomination/Rebranding', internalType: 'IGNORED', status: 'ignored' },
   { csvLabel: 'Dual Investment - Subscribe',          internalType: 'IGNORED', status: 'ignored' },
   { csvLabel: 'Dual Investment - Settlement',         internalType: 'IGNORED', status: 'ignored' },
-  { csvLabel: 'Fiat OCBS - Add Fiat and Fees',        internalType: 'IGNORED', status: 'ignored', notes: 'Asiento contable OCBS redundante' },
-  { csvLabel: 'Deposit Fiat OCBS',                    internalType: 'IGNORED', status: 'ignored', notes: 'Asiento contable OCBS redundante' },
+
 ];
 
 // ── Mapeo cuenta CSV → nombre de wallet en la DB ──────────────────────────
