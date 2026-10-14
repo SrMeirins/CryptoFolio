@@ -12,6 +12,8 @@ export interface DisplayMarket {
   rate: number | null
   prices: Readonly<Record<string, number>>
   open24: Readonly<Record<string, number>>
+  /** Valor de 1 € hace 24h en la moneda de visualización (1 en EUR); null si falta el USDT de hace 24h. */
+  fiatOpen24: number | null
   /** Umbral de polvo (1 €) expresado en la moneda de visualización. */
   dustThreshold: number
 }
@@ -30,7 +32,10 @@ export function useDisplayMarket(): DisplayMarket {
   const open24 = useMemo(() => convertOpen24(rawOpen24, rawPrices, currency), [rawOpen24, rawPrices, currency])
   const rate = liveRate(currency, rawPrices)
 
-  return { currency, rate, prices, open24, dustThreshold: DUST_THRESHOLD_EUR * (rate ?? 1) }
+  // El EUR de hace 24h, con el USDT de hace 24h (mismo criterio que convertOpen24).
+  const fiatOpen24 = liveRate(currency, rawOpen24)
+
+  return { currency, rate, prices, open24, fiatOpen24, dustThreshold: DUST_THRESHOLD_EUR * (rate ?? 1) }
 }
 
 /**

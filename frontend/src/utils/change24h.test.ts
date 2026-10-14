@@ -55,3 +55,39 @@ describe('computeChange24h', () => {
     expect(computeChange24h([crypto('XRP', 100, 2.2)], {})).toEqual({ status: 'unavailable', reason: 'no-reference' })
   })
 })
+
+describe('computeChange24h — efecto divisa del saldo fiat en USD (#184)', () => {
+  // En USD el saldo de 100 € vale hoy 100 × 1,10 $ = 110 $; hace 24h 1 € valía 1,08 $.
+  const eurInUsd = (balance: number, rate: number): AssetValuation =>
+    ({ asset: 'EUR', kind: 'fiat', quantity: balance, cost: balance * rate, price: rate, value: balance * rate })
+
+  it('una cartera solo con EUR refleja el movimiento del EUR/USD', () => {
+    const r = computeChange24h([eurInUsd(100, 1.1)], {}, 1.08)
+    if (r.status !== 'ok') throw new Error('se esperaba ok')
+    expect(r.eur).toBeCloseTo(2, 10)                 // 110 − 108
+    expect(r.pct).toBeCloseTo(2 / 108 * 100, 10)
+  })
+
+  it('con cripto y EUR suma ambos efectos', () => {
+    const r = computeChange24h([crypto('XRP', 100, 2.2), eurInUsd(100, 1.1)], { XRP: 2 }, 1.08)
+    if (r.status !== 'ok') throw new Error('se esperaba ok')
+    expect(r.eur).toBeCloseTo(22, 10)                // 20 (XRP) + 2 (EUR)
+  })
+
+  it('sin tipo de hace 24h el fiat no varía, como antes', () => {
+    const r = computeChange24h([crypto('XRP', 100, 2.2), eurInUsd(100, 1.1)], { XRP: 2 }, null)
+    if (r.status !== 'ok') throw new Error('se esperaba ok')
+    expect(r.eur).toBeCloseTo(20, 10)
+  })
+
+  it('en EUR (fiatOpen24 = 1) el resultado es idéntico al anterior', () => {
+    const assets = [crypto('XRP', 100, 2.2), fiat('EUR', 795)]
+    const before = computeChange24h(assets, { XRP: 2 })
+    const now = computeChange24h(assets, { XRP: 2 }, 1)
+    expect(now).toEqual(before)
+  })
+
+  it('una cartera solo con fiat sin movimiento de tipo sigue sin variación disponible', () => {
+    expect(computeChange24h([fiat('EUR', 100)], {}, 1)).toEqual({ status: 'unavailable', reason: 'no-prices' })
+  })
+})
