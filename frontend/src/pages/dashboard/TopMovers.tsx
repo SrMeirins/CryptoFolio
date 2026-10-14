@@ -7,6 +7,7 @@ import { useFlashOnChange, type FlashDirection } from '../../hooks/useFlashOnCha
 import { rankMovers, type MoverItem, type MoversMode } from '../../utils/topMovers'
 import { formatMoney } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
+import { T, alpha } from '../../utils/colors'
 
 // Escala de la barra: el % de 24h suele ser mucho menor que el total.
 const BAR_SCALE: Record<MoversMode, number> = { '24h': 10, total: 2 }
@@ -16,30 +17,30 @@ function MoverRow({ asset, pct, value, rank, mode }: MoverItem & { mode: MoversM
   const pctFlash   = useFlashOnChange(pct)
   const valueFlash = useFlashOnChange(value)
   const isUp  = pct >= 0
-  const color = isUp ? '#00c896' : '#e74c3c'
+  const color = isUp ? T.positive : T.negative
   const flashClass = (f: FlashDirection) => (f === 'up' ? 'flash-up' : f === 'down' ? 'flash-down' : '')
 
   return (
     <div
       className="flex items-center gap-3 px-4 py-3 transition-colors hover:brightness-110"
-      style={{ background: `${color}06` }}
+      style={{ background: `${alpha(color, 2)}` }}
     >
-      <span className="text-[10px] text-gray-700 w-4 text-center font-mono shrink-0">{rank}</span>
+      <span className="text-xs text-fg-subtle w-4 text-center mono shrink-0">{rank}</span>
       <CryptoIcon symbol={asset} size={32} ring={color} />
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-bold leading-tight" style={{ color }}>{asset}</p>
-        <p className="text-[10px] text-gray-600 font-mono leading-tight mt-0.5">
-          <span className={`rounded-sm ${flashClass(valueFlash)}`}>{formatMoney(value, currency)}</span>
+        <p className="text-xs text-fg-subtle mono leading-tight mt-0.5">
+          <span className={`rounded-lg ${flashClass(valueFlash)}`}>{formatMoney(value, currency)}</span>
         </p>
       </div>
       <div className="flex flex-col items-end gap-1 shrink-0">
         <span
-          className={`text-[13px] font-bold font-mono px-2 py-0.5 rounded-lg ${flashClass(pctFlash)}`}
-          style={{ background: `${color}18`, color }}
+          className={`text-[13px] font-bold mono px-2 py-0.5 rounded-lg ${flashClass(pctFlash)}`}
+          style={{ background: `${alpha(color, 9)}`, color }}
         >
           {isUp ? '+' : ''}{pct.toFixed(2)}%
         </span>
-        <div className="w-16 h-1 rounded-full overflow-hidden bg-white/5">
+        <div className="w-16 h-1 rounded-full overflow-hidden bg-overlay/5">
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{ width: `${Math.min(Math.abs(pct) * BAR_SCALE[mode], 100)}%`, background: color, opacity: 0.7 }}
@@ -90,9 +91,9 @@ export function TopMovers({ lots }: { lots: FifoLot[] }) {
   )
 
   return (
-    <div className="bg-background-card border border-border rounded-2xl overflow-hidden">
+    <div className="bg-background-card border border-border rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-        <span className="text-[11px] text-gray-500">{MODE_LABELS[mode].title}</span>
+        <span className="text-xs text-fg-subtle">{MODE_LABELS[mode].title}</span>
         <div role="group" aria-label="Métrica de mejores y peores" className="inline-flex rounded-lg border border-border p-0.5 bg-background-tertiary">
           {(['24h', 'total'] as const).map(m => (
             <button
@@ -101,8 +102,8 @@ export function TopMovers({ lots }: { lots: FifoLot[] }) {
               aria-pressed={mode === m}
               title={MODE_LABELS[m].title}
               onClick={() => changeMode(m)}
-              className={`px-2.5 py-1 text-[11px] rounded-md transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-blue/60 ${
-                mode === m ? 'bg-accent-blue/15 text-accent-blue font-semibold' : 'text-gray-500 hover:text-gray-300'
+              className={`px-2.5 py-1 text-xs rounded-lg transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
+                mode === m ? 'bg-brand/15 text-brand font-semibold' : 'text-fg-subtle hover:text-fg'
               }`}>
               {MODE_LABELS[m].short}
             </button>
@@ -111,7 +112,7 @@ export function TopMovers({ lots }: { lots: FifoLot[] }) {
       </div>
 
       {top.length === 0 ? (
-        <p className="px-4 py-6 text-center text-xs text-gray-500">
+        <p className="px-4 py-6 text-center text-xs text-fg-subtle">
           {mode === '24h'
             ? 'Aún no hay precios de hace 24h. Aparecerán en cuanto lleguen del feed en vivo.'
             : 'No hay activos con valor suficiente para comparar.'}
@@ -119,13 +120,13 @@ export function TopMovers({ lots }: { lots: FifoLot[] }) {
       ) : (
         <div className="grid grid-cols-2 divide-x divide-border">
           <div>
-            {header('Mejores', 'bg-accent-green', '#00c896', 'text-accent-green/80')}
+            {header('Mejores', 'bg-positive', T.positive, 'text-positive/80')}
             <div className="divide-y divide-border/30">
               {top.map(item => <MoverRow key={`${item.asset}-${currency}`} {...item} mode={mode} />)}
             </div>
           </div>
           <div>
-            {header('Peores', 'bg-accent-red', '#e74c3c', 'text-accent-red/80')}
+            {header('Peores', 'bg-negative', T.negative, 'text-negative/80')}
             <div className="divide-y divide-border/30">
               {bottom.map(item => <MoverRow key={`${item.asset}-${currency}`} {...item} mode={mode} />)}
             </div>

@@ -10,7 +10,7 @@ import { useNow } from '../hooks/useNow'
 import { LIVE_STATUS_META, useLiveStatus } from '../hooks/useLiveStatus'
 import { CurrencyToggle } from './CurrencyToggle'
 import { ThemeToggle } from './ThemeToggle'
-import { LIGHT_THEME_ENABLED } from '../utils/theme'
+import { T, alpha } from '../utils/colors'
 
 function PriceRefreshButton() {
   const status = useLiveStatus()
@@ -57,10 +57,10 @@ function PriceRefreshButton() {
       aria-label={title}
       className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-xs ${
         refreshing
-          ? 'text-accent-blue bg-accent-blue/10'
+          ? 'text-brand bg-brand/10'
           : done
-          ? 'text-accent-green bg-accent-green/10'
-          : 'text-gray-500 hover:text-white hover:bg-background-tertiary'
+          ? 'text-positive bg-positive/10'
+          : 'text-fg-subtle hover:text-fg hover:bg-background-tertiary'
       }`}
     >
       <RefreshCw
@@ -89,7 +89,7 @@ function NotificationsButton() {
   const errorCount   = notifications.filter(n => n.type === 'error').length
   const warningCount = notifications.filter(n => n.type === 'warning').length
   const totalCount   = notifications.length
-  const badgeColor   = errorCount > 0 ? '#e74c3c' : warningCount > 0 ? '#f59e0b' : '#6366f1'
+  const badgeColor   = errorCount > 0 ? T.negative : warningCount > 0 ? T.warning : T.brand
 
   return (
     <div className="relative" ref={panelRef}>
@@ -98,14 +98,14 @@ function NotificationsButton() {
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         className={`relative p-2 rounded-lg transition-colors ${
-          open ? 'bg-background-tertiary text-white' : 'text-gray-500 hover:text-white hover:bg-background-tertiary'
+          open ? 'bg-background-tertiary text-fg' : 'text-fg-subtle hover:text-fg hover:bg-background-tertiary'
         }`}
         title="Avisos del sistema"
       >
         <Bell size={18} />
         {totalCount > 0 && (
           <span
-            className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-0.5 rounded-full text-white flex items-center justify-center font-bold"
+            className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-0.5 rounded-full text-fg flex items-center justify-center font-bold"
             style={{ backgroundColor: badgeColor, fontSize: '10px' }}
           >
             {totalCount > 9 ? '9+' : totalCount}
@@ -117,15 +117,15 @@ function NotificationsButton() {
         <div className="absolute top-full right-0 mt-2 w-96 rounded-xl border border-border bg-background-card shadow-2xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <span className="text-sm font-semibold">Avisos del sistema</span>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar avisos" className="text-gray-600 hover:text-white transition-colors">
+            <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar avisos" className="text-fg-subtle hover:text-fg transition-colors">
               <X size={14} />
             </button>
           </div>
           <div className="max-h-[480px] overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <Bell size={20} className="text-gray-700" />
-                <p className="text-xs text-gray-600">Sin avisos. Todo en orden.</p>
+                <Bell size={20} className="text-fg-subtle" />
+                <p className="text-xs text-fg-subtle">Sin avisos. Todo en orden.</p>
               </div>
             ) : (
               <div className="divide-y divide-border/50">
@@ -136,19 +136,19 @@ function NotificationsButton() {
                     <div key={n.id}
                       onClick={dest ? () => { navigate(dest); setOpen(false) } : undefined}
                       className={`flex gap-3 px-4 py-3.5 transition-colors ${dest ? 'cursor-pointer hover:brightness-110' : ''}`}
-                      style={{ backgroundColor: `${color}08` }}>
+                      style={{ backgroundColor: `${alpha(color, 3)}` }}>
                       <Icon size={15} className="shrink-0 mt-0.5" style={{ color }} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs font-semibold" style={{ color }}>{n.category}</span>
-                          <span className="text-xs px-1.5 py-0.5 rounded-md" style={{ backgroundColor: `${color}20`, color }}>
+                          <span className="text-xs px-1.5 py-0.5 rounded-lg" style={{ backgroundColor: `${alpha(color, 13)}`, color }}>
                             {label}
                           </span>
                           {dest && (
-                            <span className="ml-auto text-xs text-gray-600 group-hover:text-gray-400">Ir →</span>
+                            <span className="ml-auto text-xs text-fg-subtle group-hover:text-fg-muted">Ir →</span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-300 leading-relaxed">{n.message}</p>
+                        <p className="text-xs text-fg leading-relaxed">{n.message}</p>
                       </div>
                     </div>
                   )
@@ -165,7 +165,8 @@ function NotificationsButton() {
 export function TopBar() {
   return (
     <div className="shrink-0 h-12 flex items-center justify-end gap-1 px-4 border-b border-border bg-background-secondary">
-      {LIGHT_THEME_ENABLED && <><ThemeToggle /><div className="w-2" aria-hidden="true" /></>}
+      <ThemeToggle />
+      <div className="w-2" aria-hidden="true" />
       <CurrencyToggle />
       <div className="w-2" aria-hidden="true" />
       <PriceRefreshButton />

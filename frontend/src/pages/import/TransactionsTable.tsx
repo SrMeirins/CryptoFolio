@@ -3,6 +3,7 @@ import { OP_META } from '../../constants/operations'
 import { AccountChip } from './AccountChip'
 import { ACCOUNT_COLORS } from './types'
 import type { PreviewTransaction } from './types'
+import { T } from '../../utils/colors'
 
 export function TransactionsTable({ newCount, newTxs, showTxTable, setShowTxTable, txPage, setTxPage, txPageSize }: {
   newCount: number
@@ -24,10 +25,10 @@ export function TransactionsTable({ newCount, newTxs, showTxTable, setShowTxTabl
         className="w-full flex items-center justify-between px-5 py-4 hover:bg-background-tertiary/50 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Eye size={15} className="text-gray-500" />
+          <Eye size={15} className="text-fg-subtle" />
           <span className="font-medium text-sm">Ver {newCount} transacciones nuevas</span>
         </div>
-        {showTxTable ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
+        {showTxTable ? <ChevronUp size={14} className="text-fg-subtle" /> : <ChevronDown size={14} className="text-fg-subtle" />}
       </button>
 
       {showTxTable && (
@@ -35,7 +36,7 @@ export function TransactionsTable({ newCount, newTxs, showTxTable, setShowTxTabl
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-gray-500 uppercase tracking-wider border-b border-border">
+                <tr className="text-fg-subtle uppercase tracking-wider border-b border-border">
                   <th className="text-left px-4 py-2.5">Fecha</th>
                   <th className="text-left px-4 py-2.5">Cuenta</th>
                   <th className="text-left px-4 py-2.5">Tipo</th>
@@ -46,10 +47,10 @@ export function TransactionsTable({ newCount, newTxs, showTxTable, setShowTxTabl
               </thead>
               <tbody className="divide-y divide-border">
                 {paginated.map((tx, i) => {
-                  const meta = OP_META[tx.operationType] ?? { label: tx.operationType, color: '#9ca3af' }
+                  const meta = OP_META[tx.operationType] ?? { label: tx.operationType, color: T.muted }
                   return (
                     <tr key={i} className="hover:bg-background-tertiary/50">
-                      <td className="px-4 py-2.5 text-gray-400 mono">
+                      <td className="px-4 py-2.5 text-fg-muted mono">
                         {new Date(tx.timestamp).toLocaleDateString('es-ES')}
                       </td>
                       <td className="px-4 py-2.5">
@@ -60,7 +61,7 @@ export function TransactionsTable({ newCount, newTxs, showTxTable, setShowTxTabl
                       </td>
                       <td className="px-4 py-2.5 mono font-medium">{tx.asset}</td>
                       <td className="px-4 py-2.5 text-right mono">{tx.amountNet.toFixed(4)}</td>
-                      <td className="px-4 py-2.5 text-right mono text-gray-400">
+                      <td className="px-4 py-2.5 text-right mono text-fg-muted">
                         {tx.costAmount ? `${tx.costAmount.toFixed(2)} ${tx.costAsset}` : '—'}
                       </td>
                     </tr>
@@ -76,16 +77,16 @@ export function TransactionsTable({ newCount, newTxs, showTxTable, setShowTxTabl
                 type="button"
                 onClick={() => setTxPage(Math.max(0, txPage - 1))}
                 disabled={txPage === 0}
-                className="text-xs text-gray-500 hover:text-white disabled:opacity-30 transition-colors"
+                className="text-xs text-fg-subtle hover:text-fg disabled:opacity-30 transition-colors"
               >
                 Anterior
               </button>
-              <span className="text-xs text-gray-500">{txPage + 1} / {totalPages}</span>
+              <span className="text-xs text-fg-subtle">{txPage + 1} / {totalPages}</span>
               <button
                 type="button"
                 onClick={() => setTxPage(Math.min(totalPages - 1, txPage + 1))}
                 disabled={txPage === totalPages - 1}
-                className="text-xs text-gray-500 hover:text-white disabled:opacity-30 transition-colors"
+                className="text-xs text-fg-subtle hover:text-fg disabled:opacity-30 transition-colors"
               >
                 Siguiente
               </button>

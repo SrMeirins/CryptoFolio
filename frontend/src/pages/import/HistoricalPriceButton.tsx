@@ -28,7 +28,7 @@ export function HistoricalPriceButton({ asset, timestamp, onPrice, label = 'Prec
       <button
         type="button"
         onClick={() => setState('idle')}
-        className="text-[10px] px-2 py-1 rounded-md border border-accent-red/40 text-accent-red bg-accent-red/5 transition-colors"
+        className="text-xs px-2 py-1 rounded-lg border border-negative/40 text-negative bg-negative/5 transition-colors"
       >
         Sin precio en Binance ✕
       </button>
@@ -41,7 +41,7 @@ export function HistoricalPriceButton({ asset, timestamp, onPrice, label = 'Prec
       onClick={fetch_}
       disabled={state === 'loading'}
       title="Precio de mercado en esa fecha — puede no coincidir con lo que pagaste realmente en el exchange de origen. Corrígelo si sabes tu coste real."
-      className="text-[10px] px-2 py-1 rounded-md border border-accent-blue/30 text-accent-blue bg-accent-blue/5 hover:bg-accent-blue/15 transition-colors disabled:opacity-50 flex items-center gap-1"
+      className="text-xs px-2 py-1 rounded-lg border border-brand/30 text-brand bg-brand/5 hover:bg-brand/15 transition-colors disabled:opacity-50 flex items-center gap-1"
     >
       {state === 'loading' ? <RefreshCw size={9} className="animate-spin" /> : <Zap size={9} />}
       {label}

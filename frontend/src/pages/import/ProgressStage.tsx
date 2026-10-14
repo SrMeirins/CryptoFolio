@@ -42,12 +42,12 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
               {lastMsg}
             </span>
             {latestImportingEvent && currentPhase === 'importing' && (
-              <span className="ml-auto text-xs text-gray-500 font-mono shrink-0">
+              <span className="ml-auto text-xs text-fg-subtle mono shrink-0">
                 {latestImportingEvent.progress}/{latestImportingEvent.total}
               </span>
             )}
             {latestPricesEvent && currentPhase === 'prices' && (
-              <span className="ml-auto text-xs text-gray-500 font-mono shrink-0">
+              <span className="ml-auto text-xs text-fg-subtle mono shrink-0">
                 {latestPricesEvent.progress}/{latestPricesEvent.total}
               </span>
             )}
@@ -56,11 +56,11 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
       })()}
 
       {isError && (
-        <div className="flex items-start gap-3 p-4 bg-accent-red/5 border border-accent-red/30 rounded-xl">
-          <AlertTriangle size={16} className="text-accent-red shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 bg-negative/5 border border-negative/30 rounded-xl">
+          <AlertTriangle size={16} className="text-negative shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-accent-red mb-1">Error durante la importación</p>
-            <p className="text-xs text-gray-400">
+            <p className="text-sm font-medium text-negative mb-1">Error durante la importación</p>
+            <p className="text-xs text-fg-muted">
               {log.find(e => e.phase === 'error')?.message ?? 'Error desconocido'}
             </p>
           </div>

@@ -18,10 +18,10 @@ function ChartTooltip({ active, payload, label }: {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-background-card border border-border rounded-xl px-3 py-2 text-xs shadow-lg">
-      <p className="text-gray-400 mb-1">{label}</p>
+      <p className="text-fg-muted mb-1">{label}</p>
       {payload.map((p, i) => (
-        <p key={i} className={`font-bold mono ${(p.value ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
-          {p.name && <span className="text-gray-500 font-normal mr-1">{p.name}</span>}
+        <p key={i} className={`font-bold mono ${(p.value ?? 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
+          {p.name && <span className="text-fg-subtle font-normal mr-1">{p.name}</span>}
           {(p.value ?? 0) >= 0 ? '+' : ''}{formatEur(p.value ?? 0)}
         </p>
       ))}
@@ -39,7 +39,7 @@ export function ComparativaAnual({ data }: { data: YearOverview[] }) {
     <FiscalChartCard icon={TrendingUp} title="Comparativa interanual — G/P neto">
       <ResponsiveContainer width="100%" height={120}>
         <BarChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
-          <XAxis dataKey="name" tick={{ fontSize: 11, fill: c.axisMuted }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 12, fill: c.axisMuted }} axisLine={false} tickLine={false} />
           <YAxis hide domain={[-max * 1.15, max * 1.15]} />
           <ReferenceLine y={0} stroke={c.gridStrong} strokeWidth={1} />
           <Tooltip content={<ChartTooltip />} cursor={{ fill: c.cursorSoft }} />
@@ -69,8 +69,8 @@ export function EvolucionMensual({ data, esAnioEnCurso }: { data: MonthlyData; e
       right={esAnioEnCurso && data.proyeccionFinAnio !== null && (
         <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-xl border ${
           data.proyeccionFinAnio >= 0
-            ? 'bg-accent-green/10 border-accent-green/20 text-accent-green'
-            : 'bg-accent-red/10 border-accent-red/20 text-accent-red'
+            ? 'bg-positive/10 border-positive/20 text-positive'
+            : 'bg-negative/10 border-negative/20 text-negative'
         }`}>
           <Calendar size={11} />
           <span>Proyección dic: <span className="font-bold mono">{data.proyeccionFinAnio >= 0 ? '+' : ''}{formatEur(data.proyeccionFinAnio)}</span></span>
@@ -85,7 +85,7 @@ export function EvolucionMensual({ data, esAnioEnCurso }: { data: MonthlyData; e
               <stop offset="95%" stopColor={lastColor} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <XAxis dataKey="name" tick={{ fontSize: 10, fill: c.axisMuted }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 12, fill: c.axisMuted }} axisLine={false} tickLine={false} />
           <YAxis hide domain={[-max * 1.2, max * 1.2]} />
           <ReferenceLine y={0} stroke={c.gridStrong} strokeWidth={1} />
           <Tooltip content={<ChartTooltip />} cursor={{ stroke: c.cursorLine }} />
@@ -110,18 +110,18 @@ export function DesglosePorActivo({ data }: { data: BreakdownItem[] }) {
             <div key={item.asset} className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 w-20 shrink-0">
                 <CryptoIcon symbol={item.asset} size={16} />
-                <span className="text-xs font-bold mono text-gray-300">{item.asset}</span>
+                <span className="text-xs font-bold mono text-fg">{item.asset}</span>
               </div>
               <div className="flex-1 flex items-center gap-1 h-5">
                 <div className="flex-1 flex justify-end">
                   {item.perdidas < -PNL_THRESHOLD && (
-                    <div className="h-3 rounded-l bg-accent-red/70" style={{ width: `${barP}%` }} />
+                    <div className="h-3 rounded-l bg-negative/70" style={{ width: `${barP}%` }} />
                   )}
                 </div>
                 <div className="w-px h-4 bg-border shrink-0" />
                 <div className="flex-1">
                   {item.ganancias > PNL_THRESHOLD && (
-                    <div className="h-3 rounded-r bg-accent-green/70" style={{ width: `${barG}%` }} />
+                    <div className="h-3 rounded-r bg-positive/70" style={{ width: `${barG}%` }} />
                   )}
                 </div>
               </div>

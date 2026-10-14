@@ -27,7 +27,7 @@ export function ThemeSelector() {
         return (
           <button key={opt} ref={el => { refs.current[opt] = el }} type="button" role="radio"
             aria-checked={active} tabIndex={active ? 0 : -1} onClick={() => setTheme(opt)}
-            className={`px-3 py-1.5 text-sm whitespace-nowrap rounded-md font-medium transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-blue ${
+            className={`px-3 py-1.5 text-sm whitespace-nowrap rounded-lg font-medium transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
               active ? 'bg-background-card text-fg shadow-xs' : 'text-fg-subtle hover:text-fg'
             }`}>
             {LABELS[opt]}

@@ -9,6 +9,7 @@ import { type SortKey, type SortDir } from './assets/helpers'
 import { SortButton } from './assets/SortButton'
 import { AssetItem } from './assets/AssetItem'
 import { AddAssetDialog } from './assets/AddAssetDialog'
+import { T } from '../../utils/colors'
 
 export function AssetsSection() {
   const queryClient = useQueryClient()
@@ -94,7 +95,7 @@ export function AssetsSection() {
     )
   }
 
-  const inputSearch = "w-full bg-background-tertiary border border-border rounded-lg pl-9 pr-3 py-2 text-sm placeholder-gray-600 focus:outline-hidden focus:border-accent-blue"
+  const inputSearch = "w-full bg-background-tertiary border border-border rounded-lg pl-9 pr-3 py-2 text-sm placeholder-fg-subtle focus:outline-hidden focus:border-brand"
 
   return (
     <div className="h-full flex flex-col">
@@ -103,36 +104,36 @@ export function AssetsSection() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-medium">Activos y precios</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Pares de precio en Binance. Se auto-detectan al importar.</p>
+            <p className="text-xs text-fg-subtle mt-0.5">Pares de precio en Binance. Se auto-detectan al importar.</p>
           </div>
           <div className="flex items-center gap-2">
             {unknown.length > 0 && !detectingAll && (
               <button type="button" onClick={handleDetectAll}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
-                style={{ backgroundColor: '#f59e0b18', color: '#f59e0b' }}>
+                style={{ backgroundColor: '#f59e0b18', color: T.warning }}>
                 <Zap size={12} /> Detectar {unknown.length} sin precio
               </button>
             )}
             {detectingAll && (
-              <span className="flex items-center gap-1.5 text-xs text-gray-400 px-3 py-2">
+              <span className="flex items-center gap-1.5 text-xs text-fg-muted px-3 py-2">
                 <RefreshCw size={12} className="animate-spin" /> Detectando...
               </span>
             )}
             <button type="button" onClick={() => setShowAdd(s => !s)}
-              className="flex items-center gap-2 px-4 py-2 bg-accent-blue hover:bg-accent-blue/80 rounded-lg text-sm font-medium transition-colors">
+              className="flex items-center gap-2 px-4 py-2 bg-brand-solid text-on-brand hover:bg-brand-solid/90 rounded-lg text-sm font-medium transition-colors">
               <Plus size={14} /> Añadir activo
             </button>
           </div>
         </div>
 
         {detectResult && (
-          <div className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-accent-green/30 bg-accent-green/8 text-sm">
-            <span className="flex items-center gap-2 text-accent-green">
+          <div className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-positive/30 bg-positive/8 text-sm">
+            <span className="flex items-center gap-2 text-positive">
               <CheckCircle size={13} />
               {detectResult.detected} actualizado{detectResult.detected !== 1 ? 's' : ''}
-              {detectResult.failed > 0 && <span className="text-gray-400">, {detectResult.failed} sin par en Binance</span>}
+              {detectResult.failed > 0 && <span className="text-fg-muted">, {detectResult.failed} sin par en Binance</span>}
             </span>
-            <button type="button" onClick={() => setDetectResult(null)} aria-label="Cerrar aviso" className="text-gray-600 hover:text-white transition-colors"><X size={13} /></button>
+            <button type="button" onClick={() => setDetectResult(null)} aria-label="Cerrar aviso" className="text-fg-subtle hover:text-fg transition-colors"><X size={13} /></button>
           </div>
         )}
 
@@ -146,13 +147,13 @@ export function AssetsSection() {
         {/* Search + sort */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
             <input placeholder="Buscar activo..." value={search}
               onChange={e => { setSearch(e.target.value); setPage(0) }} className={inputSearch} />
-            {!search && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-700">{assets.length} activos</span>}
+            {!search && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-fg-subtle">{assets.length} activos</span>}
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <span className="text-xs text-gray-600 mr-1">Ordenar:</span>
+            <span className="text-xs text-fg-subtle mr-1">Ordenar:</span>
             <SortButton label="Nombre" sortKey="name"   active={sortKey} dir={sortDir} onClick={handleSort} />
             <SortButton label="Precio" sortKey="price"  active={sortKey} dir={sortDir} onClick={handleSort} />
             <SortButton label="Fuente" sortKey="source" active={sortKey} dir={sortDir} onClick={handleSort} />
@@ -162,13 +163,13 @@ export function AssetsSection() {
 
       {/* Lista con scroll */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-        {isLoading && <div className="py-8 text-center text-gray-500 text-sm">Cargando...</div>}
+        {isLoading && <div className="py-8 text-center text-fg-subtle text-sm">Cargando...</div>}
 
         {unknown.length > 0 && (
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5 px-1">
-              <AlertCircle size={12} className="text-accent-red" />
-              <span className="text-xs font-medium text-accent-red">{unknown.length} sin precio configurado</span>
+              <AlertCircle size={12} className="text-negative" />
+              <span className="text-xs font-medium text-negative">{unknown.length} sin precio configurado</span>
             </div>
             {unknown.map(renderAssetItem)}
           </div>
@@ -181,7 +182,7 @@ export function AssetsSection() {
             </div>
             {totalPages > 1 && (
               <div className="flex items-center justify-between pt-2">
-                <span className="text-xs text-gray-600">
+                <span className="text-xs text-fg-subtle">
                   {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, normal.length)} de {normal.length} activos
                 </span>
                 <div className="flex items-center gap-1">
@@ -191,7 +192,7 @@ export function AssetsSection() {
                   </button>
                   {Array.from({ length: totalPages }, (_, i) => (
                     <button type="button" key={i} onClick={() => setPage(i)}
-                      className={`w-7 h-7 text-xs rounded-lg transition-colors ${i === page ? 'bg-accent-blue text-white font-medium' : 'bg-background-tertiary border border-border hover:bg-border text-gray-400'}`}>
+                      className={`w-7 h-7 text-xs rounded-lg transition-colors ${i === page ? 'bg-brand-solid text-on-brand font-medium' : 'bg-background-tertiary border border-border hover:bg-border text-fg-muted'}`}>
                       {i + 1}
                     </button>
                   ))}
@@ -208,7 +209,7 @@ export function AssetsSection() {
         {stablecoins.length > 0 && (
           <div>
             <button type="button" onClick={() => setShowStablecoins(s => !s)} aria-expanded={showStablecoins}
-              className="flex items-center gap-2 text-xs text-gray-600 hover:text-gray-400 transition-colors py-1 px-1">
+              className="flex items-center gap-2 text-xs text-fg-subtle hover:text-fg-muted transition-colors py-1 px-1">
               <ChevronDown size={12} className={`transition-transform duration-200 ${showStablecoins ? 'rotate-180' : ''}`} />
               {stablecoins.length} stablecoins y fiat
             </button>

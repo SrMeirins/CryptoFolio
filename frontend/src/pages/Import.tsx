@@ -173,15 +173,15 @@ export function ImportPage() {
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       {!setupSeen && (
-        <div className="flex items-center justify-between gap-4 px-4 py-3 bg-accent-amber/10 border border-accent-amber/30 rounded-lg text-sm">
+        <div className="flex items-center justify-between gap-4 px-4 py-3 bg-warning/10 border border-warning/30 rounded-lg text-sm">
           <div className="flex items-center gap-3">
-            <HardDrive size={15} className="text-accent-amber shrink-0" />
-            <span className="text-gray-300">
+            <HardDrive size={15} className="text-warning shrink-0" />
+            <span className="text-fg">
               ¿Tienes wallets frías? Configúralas antes de importar para que los retiros se asignen correctamente.
             </span>
             <Link
               to="/settings"
-              className="flex items-center gap-1 text-accent-amber hover:text-accent-amber/80 font-medium whitespace-nowrap transition-colors"
+              className="flex items-center gap-1 text-warning hover:text-warning/80 font-medium whitespace-nowrap transition-colors"
             >
               Ir a configuración <ArrowRight size={13} />
             </Link>
@@ -190,7 +190,7 @@ export function ImportPage() {
             type="button"
             onClick={markSetupSeen}
             aria-label="Cerrar aviso"
-            className="text-gray-600 hover:text-white transition-colors shrink-0"
+            className="text-fg-subtle hover:text-fg transition-colors shrink-0"
           >
             <X size={15} />
           </button>
@@ -209,7 +209,7 @@ export function ImportPage() {
             Nueva transaccion
           </button>
           {stage !== 'upload' && (
-            <button type="button" onClick={handleReset} className="text-xs text-gray-500 hover:text-white transition-colors">
+            <button type="button" onClick={handleReset} className="text-xs text-fg-subtle hover:text-fg transition-colors">
               Volver al inicio
             </button>
           )}

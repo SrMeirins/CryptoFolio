@@ -41,11 +41,11 @@ export function CurrencyToggle({ size = 'sm' }: { size?: 'sm' | 'md' }) {
             aria-checked={active}
             tabIndex={active ? 0 : -1}
             onClick={() => setCurrency(c)}
-            className={`${pad} whitespace-nowrap rounded-md font-medium mono transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-blue ${
-              active ? 'bg-background-card text-white shadow-xs' : 'text-gray-500 hover:text-white'
+            className={`${pad} whitespace-nowrap rounded-lg font-medium mono transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
+              active ? 'bg-background-card text-fg shadow-xs' : 'text-fg-subtle hover:text-fg'
             }`}
           >
-            {c} <span aria-hidden="true" className="text-gray-500">{SYMBOL[c]}</span>
+            {c} <span aria-hidden="true" className="text-fg-subtle">{SYMBOL[c]}</span>
           </button>
         )
       })}

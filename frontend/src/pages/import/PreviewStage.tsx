@@ -56,38 +56,38 @@ export function PreviewStage({
         <h2 className="font-medium text-sm">Resumen del archivo</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-background-tertiary rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold mono text-accent-green">{preview.newCount}</div>
-            <div className="text-xs text-gray-500 mt-1">Transacciones nuevas</div>
+            <div className="text-2xl font-bold mono text-positive">{preview.newCount}</div>
+            <div className="text-xs text-fg-subtle mt-1">Transacciones nuevas</div>
           </div>
           <div className="bg-background-tertiary rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold mono text-gray-500">{preview.duplicateCount}</div>
-            <div className="text-xs text-gray-500 mt-1">Duplicadas</div>
+            <div className="text-2xl font-bold mono text-fg-subtle">{preview.duplicateCount}</div>
+            <div className="text-xs text-fg-subtle mt-1">Duplicadas</div>
           </div>
           <div className="bg-background-tertiary rounded-lg p-3 text-center">
-            <div className="text-lg font-bold mono text-white">
+            <div className="text-lg font-bold mono text-fg">
               {LANG_LABELS[preview.validation.detectedLanguage] ?? preview.validation.detectedLanguage}
             </div>
-            <div className="text-xs text-gray-500 mt-1">Idioma detectado</div>
+            <div className="text-xs text-fg-subtle mt-1">Idioma detectado</div>
           </div>
           <div className="bg-background-tertiary rounded-lg p-3 text-center">
-            <div className="text-sm font-medium mono text-gray-300">
+            <div className="text-sm font-medium mono text-fg">
               {preview.validation.dateRange
                 ? `${preview.validation.dateRange.from} / ${preview.validation.dateRange.to}`
                 : '—'
               }
             </div>
-            <div className="text-xs text-gray-500 mt-1">Rango de fechas</div>
+            <div className="text-xs text-fg-subtle mt-1">Rango de fechas</div>
           </div>
         </div>
 
         {preview.validation.warnings.map((w, i) => (
-          <div key={i} className="flex items-start gap-2 p-3 bg-accent-amber/5 border border-accent-amber/20 rounded-lg text-xs text-accent-amber">
+          <div key={i} className="flex items-start gap-2 p-3 bg-warning/5 border border-warning/20 rounded-lg text-xs text-warning">
             <AlertTriangle size={13} className="shrink-0 mt-0.5" />
             {w}
           </div>
         ))}
         {preview.validation.info.map((msg, i) => (
-          <div key={i} className="flex items-start gap-2 p-3 bg-accent-blue/5 border border-accent-blue/20 rounded-lg text-xs text-accent-blue">
+          <div key={i} className="flex items-start gap-2 p-3 bg-info/5 border border-info/20 rounded-lg text-xs text-info">
             <Info size={13} className="shrink-0 mt-0.5" />
             {msg}
           </div>
@@ -128,7 +128,7 @@ export function PreviewStage({
       )}
 
       <div className="flex items-center justify-between pt-2">
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-fg-subtle">
           {hasUnresolved
             ? '⚠ Resuelve todas las operaciones desconocidas antes de confirmar'
             : hasUnassignedWithdrawals
@@ -146,7 +146,7 @@ export function PreviewStage({
           type="button"
           onClick={onConfirm}
           disabled={isBlocked}
-          className="flex items-center gap-2 px-6 py-2.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+          className="flex items-center gap-2 px-6 py-2.5 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
         >
           <Play size={14} />
           {preview.newCount === 0 && depositsForPanel.length > 0 ? 'Guardar costes y recalcular FIFO' : 'Confirmar e importar'}

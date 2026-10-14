@@ -32,14 +32,14 @@ export function AddAddressForm({ networks, onSave, onCancel }: {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs font-medium text-gray-400">Añadir red blockchain</p>
+      <p className="text-xs font-medium text-fg-muted">Añadir red blockchain</p>
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Red *</label>
+        <label className="text-xs text-fg-subtle">Red *</label>
         <NetworkPicker networks={networks} value={selected}
           onChange={id => { setSelected(id); setCustomName(''); setCustomExplorerUrl('') }} />
         {explorerHref && (
           <a href={explorerHref} target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs text-accent-blue hover:text-accent-blue/80 pt-1">
+            className="inline-flex items-center gap-1.5 text-xs text-brand hover:text-brand/80 pt-1">
             <ExternalLink size={11} /> Verificar en el explorador
           </a>
         )}
@@ -48,27 +48,27 @@ export function AddAddressForm({ networks, onSave, onCancel }: {
       {isCustom && (
         <>
           <div className="space-y-1">
-            <label className="text-xs text-gray-500">Nombre de la red *</label>
+            <label className="text-xs text-fg-subtle">Nombre de la red *</label>
             <input autoFocus value={customName} onChange={e => setCustomName(e.target.value)}
               placeholder="Ej: Stacks, Kaspa..." className={inputClass} />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-gray-500">URL del explorador (opcional)</label>
+            <label className="text-xs text-fg-subtle">URL del explorador (opcional)</label>
             <input value={customExplorerUrl} onChange={e => setCustomExplorerUrl(e.target.value)}
               placeholder="https://explorer.ejemplo.com/address/{address}" className={inputClass} />
           </div>
         </>
       )}
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Dirección pública (opcional)</label>
+        <label className="text-xs text-fg-subtle">Dirección pública (opcional)</label>
         <input value={address} onChange={e => setAddress(e.target.value)}
           placeholder={getAddressPlaceholder(selectedNetwork)}
           className={`${inputClass} font-mono text-xs`} />
       </div>
       <div className="flex justify-end gap-2 pt-1">
-        <button type="button" onClick={onCancel} className="px-3 py-1.5 text-xs text-gray-400 hover:text-white transition-colors">Cancelar</button>
+        <button type="button" onClick={onCancel} className="px-3 py-1.5 text-xs text-fg-muted hover:text-fg transition-colors">Cancelar</button>
         <button type="button" onClick={handleSave} disabled={!canSave}
-          className="px-3 py-1.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors">
+          className="px-3 py-1.5 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors">
           Añadir red
         </button>
       </div>

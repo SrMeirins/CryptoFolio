@@ -12,7 +12,7 @@ export function Change24hChip({ change }: { change: Change24h }) {
       <InfoTooltip
         label="Variación 24h no disponible"
         trigger={
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md border border-border text-[10px] leading-none text-gray-500 font-mono whitespace-nowrap">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-lg border border-border text-xs leading-none text-fg-subtle mono whitespace-nowrap">
             24h —
           </span>
         }>
@@ -21,15 +21,15 @@ export function Change24hChip({ change }: { change: Change24h }) {
     )
   }
 
-  const color = change.positive ? 'text-accent-green' : 'text-accent-red'
-  const frame = change.positive ? 'bg-accent-green/8 border-accent-green/25' : 'bg-accent-red/8 border-accent-red/25'
+  const color = change.positive ? 'text-positive' : 'text-negative'
+  const frame = change.positive ? 'bg-positive/8 border-positive/25' : 'bg-negative/8 border-negative/25'
 
   return (
     <InfoTooltip
       label="Variación 24h"
       triggerLabel={`Variación 24h: ${change.eur} (${change.pct})`}
       trigger={
-        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] leading-none font-mono font-semibold whitespace-nowrap ${frame} ${color}`}>
+        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg border text-xs leading-none mono font-semibold whitespace-nowrap ${frame} ${color}`}>
           <span aria-hidden="true">{change.positive ? '▲' : '▼'}</span>
           <span className="change24h-full">{change.eurCompact} ·</span>
           <span>{change.pctCompact}</span>

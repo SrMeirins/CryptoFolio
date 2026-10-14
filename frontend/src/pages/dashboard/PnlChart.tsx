@@ -32,12 +32,12 @@ function fmtLongDate(date: string): string {
 function ChartTooltip({ active, payload, currency }: { active?: boolean; payload?: { payload: PnlPoint }[]; currency: Currency }) {
   if (!active || !payload?.[0]) return null
   const p = payload[0].payload
-  const color = p.pct >= 0 ? 'text-accent-green' : 'text-accent-red'
+  const color = p.pct >= 0 ? 'text-positive' : 'text-negative'
   return (
-    <div className="bg-gray-950/95 border border-white/10 rounded-xl px-3 py-2.5 shadow-xl text-xs space-y-0.5">
-      <p className="text-gray-400">{fmtLongDate(p.date)}{p.live ? ' · en vivo' : ''}</p>
+    <div className="bg-tooltip/95 border border-overlay/10 rounded-xl px-3 py-2.5 shadow-xl text-xs space-y-0.5">
+      <p className="text-fg-muted">{fmtLongDate(p.date)}{p.live ? ' · en vivo' : ''}</p>
       <p className={`mono font-semibold ${color}`}>{signed(p.pct)}</p>
-      <p className="text-gray-300 mono">{signedMoney(p.pnl, currency)} acumulado</p>
+      <p className="text-fg mono">{signedMoney(p.pnl, currency)} acumulado</p>
     </div>
   )
 }
@@ -61,7 +61,7 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
   const color = positive ? c.up : c.down
 
   return (
-    <div className="bg-background-card border border-border rounded-2xl px-5 py-5">
+    <div className="bg-background-card border border-border rounded-xl px-5 py-5">
       <div className="flex items-center justify-between mb-1 gap-3 flex-wrap">
         {headerLeft}
         <div className="flex gap-1" role="group" aria-label="Periodo del gráfico de rentabilidad">
@@ -71,8 +71,8 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
               type="button"
               aria-pressed={period === p}
               onClick={() => setPeriod(p)}
-              className={`text-[11px] font-medium px-2.5 py-1 rounded-lg transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-blue/60 ${
-                period === p ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-gray-400'
+              className={`text-xs font-medium px-2.5 py-1 rounded-lg transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
+                period === p ? 'bg-overlay/10 text-fg' : 'text-fg-subtle hover:text-fg-muted'
               }`}
             >
               {p}
@@ -83,18 +83,18 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
 
       <div className="flex items-center gap-3 mb-4 min-h-6 flex-wrap" aria-live="polite">
         {last && (
-          <p className={`text-sm font-mono font-semibold ${positive ? 'text-accent-green' : 'text-accent-red'}`}>
+          <p className={`text-sm mono font-semibold ${positive ? 'text-positive' : 'text-negative'}`}>
             <span aria-hidden="true">{positive ? '▲' : '▼'} </span>
             {signed(last.pct)} <span className="text-xs font-normal opacity-80">({signedMoney(last.pnl, currency)})</span>
           </p>
         )}
-        <span className="inline-flex items-center gap-1 text-[10px] text-gray-500">
+        <span className="inline-flex items-center gap-1 text-xs text-fg-subtle">
           {metric.short}
           <InfoTooltip label={metric.short}>{metric.help}</InfoTooltip>
         </span>
         {data?.refreshing && (
-          <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
-            <span className="w-2.5 h-2.5 border border-gray-600 border-t-gray-400 rounded-full animate-spin" aria-hidden="true" />
+          <span className="flex items-center gap-1.5 text-xs text-fg-subtle">
+            <span className="w-2.5 h-2.5 border border-border border-t-gray-400 rounded-full animate-spin" aria-hidden="true" />
             Descargando precios de cierre…
           </span>
         )}
@@ -102,13 +102,13 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
 
       <div className="h-52 relative">
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-600">Cargando…</div>
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-fg-subtle">Cargando…</div>
         )}
         {isError && (
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-500">No se pudo cargar la rentabilidad.</div>
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-fg-subtle">No se pudo cargar la rentabilidad.</div>
         )}
         {!isLoading && !isError && series.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-600">Sin datos para este periodo</div>
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-fg-subtle">Sin datos para este periodo</div>
         )}
         {series.length > 0 && (
           <ResponsiveContainer width="100%" height="100%">
@@ -123,14 +123,14 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
               <XAxis
                 dataKey="date"
                 tickFormatter={(d: string) => fmtAxisDate(d, period)}
-                tick={{ fontSize: 10, fill: c.axis }}
+                tick={{ fontSize: 12, fill: c.axis }}
                 axisLine={false}
                 tickLine={false}
                 interval="preserveStartEnd"
                 minTickGap={24}
               />
               <YAxis
-                tick={{ fontSize: 10, fill: c.axis }}
+                tick={{ fontSize: 12, fill: c.axis }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v: number) => `${v.toFixed(0)}%`}

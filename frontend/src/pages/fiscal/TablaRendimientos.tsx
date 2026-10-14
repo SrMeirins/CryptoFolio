@@ -29,7 +29,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
   }, {})
 
   return (
-    <div className="bg-background-card border border-border rounded-2xl overflow-hidden">
+    <div className="bg-background-card border border-border rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-wrap gap-2">
         <TableExpandToggle
           icon={TrendingDown}
@@ -42,7 +42,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
             {Object.entries(porTipo).map(([tipo, val]) => (
-              <span key={tipo} className="text-[10px] bg-accent-amber/10 text-accent-amber border border-accent-amber/20 px-2 py-0.5 rounded-full font-medium">
+              <span key={tipo} className="text-xs bg-warning/10 text-warning border border-warning/20 px-2 py-0.5 rounded-full font-medium">
                 {tipo} · {formatEur(val)}
               </span>
             ))}
@@ -53,7 +53,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
               <select
                 value={filterActivo}
                 onChange={e => setFilterActivo(e.target.value)}
-                className="px-2 py-1 bg-background-tertiary border border-border rounded-lg text-[11px] text-gray-300 appearance-none cursor-pointer hover:border-gray-500 transition-colors"
+                className="px-2 py-1 bg-background-tertiary border border-border rounded-lg text-xs text-fg appearance-none cursor-pointer hover:border-fg-subtle transition-colors"
               >
                 <option value="">Todos los activos</option>
                 {activos.map(a => <option key={a} value={a}>{a}</option>)}
@@ -62,7 +62,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
               <select
                 value={filterTipo}
                 onChange={e => setFilterTipo(e.target.value)}
-                className="px-2 py-1 bg-background-tertiary border border-border rounded-lg text-[11px] text-gray-300 appearance-none cursor-pointer hover:border-gray-500 transition-colors"
+                className="px-2 py-1 bg-background-tertiary border border-border rounded-lg text-xs text-fg appearance-none cursor-pointer hover:border-fg-subtle transition-colors"
               >
                 <option value="">Todos los tipos</option>
                 {tipos.map(t => <option key={t} value={t}>{t}</option>)}
@@ -72,7 +72,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
                 type="button"
                 onClick={() => window.open(`/api/fiscal/${year}/export?format=csv`, '_blank')}
                 title="Descarga el export fiscal completo del año (el backend no soporta filtrar solo esta sección)"
-                className="flex items-center gap-1.5 px-2.5 py-1 bg-background-tertiary border border-border rounded-lg text-[11px] text-gray-300 hover:border-gray-500 transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-1 bg-background-tertiary border border-border rounded-lg text-xs text-fg hover:border-fg-subtle transition-colors"
               >
                 <Download size={11} />
                 CSV
@@ -86,7 +86,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-gray-500 text-[10px] uppercase tracking-wider border-b border-border bg-background-tertiary/30">
+              <tr className="text-fg-subtle text-[11px] uppercase tracking-wider border-b border-border bg-background-tertiary/30">
                 <th className="text-left px-4 py-2.5">Fecha</th>
                 <th className="text-left px-4 py-2.5">Tipo</th>
                 <th className="text-left px-4 py-2.5">Activo</th>
@@ -98,13 +98,13 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
             <tbody className="divide-y divide-border">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-gray-600 text-xs">Sin rendimientos con los filtros actuales</td>
+                  <td colSpan={6} className="px-4 py-6 text-center text-fg-subtle text-xs">Sin rendimientos con los filtros actuales</td>
                 </tr>
               ) : filtered.map((r, i) => (
                 <tr key={`${r.fecha}-${r.tipo}-${r.activo}-${i}`} className="hover:bg-background-tertiary/40 transition-colors">
-                  <td className="px-4 py-2.5 mono text-gray-400 text-[11px]">{r.fecha}</td>
+                  <td className="px-4 py-2.5 mono text-fg-muted text-xs">{r.fecha}</td>
                   <td className="px-4 py-2.5">
-                    <span className="text-[10px] bg-accent-amber/10 text-accent-amber px-1.5 py-0.5 rounded-sm">{r.tipo}</span>
+                    <span className="text-xs bg-warning/10 text-warning px-1.5 py-0.5 rounded-lg">{r.tipo}</span>
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5">
@@ -112,20 +112,20 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
                       <span className="font-bold mono">{r.activo}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-right mono text-gray-400">{r.cantidad.toFixed(6)}</td>
-                  <td className="px-4 py-2.5 text-right mono font-medium text-accent-amber">{formatEur(r.valorEur)}</td>
-                  <td className="px-4 py-2.5 text-gray-500 text-[11px]">{r.wallet}</td>
+                  <td className="px-4 py-2.5 text-right mono text-fg-muted">{r.cantidad.toFixed(6)}</td>
+                  <td className="px-4 py-2.5 text-right mono font-medium text-warning">{formatEur(r.valorEur)}</td>
+                  <td className="px-4 py-2.5 text-fg-subtle text-xs">{r.wallet}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-border bg-background-tertiary/20">
-                <td className="px-4 py-2.5 text-xs text-gray-500 font-medium" colSpan={4}>
+                <td className="px-4 py-2.5 text-xs text-fg-subtle font-medium" colSpan={4}>
                   {filtered.length < rendimientos.length
                     ? `${filtered.length} de ${rendimientos.length} operaciones`
                     : `${filtered.length} operaciones`}
                 </td>
-                <td className="px-4 py-2.5 text-right mono font-bold text-accent-amber">{formatEur(totalRend)}</td>
+                <td className="px-4 py-2.5 text-right mono font-bold text-warning">{formatEur(totalRend)}</td>
                 <td />
               </tr>
             </tfoot>

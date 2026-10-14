@@ -4,6 +4,7 @@ import { useTramos } from '../../hooks/useTramos'
 import { calcularTramos, tramoActivo } from '../../utils/tramosIrpf'
 import { FiscalChartCard } from './FiscalChartCard'
 import type { Carryforward } from './types'
+import { T } from '../../utils/colors'
 
 export function TramosIRPF({ base, label }: { base: number; label: string }) {
   const tramosConfig = useTramos()
@@ -19,8 +20,8 @@ export function TramosIRPF({ base, label }: { base: number; label: string }) {
       title={label}
       right={
         <div className="flex items-center gap-3 text-xs">
-          <span className="text-gray-500">Tipo medio <span className="text-white font-bold mono">{tipoMedio.toFixed(1)}%</span></span>
-          <span className="text-gray-500">Tipo marginal <span className="text-accent-amber font-bold mono">{tipoMarginal}%</span></span>
+          <span className="text-fg-subtle">Tipo medio <span className="text-fg font-bold mono">{tipoMedio.toFixed(1)}%</span></span>
+          <span className="text-fg-subtle">Tipo marginal <span className="text-warning font-bold mono">{tipoMarginal}%</span></span>
         </div>
       }
     >
@@ -33,15 +34,15 @@ export function TramosIRPF({ base, label }: { base: number; label: string }) {
           const pct   = activo ? Math.min((info.cuota / cuotaTotal) * 100, 100) : 0
           return (
             <div key={t.label} className={`flex items-center gap-3 ${activo ? '' : 'opacity-25'}`}>
-              <div className="w-24 text-[10px] text-gray-500 shrink-0">{t.label}</div>
+              <div className="w-24 text-xs text-fg-subtle shrink-0">{t.label}</div>
               <div className="flex-1 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
-                  style={{ width: `${pct}%`, backgroundColor: activo ? '#f59e0b' : '#374151' }}
+                  style={{ width: `${pct}%`, backgroundColor: activo ? T.warning : T.track }}
                 />
               </div>
-              <div className="w-8 text-[10px] text-gray-500 text-right">{t.tipo}%</div>
-              <div className="w-20 text-right mono text-xs font-medium text-white shrink-0">
+              <div className="w-8 text-xs text-fg-subtle text-right">{t.tipo}%</div>
+              <div className="w-20 text-right mono text-xs font-medium text-fg shrink-0">
                 {activo ? formatEur(info.cuota) : '—'}
               </div>
             </div>
@@ -50,10 +51,10 @@ export function TramosIRPF({ base, label }: { base: number; label: string }) {
       </div>
 
       <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
-        <span className="text-xs text-gray-500">Cuota estimada total</span>
-        <span className="mono font-bold text-accent-amber">{formatEur(cuotaTotal)}</span>
+        <span className="text-xs text-fg-subtle">Cuota estimada total</span>
+        <span className="mono font-bold text-warning">{formatEur(cuotaTotal)}</span>
       </div>
-      <p className="text-[10px] text-gray-600 mt-1">Estimación orientativa. Base del ahorro, sin considerar deducciones ni mínimo personal.</p>
+      <p className="text-xs text-fg-subtle mt-1">Estimación orientativa. Base del ahorro, sin considerar deducciones ni mínimo personal.</p>
     </FiscalChartCard>
   )
 }
@@ -66,7 +67,7 @@ export function CompensacionPerdidas({ data }: { data: Carryforward }) {
       icon={Scale}
       title="Compensación de pérdidas (4 años)"
       right={data.pendienteTotal > 0.01 && (
-        <span className="text-xs bg-accent-blue/10 text-accent-blue px-2 py-0.5 rounded-full font-medium mono">
+        <span className="text-xs bg-info/10 text-info px-2 py-0.5 rounded-full font-medium mono">
           {formatEur(data.pendienteTotal)} pendiente
         </span>
       )}
@@ -74,28 +75,28 @@ export function CompensacionPerdidas({ data }: { data: Carryforward }) {
       <div className="space-y-1.5">
         {data.detalle.map((d) => (
           <div key={d.year} className="flex items-center gap-3 text-xs flex-wrap">
-            <span className="w-10 text-gray-500 font-medium">{d.year}</span>
+            <span className="w-10 text-fg-subtle font-medium">{d.year}</span>
             {d.perdida > 0.01 ? (
               <>
-                <span className="text-accent-red mono">−{formatEur(d.perdida)}</span>
+                <span className="text-negative mono">−{formatEur(d.perdida)}</span>
                 {d.compensadoPatrim > 0.01 && (
-                  <span className="text-accent-green mono">+{formatEur(d.compensadoPatrim)} vs patrimonio</span>
+                  <span className="text-positive mono">+{formatEur(d.compensadoPatrim)} vs patrimonio</span>
                 )}
                 {d.compensadoRend > 0.01 && (
-                  <span className="text-accent-amber mono">+{formatEur(d.compensadoRend)} vs rendimientos</span>
+                  <span className="text-warning mono">+{formatEur(d.compensadoRend)} vs rendimientos</span>
                 )}
               </>
             ) : d.netoAntes > 0 ? (
-              <span className="text-gray-600 mono">+{formatEur(d.netoAntes)} ganancias</span>
+              <span className="text-fg-subtle mono">+{formatEur(d.netoAntes)} ganancias</span>
             ) : (
-              <span className="text-gray-700">Sin operaciones</span>
+              <span className="text-fg-subtle">Sin operaciones</span>
             )}
           </div>
         ))}
       </div>
 
       {data.pendienteTotal > 0.01 && (
-        <div className="mt-3 pt-3 border-t border-border flex items-start gap-2 text-xs text-accent-blue">
+        <div className="mt-3 pt-3 border-t border-border flex items-start gap-2 text-xs text-info">
           <Info size={12} className="shrink-0 mt-0.5" />
           <span>
             Puedes compensar {formatEur(data.pendienteTotal)} de pérdidas pendientes con ganancias patrimoniales futuras

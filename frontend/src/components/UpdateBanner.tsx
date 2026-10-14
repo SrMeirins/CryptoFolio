@@ -39,8 +39,8 @@ export function UpdateBanner() {
   }
 
   return (
-    <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-accent-blue/10 border-b border-accent-blue/20">
-      <div className="flex items-center gap-2 text-xs text-accent-blue">
+    <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-brand/10 border-b border-brand/20">
+      <div className="flex items-center gap-2 text-xs text-brand">
         <ArrowUpCircle size={14} className="shrink-0" />
         <span>
           {state.downloaded
@@ -52,7 +52,7 @@ export function UpdateBanner() {
       <button
         onClick={handleUpdate}
         disabled={state.installing}
-        className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-lg bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-medium transition-colors"
+        className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-lg bg-brand-solid hover:bg-brand-solid/90 disabled:opacity-50 disabled:cursor-not-allowed text-on-brand text-xs font-medium transition-colors"
       >
         {state.installing
           ? <><RefreshCw size={12} className="animate-spin" /> Instalando...</>

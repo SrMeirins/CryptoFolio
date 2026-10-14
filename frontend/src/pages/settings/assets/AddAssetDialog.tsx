@@ -4,6 +4,7 @@ import { portfolioApi, type AssetMetadata } from '../../../api/portfolio'
 import { Toggle } from '../../../components/Toggle'
 import { inputClass } from './helpers'
 import { PairInputsGrid } from './PairInputsGrid'
+import { T } from '../../../utils/colors'
 
 type DetectStatus = 'idle' | 'detecting' | 'found_binance' | 'found_coingecko' | 'notfound'
 
@@ -82,21 +83,21 @@ export function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSa
     onSaved()
   }
 
-  const statusIcon = status === 'detecting'        ? <RefreshCw size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 animate-spin" />
-                   : status === 'found_binance'    ? <CheckCircle size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-accent-green" />
-                   : status === 'found_coingecko'  ? <CheckCircle size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: '#8b5cf6' }} />
-                   : status === 'notfound'         ? <AlertCircle size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-accent-amber" />
+  const statusIcon = status === 'detecting'        ? <RefreshCw size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle animate-spin" />
+                   : status === 'found_binance'    ? <CheckCircle size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-positive" />
+                   : status === 'found_coingecko'  ? <CheckCircle size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: T.purple }} />
+                   : status === 'notfound'         ? <AlertCircle size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-warning" />
                    : null
 
   return (
     <div className="rounded-xl border border-border bg-background-card p-5 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-sm">Añadir nuevo activo</h3>
-        <button type="button" onClick={onClose} aria-label="Cerrar" className="text-gray-600 hover:text-white transition-colors"><X size={16} /></button>
+        <button type="button" onClick={onClose} aria-label="Cerrar" className="text-fg-subtle hover:text-fg transition-colors"><X size={16} /></button>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-xs text-gray-500">Símbolo *</label>
+          <label className="text-xs text-fg-subtle">Símbolo *</label>
           <div className="relative">
             <input autoFocus value={symbol}
               onChange={e => handleSymbolChange(e.target.value)}
@@ -105,27 +106,27 @@ export function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSa
           </div>
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-gray-500">Nombre</label>
+          <label className="text-xs text-fg-subtle">Nombre</label>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Pepe Coin" className={inputClass} />
         </div>
       </div>
 
       {status === 'found_binance' && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent-green/8 border border-accent-green/20 text-xs text-accent-green">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-positive/8 border border-positive/20 text-xs text-positive">
           <CheckCircle size={12} /> Encontrado en Binance — pares configurados automáticamente
         </div>
       )}
       {status === 'found_coingecko' && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs"
-          style={{ backgroundColor: '#8b5cf608', borderColor: '#8b5cf630', color: '#8b5cf6' }}>
+          style={{ backgroundColor: '#8b5cf608', borderColor: '#8b5cf630', color: T.purple }}>
           <CheckCircle size={12} />
-          Encontrado en CoinGecko — precio vía <span className="mono font-medium">{geckoId}</span>
+          Encontrado en CoinGecko — precio vía <span className="font-mono font-medium">{geckoId}</span>
         </div>
       )}
       {status === 'notfound' && (
-        <div className="px-3 py-2.5 rounded-lg bg-accent-amber/8 border border-accent-amber/20 space-y-1">
-          <div className="flex items-center gap-2 text-xs text-accent-amber"><AlertCircle size={12} /> No encontrado en Binance ni CoinGecko</div>
-          <p className="text-xs text-gray-500">Introduce los pares manualmente o márcalo como stablecoin.</p>
+        <div className="px-3 py-2.5 rounded-lg bg-warning/8 border border-warning/20 space-y-1">
+          <div className="flex items-center gap-2 text-xs text-warning"><AlertCircle size={12} /> No encontrado en Binance ni CoinGecko</div>
+          <p className="text-xs text-fg-subtle">Introduce los pares manualmente o márcalo como stablecoin.</p>
         </div>
       )}
 
@@ -140,9 +141,9 @@ export function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSa
 
       <Toggle checked={isStable} onChange={setIsStable} label="Stablecoin o fiat (sin precio de mercado)" />
       <div className="flex justify-end gap-2 pt-1">
-        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">Cancelar</button>
+        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-fg-muted hover:text-fg transition-colors">Cancelar</button>
         <button type="button" onClick={handleSave} disabled={!symbol || saving}
-          className="px-4 py-2 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
+          className="px-4 py-2 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
           {saving ? 'Guardando...' : 'Añadir activo'}
         </button>
       </div>

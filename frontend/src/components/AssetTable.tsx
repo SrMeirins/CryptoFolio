@@ -87,7 +87,7 @@ export function AssetTable({ lots: rawLots, fiatBalances = NO_FIAT, onSimulate }
   const sortProps = { sortKey, sortDir, onSort: handleSort }
   const tableHeader = (
     <thead>
-      <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-border">
+      <tr className="text-xs text-fg-subtle uppercase tracking-wider border-b border-border">
         <SortTh {...sortProps} label="Activo"     sk="asset"    right={false} />
         <SortTh {...sortProps} label="Cantidad"   sk="quantity"  />
         <SortTh {...sortProps} label="Precio"     sk="price"     />
@@ -115,16 +115,16 @@ export function AssetTable({ lots: rawLots, fiatBalances = NO_FIAT, onSimulate }
     <div className="space-y-3">
       {/* Banner si hay activos sin precio */}
       {noPriceAssets.length > 0 && (
-        <div className="flex items-center justify-between px-4 py-2.5 bg-accent-amber/5 border border-accent-amber/20 rounded-xl text-xs">
-          <span className="text-accent-amber/90">
+        <div className="flex items-center justify-between px-4 py-2.5 bg-warning/5 border border-warning/20 rounded-xl text-xs">
+          <span className="text-warning/90">
             {noPriceAssets.length === 1
-              ? <><span className="font-mono font-semibold">{noPriceAssets[0]}</span> no tiene precio configurado — valor y P&L no disponibles</>
-              : <><span className="font-mono font-semibold">{noPriceAssets.join(', ')}</span> no tienen precio configurado</>
+              ? <><span className="mono font-semibold">{noPriceAssets[0]}</span> no tiene precio configurado — valor y P&L no disponibles</>
+              : <><span className="mono font-semibold">{noPriceAssets.join(', ')}</span> no tienen precio configurado</>
             }
           </span>
           <Link
             to="/settings?tab=assets"
-            className="flex items-center gap-1 text-accent-amber hover:text-accent-amber/80 font-medium transition-colors shrink-0 ml-3"
+            className="flex items-center gap-1 text-warning hover:text-warning/80 font-medium transition-colors shrink-0 ml-3"
           >
             <Settings size={11} />
             Configurar en Settings
@@ -140,7 +140,7 @@ export function AssetTable({ lots: rawLots, fiatBalances = NO_FIAT, onSimulate }
               <button
                 type="button"
                 onClick={() => { setSortKey('value'); setSortDir('desc') }}
-                className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-white bg-background-tertiary hover:bg-border border border-border rounded-md px-1.5 py-0.5 transition-colors"
+                className="flex items-center gap-1 text-xs text-fg-subtle hover:text-fg bg-background-tertiary hover:bg-border border border-border rounded-lg px-1.5 py-0.5 transition-colors"
                 title="Restablecer orden por defecto"
               >
                 <ArrowUpDown size={9} />
@@ -153,17 +153,17 @@ export function AssetTable({ lots: rawLots, fiatBalances = NO_FIAT, onSimulate }
             <button
               type="button"
               onClick={() => setCompact(c => !c)}
-              className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-md border transition-colors ${
+              className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg border transition-colors ${
                 compact
-                  ? 'border-accent-blue/40 bg-accent-blue/10 text-accent-blue'
-                  : 'border-border text-gray-500 hover:border-gray-600 hover:text-gray-300'
+                  ? 'border-brand/40 bg-brand/10 text-brand'
+                  : 'border-border text-fg-subtle hover:border-border hover:text-fg'
               }`}
               title={compact ? 'Ver tabla completa' : 'Vista compacta'}
             >
               {compact ? '⊞ Expandir' : '⊟ Compacto'}
             </button>
-            <span className="text-xs text-gray-500">
-              Valor total: <span className="text-white mono">{formatMoney(totalValue, currency)}</span>
+            <span className="text-xs text-fg-subtle">
+              Valor total: <span className="text-fg mono">{formatMoney(totalValue, currency)}</span>
             </span>
           </div>
         </div>
@@ -178,7 +178,7 @@ export function AssetTable({ lots: rawLots, fiatBalances = NO_FIAT, onSimulate }
       </div>
 
       {dustRows.length > 0 && (
-        <div className={`card overflow-hidden p-0 ${onlyDust ? 'border-amber-500/20 bg-amber-500/2' : ''}`}>
+        <div className={`card overflow-hidden p-0 ${onlyDust ? 'border-warning/20 bg-warning/2' : ''}`}>
           <button
             type="button"
             onClick={() => setDustOpen(!dustOpen)}
@@ -186,23 +186,23 @@ export function AssetTable({ lots: rawLots, fiatBalances = NO_FIAT, onSimulate }
           >
             <div className="flex items-center gap-2">
               {(dustOpen || onlyDust)
-                ? <ChevronDown size={14} className={onlyDust ? 'text-amber-500/70' : 'text-gray-500'} />
-                : <ChevronRight size={14} className="text-gray-500" />}
-              <span className={`text-xs font-semibold uppercase tracking-wider ${onlyDust ? 'text-amber-500/80' : 'text-gray-500'}`}>
+                ? <ChevronDown size={14} className={onlyDust ? 'text-warning/70' : 'text-fg-subtle'} />
+                : <ChevronRight size={14} className="text-fg-subtle" />}
+              <span className={`text-xs font-semibold uppercase tracking-wider ${onlyDust ? 'text-warning/80' : 'text-fg-subtle'}`}>
                 Polvo
               </span>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                 onlyDust
-                  ? 'bg-amber-500/15 text-amber-500/80 border border-amber-500/20'
-                  : 'bg-background-tertiary text-gray-500'
+                  ? 'bg-warning/15 text-warning/80 border border-warning/20'
+                  : 'bg-background-tertiary text-fg-subtle'
               }`}>
                 {dustRows.length} activos &lt; €1
               </span>
               {onlyDust && (
-                <span className="text-[10px] text-amber-500/60 italic">esta wallet solo tiene polvo</span>
+                <span className="text-xs text-warning/60 italic">esta wallet solo tiene polvo</span>
               )}
             </div>
-            <span className={`text-xs mono font-medium ${onlyDust ? 'text-amber-500/70' : 'text-gray-600'}`}>
+            <span className={`text-xs mono font-medium ${onlyDust ? 'text-warning/70' : 'text-fg-subtle'}`}>
               {formatMoney(dustValue, currency)}
             </span>
           </button>

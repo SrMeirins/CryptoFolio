@@ -3,17 +3,17 @@ import { CheckCircle, AlertTriangle, XCircle, Info, X } from 'lucide-react'
 import { ToastContext, type ToastItem, type ToastType } from './toastContext'
 
 const ICONS: Record<ToastType, React.ReactNode> = {
-  success: <CheckCircle  size={15} className="text-accent-green  shrink-0 mt-0.5" />,
-  error:   <XCircle      size={15} className="text-accent-red    shrink-0 mt-0.5" />,
-  warning: <AlertTriangle size={15} className="text-accent-amber  shrink-0 mt-0.5" />,
-  info:    <Info          size={15} className="text-accent-blue   shrink-0 mt-0.5" />,
+  success: <CheckCircle  size={15} className="text-positive  shrink-0 mt-0.5" />,
+  error:   <XCircle      size={15} className="text-negative    shrink-0 mt-0.5" />,
+  warning: <AlertTriangle size={15} className="text-warning  shrink-0 mt-0.5" />,
+  info:    <Info          size={15} className="text-info   shrink-0 mt-0.5" />,
 }
 
 const BORDER: Record<ToastType, string> = {
-  success: 'border-accent-green/30',
-  error:   'border-accent-red/30',
-  warning: 'border-accent-amber/30',
-  info:    'border-accent-blue/30',
+  success: 'border-positive/30',
+  error:   'border-negative/30',
+  warning: 'border-warning/30',
+  info:    'border-info/30',
 }
 
 // role="alert" (error) implica aria-live="assertive": interrumpe al lector
@@ -95,14 +95,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           >
             {ICONS[t.type]}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white leading-snug">{t.title}</p>
-              {t.message && <p className="text-xs text-gray-400 mt-0.5 leading-snug">{t.message}</p>}
+              <p className="text-sm font-medium text-fg leading-snug">{t.title}</p>
+              {t.message && <p className="text-xs text-fg-muted mt-0.5 leading-snug">{t.message}</p>}
             </div>
             <button
               type="button"
               onClick={() => remove(t.id)}
               aria-label="Cerrar notificación"
-              className="text-gray-600 hover:text-gray-400 transition-colors shrink-0 mt-0.5"
+              className="text-fg-subtle hover:text-fg-muted transition-colors shrink-0 mt-0.5"
             >
               <X size={13} />
             </button>

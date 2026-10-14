@@ -18,7 +18,7 @@ export function ColorPicker({ value, onChange, size = 'md' }: {
       {COLORS.map(c => (
         <button key={c} type="button" onClick={() => onChange(c)}
           aria-label={`Elegir color ${c}`}
-          className={`${dim} rounded-full transition-transform ${value === c ? `scale-125 ${ring} ring-white` : ''}`}
+          className={`${dim} rounded-full transition-transform ${value === c ? `scale-125 ${ring} ring-fg` : ''}`}
           style={{ backgroundColor: c }} />
       ))}
     </div>

@@ -8,5 +8,8 @@ export default defineConfig({
     environment: 'node',
     // e2e/ son pruebas de Playwright (npm run test:e2e), no de vitest.
     exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
+    // Vitest entrega los .css vacíos por defecto; el test de contraste de la
+    // paleta (#198) necesita leer index.css tal cual.
+    css: { include: [/index\.css/] },
   },
 })

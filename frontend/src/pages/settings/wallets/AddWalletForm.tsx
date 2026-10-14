@@ -16,12 +16,12 @@ export function AddWalletForm({ onSave, onCancel }: {
       <h3 className="font-medium text-sm">Nueva wallet</h3>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-xs text-gray-500">Nombre *</label>
+          <label className="text-xs text-fg-subtle">Nombre *</label>
           <input value={name} onChange={e => setName(e.target.value)}
             placeholder="Mi Tangem, Ledger Nano..." className={inputClass} autoFocus />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-gray-500">Tipo *</label>
+          <label className="text-xs text-fg-subtle">Tipo *</label>
           <select value={type} onChange={e => setType(e.target.value)} className={inputClass}>
             <option value="hardware">Hardware wallet</option>
             <option value="software">Software wallet</option>
@@ -31,18 +31,18 @@ export function AddWalletForm({ onSave, onCancel }: {
         </div>
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Color</label>
+        <label className="text-xs text-fg-subtle">Color</label>
         <ColorPicker value={color} onChange={setColor} size="md" />
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Notas (opcional)</label>
+        <label className="text-xs text-fg-subtle">Notas (opcional)</label>
         <input value={notes} onChange={e => setNotes(e.target.value)}
           placeholder="Tangem Card modelo 2..." className={inputClass} />
       </div>
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">Cancelar</button>
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-fg-muted hover:text-fg transition-colors">Cancelar</button>
         <button type="button" onClick={() => onSave({ name, type, color, notes: notes || null })} disabled={!name}
-          className="px-4 py-2 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
+          className="px-4 py-2 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
           Crear wallet
         </button>
       </div>

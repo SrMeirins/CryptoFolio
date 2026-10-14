@@ -16,16 +16,16 @@ export const PHASE_STATUS_STYLES: Record<PhaseStatus, {
   text: string
   bar: string
 }> = {
-  error:   { border: 'border-accent-red/40 bg-accent-red/5',     iconBg: 'bg-accent-red/15',       iconColor: 'text-accent-red',   text: 'text-accent-red',   bar: 'bg-accent-red' },
-  done:    { border: 'border-accent-green/30 bg-accent-green/5', iconBg: 'bg-accent-green/15',     iconColor: 'text-accent-green', text: 'text-accent-green', bar: 'bg-accent-green' },
-  current: { border: 'border-accent-blue/40 bg-accent-blue/5',   iconBg: 'bg-accent-blue/15',      iconColor: 'text-accent-blue',  text: 'text-accent-blue',  bar: 'bg-accent-blue' },
-  pending: { border: 'border-border bg-background-tertiary/30',  iconBg: 'bg-background-tertiary', iconColor: 'text-gray-600',     text: 'text-gray-600',     bar: '' },
+  error:   { border: 'border-negative/40 bg-negative/5',     iconBg: 'bg-negative/15',       iconColor: 'text-negative',   text: 'text-negative',   bar: 'bg-negative' },
+  done:    { border: 'border-positive/30 bg-positive/5', iconBg: 'bg-positive/15',     iconColor: 'text-positive', text: 'text-positive', bar: 'bg-positive' },
+  current: { border: 'border-brand/40 bg-brand/5',   iconBg: 'bg-brand/15',      iconColor: 'text-brand',  text: 'text-brand',  bar: 'bg-brand-solid' },
+  pending: { border: 'border-border bg-background-tertiary/30',  iconBg: 'bg-background-tertiary', iconColor: 'text-fg-subtle',     text: 'text-fg-subtle',     bar: '' },
 }
 
 export type BannerKind = 'rateLimit' | 'prefetch' | 'normal'
 
 export const BANNER_STYLES: Record<BannerKind, { container: string; icon: string; text: string }> = {
   rateLimit: { container: 'bg-orange-950/40 border border-orange-500/30',     icon: 'text-orange-400', text: 'text-orange-300' },
-  prefetch:  { container: 'bg-purple-950/40 border border-purple-500/30',     icon: 'text-purple-400', text: 'text-purple-300' },
-  normal:    { container: 'bg-background-tertiary border border-transparent', icon: 'text-accent-blue', text: 'text-gray-300' },
+  prefetch:  { container: 'bg-accent-purple/40 border border-accent-purple/30',     icon: 'text-accent-purple', text: 'text-accent-purple' },
+  normal:    { container: 'bg-background-tertiary border border-transparent', icon: 'text-brand', text: 'text-fg' },
 }

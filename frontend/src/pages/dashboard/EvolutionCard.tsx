@@ -27,7 +27,7 @@ export function EvolutionCard({ currentValue }: { currentValue?: number }) {
 
   const tabs = (
     <div role="tablist" aria-label="Evolución del portfolio" className="flex items-center gap-1" onKeyDown={onKeyDown}>
-      <span className="text-[11px] text-gray-600 font-medium uppercase tracking-widest mr-2">Evolución</span>
+      <span className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest mr-2">Evolución</span>
       {TABS.map(t => (
         <button
           key={t.id}
@@ -38,8 +38,8 @@ export function EvolutionCard({ currentValue }: { currentValue?: number }) {
           aria-controls={`${baseId}-panel`}
           tabIndex={tab === t.id ? 0 : -1}
           onClick={() => setTab(t.id)}
-          className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-blue/60 ${
-            tab === t.id ? 'bg-accent-blue/15 text-accent-blue' : 'text-gray-500 hover:text-gray-300'
+          className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
+            tab === t.id ? 'bg-brand/15 text-brand' : 'text-fg-subtle hover:text-fg'
           }`}
         >
           {t.label}

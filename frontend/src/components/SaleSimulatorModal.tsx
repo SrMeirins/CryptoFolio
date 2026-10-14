@@ -20,13 +20,13 @@ interface Props {
 }
 
 const inputCls = `
-  flex-1 min-w-0 bg-transparent py-2.5 text-sm text-white text-center
-  placeholder-gray-600 focus:outline-hidden mono
+  flex-1 min-w-0 bg-transparent py-2.5 text-sm text-fg text-center
+  placeholder-fg-subtle focus:outline-hidden mono
   [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
 `
 const wrapCls = `
-  flex items-center bg-white/5 border border-white/10 rounded-xl overflow-hidden
-  focus-within:border-accent-blue/60 transition-all
+  flex items-center bg-overlay/5 border border-overlay/10 rounded-xl overflow-hidden
+  focus-within:border-brand/60 transition-all
 `
 
 export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: Props) {
@@ -102,29 +102,29 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full sm:max-w-lg bg-background-primary border border-white/10 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh]"
+        className="w-full sm:max-w-lg bg-background-primary border border-overlay/10 rounded-t-xl sm:rounded-xl shadow-2xl flex flex-col max-h-[92vh]"
       >
 
         {/* Header */}
-        <div className="relative px-5 pt-5 pb-4 border-b border-white/8 shrink-0 overflow-hidden">
-          <div className="absolute inset-0 bg-linear-to-br from-accent-blue/10 via-transparent to-transparent pointer-events-none" />
+        <div className="relative px-5 pt-5 pb-4 border-b border-overlay/8 shrink-0 overflow-hidden">
+          <div className="absolute inset-0 bg-linear-to-br from-brand/10 via-transparent to-transparent pointer-events-none" />
           <div className="relative flex items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 mb-0.5">
-                <Calculator size={15} className="text-accent-blue" />
-                <span className="text-[11px] font-medium text-accent-blue tracking-wide uppercase">Simulador de venta</span>
+                <Calculator size={15} className="text-brand" />
+                <span className="text-[11px] font-medium text-brand tracking-wide uppercase">Simulador de venta</span>
                 <EurOnlyBadge />
               </div>
               <h2 id={titleId} className="text-xl font-bold tracking-tight">{asset}</h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Disponible: <span className="text-gray-300 mono">{formatAmount(totalQty)} {asset}</span>
+              <p className="text-xs text-fg-subtle mt-0.5">
+                Disponible: <span className="text-fg mono">{formatAmount(totalQty)} {asset}</span>
               </p>
             </div>
             <button
               type="button"
               onClick={onClose}
               aria-label="Cerrar"
-              className="shrink-0 mt-0.5 p-1.5 text-gray-500 hover:text-white hover:bg-white/8 rounded-lg transition-all"
+              className="shrink-0 mt-0.5 p-1.5 text-fg-subtle hover:text-fg hover:bg-overlay/8 rounded-lg transition-all"
             >
               <X size={15} />
             </button>
@@ -137,7 +137,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
           <div className="grid grid-cols-2 gap-3">
             {/* Cantidad */}
             <div>
-              <label className="text-[11px] font-medium text-gray-400 mb-1.5 block">Cantidad a vender</label>
+              <label className="text-xs font-medium text-fg-muted mb-1.5 block">Cantidad a vender</label>
               <div className={wrapCls}>
                 <StepButton label="−" onStep={decQty} />
                 <input
@@ -150,7 +150,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
               <button
                 type="button"
                 onClick={() => setQty(totalQty.toString())}
-                className="mt-1.5 text-[10px] font-medium text-accent-blue/80 hover:text-accent-blue transition-colors"
+                className="mt-1.5 text-xs font-medium text-brand/80 hover:text-brand transition-colors"
               >
                 Usar máximo ({formatAmount(totalQty)})
               </button>
@@ -158,7 +158,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
 
             {/* Precio */}
             <div>
-              <label className="text-[11px] font-medium text-gray-400 mb-1.5 block">Precio venta (€/ud.)</label>
+              <label className="text-xs font-medium text-fg-muted mb-1.5 block">Precio venta (€/ud.)</label>
               <div className={wrapCls}>
                 <StepButton label="−" onStep={decPrice} />
                 <input
@@ -173,7 +173,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
                 <button
                   type="button"
                   onClick={() => setPrice(currentPrice.toFixed(4))}
-                  className="mt-1.5 text-[10px] font-medium text-accent-blue/80 hover:text-accent-blue transition-colors"
+                  className="mt-1.5 text-xs font-medium text-brand/80 hover:text-brand transition-colors"
                 >
                   Precio actual ({formatPrice(currentPrice)})
                 </button>
@@ -183,15 +183,15 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
 
           {/* Error */}
           {error && (
-            <div className="flex items-center gap-2 px-3 py-2.5 bg-accent-red/10 border border-accent-red/25 rounded-xl text-xs text-accent-red">
+            <div className="flex items-center gap-2 px-3 py-2.5 bg-negative/10 border border-negative/25 rounded-xl text-xs text-negative">
               <AlertCircle size={13} className="shrink-0" /> {error}
             </div>
           )}
 
           {/* Spinner solo en la primera carga (sin resultado previo) */}
           {loading && !result && (
-            <div className="flex items-center justify-center gap-2 py-6 text-xs text-gray-500">
-              <span className="inline-block w-3 h-3 border border-gray-600 border-t-accent-blue rounded-full animate-spin" />
+            <div className="flex items-center justify-center gap-2 py-6 text-xs text-fg-subtle">
+              <span className="inline-block w-3 h-3 border border-border border-t-brand rounded-full animate-spin" />
               Calculando...
             </div>
           )}
@@ -203,11 +203,11 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-white/8 shrink-0">
+        <div className="px-5 py-3 border-t border-overlay/8 shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2 text-sm text-gray-500 hover:text-gray-200 transition-colors rounded-xl hover:bg-white/5"
+            className="w-full py-2 text-sm text-fg-subtle hover:text-fg transition-colors rounded-xl hover:bg-overlay/5"
           >
             Cerrar
           </button>

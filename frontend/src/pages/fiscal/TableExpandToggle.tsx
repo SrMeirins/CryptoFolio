@@ -17,12 +17,12 @@ export function TableExpandToggle({ icon: Icon, title, count, expanded, onToggle
       type="button"
       onClick={onToggle}
       aria-expanded={expanded}
-      className="flex items-center gap-2 hover:text-white transition-colors"
+      className="flex items-center gap-2 hover:text-fg transition-colors"
     >
-      <Icon size={15} className="text-gray-500" />
+      <Icon size={15} className="text-fg-subtle" />
       <span className="font-medium text-sm">{title}</span>
-      <span className="text-xs text-gray-500">({count} operacion{count !== 1 ? 'es' : ''})</span>
-      {expanded ? <ChevronUp size={13} className="text-gray-500" /> : <ChevronDown size={13} className="text-gray-500" />}
+      <span className="text-xs text-fg-subtle">({count} operacion{count !== 1 ? 'es' : ''})</span>
+      {expanded ? <ChevronUp size={13} className="text-fg-subtle" /> : <ChevronDown size={13} className="text-fg-subtle" />}
     </button>
   )
 }

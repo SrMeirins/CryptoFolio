@@ -21,10 +21,10 @@ export function SortTh({ label, sk, sortKey, sortDir, onSort, right = true, titl
       onClick={() => onSort(sk)}
       title={title}
     >
-      <span className="inline-flex items-center gap-1 hover:text-gray-300 transition-colors">
-        {right && <Icon size={10} className={active ? 'text-accent-blue' : 'text-gray-700 group-hover:text-gray-500'} />}
-        <span className={active ? 'text-accent-blue' : ''}>{label}</span>
-        {!right && <Icon size={10} className={active ? 'text-accent-blue' : 'text-gray-700 group-hover:text-gray-500'} />}
+      <span className="inline-flex items-center gap-1 hover:text-fg transition-colors">
+        {right && <Icon size={10} className={active ? 'text-brand' : 'text-fg-subtle group-hover:text-fg-subtle'} />}
+        <span className={active ? 'text-brand' : ''}>{label}</span>
+        {!right && <Icon size={10} className={active ? 'text-brand' : 'text-fg-subtle group-hover:text-fg-subtle'} />}
       </span>
     </th>
   )

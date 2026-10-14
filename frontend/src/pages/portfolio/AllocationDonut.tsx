@@ -19,10 +19,10 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: { payl
   if (!active || !payload?.[0]) return null
   const item = payload[0].payload
   return (
-    <div className="bg-gray-950/95 backdrop-blur-xs border border-white/10 rounded-xl px-3 py-2.5 shadow-xl text-xs">
-      <p className="font-semibold text-white mono mb-0.5">{item.name}</p>
-      <p className="text-gray-300">{formatMoney(item.value, currency)}</p>
-      <p className="text-gray-500">{item.pct.toFixed(1)}% del portfolio</p>
+    <div className="bg-tooltip/95 backdrop-blur-xs border border-overlay/10 rounded-xl px-3 py-2.5 shadow-xl text-xs">
+      <p className="font-semibold text-fg mono mb-0.5">{item.name}</p>
+      <p className="text-fg">{formatMoney(item.value, currency)}</p>
+      <p className="text-fg-subtle">{item.pct.toFixed(1)}% del portfolio</p>
     </div>
   )
 }
@@ -48,14 +48,14 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
   const hoveredEntry = items.find(item => item.name === hovered)
 
   return (
-    <div className="bg-background-card border border-border rounded-2xl p-6 space-y-5">
+    <div className="bg-background-card border border-border rounded-xl p-6 space-y-5">
       {/* Cabecera */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-white">Distribución del portfolio</h3>
-          <p className="text-xs text-gray-600 mt-0.5">{items.length} activos · actualización cada 5 s</p>
+          <h3 className="text-sm font-semibold text-fg">Distribución del portfolio</h3>
+          <p className="text-xs text-fg-subtle mt-0.5">{items.length} activos · actualización cada 5 s</p>
         </div>
-        <p className="text-xl font-semibold mono text-white">{formatMoney(total, currency)}</p>
+        <p className="text-xl font-semibold mono text-fg">{formatMoney(total, currency)}</p>
       </div>
 
       <div className="flex items-center gap-8">
@@ -90,14 +90,14 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-0.5">
             {hoveredEntry ? (
               <>
-                <p className="text-base font-bold text-white mono tracking-tight">{hoveredEntry.name}</p>
-                <p className="text-2xl font-semibold mono text-white">{hoveredEntry.pct.toFixed(1)}%</p>
-                <p className="text-xs text-gray-500 mono">{formatMoney(hoveredEntry.value, currency)}</p>
+                <p className="text-base font-bold text-fg mono tracking-tight">{hoveredEntry.name}</p>
+                <p className="text-2xl font-semibold mono text-fg">{hoveredEntry.pct.toFixed(1)}%</p>
+                <p className="text-xs text-fg-subtle mono">{formatMoney(hoveredEntry.value, currency)}</p>
               </>
             ) : (
               <>
-                <p className="text-[10px] text-gray-600 uppercase tracking-widest">portfolio</p>
-                <p className="text-lg font-bold mono text-white leading-tight">{formatMoney(total, currency)}</p>
+                <p className="text-[11px] text-fg-subtle uppercase tracking-widest">portfolio</p>
+                <p className="text-lg font-bold mono text-fg leading-tight">{formatMoney(total, currency)}</p>
               </>
             )}
           </div>
@@ -119,10 +119,10 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
                 <div className="flex items-center justify-between mb-0.5">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                    <span className="text-xs font-medium text-gray-200 truncate">{entry.name}</span>
+                    <span className="text-xs font-medium text-fg truncate">{entry.name}</span>
                   </div>
                   <div className="flex items-center gap-3 shrink-0 ml-2">
-                    <span className="text-xs text-gray-500 mono">{formatMoney(entry.value, currency)}</span>
+                    <span className="text-xs text-fg-subtle mono">{formatMoney(entry.value, currency)}</span>
                     <span className="text-xs font-semibold mono w-10 text-right" style={{ color }}>{entry.pct.toFixed(1)}%</span>
                   </div>
                 </div>

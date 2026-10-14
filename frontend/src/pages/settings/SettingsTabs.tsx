@@ -20,12 +20,12 @@ export function SettingsTabs({ active, onChange }: { active: string; onChange: (
           role="tab" aria-selected={active === tab.id}
           className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-all border-b-2 -mb-px ${
             active === tab.id
-              ? 'text-white border-accent-blue'
-              : 'text-gray-500 border-transparent hover:text-gray-300 hover:border-gray-600'
+              ? 'text-fg border-brand'
+              : 'text-fg-subtle border-transparent hover:text-fg hover:border-border'
           }`}>
           {tab.label}
           {(tab.badge ?? 0) > 0 && (
-            <span className="text-xs px-1.5 py-0.5 rounded-full bg-accent-red/15 text-accent-red font-semibold">
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-negative/15 text-negative font-semibold">
               {tab.badge}
             </span>
           )}

@@ -12,7 +12,7 @@ export function EurOnlyBadge() {
   return (
     <span
       title={EUR_ONLY_TEXT}
-      className="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide uppercase text-accent-amber bg-accent-amber/10 border border-accent-amber/25 px-1.5 py-0.5 rounded-md whitespace-nowrap"
+      className="inline-flex items-center gap-1 text-[11px] font-semibold tracking-wide uppercase text-warning bg-warning/10 border border-warning/25 px-1.5 py-0.5 rounded-lg whitespace-nowrap"
     >
       En EUR
       <span className="sr-only">: {EUR_ONLY_TEXT}</span>

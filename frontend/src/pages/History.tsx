@@ -29,10 +29,10 @@ const PAGE_SIZE = 50
 
 // ── SortIcon ─────────────────────────────────────────────────────────────
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
-  if (col !== sortKey) return <ArrowUpDown size={10} className="text-gray-700 ml-1" />
+  if (col !== sortKey) return <ArrowUpDown size={10} className="text-fg-subtle ml-1" />
   return sortDir === 'asc'
-    ? <ArrowUp size={10} className="text-accent-blue ml-1" />
-    : <ArrowDown size={10} className="text-accent-blue ml-1" />
+    ? <ArrowUp size={10} className="text-brand ml-1" />
+    : <ArrowDown size={10} className="text-brand ml-1" />
 }
 
 // ── Filtros ────────────────────────────────────────────────────────────────
@@ -179,28 +179,28 @@ export function History() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Historial</h1>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-fg-subtle mt-0.5">
               {total > 0
                 ? `${total.toLocaleString('es-ES')} transacciones${hasActiveFilters ? ' filtradas' : ''}`
                 : 'Sin transacciones importadas'}
               {hasActiveFilters && totalAmount > 0 && (
-                <span className="ml-2 text-accent-blue font-semibold mono">· {formatMoney(totalAmount, currency)} total</span>
+                <span className="ml-2 text-brand font-semibold mono">· {formatMoney(totalAmount, currency)} total</span>
               )}
             </p>
           </div>
           <div className="flex items-center gap-2">
             {hasActiveFilters && (
               <button type="button" onClick={clearFilters}
-                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-white px-3 py-1.5 border border-border rounded-lg hover:border-gray-500 transition-colors">
+                className="flex items-center gap-1.5 text-xs text-fg-subtle hover:text-fg px-3 py-1.5 border border-border rounded-lg hover:border-fg-subtle transition-colors">
                 <X size={11} /> Limpiar
               </button>
             )}
             <button type="button" onClick={exportCsv}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-background-tertiary border border-border rounded-lg text-xs text-gray-400 hover:text-white hover:border-gray-500 transition-colors">
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-background-tertiary border border-border rounded-lg text-xs text-fg-muted hover:text-fg hover:border-fg-subtle transition-colors">
               <Download size={13} /> CSV
             </button>
             <button type="button" onClick={() => setShowNewTx(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-blue/15 border border-accent-blue/30 rounded-lg text-xs text-accent-blue hover:bg-accent-blue/25 transition-colors font-medium">
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand/15 border border-brand/30 rounded-lg text-xs text-brand hover:bg-brand/25 transition-colors font-medium">
               + Nueva
             </button>
           </div>
@@ -210,17 +210,17 @@ export function History() {
         <div className="flex items-center gap-2 flex-wrap">
           {/* Búsqueda */}
           <div className="relative">
-            <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+            <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
             <input
               ref={searchRef}
               placeholder="Buscar activo o nota…"
               value={filters.search}
               onChange={e => setFilter('search', e.target.value)}
-              className="bg-background-tertiary border border-border rounded-lg pl-7 pr-8 py-1.5 text-xs placeholder-gray-600 focus:outline-hidden focus:border-accent-blue w-48"
+              className="bg-background-tertiary border border-border rounded-lg pl-7 pr-8 py-1.5 text-xs placeholder-fg-subtle focus:outline-hidden focus:border-brand w-48"
             />
             {filters.search && (
               <button type="button" onClick={() => setFilter('search', '')} aria-label="Limpiar búsqueda"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400">
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-muted">
                 <X size={10} />
               </button>
             )}
@@ -228,21 +228,21 @@ export function History() {
 
           {/* Tipo */}
           <select value={filters.type} onChange={e => setFilter('type', e.target.value)}
-            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-gray-400 focus:outline-hidden focus:border-accent-blue">
+            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-fg-muted focus:outline-hidden focus:border-brand">
             <option value="">Todos los tipos</option>
             {Object.entries(OP_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
 
           {/* Wallet */}
           <select value={filters.wallet_id} onChange={e => setFilter('wallet_id', e.target.value)}
-            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-gray-400 focus:outline-hidden focus:border-accent-blue">
+            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-fg-muted focus:outline-hidden focus:border-brand">
             <option value="">Todas las wallets</option>
             {walletList.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
 
           {/* Cuenta */}
           <select value={filters.account} onChange={e => setFilter('account', e.target.value)}
-            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-gray-400 focus:outline-hidden focus:border-accent-blue">
+            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-fg-muted focus:outline-hidden focus:border-brand">
             <option value="">Todas las cuentas</option>
             {KNOWN_ACCOUNTS.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
@@ -258,13 +258,13 @@ export function History() {
           <button type="button" onClick={() => setFilter('manualOnly', !filters.manualOnly)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
               filters.manualOnly
-                ? 'bg-accent-blue/10 border-accent-blue/40 text-accent-blue'
-                : 'bg-background-tertiary border-border text-gray-400 hover:border-accent-blue/30'
+                ? 'bg-brand/10 border-brand/40 text-brand'
+                : 'bg-background-tertiary border-border text-fg-muted hover:border-brand/30'
             }`}>
             <PenLine size={11} /> Manuales
           </button>
 
-          {isFetching && <RefreshCw size={11} className="text-gray-600 animate-spin ml-1" />}
+          {isFetching && <RefreshCw size={11} className="text-fg-subtle animate-spin ml-1" />}
         </div>
       </div>
 
@@ -280,37 +280,37 @@ export function History() {
           )}
 
           {isLoading ? (
-            <div className="flex items-center justify-center py-20 text-gray-500 text-sm">
+            <div className="flex items-center justify-center py-20 text-fg-subtle text-sm">
               <RefreshCw size={16} className="animate-spin mr-2" /> Cargando…
             </div>
           ) : transactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
-              <Package size={28} className="text-gray-700" />
-              <p className="text-gray-500 text-sm">
+              <Package size={28} className="text-fg-subtle" />
+              <p className="text-fg-subtle text-sm">
                 {hasActiveFilters ? 'Sin resultados para estos filtros.' : 'No hay transacciones. Importa un CSV para empezar.'}
               </p>
               {hasActiveFilters && (
-                <button type="button" onClick={clearFilters} className="text-xs text-accent-blue hover:underline">Limpiar filtros</button>
+                <button type="button" onClick={clearFilters} className="text-xs text-brand hover:underline">Limpiar filtros</button>
               )}
             </div>
           ) : (
-            <div className="bg-background-card border border-border rounded-2xl overflow-hidden">
+            <div className="bg-background-card border border-border rounded-xl overflow-hidden">
               <table className="w-full">
                 <thead>
-                  <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-border bg-background-tertiary/40">
+                  <tr className="text-[11px] text-fg-subtle uppercase tracking-wider border-b border-border bg-background-tertiary/40">
                     <th className="text-left px-4 py-2.5 font-medium">
-                      <button type="button" onClick={() => toggleSort('fecha')} className="flex items-center hover:text-gray-300 transition-colors">
+                      <button type="button" onClick={() => toggleSort('fecha')} className="flex items-center hover:text-fg transition-colors">
                         Fecha <SortIcon col="fecha" sortKey={sortKey} sortDir={sortDir} />
                       </button>
                     </th>
                     <th className="text-left px-3 py-2.5 font-medium">Tipo</th>
                     <th className="text-left px-3 py-2.5 font-medium">
-                      <button type="button" onClick={() => toggleSort('activo')} className="flex items-center hover:text-gray-300 transition-colors">
+                      <button type="button" onClick={() => toggleSort('activo')} className="flex items-center hover:text-fg transition-colors">
                         Activo <SortIcon col="activo" sortKey={sortKey} sortDir={sortDir} />
                       </button>
                     </th>
                     <th className="text-right px-3 py-2.5 font-medium">
-                      <button type="button" onClick={() => toggleSort('eur')} className="flex items-center ml-auto hover:text-gray-300 transition-colors">
+                      <button type="button" onClick={() => toggleSort('eur')} className="flex items-center ml-auto hover:text-fg transition-colors">
                         Valor {currency} <SortIcon col="eur" sortKey={sortKey} sortDir={sortDir} />
                       </button>
                     </th>
@@ -325,11 +325,11 @@ export function History() {
                       <tr className="bg-background-tertiary/25">
                         <td colSpan={7} className="px-4 py-1.5">
                           <div className="flex items-center gap-2">
-                            <Calendar size={9} className="text-gray-600" />
-                            <span className="text-[10px] text-gray-600 font-semibold capitalize">
+                            <Calendar size={9} className="text-fg-subtle" />
+                            <span className="text-xs text-fg-subtle font-semibold capitalize">
                               {fmtDateGroup(day + 'T12:00:00')}
                             </span>
-                            <span className="text-[10px] text-gray-700">
+                            <span className="text-xs text-fg-subtle">
                               · {txs.length} operacion{txs.length !== 1 ? 'es' : ''}
                             </span>
                           </div>
@@ -358,7 +358,7 @@ export function History() {
       {/* ── Paginación ── */}
       {total > PAGE_SIZE && (
         <div className="shrink-0 border-t border-border px-4 py-3 flex items-center justify-between bg-background-primary">
-          <span className="text-xs text-gray-600">
+          <span className="text-xs text-fg-subtle">
             {filters.offset + 1}–{Math.min(filters.offset + PAGE_SIZE, total)} de {total.toLocaleString('es-ES')}
           </span>
           <div className="flex items-center gap-1">
@@ -370,7 +370,7 @@ export function History() {
               className="p-1.5 rounded-lg bg-background-tertiary border border-border hover:bg-border disabled:opacity-40 transition-colors">
               <ChevronLeft size={14} />
             </button>
-            <span className="text-xs text-gray-500 px-2 mono">{currentPage + 1} / {totalPages}</span>
+            <span className="text-xs text-fg-subtle px-2 mono">{currentPage + 1} / {totalPages}</span>
             <button
               type="button"
               onClick={() => setFilter('offset', filters.offset + PAGE_SIZE)}

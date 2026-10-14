@@ -75,14 +75,14 @@ export function FiscalSection() {
         title="Método de cálculo de plusvalías"
         description="La normativa española (AEAT) obliga al uso de FIFO para criptoactivos."
       >
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-accent-blue/40 bg-accent-blue/6 w-fit">
-          <Check size={15} className="text-accent-blue shrink-0" />
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-brand/40 bg-brand/6 w-fit">
+          <Check size={15} className="text-brand shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-accent-blue">FIFO</p>
-            <p className="text-xs text-gray-500">First In, First Out</p>
+            <p className="text-sm font-semibold text-brand">FIFO</p>
+            <p className="text-xs text-fg-subtle">First In, First Out</p>
           </div>
         </div>
-        <p className="text-xs text-gray-600 flex items-start gap-1.5">
+        <p className="text-xs text-fg-subtle flex items-start gap-1.5">
           <AlertCircle size={11} className="shrink-0 mt-0.5" />
           FIFO es el único método soportado y el exigido por la AEAT.
         </p>
@@ -98,34 +98,34 @@ export function FiscalSection() {
             <button key={preset} type="button" onClick={() => setThresholdInput(String(preset))}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                 thresholdInput === String(preset)
-                  ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
-                  : 'border-border bg-background-tertiary text-gray-400 hover:border-gray-500 hover:text-gray-300'
+                  ? 'border-brand bg-brand/10 text-brand'
+                  : 'border-border bg-background-tertiary text-fg-muted hover:border-fg-subtle hover:text-fg'
               }`}>
               €{preset.toLocaleString('es-ES')}
             </button>
           ))}
-          <span className="text-xs text-gray-600 ml-1">o introduce un valor personalizado:</span>
+          <span className="text-xs text-fg-subtle ml-1">o introduce un valor personalizado:</span>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-0 bg-background-tertiary border border-border rounded-lg overflow-hidden focus-within:border-accent-blue transition-colors">
-            <span className="px-3 py-2.5 text-sm text-gray-500 border-r border-border bg-background-secondary">€</span>
+          <div className="flex items-center gap-0 bg-background-tertiary border border-border rounded-lg overflow-hidden focus-within:border-brand transition-colors">
+            <span className="px-3 py-2.5 text-sm text-fg-subtle border-r border-border bg-background-secondary">€</span>
             <input type="text" inputMode="numeric" value={thresholdInput}
               onChange={e => setThresholdInput(e.target.value.replace(/[^0-9]/g, ''))}
-              className="px-3 py-2.5 text-sm mono bg-transparent text-white w-32 focus:outline-hidden"
+              className="px-3 py-2.5 text-sm mono bg-transparent text-fg w-32 focus:outline-hidden"
               placeholder="50000" />
           </div>
           <button type="button" onClick={saveThreshold}
             disabled={savingThreshold || thresholdInput === String(threshold) || !thresholdInput}
-            className="px-4 py-2.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors">
+            className="px-4 py-2.5 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors">
             {savingThreshold ? 'Guardando...' : 'Guardar'}
           </button>
           {thresholdInput === String(threshold) && threshold > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-accent-green">
+            <div className="flex items-center gap-1.5 text-xs text-positive">
               <Check size={12} /> Guardado: €{threshold.toLocaleString('es-ES')}
             </div>
           )}
         </div>
-        <p className="text-xs text-gray-600 flex items-start gap-1.5">
+        <p className="text-xs text-fg-subtle flex items-start gap-1.5">
           <AlertCircle size={11} className="shrink-0 mt-0.5" />
           El umbral legal vigente es €50.000. Modifícalo solo si la normativa cambia.
         </p>
@@ -137,7 +137,7 @@ export function FiscalSection() {
         description="Porcentajes aplicables a las ganancias patrimoniales. Los tramos en euros son fijos por ley."
         action={
           <button type="button" onClick={resetTramos}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white border border-border hover:border-gray-500 transition-all shrink-0">
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-fg-subtle hover:text-fg border border-border hover:border-fg-subtle transition-all shrink-0">
             <RotateCcw size={11} /> Restaurar
           </button>
         }
@@ -145,8 +145,8 @@ export function FiscalSection() {
         <div className="space-y-2">
           {TRAMOS_DEFAULT.map((t, i) => (
             <div key={i} className="flex items-center gap-3">
-              <span className="text-xs text-gray-500 w-44 shrink-0">{t.label}</span>
-              <div className="flex items-center gap-1.5 bg-background-tertiary border border-border rounded-lg overflow-hidden focus-within:border-accent-blue transition-colors w-24">
+              <span className="text-xs text-fg-subtle w-44 shrink-0">{t.label}</span>
+              <div className="flex items-center gap-1.5 bg-background-tertiary border border-border rounded-lg overflow-hidden focus-within:border-brand transition-colors w-24">
                 <input
                   type="number"
                   min="0"
@@ -158,12 +158,12 @@ export function FiscalSection() {
                     next[i] = e.target.value
                     setTramosInput(next)
                   }}
-                  className="px-2 py-2 text-sm mono bg-transparent text-white w-14 focus:outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="px-2 py-2 text-sm mono bg-transparent text-fg w-14 focus:outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
-                <span className="pr-2 text-sm text-gray-500">%</span>
+                <span className="pr-2 text-sm text-fg-subtle">%</span>
               </div>
               {parseFloat(tramosInput[i]) !== TRAMOS_DEFAULT[i].tipo && (
-                <span className="text-[10px] text-accent-amber mono">
+                <span className="text-xs text-warning mono">
                   por defecto: {TRAMOS_DEFAULT[i].tipo}%
                 </span>
               )}
@@ -174,22 +174,22 @@ export function FiscalSection() {
         <div className="flex items-center gap-3 pt-1">
           <button type="button" onClick={saveTramos}
             disabled={savingTramos || !tramosModified || !tramosValid}
-            className="px-4 py-2.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors">
+            className="px-4 py-2.5 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors">
             {savingTramos ? 'Guardando...' : 'Guardar tramos'}
           </button>
           {savedTramos && (
-            <div className="flex items-center gap-1.5 text-xs text-accent-green">
+            <div className="flex items-center gap-1.5 text-xs text-positive">
               <Check size={12} /> Guardado
             </div>
           )}
           {!tramosValid && tramosModified && (
-            <p className="text-xs text-accent-red flex items-center gap-1">
+            <p className="text-xs text-negative flex items-center gap-1">
               <AlertCircle size={11} /> Valores entre 0 y 100
             </p>
           )}
         </div>
 
-        <p className="text-xs text-gray-600 flex items-start gap-1.5">
+        <p className="text-xs text-fg-subtle flex items-start gap-1.5">
           <AlertCircle size={11} className="shrink-0 mt-0.5" />
           Modifica solo si la normativa fiscal cambia. Afecta al simulador de venta y a la página Fiscal.
         </p>
@@ -201,15 +201,15 @@ export function FiscalSection() {
         description="Determina la normativa aplicable y los formularios generados."
       >
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-accent-blue/40 bg-accent-blue/6">
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-brand/40 bg-brand/6">
             <span className="text-lg">🇪🇸</span>
             <div>
               <p className="text-sm font-medium">España</p>
-              <p className="text-xs text-gray-500">IRPF · Modelo 100 · Modelo 721</p>
+              <p className="text-xs text-fg-subtle">IRPF · Modelo 100 · Modelo 721</p>
             </div>
-            <Check size={14} className="text-accent-blue ml-2" />
+            <Check size={14} className="text-brand ml-2" />
           </div>
-          <span className="text-xs text-gray-600">Otros países: Próximamente</span>
+          <span className="text-xs text-fg-subtle">Otros países: Próximamente</span>
         </div>
       </SettingsCard>
 

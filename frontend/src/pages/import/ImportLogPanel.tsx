@@ -13,10 +13,10 @@ export function ImportLogPanel({ log, done }: { log: ProgressEvent[]; done: bool
   return (
     <div
       ref={logRef}
-      className="bg-black/50 rounded-lg p-4 font-mono text-xs space-y-1 max-h-64 overflow-y-auto"
+      className="bg-overlay/5 rounded-lg p-4 font-mono text-xs space-y-1 max-h-64 overflow-y-auto"
     >
       {log.length === 0 && (
-        <span className="text-gray-600">Esperando inicio...</span>
+        <span className="text-fg-subtle">Esperando inicio...</span>
       )}
       {log.map((event, absIdx) => ({ event, absIdx })).slice(-300).map(({ event, absIdx }) => {
         const msg = event.message
@@ -29,19 +29,19 @@ export function ImportLogPanel({ log, done }: { log: ProgressEvent[]; done: bool
         const isFifoError      = event.phase === 'fifo' && (isWarn || msg.startsWith('  ⚠'))
         const isImportProgress = event.phase === 'importing' && event.progress !== undefined && !isOkPrice && !isNoPrice && !isWarn && !isPrefetch
         const color =
-          event.phase === 'error' ? 'text-accent-red'         :
-          event.phase === 'done'  ? 'text-accent-green'       :
+          event.phase === 'error' ? 'text-negative'         :
+          event.phase === 'done'  ? 'text-positive'       :
           isRateLimit             ? 'text-orange-400'         :
-          isPrefetch              ? 'text-purple-400'         :
-          isFallback              ? 'text-yellow-600'         :
-          isFifoError             ? 'text-yellow-500'         :
-          isWarn                  ? 'text-yellow-500'         :
-          isOkPrice               ? 'text-accent-green'       :
-          isNoPrice               ? 'text-yellow-600'         :
-          event.phase === 'fifo'  ? 'text-accent-blue'        :
-          isImportProgress        ? 'text-gray-500'           :
-          event.phase === 'prices'? 'text-gray-400'           :
-          'text-gray-300'
+          isPrefetch              ? 'text-accent-purple'         :
+          isFallback              ? 'text-warning'         :
+          isFifoError             ? 'text-warning'         :
+          isWarn                  ? 'text-warning'         :
+          isOkPrice               ? 'text-positive'       :
+          isNoPrice               ? 'text-warning'         :
+          event.phase === 'fifo'  ? 'text-brand'        :
+          isImportProgress        ? 'text-fg-subtle'           :
+          event.phase === 'prices'? 'text-fg-muted'           :
+          'text-fg'
         return (
           <div key={absIdx} className={color}>
             {event.progress !== undefined && event.total !== undefined
@@ -51,7 +51,7 @@ export function ImportLogPanel({ log, done }: { log: ProgressEvent[]; done: bool
           </div>
         )
       })}
-      {!done && <div className="text-accent-blue animate-pulse">▍</div>}
+      {!done && <div className="text-brand animate-pulse">▍</div>}
     </div>
   )
 }

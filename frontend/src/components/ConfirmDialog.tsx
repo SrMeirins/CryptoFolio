@@ -41,15 +41,15 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={messageId}
-        className="bg-background-card border border-border rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl"
+        className="bg-background-card border border-border rounded-xl p-6 w-full max-w-sm mx-4 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             {danger && (
-              <div className="w-9 h-9 rounded-full bg-accent-red/10 flex items-center justify-center shrink-0">
-                <AlertTriangle size={16} className="text-accent-red" />
+              <div className="w-9 h-9 rounded-full bg-negative/10 flex items-center justify-center shrink-0">
+                <AlertTriangle size={16} className="text-negative" />
               </div>
             )}
             <h3 id={titleId} className="font-semibold text-base">{title}</h3>
@@ -58,14 +58,14 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
             aria-label="Cerrar"
-            className="text-gray-500 hover:text-white transition-colors p-1 -mt-1 -mr-1"
+            className="text-fg-subtle hover:text-fg transition-colors p-1 -mt-1 -mr-1"
           >
             <X size={16} />
           </button>
         </div>
 
         {/* Message */}
-        <p id={messageId} className="text-sm text-gray-400 leading-relaxed mb-6">{message}</p>
+        <p id={messageId} className="text-sm text-fg-muted leading-relaxed mb-6">{message}</p>
 
         {/* Buttons */}
         <div className="flex gap-3 justify-end">
@@ -73,7 +73,7 @@ export function ConfirmDialog({
             ref={cancelRef}
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-sm text-gray-400 hover:text-white bg-background-tertiary hover:bg-border rounded-lg transition-colors"
+            className="px-4 py-2 text-sm text-fg-muted hover:text-fg bg-background-tertiary hover:bg-border rounded-lg transition-colors"
           >
             {cancelLabel}
           </button>
@@ -82,8 +82,8 @@ export function ConfirmDialog({
             onClick={onConfirm}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
               danger
-                ? 'bg-accent-red hover:bg-accent-red/80 text-white'
-                : 'bg-accent-blue hover:bg-accent-blue/80 text-white'
+                ? 'bg-negative hover:bg-negative/90 text-on-negative'
+                : 'bg-brand-solid hover:bg-brand-solid/90 text-on-brand'
             }`}
           >
             {confirmLabel}

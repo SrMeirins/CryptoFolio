@@ -3,10 +3,10 @@ import { Download, FileText, Table, Landmark, ChevronDown } from 'lucide-react'
 import { useClickOutside } from '../../hooks/useClickOutside'
 
 const FORMATS = [
-  { key: 'csv',      label: 'CSV Modelo 100', desc: 'Todas las operaciones', icon: FileText, color: 'text-accent-blue'  },
-  { key: 'rentaweb', label: 'Renta Web',      desc: 'Formato oficial AEAT',  icon: Landmark,  color: 'text-accent-green' },
-  { key: 'excel',    label: 'Excel',          desc: 'Para asesor fiscal',    icon: Table,     color: 'text-accent-amber' },
-  { key: 'pdf',      label: 'PDF',            desc: 'Resumen formal',       icon: Download,  color: 'text-accent-red'   },
+  { key: 'csv',      label: 'CSV Modelo 100', desc: 'Todas las operaciones', icon: FileText, color: 'text-brand'  },
+  { key: 'rentaweb', label: 'Renta Web',      desc: 'Formato oficial AEAT',  icon: Landmark,  color: 'text-positive' },
+  { key: 'excel',    label: 'Excel',          desc: 'Para asesor fiscal',    icon: Table,     color: 'text-warning' },
+  { key: 'pdf',      label: 'PDF',            desc: 'Resumen formal',       icon: Download,  color: 'text-negative'   },
 ]
 
 export function ExportPanel({ year }: { year: number }) {
@@ -39,7 +39,7 @@ export function ExportPanel({ year }: { year: number }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-56 bg-background-card border border-border rounded-2xl shadow-2xl z-20 overflow-hidden" role="menu">
+        <div className="absolute right-0 top-full mt-2 w-56 bg-background-card border border-border rounded-xl shadow-2xl z-20 overflow-hidden" role="menu">
           {FORMATS.map(f => (
             <button
               key={f.key}
@@ -51,7 +51,7 @@ export function ExportPanel({ year }: { year: number }) {
               <f.icon size={16} className={f.color} />
               <div>
                 <div className="text-sm font-medium">{f.label}</div>
-                <div className="text-[11px] text-gray-500">{f.desc}</div>
+                <div className="text-xs text-fg-subtle">{f.desc}</div>
               </div>
             </button>
           ))}

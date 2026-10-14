@@ -82,9 +82,9 @@ export function formatAmount(value: number | string | null | undefined, decimals
 }
 
 export function pnlColor(value: number): string {
-  if (value > 0) return 'text-accent-green'
-  if (value < 0) return 'text-accent-red'
-  return 'text-gray-400'
+  if (value > 0) return 'text-positive'
+  if (value < 0) return 'text-negative'
+  return 'text-fg-muted'
 }
 
 export function formatPct(value: number): string {

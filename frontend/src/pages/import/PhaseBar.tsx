@@ -54,7 +54,7 @@ export function PhaseBar({ log, done, isError, currentPhase, currentIdx }: {
           >
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${styles.iconBg}`}>
               {status === 'current'
-                ? <RefreshCw size={15} className="text-accent-blue animate-spin" />
+                ? <RefreshCw size={15} className="text-brand animate-spin" />
                 : <Icon size={15} className={styles.iconColor} />
               }
             </div>

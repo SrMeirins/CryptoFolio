@@ -84,9 +84,9 @@ export function Fiscal() {
   if (hasError && activeYear) {
     return (
       <div className="p-6 flex flex-col items-center justify-center h-64 gap-3">
-        <AlertTriangle size={32} className="text-accent-red" />
-        <p className="text-gray-300 text-sm font-medium">Error al cargar los datos fiscales de {activeYear}</p>
-        <p className="text-gray-600 text-xs">Inténtalo de nuevo en unos segundos.</p>
+        <AlertTriangle size={32} className="text-negative" />
+        <p className="text-fg text-sm font-medium">Error al cargar los datos fiscales de {activeYear}</p>
+        <p className="text-fg-subtle text-xs">Inténtalo de nuevo en unos segundos.</p>
       </div>
     )
   }
@@ -94,9 +94,9 @@ export function Fiscal() {
   if (!activeYear) {
     return (
       <div className="p-6 flex flex-col items-center justify-center h-64 gap-3">
-        <FileText size={32} className="text-gray-600" />
-        <p className="text-gray-500 text-sm">No hay datos fiscales disponibles.</p>
-        <p className="text-gray-600 text-xs">Importa transacciones y ejecuta el motor FIFO primero.</p>
+        <FileText size={32} className="text-fg-subtle" />
+        <p className="text-fg-subtle text-sm">No hay datos fiscales disponibles.</p>
+        <p className="text-fg-subtle text-xs">Importa transacciones y ejecuta el motor FIFO primero.</p>
       </div>
     )
   }
@@ -115,10 +115,10 @@ export function Fiscal() {
             <h1 className="text-2xl font-semibold">Módulo Fiscal</h1>
             <EurOnlyBadge />
           </div>
-          <p className="text-xs text-gray-500 mt-0.5">Método FIFO · Normativa española vigente · Importes en EUR</p>
+          <p className="text-xs text-fg-subtle mt-0.5">Método FIFO · Normativa española vigente · Importes en EUR</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 text-[11px] text-gray-600">
+          <div className="flex items-center gap-1 text-xs text-fg-subtle">
             <Info size={11} />
             Información orientativa
           </div>
@@ -151,16 +151,16 @@ export function Fiscal() {
           {carryforward && <CompensacionPerdidas data={carryforward} />}
 
           {modelo721Loading ? (
-            <div className="bg-background-card border border-border rounded-2xl p-5 animate-pulse">
-              <div className="h-4 bg-background-tertiary rounded-sm w-48" />
+            <div className="bg-background-card border border-border rounded-xl p-5 animate-pulse">
+              <div className="h-4 bg-background-tertiary rounded-lg w-48" />
             </div>
           ) : modelo721 && (
             <Modelo721Card data={modelo721} activeYear={activeYear} />
           )}
 
           {eventsLoading ? (
-            <div className="bg-background-card border border-border rounded-2xl p-5 animate-pulse">
-              <div className="h-4 bg-background-tertiary rounded-sm w-64" />
+            <div className="bg-background-card border border-border rounded-xl p-5 animate-pulse">
+              <div className="h-4 bg-background-tertiary rounded-lg w-64" />
             </div>
           ) : events && (
             <>
@@ -171,7 +171,7 @@ export function Fiscal() {
         </>
       )}
 
-      <div className="flex items-start gap-2 p-4 bg-background-tertiary/50 rounded-2xl text-[11px] text-gray-600 border border-border">
+      <div className="flex items-start gap-2 p-4 bg-background-tertiary/50 rounded-xl text-xs text-fg-subtle border border-border">
         <Info size={12} className="shrink-0 mt-0.5" />
         Información orientativa. Los cálculos se basan en el método FIFO según la normativa española vigente.
         Consulta con un asesor fiscal antes de presentar tu declaración de la renta.

@@ -14,8 +14,8 @@ export function AdvancedSection() {
         aria-expanded={open}
         className="w-full flex items-center justify-between px-5 py-4 hover:bg-background-tertiary/50 transition-colors"
       >
-        <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Opciones avanzadas</span>
-        {open ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
+        <span className="text-xs text-fg-subtle font-medium uppercase tracking-wider">Opciones avanzadas</span>
+        {open ? <ChevronUp size={14} className="text-fg-subtle" /> : <ChevronDown size={14} className="text-fg-subtle" />}
       </button>
 
       {open && (
@@ -23,7 +23,7 @@ export function AdvancedSection() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Recalcular FIFO manualmente</p>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-fg-subtle mt-0.5">
                 Util si modificaste datos directamente en la DB o borraste un import
               </p>
             </div>
@@ -38,7 +38,7 @@ export function AdvancedSection() {
             </button>
           </div>
           {result && (
-            <p className={`text-xs ${result.startsWith('Error') ? 'text-accent-red' : 'text-accent-green'}`}>{result}</p>
+            <p className={`text-xs ${result.startsWith('Error') ? 'text-negative' : 'text-positive'}`}>{result}</p>
           )}
         </div>
       )}

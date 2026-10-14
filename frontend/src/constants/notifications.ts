@@ -1,5 +1,6 @@
 import { AlertCircle, AlertTriangle, Info, type LucideIcon } from 'lucide-react'
 import type { Notification } from '../api/portfolio'
+import { T } from '../utils/colors'
 
 // Ruta a la que navega cada tipo de aviso del sistema al hacer click
 // (components/TopBar.tsx: panel de campana; pages/settings/GeneralSection.tsx:
@@ -16,7 +17,7 @@ export const NOTIFICATION_ROUTES: Record<string, string> = {
 // mismo icono (AlertCircle) para 'error' y 'warning', indistinguibles salvo
 // por color (viola WCAG — nunca información solo por color).
 export const NOTIFICATION_TYPE_META: Record<Notification['type'], { icon: LucideIcon; color: string; label: string }> = {
-  error:   { icon: AlertCircle,   color: '#e74c3c', label: 'Error' },
-  warning: { icon: AlertTriangle, color: '#f59e0b', label: 'Aviso' },
-  info:    { icon: Info,          color: '#6366f1', label: 'Info'  },
+  error:   { icon: AlertCircle,   color: T.negative, label: 'Error' },
+  warning: { icon: AlertTriangle, color: T.warning, label: 'Aviso' },
+  info:    { icon: Info,          color: T.info, label: 'Info'  },
 }

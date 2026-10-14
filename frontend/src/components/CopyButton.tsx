@@ -21,9 +21,9 @@ export function CopyButton({ text, size = 11, title = 'Copiar', className = '' }
       onClick={handleCopy}
       aria-label={title}
       title={title}
-      className={`text-gray-700 hover:text-gray-400 transition-colors inline-flex items-center shrink-0 ${className}`}
+      className={`text-fg-subtle hover:text-fg-muted transition-colors inline-flex items-center shrink-0 ${className}`}
     >
-      {copied ? <Check size={size} className="text-accent-green" /> : <Copy size={size} />}
+      {copied ? <Check size={size} className="text-positive" /> : <Copy size={size} />}
     </button>
   )
 }

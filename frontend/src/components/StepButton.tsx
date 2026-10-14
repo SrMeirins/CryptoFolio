@@ -30,7 +30,7 @@ export function StepButton({ label, onStep }: { label: string; onStep: () => voi
     <button
       type="button"
       {...hold}
-      className="px-3 py-2.5 text-gray-500 hover:text-white hover:bg-white/8 active:bg-white/12 active:scale-90 transition-all text-base leading-none select-none"
+      className="px-3 py-2.5 text-fg-subtle hover:text-fg hover:bg-overlay/8 active:bg-overlay/12 active:scale-90 transition-all text-base leading-none select-none"
     >
       {label}
     </button>

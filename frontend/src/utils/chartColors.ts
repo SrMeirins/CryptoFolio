@@ -25,7 +25,7 @@ export type ChartColors = Record<keyof typeof CHART_COLOR_VARS, string>
 
 // Valores del tema oscuro, por si las variables no están disponibles (p. ej. en tests).
 export const DARK_CHART_COLORS: ChartColors = {
-  up: '#00c896', down: '#e74c3c', gain: '#10b981', loss: '#ef4444', warn: '#f59e0b',
+  up: '#0ecb81', down: '#f75369', gain: '#0ecb81', loss: '#f75369', warn: '#f59e0b',
   neutral: '#6b7280', neutralSoft: '#4b5563', axis: '#4b5563', axisMuted: '#6b7280',
   grid: 'rgba(255,255,255,0.04)', gridStrong: '#2a2d3e', cursor: 'rgba(255,255,255,0.15)',
   cursorSoft: 'rgba(255,255,255,0.03)', cursorLine: 'rgba(255,255,255,0.1)', tooltipBg: '#0f1117', tooltipBorder: 'rgba(255,255,255,0.08)',
