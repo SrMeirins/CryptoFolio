@@ -54,6 +54,30 @@ describe('API — moneda de visualización USD (#175)', () => {
     expect(Number(res.body[0].avg_price_usd)).toBeCloseTo(1, 6);
   });
 
+  it('GET /fifo/lots: si algún lote del grupo no tiene tipo USD, el coste en USD es nulo (#182)', async () => {
+    const spot = (await pool.query(`SELECT id FROM wallets WHERE name = 'Binance Spot'`)).rows[0].id;
+    const tx = (await pool.query(`SELECT id FROM transactions WHERE asset = 'XRP' LIMIT 1`)).rows[0].id;
+    await pool.query(
+      `INSERT INTO fifo_lots (asset, quantity_original, quantity_remaining, cost_basis_eur, price_per_unit_eur, fee_eur, open_transaction_id, opened_at, wallet_id, usd_per_eur)
+       VALUES ('ADA', 10, 10, 10, 1, 0, $1, '2026-01-02T10:00:00Z', $2, 1.25),
+              ('ADA', 10, 10, 20, 2, 0, $1, '2026-01-03T10:00:00Z', $2, NULL)`,
+      [tx, spot],
+    );
+    try {
+      const res = await request(app).get('/api/fifo/lots');
+      const ada = res.body.find((l: { asset: string }) => l.asset === 'ADA');
+      expect(Number(ada.cost_basis_eur)).toBeCloseTo(30, 6);
+      // Antes: 12,5 $ (solo el lote con tipo), un coste incompleto sin aviso.
+      expect(ada.cost_basis_usd).toBeNull();
+      expect(ada.avg_price_usd).toBeNull();
+      // Los grupos con tipo en todos sus lotes no cambian.
+      const xrp = res.body.find((l: { asset: string }) => l.asset === 'XRP');
+      expect(Number(xrp.cost_basis_usd)).toBeCloseTo(50, 6);
+    } finally {
+      await pool.query(`DELETE FROM fifo_lots WHERE asset = 'ADA'`);
+    }
+  });
+
   it('GET /fifo/eur-flow?currency=USD convierte cada movimiento con el tipo de su fecha', async () => {
     const eur = await request(app).get('/api/fifo/eur-flow');
     const usd = await request(app).get('/api/fifo/eur-flow?currency=USD');
