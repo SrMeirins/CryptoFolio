@@ -5,6 +5,7 @@ import { PHASES, BANNER_STYLES, type BannerKind } from './progressStageHelpers'
 import { PhaseBar } from './PhaseBar'
 import { ImportLogPanel } from './ImportLogPanel'
 import { ImportSummary } from './ImportSummary'
+import { cardClasses } from '../../components/ui'
 
 export function ProgressStage({ log, done, onGoToDashboard }: {
   log: ProgressEvent[]
@@ -26,7 +27,7 @@ export function ProgressStage({ log, done, onGoToDashboard }: {
   )
 
   return (
-    <div className="card space-y-6">
+    <div className={cardClasses('md', 'space-y-6')}>
       <PhaseBar log={log} done={done} isError={isError} currentPhase={currentPhase} currentIdx={currentIdx} />
 
       {!done && !isError && (() => {

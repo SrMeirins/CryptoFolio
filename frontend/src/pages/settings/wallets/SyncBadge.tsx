@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import type { WalletAddress } from '../../../api/portfolio'
 import { SYNC_BADGE } from './helpers'
+import { iconButtonClasses } from '../../../components/ui'
 
 export function SyncBadge({ addr, onSync, syncing }: { addr: WalletAddress; onSync: () => void; syncing: boolean }) {
   const [showDetail, setShowDetail] = useState(false)
@@ -15,7 +16,7 @@ export function SyncBadge({ addr, onSync, syncing }: { addr: WalletAddress; onSy
       </button>
       <button type="button" onClick={onSync} disabled={syncing}
         title="Verificar ahora" aria-label="Verificar ahora"
-        className="p-1 text-fg-subtle hover:text-brand disabled:opacity-40 transition-colors">
+        className={iconButtonClasses('sm', false, '', 'brand')}>
         <RefreshCw size={11} className={syncing ? 'animate-spin' : ''} />
       </button>
       {showDetail && addr.sync_details.length > 0 && (

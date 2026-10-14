@@ -3,6 +3,7 @@ import { ChevronDown, Check } from 'lucide-react'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { SPECIAL_DESTINATIONS } from './specialDestinations'
 import { T } from '../../utils/colors'
+import { cardClasses } from '../../components/ui'
 
 const SPECIAL_TRIGGER_CLASS: Record<string, string> = {
   __lost__: 'border-negative/40 bg-negative/8',
@@ -57,7 +58,7 @@ export function WithdrawalSelector({ value, coldWallets, onChange }: {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-72 rounded-xl border border-border bg-background-card shadow-2xl z-50 overflow-hidden">
+        <div className={cardClasses('none', 'absolute right-0 top-full mt-1.5 w-72 shadow-2xl z-50 overflow-hidden')}>
           {coldWallets.length > 0 && (
             <div>
               <p className="px-3 pt-2.5 pb-1 text-xs font-semibold text-fg-subtle uppercase tracking-wider">Mis wallets</p>

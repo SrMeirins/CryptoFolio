@@ -16,6 +16,7 @@ import { useSetupSeen } from '../hooks/useSetupSeen'
 import { portfolioApi } from '../api/portfolio'
 import { waitForImportCommit, readProgressStream } from './import/importStream'
 import { useWithdrawalDestinations, useDepositCosts, clearImportSessionStorage } from './import/useImportSessionState'
+import { cardClasses, buttonClasses, iconButtonClasses } from '../components/ui'
 
 export function ImportPage() {
   const queryClient = useQueryClient()
@@ -190,7 +191,7 @@ export function ImportPage() {
             type="button"
             onClick={markSetupSeen}
             aria-label="Cerrar aviso"
-            className="text-fg-subtle hover:text-fg transition-colors shrink-0"
+            className={iconButtonClasses('sm')}
           >
             <X size={15} />
           </button>
@@ -203,7 +204,7 @@ export function ImportPage() {
           <button
             type="button"
             onClick={() => setShowManualTx(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-background-tertiary hover:bg-border border border-border rounded-lg text-sm font-medium transition-colors"
+            className={buttonClasses('secondary', 'md', 'flex')}
           >
             <Plus size={14} />
             Nueva transaccion
@@ -259,7 +260,7 @@ export function ImportPage() {
       )}
 
       {stage === 'catalog' && catalogingOp && (
-        <div className="card p-0 overflow-hidden">
+        <div className={cardClasses('none', 'overflow-hidden')}>
           <OperationWizard
             unknownOperation={
               preview?.unknownOperationSamples?.[catalogingOp] ?? {

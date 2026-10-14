@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Search, Check, X, Plus } from 'lucide-react'
 import type { Network } from '../../../api/portfolio'
 import { OTHER_NETWORK } from './helpers'
+import { iconButtonClasses } from '../../../components/ui'
 
 export function NetworkPicker({ networks, value, onChange }: {
   networks: Network[]
@@ -46,7 +47,7 @@ export function NetworkPicker({ networks, value, onChange }: {
           placeholder="Bitcoin, ETH, Solana..."
           className="flex-1 bg-transparent text-sm text-fg placeholder-fg-subtle focus:outline-hidden" />
         {search
-          ? <button type="button" onClick={() => setSearch('')} className="text-fg-subtle hover:text-fg"><X size={13} /></button>
+          ? <button type="button" aria-label="Borrar búsqueda" onClick={() => setSearch('')} className={iconButtonClasses('sm')}><X size={13} /></button>
           : <span className="text-xs text-fg-subtle">{networks.length} redes</span>
         }
       </div>

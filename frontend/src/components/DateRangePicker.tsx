@@ -5,6 +5,7 @@ import {
   DAYS_ES, MONTHS_ES, today, startOfMonth, startOfYear,
   parseDate, fmtShort, getDaysInGrid, inDateRange,
 } from '../utils/date'
+import { iconButtonClasses } from './ui'
 
 interface Props {
   from:     string   // 'YYYY-MM-DD' o ''
@@ -173,7 +174,7 @@ export function DateRangePicker({ from, to, onChange }: Props) {
             type="button"
             onClick={e => { e.stopPropagation(); onChange('', '') }}
             aria-label="Quitar filtro de fechas"
-            className="ml-0.5 text-brand/60 hover:text-brand transition-colors"
+            className={iconButtonClasses('sm', false, 'ml-0.5', 'brand')}
           >
             <X size={10} />
           </button>
@@ -223,7 +224,7 @@ export function DateRangePicker({ from, to, onChange }: Props) {
               type="button"
               onClick={prevMonth}
               aria-label="Mes anterior"
-              className="p-1.5 rounded-lg text-fg-subtle hover:text-fg hover:bg-overlay/8 transition-all active:scale-90"
+              className={iconButtonClasses('md')}
             >
               <ChevronLeft size={14} />
             </button>
@@ -234,7 +235,7 @@ export function DateRangePicker({ from, to, onChange }: Props) {
               type="button"
               onClick={nextMonth}
               aria-label="Mes siguiente"
-              className="p-1.5 rounded-lg text-fg-subtle hover:text-fg hover:bg-overlay/8 transition-all active:scale-90"
+              className={iconButtonClasses('md')}
             >
               <ChevronRight size={14} />
             </button>

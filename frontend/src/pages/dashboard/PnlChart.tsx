@@ -10,6 +10,7 @@ import {
   PNL_PERIODS, METRIC_LABELS, buildPnlSeries, madridToday, metricFor, periodFrom, type PnlPeriod, type PnlPoint,
 } from '../../utils/pnlChart'
 import { useChartColors } from '../../hooks/useChartColors'
+import { SegmentedControl, cardClasses } from '../../components/ui'
 
 // Gráfico de rentabilidad acumulada del Dashboard (#166), sobre
 // GET /api/v1/pnl/daily. Mientras el backend descarga precios de cierre
@@ -61,24 +62,11 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
   const color = positive ? c.up : c.down
 
   return (
-    <div className="bg-background-card border border-border rounded-xl px-5 py-5">
+    <div className={cardClasses('none', 'px-5 py-5')}>
       <div className="flex items-center justify-between mb-1 gap-3 flex-wrap">
         {headerLeft}
-        <div className="flex gap-1" role="group" aria-label="Periodo del gráfico de rentabilidad">
-          {PNL_PERIODS.map(p => (
-            <button
-              key={p}
-              type="button"
-              aria-pressed={period === p}
-              onClick={() => setPeriod(p)}
-              className={`text-xs font-medium px-2.5 py-1 rounded-lg transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
-                period === p ? 'bg-overlay/10 text-fg' : 'text-fg-subtle hover:text-fg-muted'
-              }`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl label="Periodo del gráfico de rentabilidad" value={period} onChange={setPeriod}
+          options={PNL_PERIODS.map(p => ({ value: p, label: p }))} />
       </div>
 
       <div className="flex items-center gap-3 mb-4 min-h-6 flex-wrap" aria-live="polite">

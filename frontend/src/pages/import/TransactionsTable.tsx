@@ -4,6 +4,7 @@ import { AccountChip } from './AccountChip'
 import { ACCOUNT_COLORS } from './types'
 import type { PreviewTransaction } from './types'
 import { T } from '../../utils/colors'
+import { cardClasses } from '../../components/ui'
 
 export function TransactionsTable({ newCount, newTxs, showTxTable, setShowTxTable, txPage, setTxPage, txPageSize }: {
   newCount: number
@@ -18,7 +19,7 @@ export function TransactionsTable({ newCount, newTxs, showTxTable, setShowTxTabl
   const totalPages = Math.ceil(newTxs.length / txPageSize)
 
   return (
-    <div className="card p-0">
+    <div className={cardClasses('none')}>
       <button
         type="button"
         onClick={() => setShowTxTable(!showTxTable)}

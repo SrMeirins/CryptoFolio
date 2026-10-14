@@ -7,6 +7,7 @@ import { useToast } from '../hooks/useToast'
 import { useModalA11y } from '../hooks/useModalA11y'
 import { ManualTxPreviewPanel } from './ManualTxPreviewPanel'
 import { ManualTxDoneScreen } from './ManualTxDoneScreen'
+import { cardClasses, buttonClasses, iconButtonClasses } from './ui'
 
 interface ManualTxModalProps {
   onClose: () => void
@@ -140,7 +141,7 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="bg-background-card border border-border rounded-xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl"
+        className={cardClasses('none', 'w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl')}
       >
 
         {step === 'wizard' && (
@@ -155,7 +156,7 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
           <>
             <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
               <h2 id={titleId} className="font-semibold text-lg">{isEditMode ? 'Confirmar edición' : 'Confirmar transacción'}</h2>
-              <button type="button" onClick={onClose} aria-label="Cerrar" className="text-fg-subtle hover:text-fg transition-colors p-1">
+              <button type="button" onClick={onClose} aria-label="Cerrar" className={iconButtonClasses('sm')}>
                 <X size={18} />
               </button>
             </div>
@@ -191,7 +192,7 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
                 type="button"
                 onClick={handleConfirm}
                 disabled={step === 'saving' || previewLoading}
-                className="flex items-center gap-2 px-5 py-2 bg-positive text-on-positive hover:bg-positive/90 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
+                className={buttonClasses('success', 'lg', 'flex')}
               >
                 {step === 'saving'
                   ? <><Loader size={14} className="animate-spin" /> {isEditMode ? 'Actualizando y recalculando FIFO...' : 'Guardando y recalculando FIFO...'}</>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { FileText, RefreshCw, Trash2, Calendar, Hash, ChevronRight } from 'lucide-react'
 import type { ImportRecord } from '../../api/portfolio'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { iconButtonClasses } from '../../components/ui'
 
 export function ImportsList({ imports, onDelete }: {
   imports: ImportRecord[]
@@ -85,7 +86,7 @@ export function ImportsList({ imports, onDelete }: {
               <button
                 type="button"
                 onClick={() => setConfirmId(imp.id)}
-                className="p-1.5 rounded-lg transition-colors shrink-0 text-fg-subtle hover:text-negative hover:bg-negative/10"
+                className={iconButtonClasses('md', false, '', 'danger')}
                 title="Borrar importación"
               >
                 <Trash2 size={14} />

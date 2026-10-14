@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { CheckCircle, AlertTriangle, XCircle, Info, X } from 'lucide-react'
 import { ToastContext, type ToastItem, type ToastType } from './toastContext'
+import { iconButtonClasses } from './ui'
 
 const ICONS: Record<ToastType, React.ReactNode> = {
   success: <CheckCircle  size={15} className="text-positive  shrink-0 mt-0.5" />,
@@ -102,7 +103,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               type="button"
               onClick={() => remove(t.id)}
               aria-label="Cerrar notificación"
-              className="text-fg-subtle hover:text-fg-muted transition-colors shrink-0 mt-0.5"
+              className={iconButtonClasses('sm', false, 'mt-0.5')}
             >
               <X size={13} />
             </button>

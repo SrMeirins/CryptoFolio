@@ -11,6 +11,7 @@ import { SetupBanner } from './settings/SetupBanner'
 import { SettingsTabs } from './settings/SettingsTabs'
 import { VALID_TABS } from './settings/validTabs'
 import { useSetupSeen } from '../hooks/useSetupSeen'
+import { tabId, tabPanelId } from '../components/ui'
 
 export function Settings() {
   const { setupSeen, markSetupSeen } = useSetupSeen()
@@ -54,7 +55,7 @@ export function Settings() {
         <SettingsTabs active={activeTab} onChange={handleTabChange} />
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden" id={tabPanelId('settings')} role="tabpanel" aria-labelledby={tabId('settings', activeTab)}>
         {activeTab === 'wallets' && (
           <div className="h-full overflow-y-auto px-6 py-6">
             <WalletsSection onWalletCreated={markSetupSeen} />

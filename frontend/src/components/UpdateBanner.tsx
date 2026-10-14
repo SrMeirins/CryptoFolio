@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { RefreshCw, Download, ArrowUpCircle } from 'lucide-react'
+import { buttonClasses } from './ui'
 
 export function UpdateBanner() {
   const bridge = window.__CRYPTOFOLIO__
@@ -52,7 +53,7 @@ export function UpdateBanner() {
       <button
         onClick={handleUpdate}
         disabled={state.installing}
-        className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-lg bg-brand-solid hover:bg-brand-solid/90 disabled:opacity-50 disabled:cursor-not-allowed text-on-brand text-xs font-medium transition-colors"
+        className={buttonClasses('primary', 'sm', 'shrink-0 flex gap-1.5')}
       >
         {state.installing
           ? <><RefreshCw size={12} className="animate-spin" /> Instalando...</>

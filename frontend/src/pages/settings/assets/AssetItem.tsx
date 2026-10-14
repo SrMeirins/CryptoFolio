@@ -3,6 +3,7 @@ import type { AssetMetadata } from '../../../api/portfolio'
 import { SOURCE_META, fmtPrice } from './helpers'
 import { AssetEditPanel } from './AssetEditPanel'
 import { T, alpha, ink } from '../../../utils/colors'
+import { cardClasses, iconButtonClasses } from '../../../components/ui'
 
 export function AssetItem({ asset, price, isEditing, onEdit, onSaved, onDelete }: {
   asset: AssetMetadata; price: number | undefined
@@ -12,7 +13,7 @@ export function AssetItem({ asset, price, isEditing, onEdit, onSaved, onDelete }
   const activePair = asset.binance_eur_pair ?? asset.binance_usdt_pair ?? asset.binance_btc_pair
 
   return (
-    <div className="rounded-xl border border-border bg-background-card" style={{ borderLeftColor: src.color, borderLeftWidth: 3 }}>
+    <div className={cardClasses('none')} style={{ borderLeftColor: src.color, borderLeftWidth: 3 }}>
       <div className="group flex items-center gap-4 px-4 py-3">
         <div className="w-28 shrink-0">
           <div className="flex items-center gap-1.5">
@@ -36,11 +37,11 @@ export function AssetItem({ asset, price, isEditing, onEdit, onSaved, onDelete }
         </div>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
           <button type="button" onClick={onEdit} aria-label="Editar activo"
-            className="p-1.5 text-fg-subtle hover:text-fg hover:bg-background-tertiary rounded-lg transition-colors">
+            className={iconButtonClasses('md')}>
             <Edit2 size={12} />
           </button>
           <button type="button" onClick={onDelete} aria-label="Eliminar activo"
-            className="p-1.5 text-fg-subtle hover:text-negative hover:bg-negative/10 rounded-lg transition-colors">
+            className={iconButtonClasses('md', false, '', 'danger')}>
             <Trash2 size={12} />
           </button>
         </div>

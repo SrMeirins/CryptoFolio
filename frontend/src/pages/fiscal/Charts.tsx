@@ -9,6 +9,7 @@ import { PNL_THRESHOLD } from './constants'
 import { FiscalChartCard } from './FiscalChartCard'
 import type { YearOverview, MonthlyData, BreakdownItem } from './types'
 import { useChartColors } from '../../hooks/useChartColors'
+import { cardClasses } from '../../components/ui'
 
 function ChartTooltip({ active, payload, label }: {
   active?: boolean
@@ -17,7 +18,7 @@ function ChartTooltip({ active, payload, label }: {
 }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-background-card border border-border rounded-xl px-3 py-2 text-xs shadow-lg">
+    <div className={cardClasses('none', 'px-3 py-2 text-xs shadow-lg')}>
       <p className="text-fg-muted mb-1">{label}</p>
       {payload.map((p, i) => (
         <p key={i} className={`font-bold mono ${(p.value ?? 0) >= 0 ? 'text-positive' : 'text-negative'}`}>

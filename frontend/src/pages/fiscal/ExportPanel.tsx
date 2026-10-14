@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, FileText, Table, Landmark, ChevronDown } from 'lucide-react'
 import { useClickOutside } from '../../hooks/useClickOutside'
+import { cardClasses, buttonClasses } from '../../components/ui'
 
 const FORMATS = [
   { key: 'csv',      label: 'CSV Modelo 100', desc: 'Todas las operaciones', icon: FileText, color: 'text-brand'  },
@@ -31,7 +32,7 @@ export function ExportPanel({ year }: { year: number }) {
         onClick={() => setOpen(o => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-2 px-4 py-2 bg-background-tertiary border border-border rounded-xl hover:bg-border transition-colors text-sm font-medium"
+        className={buttonClasses('secondary', 'md', 'flex')}
       >
         <Download size={14} />
         Exportar
@@ -39,7 +40,7 @@ export function ExportPanel({ year }: { year: number }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-56 bg-background-card border border-border rounded-xl shadow-2xl z-20 overflow-hidden" role="menu">
+        <div className={cardClasses('none', 'absolute right-0 top-full mt-2 w-56 shadow-2xl z-20 overflow-hidden')} role="menu">
           {FORMATS.map(f => (
             <button
               key={f.key}

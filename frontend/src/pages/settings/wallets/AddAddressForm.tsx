@@ -4,6 +4,7 @@ import type { Network } from '../../../api/portfolio'
 import { OTHER_NETWORK, getAddressPlaceholder, inputClass } from './helpers'
 import { NetworkPicker } from './NetworkPicker'
 import { NetworkApiKeyField } from './NetworkApiKeyField'
+import { buttonClasses } from '../../../components/ui'
 
 export function AddAddressForm({ networks, onSave, onCancel }: {
   networks: Network[]
@@ -68,7 +69,7 @@ export function AddAddressForm({ networks, onSave, onCancel }: {
       <div className="flex justify-end gap-2 pt-1">
         <button type="button" onClick={onCancel} className="px-3 py-1.5 text-xs text-fg-muted hover:text-fg transition-colors">Cancelar</button>
         <button type="button" onClick={handleSave} disabled={!canSave}
-          className="px-3 py-1.5 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors">
+          className={buttonClasses('primary', 'sm')}>
           Añadir red
         </button>
       </div>

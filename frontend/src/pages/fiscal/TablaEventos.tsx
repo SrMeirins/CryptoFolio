@@ -6,6 +6,7 @@ import { PNL_THRESHOLD } from './constants'
 import { TableExpandToggle } from './TableExpandToggle'
 import { FiscalEventRow } from './FiscalEventRow'
 import type { FiscalEvent, FiscalSummary } from './types'
+import { cardClasses, iconButtonClasses } from '../../components/ui'
 
 type SortKey = 'fecha' | 'activoTransmitido' | 'gananciaPerdidaEur' | 'valorTransmisionEur'
 type SortDir  = 'asc' | 'desc'
@@ -67,7 +68,7 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
   const hasAnyFilter  = filterAsset || filterTipo !== 'all' || hasDateFilter
 
   return (
-    <div className="bg-background-card border border-border rounded-xl overflow-hidden">
+    <div className={cardClasses('none', 'overflow-hidden')}>
       <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-wrap gap-2">
         <TableExpandToggle
           icon={TrendingUp}
@@ -96,7 +97,7 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
                 title="Hasta"
               />
               {hasDateFilter && (
-                <button type="button" onClick={() => { setFilterFrom(''); setFilterTo('') }} className="text-fg-subtle hover:text-fg ml-0.5">
+                <button type="button" aria-label="Quitar filtro de fechas" onClick={() => { setFilterFrom(''); setFilterTo('') }} className={iconButtonClasses('sm', false, 'ml-0.5')}>
                   <ChevronDown size={12} className="rotate-90" />
                 </button>
               )}

@@ -7,6 +7,7 @@ import { formatMoney } from '../../utils/format'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
 import { portfolioHistoryQuery } from '../../queries/currencyQueries'
 import { useChartColors } from '../../hooks/useChartColors'
+import { SegmentedControl, cardClasses } from '../../components/ui'
 
 const PERIODS = [
   { key: '1m', label: '1M' },
@@ -68,27 +69,12 @@ export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentVal
   }))
 
   return (
-    <div className="bg-background-card border border-border rounded-xl px-5 py-5">
+    <div className={cardClasses('none', 'px-5 py-5')}>
       {/* Header */}
       <div className="flex items-center justify-between mb-1">
         {headerLeft ?? <h3 className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest">Evolución del portfolio</h3>}
-        <div className="flex gap-1" role="group" aria-label="Periodo del gráfico de valor">
-          {PERIODS.map(p => (
-            <button
-              key={p.key}
-              type="button"
-              aria-pressed={period === p.key}
-              onClick={() => setPeriod(p.key)}
-              className={`text-xs font-medium px-2.5 py-1 rounded-lg transition-colors ${
-                period === p.key
-                  ? 'bg-overlay/10 text-fg'
-                  : 'text-fg-subtle hover:text-fg-muted'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl label="Periodo del gráfico de valor" value={period} onChange={setPeriod}
+          options={PERIODS.map(p => ({ value: p.key, label: p.label }))} />
       </div>
 
       {/* Variación del periodo + estado de actualización */}

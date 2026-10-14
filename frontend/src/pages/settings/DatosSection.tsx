@@ -5,6 +5,7 @@ import { RefreshCw, Trash2, Zap, Download } from 'lucide-react'
 import { useToast } from '../../hooks/useToast'
 import { useRunFifo } from '../../hooks/useRunFifo'
 import { T } from '../../utils/colors'
+import { cardClasses, buttonClasses } from '../../components/ui'
 
 const CONFIRM_WORD = 'CONFIRMAR'
 
@@ -81,7 +82,7 @@ export function DatosSection() {
     <div className="space-y-6 max-w-2xl">
 
       {/* Stats */}
-      <div className="rounded-xl border border-border bg-background-card p-5 space-y-4">
+      <div className={cardClasses('md', 'space-y-4')}>
         <h3 className="font-semibold text-sm">Estadísticas de la base de datos</h3>
         <div className="grid grid-cols-3 gap-3">
           {statCards.map(s => (
@@ -96,7 +97,7 @@ export function DatosSection() {
       </div>
 
       {/* Mantenimiento */}
-      <div className="rounded-xl border border-border bg-background-card p-5 space-y-3">
+      <div className={cardClasses('md', 'space-y-3')}>
         <h3 className="font-semibold text-sm">Mantenimiento</h3>
         <div className="space-y-2">
 
@@ -111,7 +112,7 @@ export function DatosSection() {
                 <span className="text-xs text-positive">{cacheResult} entradas eliminadas</span>
               )}
               <button type="button" onClick={handleClearCache} disabled={clearingCache}
-                className="flex items-center gap-2 px-4 py-2 bg-background-tertiary hover:bg-border border border-border rounded-lg text-sm transition-colors disabled:opacity-50">
+                className={buttonClasses('secondary', 'md', 'flex')}>
                 {clearingCache ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
                 Limpiar
               </button>
@@ -146,7 +147,7 @@ export function DatosSection() {
               <p className="text-xs text-fg-subtle mt-0.5">Descarga un JSON con todas las transacciones, wallets y configuración.</p>
             </div>
             <button type="button" onClick={handleExport} disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-background-tertiary hover:bg-border border border-border rounded-lg text-sm transition-colors disabled:opacity-50">
+              className={buttonClasses('secondary', 'md', 'flex')}>
               {exporting ? <RefreshCw size={13} className="animate-spin" /> : <Download size={13} />}
               Descargar
             </button>
@@ -195,7 +196,7 @@ export function DatosSection() {
                 Cancelar
               </button>
               <button type="button" onClick={handleReset} disabled={resetInput !== CONFIRM_WORD || resetting}
-                className="px-4 py-2 bg-negative text-on-negative hover:bg-negative/90 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors">
+                className={buttonClasses('danger', 'md')}>
                 {resetting ? 'Eliminando...' : 'Sí, eliminar todo'}
               </button>
             </div>

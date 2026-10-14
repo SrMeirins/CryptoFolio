@@ -3,6 +3,7 @@ import { ChevronDown, CheckCircle } from 'lucide-react'
 import { type Wallet } from '../api/portfolio'
 import { useClickOutside } from '../hooks/useClickOutside'
 import { useWalletsQuery } from '../hooks/useWallets'
+import { cardClasses, buttonClasses } from './ui'
 
 const TYPE_LABEL: Record<string, string> = { exchange: 'Exchange', cold: 'Frío', hot: 'Caliente', other: 'Otro' }
 
@@ -27,7 +28,7 @@ export function WalletPicker({ wallets, value, onChange }: {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm hover:border-brand/50 transition-colors text-left"
+        className={buttonClasses('secondary', 'md', 'w-full flex justify-between text-left')}
       >
         {selected ? (
           <div className="flex items-center gap-2 min-w-0">
@@ -42,7 +43,7 @@ export function WalletPicker({ wallets, value, onChange }: {
       </button>
 
       {open && (
-        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-background-card border border-border rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+        <div className={cardClasses('none', 'absolute z-50 top-full mt-1 left-0 right-0 shadow-xl overflow-hidden max-h-52 overflow-y-auto')}>
           {wallets.length === 0 ? (
             <div className="px-4 py-3 text-xs text-fg-subtle">Sin wallets configuradas</div>
           ) : (

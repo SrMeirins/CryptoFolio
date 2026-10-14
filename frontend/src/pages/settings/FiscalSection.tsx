@@ -4,6 +4,7 @@ import { portfolioApi } from '../../api/portfolio'
 import { AlertCircle, Check, RotateCcw } from 'lucide-react'
 import { TRAMOS_DEFAULT } from '../../utils/tramosIrpf'
 import { SettingsCard } from './SettingsCard'
+import { buttonClasses } from '../../components/ui'
 
 export function FiscalSection() {
   const { data: config = {} } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
@@ -116,7 +117,7 @@ export function FiscalSection() {
           </div>
           <button type="button" onClick={saveThreshold}
             disabled={savingThreshold || thresholdInput === String(threshold) || !thresholdInput}
-            className="px-4 py-2.5 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors">
+            className={buttonClasses('primary', 'lg')}>
             {savingThreshold ? 'Guardando...' : 'Guardar'}
           </button>
           {thresholdInput === String(threshold) && threshold > 0 && (
@@ -174,7 +175,7 @@ export function FiscalSection() {
         <div className="flex items-center gap-3 pt-1">
           <button type="button" onClick={saveTramos}
             disabled={savingTramos || !tramosModified || !tramosValid}
-            className="px-4 py-2.5 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors">
+            className={buttonClasses('primary', 'lg')}>
             {savingTramos ? 'Guardando...' : 'Guardar tramos'}
           </button>
           {savedTramos && (

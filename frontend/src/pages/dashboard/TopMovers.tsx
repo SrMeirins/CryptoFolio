@@ -8,6 +8,7 @@ import { rankMovers, type MoverItem, type MoversMode } from '../../utils/topMove
 import { formatMoney } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
 import { T, alpha } from '../../utils/colors'
+import { SegmentedControl, cardClasses } from '../../components/ui'
 
 // Escala de la barra: el % de 24h suele ser mucho menor que el total.
 const BAR_SCALE: Record<MoversMode, number> = { '24h': 10, total: 2 }
@@ -91,24 +92,11 @@ export function TopMovers({ lots }: { lots: FifoLot[] }) {
   )
 
   return (
-    <div className="bg-background-card border border-border rounded-xl overflow-hidden">
+    <div className={cardClasses('none', 'overflow-hidden')}>
       <div className="flex items-center justify-between px-4 py-2 border-b border-border">
         <span className="text-xs text-fg-subtle">{MODE_LABELS[mode].title}</span>
-        <div role="group" aria-label="Métrica de mejores y peores" className="inline-flex rounded-lg border border-border p-0.5 bg-background-tertiary">
-          {(['24h', 'total'] as const).map(m => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={mode === m}
-              title={MODE_LABELS[m].title}
-              onClick={() => changeMode(m)}
-              className={`px-2.5 py-1 text-xs rounded-lg transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
-                mode === m ? 'bg-brand/15 text-brand font-semibold' : 'text-fg-subtle hover:text-fg'
-              }`}>
-              {MODE_LABELS[m].short}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl label="Métrica de mejores y peores" value={mode} onChange={changeMode}
+          options={(['24h', 'total'] as const).map(m => ({ value: m, label: MODE_LABELS[m].short }))} />
       </div>
 
       {top.length === 0 ? (

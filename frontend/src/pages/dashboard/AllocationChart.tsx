@@ -4,6 +4,7 @@ import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
 import { formatMoney } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
 import { T, alpha, ink } from '../../utils/colors'
+import { cardClasses } from '../../components/ui'
 
 const ALLOC_COLORS = [
   '#6366f1','#F0B90B','#00c896','#e74c3c','#8b5cf6',
@@ -40,7 +41,7 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
   const hasHover = hovered !== null
 
   return (
-    <div className="bg-background-card border border-border rounded-xl px-5 py-5">
+    <div className={cardClasses('none', 'px-5 py-5')}>
       <h3 className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest mb-4">Distribución</h3>
 
       {/* Barra apilada interactiva */}

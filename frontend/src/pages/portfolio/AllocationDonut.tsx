@@ -4,6 +4,7 @@ import type { FifoLot, FiatBalance } from '../../api/portfolio'
 import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
 import { formatMoney } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
+import { cardClasses } from '../../components/ui'
 
 const DONUT_COLORS = [
   '#6366f1','#F0B90B','#00c896','#e74c3c','#8b5cf6',
@@ -48,7 +49,7 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
   const hoveredEntry = items.find(item => item.name === hovered)
 
   return (
-    <div className="bg-background-card border border-border rounded-xl p-6 space-y-5">
+    <div className={cardClasses('none', 'p-6 space-y-5')}>
       {/* Cabecera */}
       <div className="flex items-center justify-between">
         <div>

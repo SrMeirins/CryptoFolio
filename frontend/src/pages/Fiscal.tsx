@@ -13,6 +13,7 @@ import { ExportPanel } from './fiscal/ExportPanel'
 import { YearTabs } from './fiscal/YearTabs'
 import { FiscalSummaryCards, FiscalSummaryCardsSkeleton } from './fiscal/FiscalSummaryCards'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
+import { cardClasses } from '../components/ui'
 
 export function Fiscal() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
@@ -151,7 +152,7 @@ export function Fiscal() {
           {carryforward && <CompensacionPerdidas data={carryforward} />}
 
           {modelo721Loading ? (
-            <div className="bg-background-card border border-border rounded-xl p-5 animate-pulse">
+            <div className={cardClasses('md', 'animate-pulse')}>
               <div className="h-4 bg-background-tertiary rounded-lg w-48" />
             </div>
           ) : modelo721 && (
@@ -159,7 +160,7 @@ export function Fiscal() {
           )}
 
           {eventsLoading ? (
-            <div className="bg-background-card border border-border rounded-xl p-5 animate-pulse">
+            <div className={cardClasses('md', 'animate-pulse')}>
               <div className="h-4 bg-background-tertiary rounded-lg w-64" />
             </div>
           ) : events && (

@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react'
 import type { PendingDeposit } from './PendingDepositsPanel'
+import { badgeClasses } from '../../components/ui'
 
 export function PendingDepositRow({ dep, cost, isReviewed, onChangeCost, onUseHistorical, onToggleUnknown }: {
   dep: PendingDeposit
@@ -30,17 +31,17 @@ export function PendingDepositRow({ dep, cost, isReviewed, onChangeCost, onUseHi
             <span className="text-fg-subtle">·</span>
             <span className="text-xs text-fg-subtle">{date}</span>
             {!isReviewed && (
-              <span className="ml-auto text-xs px-1.5 py-0.5 bg-warning/15 text-warning rounded-full font-medium">
+              <span className={badgeClasses('warning', 'sm', 'ml-auto')}>
                 Pendiente
               </span>
             )}
             {isReviewed && cost != null && (
-              <span className="ml-auto text-xs px-1.5 py-0.5 bg-positive/15 text-positive rounded-full font-medium flex items-center gap-0.5">
+              <span className={badgeClasses('positive', 'sm', 'ml-auto flex gap-0.5')}>
                 <Check size={9} /> {cost.toLocaleString('es-ES', { maximumFractionDigits: 4 })} €/ud.
               </span>
             )}
             {isReviewed && cost == null && (
-              <span className="ml-auto text-xs px-1.5 py-0.5 bg-overlay/10 text-fg-muted rounded-full font-medium">
+              <span className={badgeClasses('neutral', 'sm', 'ml-auto')}>
                 Desconocido
               </span>
             )}

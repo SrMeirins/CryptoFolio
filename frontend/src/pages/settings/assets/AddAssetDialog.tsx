@@ -5,6 +5,7 @@ import { Toggle } from '../../../components/Toggle'
 import { inputClass } from './helpers'
 import { PairInputsGrid } from './PairInputsGrid'
 import { T } from '../../../utils/colors'
+import { cardClasses, buttonClasses, iconButtonClasses } from '../../../components/ui'
 
 type DetectStatus = 'idle' | 'detecting' | 'found_binance' | 'found_coingecko' | 'notfound'
 
@@ -90,10 +91,10 @@ export function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSa
                    : null
 
   return (
-    <div className="rounded-xl border border-border bg-background-card p-5 space-y-4">
+    <div className={cardClasses('md', 'space-y-4')}>
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-sm">Añadir nuevo activo</h3>
-        <button type="button" onClick={onClose} aria-label="Cerrar" className="text-fg-subtle hover:text-fg transition-colors"><X size={16} /></button>
+        <button type="button" onClick={onClose} aria-label="Cerrar" className={iconButtonClasses('sm')}><X size={16} /></button>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
@@ -143,7 +144,7 @@ export function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSa
       <div className="flex justify-end gap-2 pt-1">
         <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-fg-muted hover:text-fg transition-colors">Cancelar</button>
         <button type="button" onClick={handleSave} disabled={!symbol || saving}
-          className="px-4 py-2 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
+          className={buttonClasses('primary', 'md')}>
           {saving ? 'Guardando...' : 'Añadir activo'}
         </button>
       </div>

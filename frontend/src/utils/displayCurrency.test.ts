@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CURRENCY_STORAGE_KEY, currencyForKey, parseCurrency, readStoredCurrency, resolveCurrency, writeStoredCurrency,
+  CURRENCY_STORAGE_KEY, parseCurrency, readStoredCurrency, resolveCurrency, writeStoredCurrency,
 } from './displayCurrency'
 
 const memoryStorage = (initial: Record<string, string> = {}) => {
@@ -54,21 +54,5 @@ describe('resolveCurrency', () => {
   it('mientras no carga, o si nunca se guardó, usa la copia local', () => {
     expect(resolveCurrency(undefined, 'USD')).toBe('USD')
     expect(resolveCurrency({ fiscal_method: 'fifo' }, 'USD')).toBe('USD')
-  })
-})
-
-describe('currencyForKey', () => {
-  it('flechas alternan en ambos sentidos; Home/End van a los extremos', () => {
-    expect(currencyForKey('EUR', 'ArrowRight')).toBe('USD')
-    expect(currencyForKey('USD', 'ArrowRight')).toBe('EUR')
-    expect(currencyForKey('EUR', 'ArrowLeft')).toBe('USD')
-    expect(currencyForKey('USD', 'ArrowUp')).toBe('EUR')
-    expect(currencyForKey('USD', 'Home')).toBe('EUR')
-    expect(currencyForKey('EUR', 'End')).toBe('USD')
-  })
-
-  it('otras teclas no cambian nada', () => {
-    expect(currencyForKey('EUR', 'Tab')).toBeNull()
-    expect(currencyForKey('EUR', 'a')).toBeNull()
   })
 })

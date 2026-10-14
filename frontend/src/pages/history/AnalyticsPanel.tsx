@@ -5,13 +5,14 @@ import { CryptoIcon } from '../../components/CryptoIcon'
 import { formatMoney, formatAmount, type Currency } from '../../utils/format'
 import { fmtMonthLabel } from './helpers'
 import { useChartColors } from '../../hooks/useChartColors'
+import { cardClasses } from '../../components/ui'
 
 function ChartTooltip({ active, payload, label }: {
   active?: boolean; payload?: { value: number; name?: string }[]; label?: string
 }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-background-card border border-border rounded-xl px-3 py-2 text-xs shadow-lg">
+    <div className={cardClasses('none', 'px-3 py-2 text-xs shadow-lg')}>
       <p className="text-fg-muted mb-1 font-medium">{label}</p>
       {payload.map((p, i) => (
         <p key={i} className="text-fg mono">{p.name}: <span className="font-bold">{p.value}</span></p>
@@ -42,7 +43,7 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
   const maxOps = Math.max(...stats.monthly.map(m => m.total_ops), 1)
 
   return (
-    <div className="bg-background-card border border-border rounded-xl overflow-hidden">
+    <div className={cardClasses('none', 'overflow-hidden')}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}

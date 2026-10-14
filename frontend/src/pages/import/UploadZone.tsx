@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Upload, FileText, RefreshCw, AlertCircle, Info } from 'lucide-react'
+import { cardClasses } from '../../components/ui'
+import { SegmentedControl } from '../../components/ui'
 
 const EXCHANGE_HELP: Record<'binance' | 'bitvavo', { title: string; steps: string[]; note: string }> = {
   binance: {
@@ -61,23 +63,10 @@ export function UploadZone({ dragOver, loading, error, fileRef, exchange, onExch
 
   return (
     <div className="space-y-4">
-      <div className="inline-flex rounded-lg border border-border p-1 gap-1">
-        {(['binance', 'bitvavo'] as const).map(ex => (
-          <button
-            key={ex}
-            type="button"
-            onClick={() => onExchangeChange(ex)}
-            disabled={loading}
-            className={`px-4 py-1.5 text-sm rounded-lg font-medium transition-colors capitalize
-              ${exchange === ex ? 'bg-brand/15 text-brand' : 'text-fg-muted hover:text-fg'}
-            `}
-          >
-            {ex}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl label="Exchange del CSV" size="md" value={exchange} onChange={onExchangeChange} disabled={loading}
+        options={[{ value: 'binance', label: 'Binance' }, { value: 'bitvavo', label: 'Bitvavo' }]} />
 
-      <div className="card bg-info/5 border-info/20 p-4">
+      <div className={cardClasses('sm', 'bg-info/5 border-info/20')}>
         <div className="flex items-start gap-3">
           <Info size={16} className="text-info shrink-0 mt-0.5" />
           <div className="text-xs space-y-1">

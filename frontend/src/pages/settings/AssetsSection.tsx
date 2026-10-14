@@ -10,6 +10,7 @@ import { SortButton } from './assets/SortButton'
 import { AssetItem } from './assets/AssetItem'
 import { AddAssetDialog } from './assets/AddAssetDialog'
 import { T } from '../../utils/colors'
+import { buttonClasses, iconButtonClasses } from '../../components/ui'
 
 export function AssetsSection() {
   const queryClient = useQueryClient()
@@ -120,7 +121,7 @@ export function AssetsSection() {
               </span>
             )}
             <button type="button" onClick={() => setShowAdd(s => !s)}
-              className="flex items-center gap-2 px-4 py-2 bg-brand-solid text-on-brand hover:bg-brand-solid/90 rounded-lg text-sm font-medium transition-colors">
+              className={buttonClasses('primary', 'md', 'flex')}>
               <Plus size={14} /> Añadir activo
             </button>
           </div>
@@ -133,7 +134,7 @@ export function AssetsSection() {
               {detectResult.detected} actualizado{detectResult.detected !== 1 ? 's' : ''}
               {detectResult.failed > 0 && <span className="text-fg-muted">, {detectResult.failed} sin par en Binance</span>}
             </span>
-            <button type="button" onClick={() => setDetectResult(null)} aria-label="Cerrar aviso" className="text-fg-subtle hover:text-fg transition-colors"><X size={13} /></button>
+            <button type="button" onClick={() => setDetectResult(null)} aria-label="Cerrar aviso" className={iconButtonClasses('sm')}><X size={13} /></button>
           </div>
         )}
 
@@ -187,7 +188,7 @@ export function AssetsSection() {
                 </span>
                 <div className="flex items-center gap-1">
                   <button type="button" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-                    className="px-3 py-1.5 text-xs rounded-lg bg-background-tertiary border border-border hover:bg-border disabled:opacity-40 transition-colors">
+                    className={buttonClasses('secondary', 'sm')}>
                     ← Anterior
                   </button>
                   {Array.from({ length: totalPages }, (_, i) => (
@@ -197,7 +198,7 @@ export function AssetsSection() {
                     </button>
                   ))}
                   <button type="button" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1}
-                    className="px-3 py-1.5 text-xs rounded-lg bg-background-tertiary border border-border hover:bg-border disabled:opacity-40 transition-colors">
+                    className={buttonClasses('secondary', 'sm')}>
                     Siguiente →
                   </button>
                 </div>

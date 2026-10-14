@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { cardClasses } from '../../components/ui'
 
 /**
  * Tarjeta con título + descripción + acción opcional en cabecera, común a
@@ -12,7 +13,7 @@ export function SettingsCard({ title, description, action, children }: {
   children: ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-border bg-background-card p-5 space-y-4">
+    <div className={cardClasses('md', 'space-y-4')}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="font-semibold text-sm">{title}</h3>

@@ -9,6 +9,7 @@ import { DynamicField } from './DynamicField'
 import { WalletLabel } from './WalletPicker'
 import { buildInitialFields } from '../utils/operationWizardFields'
 import { T } from '../utils/colors'
+import { buttonClasses, iconButtonClasses } from './ui'
 
 interface OperationWizardProps {
   unknownOperation?: {
@@ -169,7 +170,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
             </p>
           )}
         </div>
-        <button type="button" onClick={onCancel} aria-label="Cerrar" className="text-fg-subtle hover:text-fg transition-colors p-1">
+        <button type="button" onClick={onCancel} aria-label="Cerrar" className={iconButtonClasses('sm')}>
           <X size={18} />
         </button>
       </div>
@@ -440,7 +441,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
             type="button"
             onClick={() => goToStep('confirm')}
             disabled={!isFormValid()}
-            className="flex items-center gap-2 px-5 py-2 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+            className={buttonClasses('primary', 'lg', 'flex')}
           >
             Continuar
             <ChevronRight size={14} />
@@ -451,7 +452,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
           <button
             type="button"
             onClick={handleComplete}
-            className="flex items-center gap-2 px-5 py-2 bg-positive text-on-positive hover:bg-positive/90 rounded-lg text-sm font-medium transition-colors"
+            className={buttonClasses('success', 'lg', 'flex')}
           >
             <CheckCircle size={14} />
             Confirmar operación

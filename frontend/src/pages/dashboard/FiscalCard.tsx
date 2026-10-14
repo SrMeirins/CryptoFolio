@@ -3,6 +3,7 @@ import type { FiscalYear } from '../../api/portfolio'
 import { formatEur } from '../../utils/format'
 import { EurOnlyBadge } from '../../components/EurOnlyBadge'
 import { T, alpha } from '../../utils/colors'
+import { cardClasses } from '../../components/ui'
 
 export function FiscalCard({ data }: { data: FiscalYear[] }) {
   const currentYear = new Date().getFullYear()
@@ -17,7 +18,7 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
   const accentColor = isPos ? T.positive : T.negative
 
   return (
-    <div className="bg-background-card border border-border rounded-xl overflow-hidden flex flex-col h-full">
+    <div className={cardClasses('none', 'overflow-hidden flex flex-col h-full')}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">

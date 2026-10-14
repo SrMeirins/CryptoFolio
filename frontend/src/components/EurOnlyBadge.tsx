@@ -1,4 +1,5 @@
 import { useCurrency } from '../hooks/useDisplayCurrency'
+import { badgeClasses } from './ui'
 
 const EUR_ONLY_TEXT = 'La fiscalidad se calcula y se muestra siempre en EUR, la moneda en la que se declara a la AEAT.'
 
@@ -12,7 +13,7 @@ export function EurOnlyBadge() {
   return (
     <span
       title={EUR_ONLY_TEXT}
-      className="inline-flex items-center gap-1 text-[11px] font-semibold tracking-wide uppercase text-warning bg-warning/10 border border-warning/25 px-1.5 py-0.5 rounded-lg whitespace-nowrap"
+      className={badgeClasses('warning', 'sm', 'text-[11px] font-semibold tracking-wide uppercase')}
     >
       En EUR
       <span className="sr-only">: {EUR_ONLY_TEXT}</span>

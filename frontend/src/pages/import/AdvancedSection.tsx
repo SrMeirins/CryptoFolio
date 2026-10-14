@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { RefreshCw, ChevronUp, ChevronDown } from 'lucide-react'
 import { useRunFifo } from '../../hooks/useRunFifo'
+import { cardClasses } from '../../components/ui'
 
 export function AdvancedSection() {
   const [open, setOpen] = useState(false)
   const { running, result, run } = useRunFifo()
 
   return (
-    <div className="card p-0">
+    <div className={cardClasses('none')}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
