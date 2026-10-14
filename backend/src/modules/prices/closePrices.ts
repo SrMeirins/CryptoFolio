@@ -51,12 +51,20 @@ function parseDay(day: string): { y: number; m: number; d: number } {
   return { y, m, d };
 }
 
+// Formateadores creados una sola vez (#183): construir un Intl.DateTimeFormat
+// es caro y estas funciones se llaman miles de veces por petición del P&L
+// diario (dos por cada día del histórico). Eran ~80 % de su tiempo de cálculo.
+const offsetFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: TIMEZONE, hourCycle: 'h23',
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+});
+const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+});
+
 // Minutos que la hora de Madrid adelanta a UTC en un instante dado (60 o 120).
 function madridOffsetMinutes(instantMs: number): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: TIMEZONE, hourCycle: 'h23',
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
-  }).formatToParts(new Date(instantMs));
+  const parts = offsetFormatter.formatToParts(new Date(instantMs));
   const get = (type: string) => Number(parts.find(p => p.type === type)?.value);
   const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
   return Math.round((asUtc - instantMs) / 60_000);
@@ -84,9 +92,7 @@ export function madridCloseInstant(day: string): Date {
 
 /** Día local (YYYY-MM-DD) en Madrid de un instante. */
 export function madridDateOf(instantMs: number): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(new Date(instantMs));
+  const parts = dateFormatter.formatToParts(new Date(instantMs));
   const get = (type: string) => parts.find(p => p.type === type)?.value;
   return `${get('year')}-${get('month')}-${get('day')}`;
 }

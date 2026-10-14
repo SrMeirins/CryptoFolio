@@ -48,6 +48,31 @@ describe('closePrices — instante de cierre a las 00:00 de Madrid', () => {
   });
 });
 
+describe('closePrices — día local de Madrid de un instante', () => {
+  let cp: typeof import('./closePrices');
+  beforeEach(async () => { vi.resetModules(); cp = await import('./closePrices'); });
+
+  it.each([
+    ['2026-01-15T22:59:59.999Z', '2026-01-15'], // 23:59:59 CET
+    ['2026-01-15T23:00:00.000Z', '2026-01-16'], // 00:00 CET del día siguiente
+    ['2026-07-15T21:59:59.999Z', '2026-07-15'], // 23:59:59 CEST
+    ['2026-07-15T22:00:00.000Z', '2026-07-16'], // 00:00 CEST del día siguiente
+    ['2026-03-29T01:30:00.000Z', '2026-03-29'], // tras el cambio a verano
+    ['2026-10-25T00:30:00.000Z', '2026-10-25'], // hora repetida del cambio a invierno
+    ['2026-12-31T23:00:00.000Z', '2027-01-01'], // cambio de año
+  ])('el instante %s es el día %s', (iso, day) => {
+    expect(cp.madridDateOf(Date.parse(iso))).toBe(day);
+  });
+
+  it('es la inversa del cierre: el instante de cierre de un día ya pertenece al día siguiente', () => {
+    for (const day of ['2026-03-28', '2026-03-29', '2026-10-24', '2026-10-25']) {
+      const close = cp.madridCloseInstant(day).getTime();
+      expect(cp.madridDateOf(close - 1)).toBe(day);
+      expect(cp.madridDateOf(close)).not.toBe(day);
+    }
+  });
+});
+
 describe('closePrices — getClosePriceEur', () => {
   let cp: typeof import('./closePrices');
   let fetchMock: ReturnType<typeof vi.fn>;
