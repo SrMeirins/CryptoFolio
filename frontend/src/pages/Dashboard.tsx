@@ -19,7 +19,7 @@ import { FiscalCard } from './dashboard/FiscalCard'
 
 export function Dashboard() {
   // Precios en la moneda de visualización (#177): en USD sin USDT aún, vacíos.
-  const { currency, prices, open24 } = useDisplayMarket()
+  const { currency, prices, open24, fiatOpen24 } = useDisplayMarket()
   const connected = usePricesStore((s) => s.connected)
   const lastUpdate = usePricesStore((s) => s.lastUpdate)
 
@@ -54,7 +54,7 @@ export function Dashboard() {
   const change24h = useMemo((): Change24h => {
     const waiting = 'Esperando los precios en vivo. Aparecerá en cuanto llegue el primer dato.'
     if (!hasPrices) return { kind: 'unavailable', reason: waiting }
-    const result = computeChange24h(assets, open24)
+    const result = computeChange24h(assets, open24, fiatOpen24)
     if (result.status === 'unavailable') {
       return {
         kind: 'unavailable',
@@ -72,7 +72,7 @@ export function Dashboard() {
         ? <p>Sin precio de hace 24h, excluidos del cálculo: <span className="mono text-white">{result.excluded.join(', ')}</span></p>
         : undefined,
     }
-  }, [assets, open24, hasPrices, currency])
+  }, [assets, open24, fiatOpen24, hasPrices, currency])
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
