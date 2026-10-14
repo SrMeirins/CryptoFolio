@@ -12,6 +12,7 @@ const onPriceUpdateMock = vi.fn();
 const offPriceUpdateMock = vi.fn();
 const onOpen24UpdateMock = vi.fn();
 const offOpen24UpdateMock = vi.fn();
+const feedStatus = { lastTickAt: null as number | null };
 vi.mock('../modules/prices/binance', () => ({
   getAllLivePrices: () => new Map([['BTC', 50000], ['EUR', 1], ['NFT', 0.0012]]),
   onPriceUpdate: onPriceUpdateMock,
@@ -19,6 +20,7 @@ vi.mock('../modules/prices/binance', () => ({
   getAllOpen24Prices: () => new Map([['BTC', 49000], ['EUR', 1]]),
   onOpen24Update: onOpen24UpdateMock,
   offOpen24Update: offOpen24UpdateMock,
+  getFeedStatus: () => feedStatus,
   getHistoricalPriceEur: vi.fn(),
   lookupHistoricalPriceEur: vi.fn(),
 }));
@@ -160,19 +162,51 @@ describe('setupPricesWebSocket — canal open24 (#147)', () => {
     await new Promise<void>((resolve, reject) => { client.on('open', resolve); client.on('error', reject); });
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    expect(received.map(m => m.type)).toEqual(['prices', 'open24']);
+    expect(received.map(m => m.type)).toEqual(['prices', 'open24', 'status']);
     expect(received[1].payload).toEqual({ BTC: 49000, EUR: 1 });
 
     // Un cambio difundido por el canal open24 llega al cliente con su tipo.
     const open24Handler = onOpen24UpdateMock.mock.calls[0][0];
     open24Handler(new Map([['BTC', 49500]]));
     await new Promise(resolve => setTimeout(resolve, 50));
-    expect(received[2]).toEqual({ type: 'open24', payload: { BTC: 49500 } });
+    expect(received[3]).toEqual({ type: 'open24', payload: { BTC: 49500 } });
 
     client.close();
     await new Promise<void>(resolve => client.on('close', resolve));
     await new Promise(resolve => setTimeout(resolve, 50));
     expect(offOpen24UpdateMock).toHaveBeenCalledWith(open24Handler);
     httpServer.close();
+  });
+});
+
+describe('setupPricesWebSocket — estado del feed (#194)', () => {
+  async function connect() {
+    const { setupPricesWebSocket } = await import('./prices');
+    const httpServer = createServer();
+    setupPricesWebSocket(httpServer);
+    await new Promise<void>(resolve => httpServer.listen(0, resolve));
+    const port = (httpServer.address() as { port: number }).port;
+    const client = new WebSocket(`ws://127.0.0.1:${port}/ws/prices`);
+    const status: Array<{ feedAgeMs: number | null }> = [];
+    client.on('message', d => { const m = JSON.parse(d.toString()); if (m.type === 'status') status.push(m.payload); });
+    await new Promise<void>((resolve, reject) => { client.on('open', resolve); client.on('error', reject); });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    const close = async () => { client.close(); await new Promise(r => setTimeout(r, 20)); httpServer.close(); };
+    return { status, close };
+  }
+
+  it('sin datos del feed todavía, informa feedAgeMs nulo', async () => {
+    feedStatus.lastTickAt = null;
+    const { status, close } = await connect();
+    expect(status).toEqual([{ feedAgeMs: null }]);
+    await close();
+  });
+
+  it('informa la antigüedad del último dato del feed', async () => {
+    feedStatus.lastTickAt = Date.now() - 90_000;
+    const { status, close } = await connect();
+    expect(status[0].feedAgeMs).toBeGreaterThanOrEqual(90_000);
+    expect(status[0].feedAgeMs).toBeLessThan(95_000);
+    await close();
   });
 });

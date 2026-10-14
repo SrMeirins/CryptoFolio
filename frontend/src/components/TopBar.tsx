@@ -7,11 +7,12 @@ import { portfolioApi, type Notification } from '../api/portfolio'
 import { NOTIFICATION_ROUTES, NOTIFICATION_TYPE_META } from '../constants/notifications'
 import { useClickOutside } from '../hooks/useClickOutside'
 import { useNow } from '../hooks/useNow'
+import { LIVE_STATUS_META, useLiveStatus } from '../hooks/useLiveStatus'
 import { CurrencyToggle } from './CurrencyToggle'
 
 function PriceRefreshButton() {
-  const { connected, lastUpdate, setPrices } = usePricesStore(s => ({
-    connected:  s.connected,
+  const status = useLiveStatus()
+  const { lastUpdate, setPrices } = usePricesStore(s => ({
     lastUpdate: s.lastUpdate,
     setPrices:  s.setPrices,
   }))
@@ -42,9 +43,9 @@ function PriceRefreshButton() {
       })()
     : null
 
-  const title = connected
+  const title = status === 'live'
     ? `Precios en vivo · actualizado hace ${timeAgo ?? '…'}`
-    : 'Sin conexión · haz clic para refrescar'
+    : `${LIVE_STATUS_META[status].title} · haz clic para refrescar`
 
   return (
     <button
@@ -64,12 +65,8 @@ function PriceRefreshButton() {
         size={14}
         className={refreshing ? 'animate-spin' : 'transition-transform hover:rotate-180 duration-300'}
       />
-      {/* Indicador de estado WS */}
-      <span
-        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-          connected ? 'bg-accent-green animate-pulse' : 'bg-gray-600'
-        }`}
-      />
+      {/* Indicador de estado: en vivo, sin actualizaciones o sin conexión (#194) */}
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${LIVE_STATUS_META[status].dot}`} />
     </button>
   )
 }

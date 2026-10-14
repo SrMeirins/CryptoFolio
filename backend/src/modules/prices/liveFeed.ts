@@ -143,6 +143,19 @@ async function refreshCoinGeckoOnlyPrices(): Promise<void> {
 // ── WebSocket: precios en tiempo real ─────────────────────────────────────
 let ws: WebSocket | null = null;
 let wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Vigilancia de la conexión con Binance (#194). Una conexión puede quedarse
+// abierta sin entregar datos (suspensión del equipo, corte breve de red, NAT
+// que caduca) sin que llegue nunca el evento 'close': el feed quedaba
+// congelado hasta reiniciar el backend. Se envía un ping periódico y, si en
+// FEED_IDLE_MS no llega ningún mensaje ni pong, se termina la conexión para
+// que se reconecte. Los reintentos fallidos esperan cada vez más.
+const FEED_IDLE_MS = 60_000;
+const PING_INTERVAL_MS = 20_000;
+const RECONNECT_BASE_MS = 5_000;
+const RECONNECT_MAX_MS = 60_000;
+let reconnectDelayMs = RECONNECT_BASE_MS;
+let lastTickAt: number | null = null;
 let coinGeckoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let pairIndex: PairIndex = new Map();
 
@@ -251,13 +264,39 @@ function connectWebSocket(): void {
   const socket = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
   ws = socket;
 
-  socket.on('message', (data: Buffer) => handleTickerMessage(data.toString()));
+  let lastActivity = Date.now();
+  const markActivity = () => { lastActivity = Date.now(); };
+  const heartbeat = setInterval(() => {
+    if (id !== connectionId || !feedRunning) { clearInterval(heartbeat); return; }
+    if (Date.now() - lastActivity >= FEED_IDLE_MS) {
+      console.warn(`[WS] Sin datos de Binance en ${FEED_IDLE_MS / 1000}s: se reinicia la conexión`);
+      clearInterval(heartbeat);
+      socket.terminate();
+      return;
+    }
+    try { socket.ping(); } catch { /* aún conectando: el siguiente intervalo lo reintenta */ }
+  }, PING_INTERVAL_MS);
+
+  socket.on('open', () => {
+    markActivity();
+    console.log(`[WS] Conectado a Binance (${currentStreamsKey.split(',').filter(Boolean).length} pares)`);
+  });
+  socket.on('pong', markActivity);
+  socket.on('message', (data: Buffer) => {
+    markActivity();
+    lastTickAt = Date.now();
+    reconnectDelayMs = RECONNECT_BASE_MS; // la conexión funciona: se reinicia la espera
+    handleTickerMessage(data.toString());
+  });
 
   socket.on('close', () => {
+    clearInterval(heartbeat);
     // Conexión sustituida por una resuscripción o feed detenido: no reconectar.
     if (id !== connectionId || !feedRunning) return;
-    console.warn('[WS] Desconectado. Reconectando en 5s...');
-    wsReconnectTimer = setTimeout(connectWebSocket, 5000);
+    const delay = reconnectDelayMs;
+    reconnectDelayMs = Math.min(reconnectDelayMs * 2, RECONNECT_MAX_MS);
+    console.warn(`[WS] Desconectado. Reconectando en ${delay / 1000}s...`);
+    wsReconnectTimer = setTimeout(connectWebSocket, delay);
   });
 
   socket.on('error', (err) => console.error('[WS] Error:', err.message));
@@ -316,6 +355,11 @@ export function stopLivePrices(): void {
   broadcaster.stop();
   open24Broadcaster.stop();
   if (ws) ws.close();
+}
+
+/** Estado del feed de Binance: instante del último mensaje recibido (null si aún no ha llegado ninguno). */
+export function getFeedStatus(): { lastTickAt: number | null } {
+  return { lastTickAt };
 }
 
 export function getLivePrice(symbol: string): number | null {

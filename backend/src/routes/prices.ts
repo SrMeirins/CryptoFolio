@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import {
   getAllLivePrices, onPriceUpdate, offPriceUpdate,
-  getAllOpen24Prices, onOpen24Update, offOpen24Update,
+  getAllOpen24Prices, onOpen24Update, offOpen24Update, getFeedStatus,
   lookupHistoricalPriceEur,
 } from '../modules/prices/binance';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -60,8 +60,14 @@ router.get('/historical', async (req, res) => {
 // - `prices`: último precio en EUR por activo.
 // - `open24`: precio en EUR de hace 24h (apertura de la ventana móvil de
 //   Binance), para la variación de 24h en tiempo real (#147).
+// - `status`: antigüedad del último dato recibido de Binance (#194), al
+//   conectar y cada STATUS_INTERVAL_MS. Permite al frontend distinguir «en
+//   vivo» de «conectado pero sin precios», y detectar que el propio WebSocket
+//   ha dejado de recibir mensajes.
 // Al conectar se envía el snapshot de cada canal; después, solo los precios
 // que cambian, agrupados como mucho una vez por segundo.
+const STATUS_INTERVAL_MS = 10_000;
+
 export function setupPricesWebSocket(server: Server): void {
   const wss = new WebSocketServer({ server, path: '/ws/prices' });
 
@@ -75,12 +81,21 @@ export function setupPricesWebSocket(server: Server): void {
     send('prices', getAllLivePrices());
     send('open24', getAllOpen24Prices());
 
+    const sendStatus = () => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      const { lastTickAt } = getFeedStatus();
+      ws.send(JSON.stringify({ type: 'status', payload: { feedAgeMs: lastTickAt === null ? null : Date.now() - lastTickAt } }));
+    };
+    sendStatus();
+    const statusTimer = setInterval(sendStatus, STATUS_INTERVAL_MS);
+
     const onPrices = (prices: Map<string, number>) => send('prices', prices);
     const onOpen24 = (prices: Map<string, number>) => send('open24', prices);
 
     onPriceUpdate(onPrices);
     onOpen24Update(onOpen24);
     ws.on('close', () => {
+      clearInterval(statusTimer);
       offPriceUpdate(onPrices);
       offOpen24Update(onOpen24);
     });
