@@ -103,6 +103,22 @@ describe('getDailyPnl — flujos de capital y rendimiento', () => {
     expect(r.days.every(x => x.complete)).toBe(true);
   });
 
+  it('el interés de un préstamo de margen es pérdida, no salida de capital (#185)', async () => {
+    await reset();
+    await tx('DEPOSIT_CRYPTO', '2026-06-01T09:00:00Z', 'USDT', 50);   // capital propio
+    await tx('MARGIN_BORROW', '2026-06-01T10:00:00Z', 'USDT', 100);   // préstamo
+    await tx('MARGIN_REPAY', '2026-06-02T10:00:00Z', 'USDT', 101);    // principal 100 + interés 1
+    const fifo = await runFifoEngine();
+    expect(fifo.errors).toEqual([]);
+    await closes('USDT', { '2026-05-31': 0.9, '2026-06-01': 0.9, '2026-06-02': 0.9 });
+
+    const r = await getDailyPnl({ from: '2026-06-01', to: '2026-06-02' });
+    const d = byDate(r);
+    expect(d['2026-06-01']).toMatchObject({ value: 135, inflow: 135, pnl: 0 });
+    // Solo el principal (100 USDT = 90 €) sale como flujo; el interés (0,90 €) es pérdida.
+    expect(d['2026-06-02']).toMatchObject({ value: 44.1, outflow: 90, pnl: -0.9 });
+  });
+
   it('las tenencias anteriores a una transferencia no se cuentan dos veces', async () => {
     await reset();
     await tx('DEPOSIT_FIAT', '2026-02-01T10:00:00Z', 'EUR', 100);
