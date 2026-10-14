@@ -8,6 +8,7 @@ import { PortfolioSummaryCards } from '../components/PortfolioSummaryCards'
 import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
 import { useDisplayMarket } from '../hooks/useDisplayMarket'
 import { useCurrencyQuery } from '../hooks/useCurrencyQuery'
+import { LIVE_STATUS_META, useLiveStatus } from '../hooks/useLiveStatus'
 import { eurFlowQuery } from '../queries/currencyQueries'
 import { computeChange24h } from '../utils/change24h'
 import { TopMovers } from './dashboard/TopMovers'
@@ -20,7 +21,7 @@ import { FiscalCard } from './dashboard/FiscalCard'
 export function Dashboard() {
   // Precios en la moneda de visualización (#177): en USD sin USDT aún, vacíos.
   const { currency, prices, open24, fiatOpen24 } = useDisplayMarket()
-  const connected = usePricesStore((s) => s.connected)
+  const live = LIVE_STATUS_META[useLiveStatus()]
   const lastUpdate = usePricesStore((s) => s.lastUpdate)
 
   const { data: lots = [], isLoading: lotsLoading } = useQuery({
@@ -84,9 +85,9 @@ export function Dashboard() {
             {lastUpdate ? `Actualizado ${lastUpdate.toLocaleTimeString('es-ES')}` : 'Cargando precios...'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${connected ? 'bg-accent-green animate-pulse' : 'bg-gray-500'}`} />
-          <span className="text-xs text-gray-500">{connected ? 'Live' : 'Offline'}</span>
+        <div className="flex items-center gap-2" title={live.title}>
+          <div className={`w-2 h-2 rounded-full ${live.dot}`} aria-hidden="true" />
+          <span className="text-xs text-gray-500">{live.label}</span>
         </div>
       </div>
 
