@@ -20,7 +20,7 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
         type="button"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/2 transition-colors"
       >
         <div className="flex items-center gap-3">
           <div className="text-left">
@@ -97,7 +97,7 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm mono">{a.asset}</span>
                       <span
-                        className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+                        className="text-[10px] px-1.5 py-0.5 rounded-sm font-medium shrink-0"
                         style={{
                           backgroundColor: a.wallet_kind === 'exchange' ? 'rgba(245,158,11,0.12)' : `${a.wallet_color}18`,
                           color: a.wallet_kind === 'exchange' ? '#f59e0b' : a.wallet_color,

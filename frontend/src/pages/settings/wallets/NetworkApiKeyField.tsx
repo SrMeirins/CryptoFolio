@@ -42,7 +42,7 @@ export function NetworkApiKeyField({ networkId, networkName }: { networkId: stri
       <div className="flex gap-1.5">
         <input type="password" value={value} onChange={e => setValue(e.target.value)}
           placeholder={status?.has_key ? 'Ya configurada — pega una nueva para reemplazarla' : 'Sin esta clave, esta red no se puede verificar automáticamente'}
-          className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-xs placeholder-gray-600 focus:outline-none focus:border-accent-blue" />
+          className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-xs placeholder-gray-600 focus:outline-hidden focus:border-accent-blue" />
         <button type="button" onClick={handleSave} disabled={!value || saving}
           className="px-3 py-2 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors">
           Guardar

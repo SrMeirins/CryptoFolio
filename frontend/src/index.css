@@ -7,42 +7,205 @@
    sistema sin avisar. Ficheros variables (un solo .woff2 cubre todo el rango
    de pesos) descargados de Google Fonts — Inter es SIL OFL, JetBrains Mono
    es Apache 2.0, ambas licencias permiten autoalojar. */
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 300 700;
-  font-display: swap;
-  src: url('/fonts/inter-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 300 700;
-  font-display: swap;
-  src: url('/fonts/inter-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 400 500;
-  font-display: swap;
-  src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 400 500;
-  font-display: swap;
-  src: url('/fonts/jetbrains-mono-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+@import 'tailwindcss';
+
+/* ── Tema (#197) ───────────────────────────────────────────────────────────
+   Cada color es una variable con un valor por tema. El atributo data-theme lo
+   fija public/theme-init.js antes del primer pintado. En oscuro se mantienen
+   los valores históricos exactos. El tema claro está definido pero oculto
+   hasta que #198 sustituya las clases de color sueltas (text-gray-*, text-white...).
+   Los colores semánticos (fg, positive, negative, brand...) los usará #198. */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --cf-bg-primary: #0f1117;
+  --cf-bg-secondary: #1a1d27;
+  --cf-bg-tertiary: #222536;
+  --cf-bg-card: #1e2130;
+  --cf-border: #2a2d3e;
+  --cf-fg: #f3f4f6;
+  --cf-fg-muted: #9ca3af;
+  --cf-fg-subtle: #8b93a1;
+  --cf-brand: #7c5cff;
+  --cf-positive: #0ecb81;
+  --cf-negative: #f6465d;
+  --cf-warning: #f59e0b;
+  --cf-info: #3b82f6;
+  --cf-accent-blue: #3b82f6;
+  --cf-accent-green: #10b981;
+  --cf-accent-red: #ef4444;
+  --cf-accent-amber: #f59e0b;
+  --cf-accent-purple: #8b5cf6;
+  /* Gráficos (recharts lee los valores con useChartColors) */
+  --cf-chart-up: #00c896;
+  --cf-chart-down: #e74c3c;
+  --cf-chart-gain: #10b981;
+  --cf-chart-loss: #ef4444;
+  --cf-chart-warn: #f59e0b;
+  --cf-chart-neutral: #6b7280;
+  --cf-chart-neutral-soft: #4b5563;
+  --cf-chart-axis: #4b5563;
+  --cf-chart-axis-muted: #6b7280;
+  --cf-chart-grid: rgba(255, 255, 255, 0.04);
+  --cf-chart-grid-strong: #2a2d3e;
+  --cf-chart-cursor: rgba(255, 255, 255, 0.15);
+  --cf-chart-cursor-soft: rgba(255, 255, 255, 0.03);
+  --cf-chart-cursor-line: rgba(255, 255, 255, 0.1);
+  --cf-chart-tooltip-bg: #0f1117;
+  --cf-chart-tooltip-border: rgba(255, 255, 255, 0.08);
+  --cf-chart-tooltip-label: #9ca3af;
 }
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+:root[data-theme='light'] {
+  color-scheme: light;
+  --cf-bg-primary: #f5f6f8;
+  --cf-bg-secondary: #ffffff;
+  --cf-bg-tertiary: #eef0f3;
+  --cf-bg-card: #ffffff;
+  --cf-border: #e2e5ea;
+  --cf-fg: #1e2329;
+  --cf-fg-muted: #474d57;
+  --cf-fg-subtle: #5e6673;
+  --cf-brand: #5b2fd8;
+  --cf-positive: #03a66d;
+  --cf-negative: #cf304a;
+  --cf-warning: #b45309;
+  --cf-info: #1d4ed8;
+  --cf-accent-blue: #1d4ed8;
+  --cf-accent-green: #047857;
+  --cf-accent-red: #b91c1c;
+  --cf-accent-amber: #b45309;
+  --cf-accent-purple: #6d28d9;
+  --cf-chart-up: #03a66d;
+  --cf-chart-down: #cf304a;
+  --cf-chart-gain: #047857;
+  --cf-chart-loss: #b91c1c;
+  --cf-chart-warn: #b45309;
+  --cf-chart-neutral: #6b7280;
+  --cf-chart-neutral-soft: #9ca3af;
+  --cf-chart-axis: #5e6673;
+  --cf-chart-axis-muted: #5e6673;
+  --cf-chart-grid: rgba(0, 0, 0, 0.06);
+  --cf-chart-grid-strong: #e2e5ea;
+  --cf-chart-cursor: rgba(0, 0, 0, 0.12);
+  --cf-chart-cursor-soft: rgba(0, 0, 0, 0.04);
+  --cf-chart-cursor-line: rgba(0, 0, 0, 0.1);
+  --cf-chart-tooltip-bg: #ffffff;
+  --cf-chart-tooltip-border: rgba(0, 0, 0, 0.1);
+  --cf-chart-tooltip-label: #474d57;
+}
+
+/* inline: las utilidades usan var(--cf-*) directamente, así cambian con el tema
+   (y los modificadores de opacidad, p. ej. bg-accent-blue/12, siguen funcionando). */
+@theme inline {
+  --color-background-primary: var(--cf-bg-primary);
+  --color-background-secondary: var(--cf-bg-secondary);
+  --color-background-tertiary: var(--cf-bg-tertiary);
+  --color-background-card: var(--cf-bg-card);
+  --color-border: var(--cf-border);
+
+  --color-fg: var(--cf-fg);
+  --color-fg-muted: var(--cf-fg-muted);
+  --color-fg-subtle: var(--cf-fg-subtle);
+  --color-brand: var(--cf-brand);
+  --color-positive: var(--cf-positive);
+  --color-negative: var(--cf-negative);
+  --color-warning: var(--cf-warning);
+  --color-info: var(--cf-info);
+
+  --color-accent-blue: var(--cf-accent-blue);
+  --color-accent-green: var(--cf-accent-green);
+  --color-accent-red: var(--cf-accent-red);
+  --color-accent-amber: var(--cf-accent-amber);
+  --color-accent-purple: var(--cf-accent-purple);
+}
+
+@theme {
+  --font-mono: JetBrains Mono, Fira Code, monospace;
+}
+
+/* Sin transiciones ni animaciones si el sistema pide reducir el movimiento (#197). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility card {
+  @apply bg-background-card border border-border rounded-xl p-5;
+}
+
+@utility mono {
+  @apply font-mono;
+}
+
+@layer base {
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 300 700;
+    font-display: swap;
+    src: url('/fonts/inter-latin.woff2') format('woff2');
+    unicode-range:
+      U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+      U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+      U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 300 700;
+    font-display: swap;
+    src: url('/fonts/inter-latin-ext.woff2') format('woff2');
+    unicode-range:
+      U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+      U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+      U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  }
+  @font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 400 500;
+    font-display: swap;
+    src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2');
+    unicode-range:
+      U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+      U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+      U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  @font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 400 500;
+    font-display: swap;
+    src: url('/fonts/jetbrains-mono-latin-ext.woff2') format('woff2');
+    unicode-range:
+      U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+      U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+      U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  }
+}
 
 @layer base {
   body {
@@ -57,11 +220,6 @@
   ::-webkit-scrollbar-thumb {
     @apply bg-border rounded-full;
   }
-}
-
-@layer utilities {
-  .card { @apply bg-background-card border border-border rounded-xl p-5; }
-  .mono { @apply font-mono; }
 }
 
 /* ── Tarjetas de métricas: chip de 24h según el ancho de la tarjeta (#152) ── */

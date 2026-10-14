@@ -13,8 +13,8 @@ import {
 // GET /api/v1/pnl/daily. El día de hoy se actualiza en vivo (reconsulta cada minuto).
 
 const WEEKDAY_NAMES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
-const GREEN_BG = ['', 'bg-accent-green/[0.07]', 'bg-accent-green/[0.13]', 'bg-accent-green/[0.2]', 'bg-accent-green/[0.3]']
-const RED_BG = ['', 'bg-accent-red/[0.07]', 'bg-accent-red/[0.13]', 'bg-accent-red/[0.2]', 'bg-accent-red/[0.3]']
+const GREEN_BG = ['', 'bg-accent-green/[0.07]', 'bg-accent-green/13', 'bg-accent-green/20', 'bg-accent-green/30']
+const RED_BG = ['', 'bg-accent-red/[0.07]', 'bg-accent-red/13', 'bg-accent-red/20', 'bg-accent-red/30']
 
 const signedMoney = (n: number, currency: Currency) => `${n > 0 ? '+' : ''}${formatMoney(n, currency)}`
 const signedPct = (n: number) => `${n > 0 ? '+' : ''}${n.toFixed(2)}%`
@@ -104,12 +104,12 @@ export function PnlCalendar() {
         <div className="flex items-center gap-2">
           <h3 className="text-[11px] text-gray-600 font-medium uppercase tracking-widest mr-1">P&L diario</h3>
           <button type="button" onClick={() => setYm(addMonths(ym, -1))} disabled={!canPrev} aria-label="Mes anterior"
-            className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60">
+            className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-blue/60">
             <ChevronLeft size={16} />
           </button>
-          <span className="text-sm font-semibold text-white min-w-[9.5rem] text-center" aria-live="polite">{monthLabel(ym)}</span>
+          <span className="text-sm font-semibold text-white min-w-38 text-center" aria-live="polite">{monthLabel(ym)}</span>
           <button type="button" onClick={() => setYm(addMonths(ym, 1))} disabled={!canNext} aria-label="Mes siguiente"
-            className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60">
+            className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-blue/60">
             <ChevronRight size={16} />
           </button>
         </div>
@@ -126,7 +126,7 @@ export function PnlCalendar() {
 
       {!isError && (
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed min-w-[34rem]">
+          <table className="w-full table-fixed min-w-136">
             <caption className="sr-only">P&L diario de {monthLabel(ym)}</caption>
             <thead>
               <tr>

@@ -63,7 +63,7 @@ export function Portfolio() {
               placeholder="Buscar activo…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="bg-background-card border border-border rounded-xl pl-8 pr-8 py-2 text-sm placeholder-gray-600 focus:outline-none focus:border-accent-blue/50 transition-colors w-44 uppercase mono"
+              className="bg-background-card border border-border rounded-xl pl-8 pr-8 py-2 text-sm placeholder-gray-600 focus:outline-hidden focus:border-accent-blue/50 transition-colors w-44 uppercase mono"
             />
             {search && (
               <button

@@ -19,7 +19,7 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: { payl
   if (!active || !payload?.[0]) return null
   const item = payload[0].payload
   return (
-    <div className="bg-gray-950/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2.5 shadow-xl text-xs">
+    <div className="bg-gray-950/95 backdrop-blur-xs border border-white/10 rounded-xl px-3 py-2.5 shadow-xl text-xs">
       <p className="font-semibold text-white mono mb-0.5">{item.name}</p>
       <p className="text-gray-300">{formatMoney(item.value, currency)}</p>
       <p className="text-gray-500">{item.pct.toFixed(1)}% del portfolio</p>

@@ -44,7 +44,7 @@ export function NetworkPicker({ networks, value, onChange }: {
         <Search size={14} className="text-gray-500 shrink-0" />
         <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Bitcoin, ETH, Solana..."
-          className="flex-1 bg-transparent text-sm text-white placeholder-gray-600 focus:outline-none" />
+          className="flex-1 bg-transparent text-sm text-white placeholder-gray-600 focus:outline-hidden" />
         {search
           ? <button type="button" onClick={() => setSearch('')} className="text-gray-600 hover:text-gray-300"><X size={13} /></button>
           : <span className="text-xs text-gray-700">{networks.length} redes</span>

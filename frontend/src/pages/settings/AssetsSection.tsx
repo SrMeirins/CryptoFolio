@@ -94,7 +94,7 @@ export function AssetsSection() {
     )
   }
 
-  const inputSearch = "w-full bg-background-tertiary border border-border rounded-lg pl-9 pr-3 py-2 text-sm placeholder-gray-600 focus:outline-none focus:border-accent-blue"
+  const inputSearch = "w-full bg-background-tertiary border border-border rounded-lg pl-9 pr-3 py-2 text-sm placeholder-gray-600 focus:outline-hidden focus:border-accent-blue"
 
   return (
     <div className="h-full flex flex-col">

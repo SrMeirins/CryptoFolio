@@ -20,4 +20,4 @@ export type SortDir = 'asc' | 'desc'
 
 // Compartido por AssetEditPanel y AddAssetDialog — antes declarado por
 // duplicado e idéntico en ambos.
-export const inputClass = "w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm mono placeholder-gray-600 focus:outline-none focus:border-accent-blue"
+export const inputClass = "w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm mono placeholder-gray-600 focus:outline-hidden focus:border-accent-blue"

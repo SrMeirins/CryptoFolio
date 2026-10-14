@@ -38,7 +38,7 @@ export function EvolutionCard({ currentValue }: { currentValue?: number }) {
           aria-controls={`${baseId}-panel`}
           tabIndex={tab === t.id ? 0 : -1}
           onClick={() => setTab(t.id)}
-          className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 ${
+          className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-blue/60 ${
             tab === t.id ? 'bg-accent-blue/15 text-accent-blue' : 'text-gray-500 hover:text-gray-300'
           }`}
         >

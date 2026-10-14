@@ -7,7 +7,7 @@ import { assetHue, assetInitials } from '../utils/assetInitials'
  * iniciales con un color estable derivado del símbolo. Sin peticiones a
  * servicios externos desde el navegador.
  *
- * `ring`: color opcional del anillo exterior (p. ej. verde/rojo en mejores y peores).
+ * `ring-3`: color opcional del anillo exterior (p. ej. verde/rojo en mejores y peores).
  */
 export function CryptoIcon({ symbol, size = 28, ring }: { symbol: string; size?: number; ring?: string }) {
   const icons = useAssetIcons()

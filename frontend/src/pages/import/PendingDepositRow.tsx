@@ -54,7 +54,7 @@ export function PendingDepositRow({ dep, cost, isReviewed, onChangeCost, onUseHi
               placeholder="Precio EUR/unidad al adquirir..."
               value={cost != null ? cost : ''}
               onChange={e => onChangeCost(e.target.value ? parseFloat(e.target.value) : null)}
-              className="flex-1 bg-background-primary border border-border rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-accent-blue transition-colors mono"
+              className="flex-1 bg-background-primary border border-border rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-hidden focus:border-accent-blue transition-colors mono"
             />
             {dep.historicalPrice != null && (
               <button

@@ -16,7 +16,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
   return (
     <>
       {text.slice(0, idx)}
-      <mark className="bg-accent-amber/30 text-white rounded px-0.5">{text.slice(idx, idx + query.length)}</mark>
+      <mark className="bg-accent-amber/30 text-white rounded-sm px-0.5">{text.slice(idx, idx + query.length)}</mark>
       {text.slice(idx + query.length)}
     </>
   )
@@ -77,7 +77,7 @@ export function TxRow({
           <div className="flex items-center gap-1.5">
             <OpChip type={tx.operation_type} />
             {tx.manually_added && (
-              <span className="text-[9px] px-1 py-0.5 rounded bg-accent-blue/15 text-accent-blue font-bold shrink-0">M</span>
+              <span className="text-[9px] px-1 py-0.5 rounded-sm bg-accent-blue/15 text-accent-blue font-bold shrink-0">M</span>
             )}
           </div>
         </td>

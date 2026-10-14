@@ -21,7 +21,7 @@ interface Props {
 
 const inputCls = `
   flex-1 min-w-0 bg-transparent py-2.5 text-sm text-white text-center
-  placeholder-gray-600 focus:outline-none mono
+  placeholder-gray-600 focus:outline-hidden mono
   [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
 `
 const wrapCls = `
@@ -94,7 +94,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/70 backdrop-blur-xs"
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -102,12 +102,12 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full sm:max-w-lg bg-[#0f1117] border border-white/10 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh]"
+        className="w-full sm:max-w-lg bg-background-primary border border-white/10 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh]"
       >
 
         {/* Header */}
         <div className="relative px-5 pt-5 pb-4 border-b border-white/8 shrink-0 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-accent-blue/10 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-linear-to-br from-accent-blue/10 via-transparent to-transparent pointer-events-none" />
           <div className="relative flex items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 mb-0.5">

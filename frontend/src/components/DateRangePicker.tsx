@@ -183,7 +183,7 @@ export function DateRangePicker({ from, to, onChange }: Props) {
       {/* Popover */}
       {open && (
         <div
-          className="absolute top-full mt-2 z-50 left-0 bg-[#0f1117] border border-white/12 rounded-2xl shadow-2xl overflow-hidden animate-date-picker-in"
+          className="absolute top-full mt-2 z-50 left-0 bg-background-primary border border-white/12 rounded-2xl shadow-2xl overflow-hidden animate-date-picker-in"
           style={{ minWidth: 280 }}
         >
           {/* Atajos */}

@@ -104,7 +104,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
                 <tr key={`${r.fecha}-${r.tipo}-${r.activo}-${i}`} className="hover:bg-background-tertiary/40 transition-colors">
                   <td className="px-4 py-2.5 mono text-gray-400 text-[11px]">{r.fecha}</td>
                   <td className="px-4 py-2.5">
-                    <span className="text-[10px] bg-accent-amber/10 text-accent-amber px-1.5 py-0.5 rounded">{r.tipo}</span>
+                    <span className="text-[10px] bg-accent-amber/10 text-accent-amber px-1.5 py-0.5 rounded-sm">{r.tipo}</span>
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5">

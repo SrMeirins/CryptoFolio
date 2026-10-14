@@ -58,7 +58,7 @@ export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; on
           onChange={e => { setGeckoId(e.target.value.toLowerCase().trim()); setTestResult(null); setError(null) }}
           onKeyDown={e => e.key === 'Enter' && handleTest()}
           placeholder="ej. bitcoin, ethereum, ethereumpow"
-          className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm mono placeholder-gray-600 focus:outline-none focus:border-accent-blue"
+          className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm mono placeholder-gray-600 focus:outline-hidden focus:border-accent-blue"
         />
         <button type="button" onClick={handleTest} disabled={testing || !geckoId.trim()}
           title="Verificar que este ID devuelve precio en CoinGecko"

@@ -80,6 +80,26 @@ describe('routes/settings — config y stats', () => {
     });
   });
 
+  describe('PUT /config — theme (#197)', () => {
+    it('acepta dark, light y system', async () => {
+      for (const theme of ['light', 'system', 'dark']) {
+        const put = await request(app).put('/api/settings/config').send({ key: 'theme', value: theme });
+        expect(put.status).toBe(200);
+        const get = await request(app).get('/api/settings/config');
+        expect(get.body.theme).toBe(theme);
+      }
+    });
+
+    it('rechaza otros valores con 400 y no los guarda', async () => {
+      for (const value of ['blue', 'Dark', '', 1]) {
+        const put = await request(app).put('/api/settings/config').send({ key: 'theme', value });
+        expect(put.status).toBe(400);
+      }
+      const get = await request(app).get('/api/settings/config');
+      expect(get.body.theme).toBe('dark');
+    });
+  });
+
   describe('GET /stats', () => {
     it('devuelve los 6 contadores esperados', async () => {
       const res = await request(app).get('/api/settings/stats');

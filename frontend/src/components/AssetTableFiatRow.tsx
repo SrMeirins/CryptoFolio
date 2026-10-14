@@ -23,7 +23,7 @@ export function FiatRowComponent({ row, totalPortfolioValue, compact = false }: 
           </div>
           <div className="flex items-center gap-2">
             <span className="font-medium">{row.asset}</span>
-            <span className="text-[10px] font-semibold tracking-widest text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded uppercase">
+            <span className="text-[10px] font-semibold tracking-widest text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-sm uppercase">
               FIAT
             </span>
           </div>

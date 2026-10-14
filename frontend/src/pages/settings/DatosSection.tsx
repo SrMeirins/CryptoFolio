@@ -186,7 +186,7 @@ export function DatosSection() {
               </label>
               <input value={resetInput} onChange={e => setResetInput(e.target.value)}
                 placeholder={CONFIRM_WORD}
-                className="w-full bg-background-tertiary border border-accent-red/30 focus:border-accent-red rounded-lg px-3 py-2.5 text-sm mono placeholder-gray-700 focus:outline-none" />
+                className="w-full bg-background-tertiary border border-accent-red/30 focus:border-accent-red rounded-lg px-3 py-2.5 text-sm mono placeholder-gray-700 focus:outline-hidden" />
             </div>
             <div className="flex items-center gap-2 justify-end">
               <button type="button" onClick={() => { setShowResetConfirm(false); setResetInput('') }}
