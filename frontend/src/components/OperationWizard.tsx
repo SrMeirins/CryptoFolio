@@ -351,7 +351,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
                   id="applyToAll"
                   checked={applyToAll}
                   onChange={e => setApplyToAll(e.target.checked)}
-                  className="w-4 h-4 rounded accent-accent-blue"
+                  className="w-4 h-4 rounded-sm accent-accent-blue"
                 />
                 <label htmlFor="applyToAll" className="text-xs text-gray-400">
                   Aplicar a todas las operaciones del tipo{' '}

@@ -29,7 +29,7 @@ function MoverRow({ asset, pct, value, rank, mode }: MoverItem & { mode: MoversM
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-bold leading-tight" style={{ color }}>{asset}</p>
         <p className="text-[10px] text-gray-600 font-mono leading-tight mt-0.5">
-          <span className={`rounded ${flashClass(valueFlash)}`}>{formatMoney(value, currency)}</span>
+          <span className={`rounded-sm ${flashClass(valueFlash)}`}>{formatMoney(value, currency)}</span>
         </p>
       </div>
       <div className="flex flex-col items-end gap-1 shrink-0">
@@ -83,7 +83,7 @@ export function TopMovers({ lots }: { lots: FifoLot[] }) {
   }
 
   const header = (label: string, color: string, glow: string, textClass: string) => (
-    <div className="px-4 py-3 border-b border-border flex items-center gap-2 min-h-[2.75rem]">
+    <div className="px-4 py-3 border-b border-border flex items-center gap-2 min-h-11">
       <span className={`w-2 h-2 rounded-full shrink-0 ${color}`} style={{ boxShadow: `0 0 6px ${glow}` }} />
       <span className={`text-[11px] font-semibold uppercase tracking-widest ${textClass}`}>{label}</span>
     </div>
@@ -101,7 +101,7 @@ export function TopMovers({ lots }: { lots: FifoLot[] }) {
               aria-pressed={mode === m}
               title={MODE_LABELS[m].title}
               onClick={() => changeMode(m)}
-              className={`px-2.5 py-1 text-[11px] rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 ${
+              className={`px-2.5 py-1 text-[11px] rounded-md transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-blue/60 ${
                 mode === m ? 'bg-accent-blue/15 text-accent-blue font-semibold' : 'text-gray-500 hover:text-gray-300'
               }`}>
               {MODE_LABELS[m].short}

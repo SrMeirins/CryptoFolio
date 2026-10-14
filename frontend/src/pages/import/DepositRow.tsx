@@ -51,7 +51,7 @@ export function DepositRow({ dep, cost, reviewed, onSetCost }: {
             placeholder="0,000000"
             value={inputVal}
             onChange={e => handleInput(e.target.value)}
-            className={`w-full bg-background-primary border rounded-lg pl-3 pr-12 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-none mono transition-colors ${
+            className={`w-full bg-background-primary border rounded-lg pl-3 pr-12 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-hidden mono transition-colors ${
               reviewed && cost != null ? 'border-accent-green/40 focus:border-accent-green' : 'border-border focus:border-accent-blue'
             }`}
           />

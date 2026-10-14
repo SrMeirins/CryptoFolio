@@ -178,7 +178,7 @@ export function AssetTable({ lots: rawLots, fiatBalances = NO_FIAT, onSimulate }
       </div>
 
       {dustRows.length > 0 && (
-        <div className={`card overflow-hidden p-0 ${onlyDust ? 'border-amber-500/20 bg-amber-500/[0.02]' : ''}`}>
+        <div className={`card overflow-hidden p-0 ${onlyDust ? 'border-amber-500/20 bg-amber-500/2' : ''}`}>
           <button
             type="button"
             onClick={() => setDustOpen(!dustOpen)}

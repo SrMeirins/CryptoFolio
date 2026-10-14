@@ -140,7 +140,7 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                   {isEditing ? (
                     <div className="flex-1 flex items-center gap-2">
                       <input value={editName} onChange={e => setEditName(e.target.value)}
-                        className="flex-1 bg-background-tertiary border border-border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-accent-blue"
+                        className="flex-1 bg-background-tertiary border border-border rounded-lg px-2.5 py-1.5 text-sm focus:outline-hidden focus:border-accent-blue"
                         onKeyDown={e => e.key === 'Enter' && handleSaveWallet(wallet.id)} />
                       <ColorPicker value={editColor} onChange={setEditColor} size="sm" />
                     </div>
@@ -149,7 +149,7 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm">{wallet.name}</span>
                         {wallet.is_default && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent-amber/15 text-accent-amber font-bold">DEFAULT</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-sm bg-accent-amber/15 text-accent-amber font-bold">DEFAULT</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5">
@@ -208,13 +208,13 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                             <div className="flex-1 flex items-center gap-1">
                               <input value={editingAddressValue}
                                 onChange={e => setEditingAddressValue(e.target.value)}
-                                className="flex-1 bg-background-card border border-border rounded-lg px-2 py-1 text-xs mono focus:outline-none focus:border-accent-blue"
+                                className="flex-1 bg-background-card border border-border rounded-lg px-2 py-1 text-xs mono focus:outline-hidden focus:border-accent-blue"
                                 placeholder="Dirección pública..."
                                 onKeyDown={e => e.key === 'Enter' && handleSaveAddress(wallet.id, addr.id)} />
                               <button type="button" onClick={() => handleSaveAddress(wallet.id, addr.id)} aria-label="Guardar dirección"
-                                className="p-1 text-accent-green hover:bg-accent-green/10 rounded"><Check size={11} /></button>
+                                className="p-1 text-accent-green hover:bg-accent-green/10 rounded-sm"><Check size={11} /></button>
                               <button type="button" onClick={() => setEditingAddressId(null)} aria-label="Cancelar"
-                                className="p-1 text-gray-600 hover:text-white rounded"><X size={11} /></button>
+                                className="p-1 text-gray-600 hover:text-white rounded-sm"><X size={11} /></button>
                             </div>
                           ) : (
                             <div className="flex-1 flex items-center gap-1 min-w-0">
@@ -243,9 +243,9 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                           {!isEditingAddr && (
                             <div className="flex items-center gap-0.5 opacity-0 group-hover/addr:opacity-100 transition-opacity">
                               <button type="button" onClick={() => { setEditingAddressId(addr.id); setEditingAddressValue(addr.address ?? '') }}
-                                className="p-1 text-gray-600 hover:text-white text-[10px] rounded transition-colors">Editar</button>
+                                className="p-1 text-gray-600 hover:text-white text-[10px] rounded-sm transition-colors">Editar</button>
                               <button type="button" onClick={() => handleDeleteAddress(wallet.id, addr.id)} aria-label="Eliminar dirección"
-                                className="p-1 text-gray-700 hover:text-accent-red rounded transition-colors">
+                                className="p-1 text-gray-700 hover:text-accent-red rounded-sm transition-colors">
                                 <Trash2 size={11} />
                               </button>
                             </div>

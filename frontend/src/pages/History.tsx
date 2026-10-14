@@ -216,7 +216,7 @@ export function History() {
               placeholder="Buscar activo o nota…"
               value={filters.search}
               onChange={e => setFilter('search', e.target.value)}
-              className="bg-background-tertiary border border-border rounded-lg pl-7 pr-8 py-1.5 text-xs placeholder-gray-600 focus:outline-none focus:border-accent-blue w-48"
+              className="bg-background-tertiary border border-border rounded-lg pl-7 pr-8 py-1.5 text-xs placeholder-gray-600 focus:outline-hidden focus:border-accent-blue w-48"
             />
             {filters.search && (
               <button type="button" onClick={() => setFilter('search', '')} aria-label="Limpiar búsqueda"
@@ -228,21 +228,21 @@ export function History() {
 
           {/* Tipo */}
           <select value={filters.type} onChange={e => setFilter('type', e.target.value)}
-            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-gray-400 focus:outline-none focus:border-accent-blue">
+            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-gray-400 focus:outline-hidden focus:border-accent-blue">
             <option value="">Todos los tipos</option>
             {Object.entries(OP_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
 
           {/* Wallet */}
           <select value={filters.wallet_id} onChange={e => setFilter('wallet_id', e.target.value)}
-            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-gray-400 focus:outline-none focus:border-accent-blue">
+            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-gray-400 focus:outline-hidden focus:border-accent-blue">
             <option value="">Todas las wallets</option>
             {walletList.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
 
           {/* Cuenta */}
           <select value={filters.account} onChange={e => setFilter('account', e.target.value)}
-            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-gray-400 focus:outline-none focus:border-accent-blue">
+            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-gray-400 focus:outline-hidden focus:border-accent-blue">
             <option value="">Todas las cuentas</option>
             {KNOWN_ACCOUNTS.map(a => <option key={a} value={a}>{a}</option>)}
           </select>

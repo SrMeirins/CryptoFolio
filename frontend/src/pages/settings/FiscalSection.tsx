@@ -111,7 +111,7 @@ export function FiscalSection() {
             <span className="px-3 py-2.5 text-sm text-gray-500 border-r border-border bg-background-secondary">€</span>
             <input type="text" inputMode="numeric" value={thresholdInput}
               onChange={e => setThresholdInput(e.target.value.replace(/[^0-9]/g, ''))}
-              className="px-3 py-2.5 text-sm mono bg-transparent text-white w-32 focus:outline-none"
+              className="px-3 py-2.5 text-sm mono bg-transparent text-white w-32 focus:outline-hidden"
               placeholder="50000" />
           </div>
           <button type="button" onClick={saveThreshold}
@@ -158,7 +158,7 @@ export function FiscalSection() {
                     next[i] = e.target.value
                     setTramosInput(next)
                   }}
-                  className="px-2 py-2 text-sm mono bg-transparent text-white w-14 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="px-2 py-2 text-sm mono bg-transparent text-white w-14 focus:outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <span className="pr-2 text-sm text-gray-500">%</span>
               </div>

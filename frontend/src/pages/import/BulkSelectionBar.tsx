@@ -52,7 +52,7 @@ export function BulkSelectionBar({
               disabled={!bulkDest}
               className="px-3 py-1.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5"
             >
-              <span className="bg-white/20 rounded px-1 py-0.5 text-[10px] font-bold">{selectedCount}</span>
+              <span className="bg-white/20 rounded-sm px-1 py-0.5 text-[10px] font-bold">{selectedCount}</span>
               Aplicar
             </button>
           ) : (

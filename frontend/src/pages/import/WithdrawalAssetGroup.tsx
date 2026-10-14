@@ -75,7 +75,7 @@ export function WithdrawalAssetGroup({
             <button
               type="button"
               onClick={onCopyPrevGroupDest}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors px-1.5 py-1 rounded hover:bg-white/5"
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors px-1.5 py-1 rounded-sm hover:bg-white/5"
               title={`Aplicar mismo destino que grupo anterior: ${destLabel(prevDest, coldWallets).text}`}
             >
               <Copy size={11} />

@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { formatMoney, formatAmount, type Currency } from '../../utils/format'
 import { fmtMonthLabel } from './helpers'
+import { useChartColors } from '../../hooks/useChartColors'
 
 function ChartTooltip({ active, payload, label }: {
   active?: boolean; payload?: { value: number; name?: string }[]; label?: string
@@ -28,6 +29,7 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
   }
   onAssetClick: (asset: string) => void
 }) {
+  const c = useChartColors()
   const [open, setOpen] = useState(false)
   const chartData = stats.monthly.map(m => ({
     name:          fmtMonthLabel(m.mes),
@@ -45,7 +47,7 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.02] transition-colors"
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/2 transition-colors"
       >
         <div className="flex items-center gap-2">
           <BarChart2 size={14} className="text-gray-500" />
@@ -62,20 +64,20 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
             <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-3">Operaciones por mes</p>
             <ResponsiveContainer width="100%" height={130}>
               <BarChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} barSize={10} barGap={1}>
-                <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 9, fill: c.axisMuted }} axisLine={false} tickLine={false} />
                 <YAxis hide domain={[0, maxOps * 1.2]} />
-                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                <Bar dataKey="Compras"        stackId="a" fill="#10b981" />
-                <Bar dataKey="Ventas"         stackId="a" fill="#ef4444" />
-                <Bar dataKey="Ingresos"       stackId="a" fill="#f59e0b" />
-                <Bar dataKey="Transferencias" stackId="a" fill="#6b7280" />
-                <Bar dataKey="Otros"          stackId="a" fill="#4b5563" radius={[2, 2, 0, 0]} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: c.cursorSoft }} />
+                <Bar dataKey="Compras"        stackId="a" fill={c.gain} />
+                <Bar dataKey="Ventas"         stackId="a" fill={c.loss} />
+                <Bar dataKey="Ingresos"       stackId="a" fill={c.warn} />
+                <Bar dataKey="Transferencias" stackId="a" fill={c.neutral} />
+                <Bar dataKey="Otros"          stackId="a" fill={c.neutralSoft} radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
             <div className="flex items-center gap-4 mt-2">
-              {[['Compras','#10b981'],['Ventas','#ef4444'],['Ingresos','#f59e0b'],['Transferencias','#6b7280'],['Otros','#4b5563']].map(([l,c]) => (
+              {[['Compras',c.gain],['Ventas',c.loss],['Ingresos',c.warn],['Transferencias',c.neutral],['Otros',c.neutralSoft]].map(([l,c]) => (
                 <div key={l} className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                  <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: c }} />{l}
+                  <div className="w-2 h-2 rounded-xs" style={{ backgroundColor: c }} />{l}
                 </div>
               ))}
             </div>

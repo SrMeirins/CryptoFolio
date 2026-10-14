@@ -4,6 +4,8 @@ import { portfolioApi } from '../../api/portfolio'
 import { Bell, BellOff, X, ArrowRight, Wrench } from 'lucide-react'
 import { NOTIFICATION_ROUTES, NOTIFICATION_TYPE_META } from '../../constants/notifications'
 import { CurrencyToggle } from '../../components/CurrencyToggle'
+import { ThemeSelector } from '../../components/ThemeSelector'
+import { LIGHT_THEME_ENABLED } from '../../utils/theme'
 
 const NOTIFICATION_LABELS: Record<string, string> = {
   'no-price':            'Ir a Activos',
@@ -48,6 +50,21 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
 
   return (
     <div className="space-y-6 max-w-2xl">
+
+      {/* Tema (#197): visible cuando el tema claro esté listo (#198) */}
+      {LIGHT_THEME_ENABLED && (
+        <div className="rounded-xl border border-border bg-background-card p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-sm">Tema</h3>
+              <p className="text-xs text-fg-subtle mt-0.5 leading-relaxed">
+                Oscuro, claro o el mismo que el sistema operativo. También puedes alternar entre claro y oscuro desde la barra superior.
+              </p>
+            </div>
+            <ThemeSelector />
+          </div>
+        </div>
+      )}
 
       {/* Moneda de visualización (#176) */}
       <div className="rounded-xl border border-border bg-background-card p-5">

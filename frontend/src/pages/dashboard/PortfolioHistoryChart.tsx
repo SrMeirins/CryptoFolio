@@ -6,6 +6,7 @@ import {
 import { formatMoney } from '../../utils/format'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
 import { portfolioHistoryQuery } from '../../queries/currencyQueries'
+import { useChartColors } from '../../hooks/useChartColors'
 
 const PERIODS = [
   { key: '1m', label: '1M' },
@@ -24,6 +25,7 @@ function fmtChartDate(dateStr: string, period: string): string {
 
 // `headerLeft` sustituye al título (lo usa EvolutionCard para poner las pestañas).
 export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentValue?: number; headerLeft?: ReactNode }) {
+  const c = useChartColors()
   const [period, setPeriod] = useState('1y')
 
   // En la moneda de visualización (#177); `currentValue` llega ya en esa moneda.
@@ -57,7 +59,7 @@ export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentVal
     return { minVal, maxVal, eurChange, isPositive: eurChange >= 0 }
   }, [points, currentValue])
 
-  const color = isPositive ? '#00c896' : '#e74c3c'
+  const color = isPositive ? c.up : c.down
 
   const today = new Date().toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
   const chartData = points.map((p, i) => ({
@@ -130,17 +132,17 @@ export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentVal
                   <stop offset="95%" stopColor={color} stopOpacity={0}   />
                 </linearGradient>
               </defs>
-              <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.04)" />
+              <CartesianGrid vertical={false} stroke={c.grid} />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 10, fill: '#4b5563' }}
+                tick={{ fontSize: 10, fill: c.axis }}
                 axisLine={false}
                 tickLine={false}
                 interval="preserveStartEnd"
               />
               <YAxis
                 domain={[minVal * 0.97, maxVal * 1.02]}
-                tick={{ fontSize: 10, fill: '#4b5563' }}
+                tick={{ fontSize: 10, fill: c.axis }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v: number) => formatMoney(v, currency)}
@@ -148,12 +150,12 @@ export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentVal
               />
               <RechartsTooltip
                 contentStyle={{
-                  background: '#0f1117',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: c.tooltipBg,
+                  border: `1px solid ${c.tooltipBorder}`,
                   borderRadius: 10,
                   fontSize: 12,
                 }}
-                labelStyle={{ color: '#9ca3af', marginBottom: 4 }}
+                labelStyle={{ color: c.tooltipLabel, marginBottom: 4 }}
                 formatter={(v: number) => [formatMoney(v, currency), 'Valor']}
               />
               <Area

@@ -24,7 +24,7 @@ function SidebarNavItem({ to, icon: Icon, label, collapsed }: SidebarNavItemProp
         ${collapsed ? 'justify-center px-0 py-[10px]' : 'gap-3 px-3 py-[10px]'}
         ${isActive
           ? 'bg-accent-blue/12 text-accent-blue'
-          : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.04]'
+          : 'text-gray-500 hover:text-gray-200 hover:bg-white/4'
         }
       `}
     >
@@ -88,7 +88,7 @@ export function Sidebar() {
         <img src="/favicon.svg" width={34} height={34} alt="CryptoFolio" className="shrink-0" />
         {!collapsed && (
           <div className="flex flex-col min-w-0 overflow-hidden">
-            <span className="font-bold text-[15px] leading-tight tracking-tight bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent whitespace-nowrap">
+            <span className="font-bold text-[15px] leading-tight tracking-tight bg-linear-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent whitespace-nowrap">
               CryptoFolio
             </span>
             <span className="text-[10px] text-gray-600 font-medium tracking-wide whitespace-nowrap">
@@ -115,7 +115,7 @@ export function Sidebar() {
           title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
           className={`
             group w-full flex items-center rounded-xl py-2.5 text-gray-600
-            hover:text-gray-300 hover:bg-white/[0.04] transition-all duration-200
+            hover:text-gray-300 hover:bg-white/4 transition-all duration-200
             ${collapsed ? 'justify-center px-0' : 'justify-between px-3'}
           `}
         >

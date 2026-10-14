@@ -8,6 +8,7 @@ import { CryptoIcon } from '../../components/CryptoIcon'
 import { PNL_THRESHOLD } from './constants'
 import { FiscalChartCard } from './FiscalChartCard'
 import type { YearOverview, MonthlyData, BreakdownItem } from './types'
+import { useChartColors } from '../../hooks/useChartColors'
 
 function ChartTooltip({ active, payload, label }: {
   active?: boolean
@@ -29,6 +30,7 @@ function ChartTooltip({ active, payload, label }: {
 }
 
 export function ComparativaAnual({ data }: { data: YearOverview[] }) {
+  const c = useChartColors()
   if (data.length < 2) return null
   const chartData = data.map(d => ({ name: String(d.year), value: d.netoPatrimonial, en_curso: d.esAnioEnCurso }))
   const max = Math.max(...chartData.map(d => Math.abs(d.value)), 1)
@@ -37,13 +39,13 @@ export function ComparativaAnual({ data }: { data: YearOverview[] }) {
     <FiscalChartCard icon={TrendingUp} title="Comparativa interanual — G/P neto">
       <ResponsiveContainer width="100%" height={120}>
         <BarChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
-          <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 11, fill: c.axisMuted }} axisLine={false} tickLine={false} />
           <YAxis hide domain={[-max * 1.15, max * 1.15]} />
-          <ReferenceLine y={0} stroke="#2a2d3e" strokeWidth={1} />
-          <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+          <ReferenceLine y={0} stroke={c.gridStrong} strokeWidth={1} />
+          <Tooltip content={<ChartTooltip />} cursor={{ fill: c.cursorSoft }} />
           <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={40}>
             {chartData.map((entry) => (
-              <Cell key={entry.name} fill={entry.value >= 0 ? '#10b981' : '#ef4444'} opacity={entry.en_curso ? 1 : 0.65} />
+              <Cell key={entry.name} fill={entry.value >= 0 ? c.gain : c.loss} opacity={entry.en_curso ? 1 : 0.65} />
             ))}
           </Bar>
         </BarChart>
@@ -53,11 +55,12 @@ export function ComparativaAnual({ data }: { data: YearOverview[] }) {
 }
 
 export function EvolucionMensual({ data, esAnioEnCurso }: { data: MonthlyData; esAnioEnCurso: boolean }) {
+  const c = useChartColors()
   if (data.meses.length === 0) return null
 
   const max = Math.max(...data.meses.map(m => Math.abs(m.acumulado)), 1)
   const chartData = data.meses.map(m => ({ ...m, name: m.label }))
-  const lastColor = data.meses[data.meses.length - 1]?.acumulado >= 0 ? '#10b981' : '#ef4444'
+  const lastColor = data.meses[data.meses.length - 1]?.acumulado >= 0 ? c.gain : c.loss
 
   return (
     <FiscalChartCard
@@ -82,10 +85,10 @@ export function EvolucionMensual({ data, esAnioEnCurso }: { data: MonthlyData; e
               <stop offset="95%" stopColor={lastColor} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 10, fill: c.axisMuted }} axisLine={false} tickLine={false} />
           <YAxis hide domain={[-max * 1.2, max * 1.2]} />
-          <ReferenceLine y={0} stroke="#2a2d3e" strokeWidth={1} />
-          <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} />
+          <ReferenceLine y={0} stroke={c.gridStrong} strokeWidth={1} />
+          <Tooltip content={<ChartTooltip />} cursor={{ stroke: c.cursorLine }} />
           <Area type="monotone" dataKey="acumulado" stroke={lastColor} strokeWidth={2} fill="url(#areaGrad)" dot={false} activeDot={{ r: 4 }} />
         </AreaChart>
       </ResponsiveContainer>

@@ -84,7 +84,7 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
           <input value={testPairVal} onChange={e => setTestPairVal(e.target.value.toUpperCase())}
             onKeyDown={e => e.key === 'Enter' && handleTest()}
             placeholder={`${asset.symbol}EUR, ${asset.symbol}USDT...`}
-            className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm mono placeholder-gray-600 focus:outline-none focus:border-accent-blue" />
+            className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm mono placeholder-gray-600 focus:outline-hidden focus:border-accent-blue" />
           <button type="button" onClick={handleTest} disabled={testLoading || !testPairVal}
             className="px-3 py-2 bg-background-tertiary hover:bg-border disabled:opacity-50 rounded-lg text-sm transition-colors">
             {testLoading ? <RefreshCw size={13} className="animate-spin" /> : <Search size={13} />}

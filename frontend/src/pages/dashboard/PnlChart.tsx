@@ -9,6 +9,7 @@ import { dailyPnlQuery } from '../../queries/currencyQueries'
 import {
   PNL_PERIODS, METRIC_LABELS, buildPnlSeries, madridToday, metricFor, periodFrom, type PnlPeriod, type PnlPoint,
 } from '../../utils/pnlChart'
+import { useChartColors } from '../../hooks/useChartColors'
 
 // Gráfico de rentabilidad acumulada del Dashboard (#166), sobre
 // GET /api/v1/pnl/daily. Mientras el backend descarga precios de cierre
@@ -42,6 +43,7 @@ function ChartTooltip({ active, payload, currency }: { active?: boolean; payload
 }
 
 export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
+  const c = useChartColors()
   const [period, setPeriod] = useState<PnlPeriod>('Todo')
   const from = periodFrom(period, madridToday())
 
@@ -56,7 +58,7 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
   const metric = METRIC_LABELS[metricFor(period)]
   const last = series[series.length - 1]
   const positive = (last?.pct ?? 0) >= 0
-  const color = positive ? '#00c896' : '#e74c3c'
+  const color = positive ? c.up : c.down
 
   return (
     <div className="bg-background-card border border-border rounded-2xl px-5 py-5">
@@ -69,7 +71,7 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
               type="button"
               aria-pressed={period === p}
               onClick={() => setPeriod(p)}
-              className={`text-[11px] font-medium px-2.5 py-1 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60 ${
+              className={`text-[11px] font-medium px-2.5 py-1 rounded-lg transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-blue/60 ${
                 period === p ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-gray-400'
               }`}
             >
@@ -79,7 +81,7 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 mb-4 min-h-[1.5rem] flex-wrap" aria-live="polite">
+      <div className="flex items-center gap-3 mb-4 min-h-6 flex-wrap" aria-live="polite">
         {last && (
           <p className={`text-sm font-mono font-semibold ${positive ? 'text-accent-green' : 'text-accent-red'}`}>
             <span aria-hidden="true">{positive ? '▲' : '▼'} </span>
@@ -117,24 +119,24 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
                   <stop offset="95%" stopColor={color} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.04)" />
+              <CartesianGrid vertical={false} stroke={c.grid} />
               <XAxis
                 dataKey="date"
                 tickFormatter={(d: string) => fmtAxisDate(d, period)}
-                tick={{ fontSize: 10, fill: '#4b5563' }}
+                tick={{ fontSize: 10, fill: c.axis }}
                 axisLine={false}
                 tickLine={false}
                 interval="preserveStartEnd"
                 minTickGap={24}
               />
               <YAxis
-                tick={{ fontSize: 10, fill: '#4b5563' }}
+                tick={{ fontSize: 10, fill: c.axis }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v: number) => `${v.toFixed(0)}%`}
                 width={44}
               />
-              <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" strokeDasharray="3 3" />
+              <ReferenceLine y={0} stroke={c.cursor} strokeDasharray="3 3" />
               <RechartsTooltip content={<ChartTooltip currency={currency} />} />
               <Area
                 type="monotone"

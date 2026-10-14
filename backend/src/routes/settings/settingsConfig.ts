@@ -16,6 +16,7 @@ const configSchema = z.object({
 // guardarlo para que un cliente no deje la app en un estado inválido.
 const restrictedValues: Record<string, z.ZodType<string>> = {
   display_currency: z.enum(DISPLAY_CURRENCIES, { message: 'display_currency debe ser EUR o USD' }),
+  theme: z.enum(['dark', 'light', 'system'], { message: 'theme debe ser dark, light o system' }),
 };
 
 // ── GET /api/settings/config ───────────────────────────────────────────────

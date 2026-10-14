@@ -3,7 +3,7 @@ import { type FieldDefinition } from '../api/portfolio'
 import { WalletPicker } from './WalletPicker'
 import { useWalletsQuery } from '../hooks/useWallets'
 
-const baseInput = 'w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-accent-blue transition-colors'
+const baseInput = 'w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-hidden focus:border-accent-blue transition-colors'
 
 /** Renderiza el input adecuado (número, texto, fecha, wallet, select...) según `field.type`. */
 export function DynamicField({ field, value, onChange }: {
@@ -18,7 +18,7 @@ export function DynamicField({ field, value, onChange }: {
         {field.required
           ? <span className="text-accent-red text-[10px]">requerido</span>
           : field.auto
-          ? <span className="flex items-center gap-0.5 text-accent-blue bg-accent-blue/10 px-1.5 py-0.5 rounded text-[10px]">
+          ? <span className="flex items-center gap-0.5 text-accent-blue bg-accent-blue/10 px-1.5 py-0.5 rounded-sm text-[10px]">
               <Zap size={8} /> auto
             </span>
           : <span className="text-gray-700 text-[10px]">opcional</span>
@@ -50,7 +50,7 @@ export function DynamicField({ field, value, onChange }: {
           type="datetime-local"
           value={value ? new Date(value as string).toISOString().slice(0, 16) : ''}
           onChange={e => onChange(e.target.value ? new Date(e.target.value).toISOString() : '')}
-          className={`${baseInput} [color-scheme:dark]`}
+          className={`${baseInput} scheme-dark`}
         />
       )}
 

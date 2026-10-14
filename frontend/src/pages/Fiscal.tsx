@@ -152,7 +152,7 @@ export function Fiscal() {
 
           {modelo721Loading ? (
             <div className="bg-background-card border border-border rounded-2xl p-5 animate-pulse">
-              <div className="h-4 bg-background-tertiary rounded w-48" />
+              <div className="h-4 bg-background-tertiary rounded-sm w-48" />
             </div>
           ) : modelo721 && (
             <Modelo721Card data={modelo721} activeYear={activeYear} />
@@ -160,7 +160,7 @@ export function Fiscal() {
 
           {eventsLoading ? (
             <div className="bg-background-card border border-border rounded-2xl p-5 animate-pulse">
-              <div className="h-4 bg-background-tertiary rounded w-64" />
+              <div className="h-4 bg-background-tertiary rounded-sm w-64" />
             </div>
           ) : events && (
             <>

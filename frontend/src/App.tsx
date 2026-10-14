@@ -10,6 +10,7 @@ import { useLivePrices } from './hooks/useLivePrices'
 import { ToastProvider } from './components/Toast'
 import { UpdateBanner } from './components/UpdateBanner'
 import { TopBar } from './components/TopBar'
+import { useApplyTheme } from './hooks/useTheme'
 
 function RoutedContent() {
   const { pathname } = useLocation()
@@ -29,6 +30,7 @@ function RoutedContent() {
 
 export default function App() {
   useLivePrices()
+  useApplyTheme()
 
   // React Router v7: los future flags v7_startTransition/v7_relativeSplatPath
   // ya eran el comportamiento activado en v6; en v7 son el único

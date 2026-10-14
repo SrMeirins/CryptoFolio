@@ -44,7 +44,7 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
       </div>
 
       {/* Desglose */}
-      <div className="mx-3 mb-3 rounded-xl bg-white/[0.03] border border-white/5 divide-y divide-white/5">
+      <div className="mx-3 mb-3 rounded-xl bg-white/3 border border-white/5 divide-y divide-white/5">
         <div className="flex items-center justify-between px-3 py-2">
           <span className="text-[11px] text-gray-500">Ganancias</span>
           <span className="font-['JetBrains_Mono',monospace] text-[11px] font-semibold text-accent-green">+{formatEur(gains)}</span>

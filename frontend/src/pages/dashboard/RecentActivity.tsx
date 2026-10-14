@@ -37,8 +37,8 @@ export function RecentActivity() {
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3 px-5 py-3.5">
               <div className="w-16 h-6 skeleton rounded-lg" />
-              <div className="flex-1 h-4 skeleton rounded" />
-              <div className="w-16 h-4 skeleton rounded" />
+              <div className="flex-1 h-4 skeleton rounded-sm" />
+              <div className="w-16 h-4 skeleton rounded-sm" />
             </div>
           ))}
         </div>
