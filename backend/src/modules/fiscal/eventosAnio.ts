@@ -30,6 +30,10 @@ export interface EventoFiscal {
   gananciaPerdidaEur: number;
   wallet: string;
   txId: string;
+  // Identificador único del evento (el consumo de lote que lo origina): una
+  // operación que consume varios lotes genera varios eventos con el mismo
+  // txId (#201).
+  eventId: string;
   permutaWrapStaking: boolean;
   lostSinMotivo: boolean;
   posiblePerdidaDiferida: boolean;
@@ -50,6 +54,7 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
   const gpRows = await db.query(`
     SELECT
       flc.consumed_at             AS fecha,
+      flc.id                      AS consumption_id,
       flc.lot_id,
       t.operation_type,
       fl.asset                    AS activo_transmitido,
@@ -140,6 +145,7 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
         gananciaPerdidaEur:       parseFloat(row.gain_loss_eur as string),
         wallet:                   row.wallet as string,
         txId:                     row.tx_id as string,
+        eventId:                  row.consumption_id as string,
         // Aviso, no bloqueo: el wrap ETH↔BETH de staking se trata como permuta
         // imponible (criterio conservador; sin doctrina DGT específica).
         permutaWrapStaking:       String(row.tx_notes ?? '').startsWith('ETH 2.0 Staking'),

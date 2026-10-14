@@ -7,9 +7,12 @@
 //   ningún mensaje, el socket se da por muerto, se cierra y se reconecta.
 // - close() lo detiene todo: quita los manejadores antes de cerrar, para que
 //   el cierre deliberado (desmontaje, StrictMode) no programe reconexiones
-//   que nadie cancelaría.
+//   que nadie cancelaría. Un socket que aún está conectando no se cierra en
+//   ese momento (el navegador avisaría en consola de «conexión interrumpida»,
+//   #201): se cierra en cuanto abre.
 
 export interface SocketLike {
+  readyState?: number
   onopen: (() => void) | null
   onmessage: ((e: { data: string }) => void) | null
   onclose: (() => void) | null
@@ -28,6 +31,7 @@ const RECONNECT_BASE_MS = 3_000
 const RECONNECT_MAX_MS = 30_000
 const SILENCE_MS = 30_000
 const WATCH_INTERVAL_MS = 5_000
+const CONNECTING = 0
 
 export function createLiveSocket({ url, createSocket, onMessage, onConnectedChange }: LiveSocketOptions): { close(): void } {
   let socket: SocketLike | null = null
@@ -102,7 +106,14 @@ export function createLiveSocket({ url, createSocket, onMessage, onConnectedChan
         const s = socket
         socket = null
         detach(s)
-        s.close()
+        if (s.readyState === CONNECTING) {
+          // Cerrar ahora haría que el navegador avisara en consola: se espera
+          // a que abra (o a que falle, en cuyo caso ya se cierra solo).
+          s.onopen = () => s.close()
+          s.onerror = () => { /* el navegador lo cierra por sí mismo */ }
+        } else {
+          s.close()
+        }
       }
     },
   }
