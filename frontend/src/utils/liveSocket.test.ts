@@ -9,16 +9,25 @@ class FakeSocket implements SocketLike {
   onclose: (() => void) | null = null
   onerror: (() => void) | null = null
   closed = false
+  readyState = 0 // CONNECTING
   constructor(public url: string) { FakeSocket.instances.push(this) }
-  close() { if (this.closed) return; this.closed = true; this.onclose?.() }
-  open() { this.onopen?.() }
+  close() {
+    if (this.closed) return
+    // Un navegador real avisa en consola si se cierra un socket que aún conecta (#201).
+    if (this.readyState === 0) FakeSocket.closedWhileConnecting++
+    this.closed = true
+    this.readyState = 3
+    this.onclose?.()
+  }
+  open() { this.readyState = 1; this.onopen?.() }
+  static closedWhileConnecting = 0
   emit(msg: unknown) { this.onmessage?.({ data: JSON.stringify(msg) }) }
 }
 
 const last = () => FakeSocket.instances[FakeSocket.instances.length - 1]
 
 describe('createLiveSocket (#194)', () => {
-  beforeEach(() => { vi.useFakeTimers(); FakeSocket.instances = [] })
+  beforeEach(() => { vi.useFakeTimers(); FakeSocket.instances = []; FakeSocket.closedWhileConnecting = 0 })
   afterEach(() => { vi.useRealTimers() })
 
   const start = () => {
@@ -63,10 +72,30 @@ describe('createLiveSocket (#194)', () => {
   it('al cerrarlo no queda ningún socket ni reconexión viva (StrictMode, desmontaje)', () => {
     const { live, states } = start()
     live.close()                         // cierre mientras aún conecta
+    last().open()                        // el socket termina de abrir: se cierra entonces
     expect(last().closed).toBe(true)
     vi.advanceTimersByTime(120_000)
     expect(FakeSocket.instances).toHaveLength(1)
     expect(states).toEqual([])           // el cierre deliberado no altera el estado
+  })
+
+  it('no cierra un socket que aún está conectando: espera a que abra (sin aviso en consola, #201)', () => {
+    const { live, messages } = start()
+    live.close()
+    expect(last().closed).toBe(false)    // cerrarlo ahora haría que el navegador avisara
+    last().open()
+    last().emit({ type: 'prices', payload: {} })
+    expect(last().closed).toBe(true)
+    expect(FakeSocket.closedWhileConnecting).toBe(0)
+    expect(messages).toEqual([])         // ya cerrado: no entrega mensajes
+  })
+
+  it('si el socket que conectaba falla antes de abrir, no queda nada pendiente', () => {
+    const { live } = start()
+    live.close()
+    last().onerror?.()
+    vi.advanceTimersByTime(120_000)
+    expect(FakeSocket.instances).toHaveLength(1)
   })
 
   it('al cerrarlo durante la espera de reconexión, la cancela', () => {

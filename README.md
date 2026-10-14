@@ -431,6 +431,18 @@ Las contribuciones son bienvenidas. Áreas donde ayudar:
 
 Para cambios grandes, abre primero un issue para discutirlo antes de ponerte a programar.
 
+### Prueba de humo de la consola del navegador
+
+El CI abre cada vista con datos sintéticos y falla ante cualquier error o aviso en la consola del navegador (`frontend/e2e/`). Para ejecutarla en local, con un backend en marcha sobre una base de datos de prueba cargada con `frontend/e2e/seed.sql`:
+
+```bash
+cd frontend
+npx playwright install chromium          # solo la primera vez
+BACKEND_PROXY_HOST=127.0.0.1:3001 npm run test:e2e
+```
+
+En el entorno de desarrollo es normal ver durante unos segundos «no puede establecer una conexión con ws://…/ws/prices» mientras el backend se reinicia (recarga en caliente o `make rebuild`): la app se reconecta sola en cuanto vuelve.
+
 ---
 
 ## 📄 Licencia

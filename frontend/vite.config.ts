@@ -6,8 +6,9 @@ import react from '@vitejs/plugin-react'
 // ese contenedor (el flujo real: `make dev`), no invocando `vite`/`npm run
 // dev` directo en el host. Si algún día se necesita correr fuera de Docker
 // (p. ej. para probar el modo dev de Electron, que carga localhost:5173),
-// hace falta otro mecanismo (variable de entorno, host.docker.internal...).
-const BACKEND_HOST = 'backend:3001'
+// hace falta otro mecanismo: BACKEND_PROXY_HOST lo sustituye (p. ej. la
+// prueba de humo de consola en CI, que arranca el backend en 127.0.0.1:3001).
+const BACKEND_HOST = process.env.BACKEND_PROXY_HOST || 'backend:3001'
 
 export default defineConfig({
   plugins: [react()],

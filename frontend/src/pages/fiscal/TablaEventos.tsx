@@ -187,7 +187,7 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
                     Sin operaciones con los filtros actuales
                   </td>
                 </tr>
-              ) : filtered.map((e) => <FiscalEventRow key={e.txId} e={e} />)}
+              ) : filtered.map((e) => <FiscalEventRow key={e.eventId} e={e} />)}
             </tbody>
             {filtered.length > 0 && (
               <tfoot>

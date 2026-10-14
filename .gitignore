@@ -84,3 +84,7 @@ xl/
 
 # ── Electron instaladores / output del packaging ───────────────────────────
 releases/
+
+# Resultados de Playwright (prueba de humo de consola, #201)
+frontend/test-results/
+frontend/playwright-report/

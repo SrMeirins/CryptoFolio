@@ -27,6 +27,8 @@ export interface FiscalEvent {
   gananciaPerdidaEur: number
   wallet: string
   txId: string
+  /** Único por evento: una operación que consume varios lotes genera varios eventos con el mismo txId (#201). */
+  eventId: string
   /** Recompra en ±2 meses de la venta con pérdida — art. 33.5 LIRPF, aplicación a cripto no pacífica. */
   posiblePerdidaDiferida?: boolean
   /** Pérdida 100% deducible computada sin motivo anotado (estafa, exchange insolvente...) — deducibilidad real por validar. */

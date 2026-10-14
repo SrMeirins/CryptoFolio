@@ -6,5 +6,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     environment: 'node',
+    // e2e/ son pruebas de Playwright (npm run test:e2e), no de vitest.
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
   },
 })

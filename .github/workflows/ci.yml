@@ -106,6 +106,75 @@ jobs:
         working-directory: frontend
         run: npm test
 
+  smoke-console:
+    name: Smoke — consola del navegador
+    # Prueba de humo (#201): backend real con datos sintéticos + frontend en
+    # modo desarrollo (React solo emite sus avisos ahí) + Playwright, que abre
+    # cada vista y falla ante cualquier error o aviso en la consola.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cryptotracker
+          POSTGRES_PASSWORD: ci_test_password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://cryptotracker:ci_test_password@localhost:5432/postgres
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+
+      - name: Start backend
+        # El backend aplica schema.sql y las migraciones sobre la base vacía al
+        # arrancar. Sin acceso a Binance/CoinGecko desde el runner, el feed y
+        # los logos fallan de forma controlada (no afecta a la consola).
+        working-directory: backend
+        env:
+          BACKEND_PORT: '3001'
+          BACKEND_HOST: 127.0.0.1
+        run: |
+          nohup npx ts-node --transpile-only src/index.ts > backend.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:3001/health && exit 0; sleep 2; done
+          cat backend.log; exit 1
+
+      - name: Seed synthetic data
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f frontend/e2e/seed.sql
+          curl -sf -X POST -m 300 http://127.0.0.1:3001/api/fifo/run
+
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Console smoke test
+        working-directory: frontend
+        env:
+          BACKEND_PROXY_HOST: 127.0.0.1:3001
+        run: npm run test:e2e
+
   test-electron:
     name: Tests — electron
     runs-on: ubuntu-latest

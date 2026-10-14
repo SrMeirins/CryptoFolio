@@ -360,6 +360,25 @@ CREATE TABLE price_close_madrid (
 );
 
 -- ============================================================
+-- TABLA: asset_icons (#201)
+-- Logos de los activos descargados por el backend y servidos desde el propio
+-- origen; 'missing' = sin logo disponible (se reintenta más adelante).
+-- ============================================================
+CREATE TABLE asset_icons (
+  symbol        TEXT PRIMARY KEY,
+  status        TEXT NOT NULL,
+  content_type  TEXT,
+  data          BYTEA,
+  fetched_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_asset_icons_status CHECK (status IN ('ok', 'missing')),
+  CONSTRAINT chk_asset_icons_content CHECK (
+    (status = 'ok' AND data IS NOT NULL AND octet_length(data) <= 262144
+       AND content_type IN ('image/png', 'image/jpeg', 'image/webp'))
+    OR (status = 'missing' AND data IS NULL AND content_type IS NULL)
+  )
+);
+
+-- ============================================================
 -- TABLA: asset_metadata
 -- ============================================================
 CREATE TABLE asset_metadata (

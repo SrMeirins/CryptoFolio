@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { CryptoIcon } from '../../components/CryptoIcon'
 import type { FifoLot, FiatBalance } from '../../api/portfolio'
 import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
 import { useDisplayMarket } from '../../hooks/useDisplayMarket'
@@ -12,7 +13,6 @@ const BAR_SCALE: Record<MoversMode, number> = { '24h': 10, total: 2 }
 
 function MoverRow({ asset, pct, value, rank, mode }: MoverItem & { mode: MoversMode }) {
   const currency = useCurrency()
-  const [imgOk, setImgOk] = useState(true)
   const pctFlash   = useFlashOnChange(pct)
   const valueFlash = useFlashOnChange(value)
   const isUp  = pct >= 0
@@ -25,22 +25,7 @@ function MoverRow({ asset, pct, value, rank, mode }: MoverItem & { mode: MoversM
       style={{ background: `${color}06` }}
     >
       <span className="text-[10px] text-gray-700 w-4 text-center font-mono shrink-0">{rank}</span>
-      {imgOk ? (
-        <img
-          src={`https://assets.coincap.io/assets/icons/${asset.toLowerCase()}@2x.png`}
-          alt={asset}
-          className="w-8 h-8 rounded-full shrink-0"
-          style={{ boxShadow: `0 0 0 2px ${color}30` }}
-          onError={() => setImgOk(false)}
-        />
-      ) : (
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
-          style={{ background: `${color}20`, color, boxShadow: `0 0 0 2px ${color}30` }}
-        >
-          {asset.slice(0, 2)}
-        </div>
-      )}
+      <CryptoIcon symbol={asset} size={32} ring={color} />
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-bold leading-tight" style={{ color }}>{asset}</p>
         <p className="text-[10px] text-gray-600 font-mono leading-tight mt-0.5">
