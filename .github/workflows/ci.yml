@@ -42,6 +42,29 @@ jobs:
           npm run lint
           npm run typecheck
 
+  audit:
+    name: Auditoría de dependencias — ${{ matrix.package }}
+    # Falla ante vulnerabilidades altas o críticas en dependencias de
+    # producción (#203). Las de herramientas de desarrollo (compilación,
+    # empaquetado) no llegan a la app y se siguen en sus propias issues.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [backend, frontend, electron]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: npm audit (producción)
+        working-directory: ${{ matrix.package }}
+        run: npm audit --omit=dev --audit-level=high
+
   test-backend:
     name: Tests — backend
     runs-on: ubuntu-latest
