@@ -1,5 +1,6 @@
 import { CheckCircle, ChevronDown, ArrowRight } from 'lucide-react'
 import type { ProgressEvent } from './types'
+import { buttonClasses } from '../../components/ui'
 
 export function ImportSummary({ log, showLog, onToggleLog, onGoToDashboard }: {
   log: ProgressEvent[]
@@ -70,7 +71,7 @@ export function ImportSummary({ log, showLog, onToggleLog, onGoToDashboard }: {
         <button
           type="button"
           onClick={onGoToDashboard}
-          className="flex items-center gap-2 px-5 py-2 bg-brand-solid text-on-brand hover:bg-brand-solid/90 rounded-lg text-sm font-medium transition-colors"
+          className={buttonClasses('primary', 'lg', 'flex')}
         >
           Ver Dashboard
           <ArrowRight size={14} />

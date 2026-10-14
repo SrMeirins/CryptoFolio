@@ -6,6 +6,7 @@ import { Toggle } from '../../../components/Toggle'
 import { PairInputsGrid } from './PairInputsGrid'
 import { CoinGeckoIdEditor } from './CoinGeckoIdEditor'
 import { T } from '../../../utils/colors'
+import { buttonClasses } from '../../../components/ui'
 
 export function AssetEditPanel({ asset, onSaved, onCancel }: {
   asset: AssetMetadata; onSaved: () => void; onCancel: () => void
@@ -106,7 +107,7 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
       <div className="flex justify-end gap-2 pt-1">
         <button type="button" onClick={onCancel} className="px-3 py-1.5 text-sm text-fg-muted hover:text-fg transition-colors">Cancelar</button>
         <button type="button" onClick={handleSave} disabled={saving}
-          className="px-4 py-1.5 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
+          className={buttonClasses('primary', 'md')}>
           {saving ? 'Guardando...' : 'Guardar'}
         </button>
       </div>

@@ -1,4 +1,5 @@
 import { WithdrawalSelector } from './WithdrawalSelector'
+import { buttonClasses } from '../../components/ui'
 
 // Barra de selección y aplicación masiva de destino — header de WithdrawalDestinations
 export function BulkSelectionBar({
@@ -50,7 +51,7 @@ export function BulkSelectionBar({
               type="button"
               onClick={onApplyBulk}
               disabled={!bulkDest}
-              className="px-3 py-1.5 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5"
+              className={buttonClasses('primary', 'sm', 'flex gap-1.5')}
             >
               <span className="bg-overlay/20 rounded-lg px-1 py-0.5 text-xs font-bold">{selectedCount}</span>
               Aplicar
@@ -72,7 +73,7 @@ export function BulkSelectionBar({
                 type="button"
                 onClick={onApplyBulk}
                 disabled={!bulkDest}
-                className="px-3 py-1.5 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
+                className={buttonClasses('primary', 'sm')}
               >
                 Todos
               </button>

@@ -1,5 +1,6 @@
 import { AlertCircle, CheckCircle, X } from 'lucide-react'
 import type { UnknownOperationSample, WizardResult } from './types'
+import { cardClasses } from '../../components/ui'
 
 export function UnknownOperationsCard({ unknownOperations, resolvedOps, unknownOperationSamples, onIgnoreOp, onCatalog }: {
   unknownOperations: string[]
@@ -9,7 +10,7 @@ export function UnknownOperationsCard({ unknownOperations, resolvedOps, unknownO
   onCatalog: (op: string) => void
 }) {
   return (
-    <div className="card space-y-3">
+    <div className={cardClasses('md', 'space-y-3')}>
       <div className="flex items-center gap-2">
         <AlertCircle size={15} className="text-warning" />
         <h2 className="font-medium text-sm">Operaciones desconocidas</h2>

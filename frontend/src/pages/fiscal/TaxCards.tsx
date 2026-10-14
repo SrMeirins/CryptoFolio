@@ -5,6 +5,7 @@ import { calcularTramos, tramoActivo } from '../../utils/tramosIrpf'
 import { FiscalChartCard } from './FiscalChartCard'
 import type { Carryforward } from './types'
 import { T } from '../../utils/colors'
+import { badgeClasses } from '../../components/ui'
 
 export function TramosIRPF({ base, label }: { base: number; label: string }) {
   const tramosConfig = useTramos()
@@ -67,7 +68,7 @@ export function CompensacionPerdidas({ data }: { data: Carryforward }) {
       icon={Scale}
       title="Compensación de pérdidas (4 años)"
       right={data.pendienteTotal > 0.01 && (
-        <span className="text-xs bg-info/10 text-info px-2 py-0.5 rounded-full font-medium mono">
+        <span className={badgeClasses('info', 'sm', 'mono')}>
           {formatEur(data.pendienteTotal)} pendiente
         </span>
       )}

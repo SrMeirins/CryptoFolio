@@ -8,6 +8,7 @@ import {
   WEEKDAYS, addMonths, compareYm, intensity, monthGrid, monthLabel, monthRange, monthSummary, ymOf,
   type CalendarDay, type YearMonth,
 } from '../../utils/pnlCalendar'
+import { cardClasses, iconButtonClasses } from '../../components/ui'
 
 // Calendario mensual de ganancias y pérdidas diarias (#167), sobre
 // GET /api/v1/pnl/daily. El día de hoy se actualiza en vivo (reconsulta cada minuto).
@@ -99,17 +100,17 @@ export function PnlCalendar() {
   const summaryTone = summary.pnl >= 0 ? 'text-positive' : 'text-negative'
 
   return (
-    <div className="bg-background-card border border-border rounded-xl px-5 py-5">
+    <div className={cardClasses('none', 'px-5 py-5')}>
       <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
         <div className="flex items-center gap-2">
           <h3 className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest mr-1">P&L diario</h3>
           <button type="button" onClick={() => setYm(addMonths(ym, -1))} disabled={!canPrev} aria-label="Mes anterior"
-            className="p-1 rounded-lg text-fg-muted hover:text-fg hover:bg-overlay/5 disabled:opacity-30 disabled:hover:bg-transparent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60">
+            className={iconButtonClasses('sm', false, 'disabled:hover:bg-transparent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60')}>
             <ChevronLeft size={16} />
           </button>
           <span className="text-sm font-semibold text-fg min-w-38 text-center" aria-live="polite">{monthLabel(ym)}</span>
           <button type="button" onClick={() => setYm(addMonths(ym, 1))} disabled={!canNext} aria-label="Mes siguiente"
-            className="p-1 rounded-lg text-fg-muted hover:text-fg hover:bg-overlay/5 disabled:opacity-30 disabled:hover:bg-transparent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60">
+            className={iconButtonClasses('sm', false, 'disabled:hover:bg-transparent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60')}>
             <ChevronRight size={16} />
           </button>
         </div>

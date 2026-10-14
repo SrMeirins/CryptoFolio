@@ -37,7 +37,7 @@ test('interacciones principales sin errores ni avisos', async ({ page }) => {
   await page.goto('/')
   await settle(page)
   await page.getByRole('radio', { name: /USD/ }).first().click()
-  await page.getByRole('button', { name: '7D' }).click()
+  await page.getByRole('radio', { name: '7D' }).click()
   await page.getByRole('tab', { name: 'Valor' }).click()
   await settle(page)
   await page.getByRole('radio', { name: /EUR/ }).first().click()

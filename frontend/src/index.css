@@ -171,10 +171,6 @@
   }
 }
 
-@utility card {
-  @apply bg-background-card border border-border rounded-xl p-5;
-}
-
 /* Cifras (#198): Inter con números tabulares, para que las columnas cuadren.
    JetBrains Mono (font-mono) queda solo para direcciones, identificadores y código. */
 @utility mono {

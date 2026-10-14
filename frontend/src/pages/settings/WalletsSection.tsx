@@ -12,6 +12,7 @@ import { SyncBadge } from './wallets/SyncBadge'
 import { AddAddressForm } from './wallets/AddAddressForm'
 import { AddWalletForm } from './wallets/AddWalletForm'
 import { alpha, ink } from '../../utils/colors'
+import { cardClasses, buttonClasses, iconButtonClasses } from '../../components/ui'
 
 export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => void }) {
   const queryClient = useQueryClient()
@@ -102,7 +103,7 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
           <p className="text-xs text-fg-subtle mt-0.5">Gestiona tus wallets y direcciones blockchain.</p>
         </div>
         <button type="button" onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-brand-solid text-on-brand hover:bg-brand-solid/90 rounded-lg text-sm font-medium transition-colors">
+          className={buttonClasses('primary', 'md', 'flex')}>
           <Plus size={14} /> Nueva wallet
         </button>
       </div>
@@ -129,7 +130,7 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
             const netsExpanded = expandedNets.has(wallet.id)
 
             return (
-              <div key={wallet.id} className="rounded-xl border border-border bg-background-card overflow-hidden"
+              <div key={wallet.id} className={cardClasses('none', 'overflow-hidden')}
                 style={{ borderLeftColor: wallet.color, borderLeftWidth: 3 }}>
                 {/* Cabecera wallet */}
                 <div className="flex items-center gap-3 px-4 py-3">
@@ -164,9 +165,9 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                     {isEditing ? (
                       <>
                         <button type="button" onClick={() => handleSaveWallet(wallet.id)} aria-label="Guardar"
-                          className="p-1.5 text-positive hover:bg-positive/10 rounded-lg transition-colors"><Check size={13} /></button>
+                          className={iconButtonClasses('md', false, '', 'positive')}><Check size={13} /></button>
                         <button type="button" onClick={() => setEditingWalletId(null)} aria-label="Cancelar"
-                          className="p-1.5 text-fg-subtle hover:text-fg hover:bg-background-tertiary rounded-lg transition-colors"><X size={13} /></button>
+                          className={iconButtonClasses('md')}><X size={13} /></button>
                       </>
                     ) : (
                       <>
@@ -175,14 +176,14 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                           Editar
                         </button>
                         <button type="button" onClick={() => setConfirmDeleteId(wallet.id)} aria-label="Eliminar wallet"
-                          className="p-1.5 text-fg-subtle hover:text-negative hover:bg-negative/10 rounded-lg transition-colors">
+                          className={iconButtonClasses('md', false, '', 'danger')}>
                           <Trash2 size={13} />
                         </button>
                       </>
                     )}
                     <button type="button" onClick={() => toggleNets(wallet.id)} aria-expanded={netsExpanded}
                       aria-label={netsExpanded ? 'Contraer redes' : 'Expandir redes'}
-                      className="p-1.5 text-fg-subtle hover:text-fg transition-colors">
+                      className={iconButtonClasses('md')}>
                       <ChevronDown size={13} className={`transition-transform ${netsExpanded ? 'rotate-180' : ''}`} />
                     </button>
                   </div>
@@ -213,9 +214,9 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                                 placeholder="Dirección pública..."
                                 onKeyDown={e => e.key === 'Enter' && handleSaveAddress(wallet.id, addr.id)} />
                               <button type="button" onClick={() => handleSaveAddress(wallet.id, addr.id)} aria-label="Guardar dirección"
-                                className="p-1 text-positive hover:bg-positive/10 rounded-lg"><Check size={11} /></button>
+                                className={iconButtonClasses('sm', false, '', 'positive')}><Check size={11} /></button>
                               <button type="button" onClick={() => setEditingAddressId(null)} aria-label="Cancelar"
-                                className="p-1 text-fg-subtle hover:text-fg rounded-lg"><X size={11} /></button>
+                                className={iconButtonClasses('sm')}><X size={11} /></button>
                             </div>
                           ) : (
                             <div className="flex-1 flex items-center gap-1 min-w-0">
@@ -246,7 +247,7 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                               <button type="button" onClick={() => { setEditingAddressId(addr.id); setEditingAddressValue(addr.address ?? '') }}
                                 className="p-1 text-fg-subtle hover:text-fg text-xs rounded-lg transition-colors">Editar</button>
                               <button type="button" onClick={() => handleDeleteAddress(wallet.id, addr.id)} aria-label="Eliminar dirección"
-                                className="p-1 text-fg-subtle hover:text-negative rounded-lg transition-colors">
+                                className={iconButtonClasses('sm', false, '', 'danger')}>
                                 <Trash2 size={11} />
                               </button>
                             </div>

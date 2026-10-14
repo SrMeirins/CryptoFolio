@@ -1,6 +1,7 @@
 import { InfoTooltip } from './InfoTooltip'
 import { AnimatedNumber } from './AnimatedNumber'
 import { Change24hChip } from './Change24hChip'
+import { cardClasses } from './ui'
 
 // Variación de 24h, mostrada como chip en la cabecera de la tarjeta para que
 // todas las tarjetas tengan la misma altura (#152). Nunca se oculta: sin dato
@@ -36,7 +37,7 @@ export function MetricCard({
     positive ? 'text-positive' : 'text-negative'
 
   return (
-    <div className="metric-card bg-background-card border border-border rounded-xl px-5 py-5 flex flex-col items-center text-center gap-2">
+    <div className={cardClasses('none', 'metric-card px-5 py-5 flex flex-col items-center text-center gap-2')}>
       {/* Si una variación muy grande no cabe, el chip baja de línea en vez de desbordar */}
       <div className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1">
         <p className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest leading-none whitespace-nowrap">{label}</p>

@@ -4,6 +4,7 @@ import { AlertTriangle, Check, RefreshCw } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
 import { useToast } from '../../hooks/useToast'
 import { PendingDepositRow } from './PendingDepositRow'
+import { cardClasses } from '../../components/ui'
 
 export type PendingDeposit = {
   id: string
@@ -65,7 +66,7 @@ export function PendingDepositsPanel({ deposits }: { deposits: PendingDeposit[] 
   }
 
   return (
-    <div className="card border-warning/40 bg-warning/5">
+    <div className={cardClasses('md', 'border-warning/40 bg-warning/5')}>
       <div className="flex items-start gap-3 mb-5">
         <div className="w-8 h-8 rounded-xl bg-warning/15 flex items-center justify-center shrink-0">
           <AlertTriangle size={16} className="text-warning" />

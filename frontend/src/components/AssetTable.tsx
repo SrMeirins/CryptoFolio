@@ -11,6 +11,7 @@ import { CryptoRowComponent } from './AssetTableCryptoRow'
 import { FiatRowComponent } from './AssetTableFiatRow'
 import { SortTh } from './AssetTableSortTh'
 import { valuePortfolio } from '../utils/portfolioValuation'
+import { cardClasses, buttonClasses } from './ui'
 
 interface AssetTableProps {
   lots: FifoLot[]
@@ -132,7 +133,7 @@ export function AssetTable({ lots: rawLots, fiatBalances = NO_FIAT, onSimulate }
         </div>
       )}
 
-      <div className="card overflow-hidden p-0">
+      <div className={cardClasses('none', 'overflow-hidden')}>
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h3 className="font-medium text-sm">Activos</h3>
@@ -140,7 +141,7 @@ export function AssetTable({ lots: rawLots, fiatBalances = NO_FIAT, onSimulate }
               <button
                 type="button"
                 onClick={() => { setSortKey('value'); setSortDir('desc') }}
-                className="flex items-center gap-1 text-xs text-fg-subtle hover:text-fg bg-background-tertiary hover:bg-border border border-border rounded-lg px-1.5 py-0.5 transition-colors"
+                className={buttonClasses('secondary', 'sm', 'flex gap-1')}
                 title="Restablecer orden por defecto"
               >
                 <ArrowUpDown size={9} />
@@ -178,7 +179,7 @@ export function AssetTable({ lots: rawLots, fiatBalances = NO_FIAT, onSimulate }
       </div>
 
       {dustRows.length > 0 && (
-        <div className={`card overflow-hidden p-0 ${onlyDust ? 'border-warning/20 bg-warning/2' : ''}`}>
+        <div className={cardClasses('none', `overflow-hidden ${onlyDust ? 'border-warning/20 bg-warning/2' : ''}`)}>
           <button
             type="button"
             onClick={() => setDustOpen(!dustOpen)}

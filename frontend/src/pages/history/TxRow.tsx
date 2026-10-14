@@ -9,6 +9,7 @@ import { formatMoney, formatPrice, formatAmount, type Currency } from '../../uti
 import { OP_META } from '../../constants/operations'
 import { fmtDate, calcEurValue, calcFeeEur, formatPriceLine, toDisplayAmount } from './helpers'
 import { T, alpha, ink } from '../../utils/colors'
+import { iconButtonClasses } from '../../components/ui'
 
 function Highlight({ text, query }: { text: string; query: string }) {
   if (!query.trim()) return <>{text}</>
@@ -168,13 +169,13 @@ export function TxRow({
             {!confirmDelete && (
               <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
                 <button type="button" onClick={() => onEdit(tx)}
-                  className="p-1.5 rounded-lg hover:bg-brand/10 text-fg-subtle hover:text-brand transition-colors"
+                  className={iconButtonClasses('md', false, '', 'brand')}
                   title="Editar transacción" aria-label="Editar transacción">
                   <PenLine size={12} />
                 </button>
                 {tx.manually_added && (
                   <button type="button" onClick={() => setConfirmDelete(true)}
-                    className="p-1.5 rounded-lg hover:bg-negative/10 text-fg-subtle hover:text-negative transition-colors"
+                    className={iconButtonClasses('md', false, '', 'danger')}
                     title="Eliminar transacción" aria-label="Eliminar transacción">
                     <Trash2 size={12} />
                   </button>
@@ -187,7 +188,7 @@ export function TxRow({
                 <button type="button" onClick={() => onDelete(tx.id)} disabled={isDeleting} className="text-negative p-0.5" aria-label="Confirmar borrado">
                   {isDeleting ? <RefreshCw size={11} className="animate-spin" /> : <AlertTriangle size={11} />}
                 </button>
-                <button type="button" onClick={() => setConfirmDelete(false)} className="text-fg-subtle p-0.5" aria-label="Cancelar borrado"><X size={11} /></button>
+                <button type="button" onClick={() => setConfirmDelete(false)} className={iconButtonClasses('sm')} aria-label="Cancelar borrado"><X size={11} /></button>
               </div>
             )}
             <button type="button" onClick={() => setExpanded(e => !e)}

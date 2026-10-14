@@ -4,6 +4,7 @@ import { LANG_LABELS } from './types'
 import { UnknownOperationsCard } from './UnknownOperationsCard'
 import { TransactionsTable } from './TransactionsTable'
 import type { PreviewResult, DepositReview, WizardResult } from './types'
+import { cardClasses, buttonClasses } from '../../components/ui'
 
 export function PreviewStage({
   preview, showTxTable, setShowTxTable, txPage, setTxPage, txPageSize,
@@ -52,7 +53,7 @@ export function PreviewStage({
 
   return (
     <div className="space-y-4">
-      <div className="card space-y-4">
+      <div className={cardClasses('md', 'space-y-4')}>
         <h2 className="font-medium text-sm">Resumen del archivo</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-background-tertiary rounded-lg p-3 text-center">
@@ -146,7 +147,7 @@ export function PreviewStage({
           type="button"
           onClick={onConfirm}
           disabled={isBlocked}
-          className="flex items-center gap-2 px-6 py-2.5 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+          className={buttonClasses('primary', 'lg', 'flex')}
         >
           <Play size={14} />
           {preview.newCount === 0 && depositsForPanel.length > 0 ? 'Guardar costes y recalcular FIFO' : 'Confirmar e importar'}

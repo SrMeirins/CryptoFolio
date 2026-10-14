@@ -4,6 +4,7 @@ import { formatEur } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { TableExpandToggle } from './TableExpandToggle'
 import type { RendimientoEvent } from './types'
+import { cardClasses, buttonClasses, badgeClasses } from '../../components/ui'
 
 export function TablaRendimientos({ rendimientos, year }: { rendimientos: RendimientoEvent[]; year: number }) {
   const [expanded, setExpanded]         = useState(true)
@@ -29,7 +30,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
   }, {})
 
   return (
-    <div className="bg-background-card border border-border rounded-xl overflow-hidden">
+    <div className={cardClasses('none', 'overflow-hidden')}>
       <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-wrap gap-2">
         <TableExpandToggle
           icon={TrendingDown}
@@ -42,7 +43,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
             {Object.entries(porTipo).map(([tipo, val]) => (
-              <span key={tipo} className="text-xs bg-warning/10 text-warning border border-warning/20 px-2 py-0.5 rounded-full font-medium">
+              <span key={tipo} className={badgeClasses('warning', 'sm', 'border border-warning/20')}>
                 {tipo} · {formatEur(val)}
               </span>
             ))}
@@ -72,7 +73,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
                 type="button"
                 onClick={() => window.open(`/api/fiscal/${year}/export?format=csv`, '_blank')}
                 title="Descarga el export fiscal completo del año (el backend no soporta filtrar solo esta sección)"
-                className="flex items-center gap-1.5 px-2.5 py-1 bg-background-tertiary border border-border rounded-lg text-xs text-fg hover:border-fg-subtle transition-colors"
+                className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}
               >
                 <Download size={11} />
                 CSV

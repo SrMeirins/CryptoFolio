@@ -21,6 +21,7 @@ import { fmtDateGroup, calcEurValue } from './history/helpers'
 import { TxRow } from './history/TxRow'
 import { StatsBar } from './history/StatsBar'
 import { AnalyticsPanel } from './history/AnalyticsPanel'
+import { cardClasses, buttonClasses, iconButtonClasses } from '../components/ui'
 
 type SortKey = 'fecha' | 'eur' | 'activo'
 type SortDir = 'asc' | 'desc'
@@ -196,7 +197,7 @@ export function History() {
               </button>
             )}
             <button type="button" onClick={exportCsv}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-background-tertiary border border-border rounded-lg text-xs text-fg-muted hover:text-fg hover:border-fg-subtle transition-colors">
+              className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
               <Download size={13} /> CSV
             </button>
             <button type="button" onClick={() => setShowNewTx(true)}
@@ -220,7 +221,7 @@ export function History() {
             />
             {filters.search && (
               <button type="button" onClick={() => setFilter('search', '')} aria-label="Limpiar búsqueda"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-muted">
+                className={iconButtonClasses('sm', false, 'absolute right-2 top-1/2 -translate-y-1/2')}>
                 <X size={10} />
               </button>
             )}
@@ -294,7 +295,7 @@ export function History() {
               )}
             </div>
           ) : (
-            <div className="bg-background-card border border-border rounded-xl overflow-hidden">
+            <div className={cardClasses('none', 'overflow-hidden')}>
               <table className="w-full">
                 <thead>
                   <tr className="text-[11px] text-fg-subtle uppercase tracking-wider border-b border-border bg-background-tertiary/40">
@@ -367,7 +368,7 @@ export function History() {
               onClick={() => setFilter('offset', Math.max(0, filters.offset - PAGE_SIZE))}
               disabled={filters.offset === 0}
               aria-label="Página anterior"
-              className="p-1.5 rounded-lg bg-background-tertiary border border-border hover:bg-border disabled:opacity-40 transition-colors">
+              className={buttonClasses('secondary', 'md')}>
               <ChevronLeft size={14} />
             </button>
             <span className="text-xs text-fg-subtle px-2 mono">{currentPage + 1} / {totalPages}</span>
@@ -376,7 +377,7 @@ export function History() {
               onClick={() => setFilter('offset', filters.offset + PAGE_SIZE)}
               disabled={filters.offset + PAGE_SIZE >= total}
               aria-label="Página siguiente"
-              className="p-1.5 rounded-lg bg-background-tertiary border border-border hover:bg-border disabled:opacity-40 transition-colors">
+              className={buttonClasses('secondary', 'md')}>
               <ChevronRight size={14} />
             </button>
           </div>

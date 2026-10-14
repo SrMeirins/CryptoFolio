@@ -38,22 +38,3 @@ export function resolveCurrency(config: Record<string, string> | undefined, stor
   const raw = config?.[DISPLAY_CURRENCY_KEY]
   return raw === undefined ? stored : parseCurrency(raw)
 }
-
-/** Navegación con teclado del grupo de opciones (patrón radiogroup del WAI-ARIA). */
-export function currencyForKey(current: Currency, key: string): Currency | null {
-  const i = CURRENCIES.indexOf(current)
-  switch (key) {
-    case 'ArrowRight':
-    case 'ArrowDown':
-      return CURRENCIES[(i + 1) % CURRENCIES.length]
-    case 'ArrowLeft':
-    case 'ArrowUp':
-      return CURRENCIES[(i - 1 + CURRENCIES.length) % CURRENCIES.length]
-    case 'Home':
-      return CURRENCIES[0]
-    case 'End':
-      return CURRENCIES[CURRENCIES.length - 1]
-    default:
-      return null
-  }
-}

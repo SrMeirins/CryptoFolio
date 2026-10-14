@@ -11,6 +11,7 @@ import { StepButton } from './StepButton'
 import { calcStep } from '../utils/calcStep'
 import { SaleSimulatorResults } from './SaleSimulatorResults'
 import { EurOnlyBadge } from './EurOnlyBadge'
+import { iconButtonClasses } from './ui'
 
 interface Props {
   asset:        string
@@ -124,7 +125,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
               type="button"
               onClick={onClose}
               aria-label="Cerrar"
-              className="shrink-0 mt-0.5 p-1.5 text-fg-subtle hover:text-fg hover:bg-overlay/8 rounded-lg transition-all"
+              className={iconButtonClasses('md', false, 'mt-0.5')}
             >
               <X size={15} />
             </button>

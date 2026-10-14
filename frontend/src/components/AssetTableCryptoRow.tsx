@@ -7,6 +7,7 @@ import { useCurrency } from '../hooks/useDisplayCurrency'
 import { type CryptoRow, walletShortName } from '../utils/assetTable'
 import { CryptoIcon } from './CryptoIcon'
 import { T, alpha, ink } from '../utils/colors'
+import { iconButtonClasses } from './ui'
 
 export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate, lockedAmounts = [] }: {
   row: CryptoRow
@@ -82,7 +83,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
               <button
                 type="button"
                 onClick={e => { e.stopPropagation(); onSimulate(row.asset, row.totalQuantity) }}
-                className="ml-auto p-1 text-fg-subtle hover:text-brand hover:bg-brand/10 rounded-lg transition-colors shrink-0"
+                className={iconButtonClasses('sm', false, 'ml-auto', 'brand')}
                 title="Simular venta"
               >
                 <Calculator size={13} />

@@ -6,6 +6,7 @@ import { NOTIFICATION_ROUTES, NOTIFICATION_TYPE_META } from '../../constants/not
 import { CurrencyToggle } from '../../components/CurrencyToggle'
 import { ThemeSelector } from '../../components/ThemeSelector'
 import { alpha } from '../../utils/colors'
+import { cardClasses, buttonClasses, iconButtonClasses } from '../../components/ui'
 
 const NOTIFICATION_LABELS: Record<string, string> = {
   'no-price':            'Ir a Activos',
@@ -52,7 +53,7 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
     <div className="space-y-6 max-w-2xl">
 
       {/* Tema (#197/#198) */}
-      <div className="rounded-xl border border-border bg-background-card p-5">
+      <div className={cardClasses('md')}>
         <div className="flex items-center justify-between gap-4">
           <div>
             <h3 className="font-semibold text-sm">Tema</h3>
@@ -65,7 +66,7 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
       </div>
 
       {/* Moneda de visualización (#176) */}
-      <div className="rounded-xl border border-border bg-background-card p-5">
+      <div className={cardClasses('md')}>
         <div className="flex items-center justify-between gap-4">
           <div>
             <h3 className="font-semibold text-sm">Moneda de visualización</h3>
@@ -79,7 +80,7 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
       </div>
 
       {/* Notificaciones */}
-      <div className="rounded-xl border border-border bg-background-card p-5 space-y-4">
+      <div className={cardClasses('md', 'space-y-4')}>
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-sm">Notificaciones del sistema</h3>
@@ -87,7 +88,7 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
           </div>
           {notifications.length > 0 && (
             <button type="button" onClick={dismissAll}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-fg-subtle hover:text-fg bg-background-tertiary hover:bg-border border border-border rounded-lg transition-colors">
+              className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
               <BellOff size={11} /> Descartar todas
             </button>
           )}
@@ -139,7 +140,7 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
                     </div>
                   </div>
                   <button type="button" onClick={() => dismissOne(n.id)} aria-label="Descartar aviso"
-                    className="p-1 text-fg-subtle hover:text-fg transition-colors shrink-0">
+                    className={iconButtonClasses('sm')}>
                     <X size={12} />
                   </button>
                 </div>
@@ -150,7 +151,7 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
       </div>
 
       {/* Acerca de */}
-      <div className="rounded-xl border border-border bg-background-card p-5 space-y-3">
+      <div className={cardClasses('md', 'space-y-3')}>
         <h3 className="font-semibold text-sm">Acerca de CryptoFolio</h3>
         <div className="space-y-2 text-xs text-fg-subtle">
           <div className="flex items-center justify-between">

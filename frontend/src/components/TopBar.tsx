@@ -11,6 +11,7 @@ import { LIVE_STATUS_META, useLiveStatus } from '../hooks/useLiveStatus'
 import { CurrencyToggle } from './CurrencyToggle'
 import { ThemeToggle } from './ThemeToggle'
 import { T, alpha } from '../utils/colors'
+import { cardClasses, iconButtonClasses } from './ui'
 
 function PriceRefreshButton() {
   const status = useLiveStatus()
@@ -114,10 +115,10 @@ function NotificationsButton() {
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 mt-2 w-96 rounded-xl border border-border bg-background-card shadow-2xl z-50 overflow-hidden">
+        <div className={cardClasses('none', 'absolute top-full right-0 mt-2 w-96 shadow-2xl z-50 overflow-hidden')}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <span className="text-sm font-semibold">Avisos del sistema</span>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar avisos" className="text-fg-subtle hover:text-fg transition-colors">
+            <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar avisos" className={iconButtonClasses('sm')}>
               <X size={14} />
             </button>
           </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { portfolioApi } from '../../../api/portfolio'
 import { NETWORKS_REQUIRING_KEY } from './helpers'
+import { buttonClasses } from '../../../components/ui'
 
 export function NetworkApiKeyField({ networkId, networkName }: { networkId: string; networkName: string }) {
   const [status, setStatus] = useState<{ has_key: boolean } | null>(null)
@@ -44,7 +45,7 @@ export function NetworkApiKeyField({ networkId, networkName }: { networkId: stri
           placeholder={status?.has_key ? 'Ya configurada — pega una nueva para reemplazarla' : 'Sin esta clave, esta red no se puede verificar automáticamente'}
           className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-xs placeholder-fg-subtle focus:outline-hidden focus:border-brand" />
         <button type="button" onClick={handleSave} disabled={!value || saving}
-          className="px-3 py-2 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors">
+          className={buttonClasses('primary', 'sm')}>
           Guardar
         </button>
       </div>

@@ -1,6 +1,7 @@
 import { useRef, useId } from 'react'
 import { AlertTriangle, X } from 'lucide-react'
 import { useModalA11y } from '../hooks/useModalA11y'
+import { cardClasses, iconButtonClasses } from './ui'
 
 interface ConfirmDialogProps {
   title: string
@@ -41,7 +42,7 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={messageId}
-        className="bg-background-card border border-border rounded-xl p-6 w-full max-w-sm mx-4 shadow-2xl"
+        className={cardClasses('none', 'p-6 w-full max-w-sm mx-4 shadow-2xl')}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -58,7 +59,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
             aria-label="Cerrar"
-            className="text-fg-subtle hover:text-fg transition-colors p-1 -mt-1 -mr-1"
+            className={iconButtonClasses('sm', false, '-mt-1 -mr-1')}
           >
             <X size={16} />
           </button>

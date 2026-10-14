@@ -1,6 +1,7 @@
 import { X, CheckCircle } from 'lucide-react'
 import { type FifoRunResult } from '../api/portfolio'
 import { formatEur } from '../utils/format'
+import { iconButtonClasses } from './ui'
 
 export function ManualTxDoneScreen({
   fifoStats, isEditMode, onClose, onAddAnother,
@@ -9,7 +10,7 @@ export function ManualTxDoneScreen({
     <>
       <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
         <h2 className="font-semibold text-lg">{isEditMode ? 'Transacción actualizada' : 'Transacción guardada'}</h2>
-        <button type="button" onClick={onClose} aria-label="Cerrar" className="text-fg-subtle hover:text-fg transition-colors p-1">
+        <button type="button" onClick={onClose} aria-label="Cerrar" className={iconButtonClasses('sm')}>
           <X size={18} />
         </button>
       </div>

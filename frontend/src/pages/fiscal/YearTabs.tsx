@@ -1,5 +1,6 @@
 import { formatEur } from '../../utils/format'
 import type { YearOverview } from './types'
+import { badgeClasses } from '../../components/ui'
 
 export function YearTabs({ years, activeYear, overview, currentYear, onSelect }: {
   years: number[]
@@ -28,7 +29,7 @@ export function YearTabs({ years, activeYear, overview, currentYear, onSelect }:
           >
             <span>{year}</span>
             {year === currentYear && (
-              <span className="text-xs bg-brand/20 text-brand px-1.5 py-0.5 rounded-full">EN CURSO</span>
+              <span className={badgeClasses('brand', 'sm')}>EN CURSO</span>
             )}
             {ov && (
               <span className={`text-xs mono font-bold ${neto >= 0 ? 'text-positive' : 'text-negative'}`}>

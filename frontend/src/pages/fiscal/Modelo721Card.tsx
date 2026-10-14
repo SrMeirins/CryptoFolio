@@ -4,6 +4,7 @@ import { formatEur, pnlColor } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import type { Modelo721 } from './types'
 import { T, alpha, ink } from '../../utils/colors'
+import { badgeClasses } from '../../components/ui'
 
 export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYear: number }) {
   const [expanded, setExpanded] = useState(true)
@@ -28,7 +29,7 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
             <div className="flex items-center gap-2">
               <h3 className="font-medium text-sm">Modelo 721</h3>
               {data.esAnioEnCurso && (
-                <span className="text-xs bg-info/15 text-info px-2 py-0.5 rounded-full">estimación actual</span>
+                <span className={badgeClasses('info', 'sm')}>estimación actual</span>
               )}
               {vencido && (
                 <span className="text-xs bg-background-tertiary text-fg-subtle px-2 py-0.5 rounded-full">cerrado</span>

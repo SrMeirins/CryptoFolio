@@ -2,12 +2,13 @@ import { Calendar } from 'lucide-react'
 import { formatEur, pnlColor } from '../../utils/format'
 import { pnlBg } from './constants'
 import type { FiscalSummary } from './types'
+import { cardClasses } from '../../components/ui'
 
 export function FiscalSummaryCardsSkeleton() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {[...Array(4)].map((_, i) => (
-        <div key={i} className="bg-background-card border border-border rounded-xl p-5 animate-pulse">
+        <div key={i} className={cardClasses('md', 'animate-pulse')}>
           <div className="h-3 bg-background-tertiary rounded-lg w-3/4 mb-3" />
           <div className="h-7 bg-background-tertiary rounded-lg w-1/2" />
         </div>
@@ -45,7 +46,7 @@ export function FiscalSummaryCards({ summary }: { summary: FiscalSummary }) {
         )}
       </div>
 
-      <div className="bg-background-card border border-border rounded-xl p-5">
+      <div className={cardClasses('md')}>
         <div className="text-[11px] text-fg-subtle uppercase tracking-widest mb-2">Rendimientos</div>
         <div className="text-xl font-bold mono text-warning">{formatEur(summary.totalRendimientos)}</div>
         <div className="text-xs text-fg-subtle mt-1.5">{summary.numRendimientos} operaciones</div>

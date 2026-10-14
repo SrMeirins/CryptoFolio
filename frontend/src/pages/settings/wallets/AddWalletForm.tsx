@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { inputClass } from './helpers'
 import { ColorPicker } from './ColorPicker'
+import { cardClasses, buttonClasses } from '../../../components/ui'
 
 export function AddWalletForm({ onSave, onCancel }: {
   onSave: (data: Record<string, unknown>) => void
@@ -12,7 +13,7 @@ export function AddWalletForm({ onSave, onCancel }: {
   const [notes, setNotes] = useState('')
 
   return (
-    <div className="card space-y-4">
+    <div className={cardClasses('md', 'space-y-4')}>
       <h3 className="font-medium text-sm">Nueva wallet</h3>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
@@ -42,7 +43,7 @@ export function AddWalletForm({ onSave, onCancel }: {
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-fg-muted hover:text-fg transition-colors">Cancelar</button>
         <button type="button" onClick={() => onSave({ name, type, color, notes: notes || null })} disabled={!name}
-          className="px-4 py-2 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
+          className={buttonClasses('primary', 'md')}>
           Crear wallet
         </button>
       </div>

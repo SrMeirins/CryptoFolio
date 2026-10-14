@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
+import { Badge, Tabs } from '../../components/ui'
 
 export function SettingsTabs({ active, onChange }: { active: string; onChange: (t: string) => void }) {
   const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: portfolioApi.getAssets })
@@ -14,23 +15,15 @@ export function SettingsTabs({ active, onChange }: { active: string; onChange: (
   ]
 
   return (
-    <div className="flex gap-1 border-b border-border" role="tablist">
-      {tabs.map(tab => (
-        <button key={tab.id} type="button" onClick={() => onChange(tab.id)}
-          role="tab" aria-selected={active === tab.id}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-all border-b-2 -mb-px ${
-            active === tab.id
-              ? 'text-fg border-brand'
-              : 'text-fg-subtle border-transparent hover:text-fg hover:border-border'
-          }`}>
-          {tab.label}
-          {(tab.badge ?? 0) > 0 && (
-            <span className="text-xs px-1.5 py-0.5 rounded-full bg-negative/15 text-negative font-semibold">
-              {tab.badge}
-            </span>
-          )}
-        </button>
-      ))}
-    </div>
+    <Tabs label="Secciones de configuración" idBase="settings" variant="underline" value={active} onChange={onChange}
+      items={tabs.map(tab => ({
+        value: tab.id,
+        label: (
+          <span className="flex items-center gap-2">
+            {tab.label}
+            {(tab.badge ?? 0) > 0 && <Badge tone="negative">{tab.badge}</Badge>}
+          </span>
+        ),
+      }))} />
   )
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
+import { cardClasses } from '../../components/ui'
 
 /**
  * Tarjeta con cabecera icono+título (+ slot derecho opcional) común a los
@@ -13,7 +14,7 @@ export function FiscalChartCard({ icon: Icon, title, right, children }: {
   children: ReactNode
 }) {
   return (
-    <div className="bg-background-card border border-border rounded-xl p-5">
+    <div className={cardClasses('md')}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Icon size={15} className="text-fg-subtle" />
