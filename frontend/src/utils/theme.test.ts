@@ -11,16 +11,11 @@ describe('parseThemePreference (#197)', () => {
 })
 
 describe('resolveTheme', () => {
-  it('con el tema claro habilitado sigue la preferencia y, con «system», al sistema', () => {
-    expect(resolveTheme('light', true, true)).toBe('light')
-    expect(resolveTheme('dark', false, true)).toBe('dark')
-    expect(resolveTheme('system', true, true)).toBe('dark')
-    expect(resolveTheme('system', false, true)).toBe('light')
-  })
-
-  it('mientras el tema claro está oculto, siempre oscuro', () => {
-    expect(resolveTheme('light', false, false)).toBe('dark')
-    expect(resolveTheme('system', false, false)).toBe('dark')
+  it('sigue la preferencia y, con «system», al sistema operativo', () => {
+    expect(resolveTheme('light', true)).toBe('light')
+    expect(resolveTheme('dark', false)).toBe('dark')
+    expect(resolveTheme('system', true)).toBe('dark')
+    expect(resolveTheme('system', false)).toBe('light')
   })
 })
 

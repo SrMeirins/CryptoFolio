@@ -27,24 +27,24 @@ export function WalletPicker({ wallets, value, onChange }: {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm hover:border-accent-blue/50 transition-colors text-left"
+        className="w-full flex items-center justify-between bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm hover:border-brand/50 transition-colors text-left"
       >
         {selected ? (
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: selected.color }} />
-            <span className="text-white truncate">{selected.name}</span>
-            <span className="text-xs text-gray-600 shrink-0">{TYPE_LABEL[selected.type] ?? selected.type}</span>
+            <span className="text-fg truncate">{selected.name}</span>
+            <span className="text-xs text-fg-subtle shrink-0">{TYPE_LABEL[selected.type] ?? selected.type}</span>
           </div>
         ) : (
-          <span className="text-gray-600">Seleccionar wallet...</span>
+          <span className="text-fg-subtle">Seleccionar wallet...</span>
         )}
-        <ChevronDown size={13} className={`text-gray-500 shrink-0 ml-2 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={13} className={`text-fg-subtle shrink-0 ml-2 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
         <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-background-card border border-border rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
           {wallets.length === 0 ? (
-            <div className="px-4 py-3 text-xs text-gray-500">Sin wallets configuradas</div>
+            <div className="px-4 py-3 text-xs text-fg-subtle">Sin wallets configuradas</div>
           ) : (
             wallets.map(w => (
               <button
@@ -54,9 +54,9 @@ export function WalletPicker({ wallets, value, onChange }: {
                 className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-background-tertiary transition-colors text-left ${w.id === value ? 'bg-background-tertiary' : ''}`}
               >
                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: w.color }} />
-                <span className="text-sm text-gray-200 flex-1">{w.name}</span>
-                <span className="text-[10px] text-gray-600">{TYPE_LABEL[w.type] ?? w.type}</span>
-                {w.id === value && <CheckCircle size={11} className="text-accent-green shrink-0" />}
+                <span className="text-sm text-fg flex-1">{w.name}</span>
+                <span className="text-xs text-fg-subtle">{TYPE_LABEL[w.type] ?? w.type}</span>
+                {w.id === value && <CheckCircle size={11} className="text-positive shrink-0" />}
               </button>
             ))
           )}

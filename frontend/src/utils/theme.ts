@@ -5,13 +5,6 @@
 export type ThemePreference = 'dark' | 'light' | 'system'
 export type EffectiveTheme = 'dark' | 'light'
 
-/**
- * El tema claro está definido pero oculto hasta que #198 sustituya las clases
- * de color sueltas: mientras sea false, el tema efectivo es siempre oscuro y
- * los selectores no se muestran.
- */
-export const LIGHT_THEME_ENABLED = false
-
 export const THEME_CONFIG_KEY = 'theme'
 export const THEME_STORAGE_KEY = 'cflio_theme_effective'
 export const THEME_PREFERENCES: readonly ThemePreference[] = ['dark', 'light', 'system']
@@ -22,8 +15,7 @@ export function parseThemePreference(raw: unknown): ThemePreference {
 }
 
 /** Tema que se ve según la preferencia y el tema del sistema operativo. */
-export function resolveTheme(pref: ThemePreference, systemPrefersDark: boolean, enabled = LIGHT_THEME_ENABLED): EffectiveTheme {
-  if (!enabled) return 'dark'
+export function resolveTheme(pref: ThemePreference, systemPrefersDark: boolean): EffectiveTheme {
   if (pref === 'system') return systemPrefersDark ? 'dark' : 'light'
   return pref
 }

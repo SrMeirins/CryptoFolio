@@ -34,7 +34,7 @@ export function ThemeToggle() {
           <button key={opt} ref={el => { refs.current[opt] = el }} type="button" role="radio"
             aria-checked={active} aria-label={label} title={label} tabIndex={active ? 0 : -1}
             onClick={() => setTheme(opt)}
-            className={`px-2 py-1 rounded-md transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-blue ${
+            className={`px-2 py-1 rounded-lg transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
               active ? 'bg-background-card text-fg shadow-xs' : 'text-fg-subtle hover:text-fg'
             }`}>
             <Icon size={14} aria-hidden="true" />

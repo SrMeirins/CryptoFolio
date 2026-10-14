@@ -23,8 +23,8 @@ function SidebarNavItem({ to, icon: Icon, label, collapsed }: SidebarNavItemProp
         transition-all duration-200 overflow-hidden select-none cursor-pointer
         ${collapsed ? 'justify-center px-0 py-[10px]' : 'gap-3 px-3 py-[10px]'}
         ${isActive
-          ? 'bg-accent-blue/12 text-accent-blue'
-          : 'text-gray-500 hover:text-gray-200 hover:bg-white/4'
+          ? 'bg-brand/12 text-brand'
+          : 'text-fg-subtle hover:text-fg hover:bg-overlay/4'
         }
       `}
     >
@@ -33,7 +33,7 @@ function SidebarNavItem({ to, icon: Icon, label, collapsed }: SidebarNavItemProp
           {/* Indicador de borde izquierdo activo */}
           <span className={`
             absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full
-            bg-accent-blue transition-all duration-250
+            bg-brand-solid text-on-brand transition-all duration-250
             ${isActive ? 'h-5 opacity-100' : 'h-0 opacity-0'}
           `} />
 
@@ -88,10 +88,10 @@ export function Sidebar() {
         <img src="/favicon.svg" width={34} height={34} alt="CryptoFolio" className="shrink-0" />
         {!collapsed && (
           <div className="flex flex-col min-w-0 overflow-hidden">
-            <span className="font-bold text-[15px] leading-tight tracking-tight bg-linear-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent whitespace-nowrap">
+            <span className="font-bold text-[15px] leading-tight tracking-tight bg-linear-to-r from-blue-400 to-accent-purple bg-clip-text text-transparent whitespace-nowrap">
               CryptoFolio
             </span>
-            <span className="text-[10px] text-gray-600 font-medium tracking-wide whitespace-nowrap">
+            <span className="text-xs text-fg-subtle font-medium tracking-wide whitespace-nowrap">
               Portfolio · Fiscal
             </span>
           </div>
@@ -114,8 +114,8 @@ export function Sidebar() {
           aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
           title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
           className={`
-            group w-full flex items-center rounded-xl py-2.5 text-gray-600
-            hover:text-gray-300 hover:bg-white/4 transition-all duration-200
+            group w-full flex items-center rounded-xl py-2.5 text-fg-subtle
+            hover:text-fg hover:bg-overlay/4 transition-all duration-200
             ${collapsed ? 'justify-center px-0' : 'justify-between px-3'}
           `}
         >

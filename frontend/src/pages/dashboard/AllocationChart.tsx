@@ -3,6 +3,7 @@ import type { FifoLot, FiatBalance } from '../../api/portfolio'
 import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
 import { formatMoney } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
+import { T, alpha, ink } from '../../utils/colors'
 
 const ALLOC_COLORS = [
   '#6366f1','#F0B90B','#00c896','#e74c3c','#8b5cf6',
@@ -39,8 +40,8 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
   const hasHover = hovered !== null
 
   return (
-    <div className="bg-background-card border border-border rounded-2xl px-5 py-5">
-      <h3 className="text-[11px] text-gray-600 font-medium uppercase tracking-widest mb-4">Distribución</h3>
+    <div className="bg-background-card border border-border rounded-xl px-5 py-5">
+      <h3 className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest mb-4">Distribución</h3>
 
       {/* Barra apilada interactiva */}
       <div className="flex h-5 rounded-xl overflow-hidden gap-px mb-2">
@@ -57,7 +58,7 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
                 background: color,
                 minWidth: '4px',
                 opacity: dimmed ? 0.2 : 1,
-                filter: isHover ? `brightness(1.25) drop-shadow(0 0 5px ${color}88)` : 'none',
+                filter: isHover ? `brightness(1.25) drop-shadow(0 0 5px ${alpha(color, 53)})` : 'none',
               }}
               onMouseEnter={() => setHovered(item.name)}
               onMouseLeave={() => setHovered(null)}
@@ -65,7 +66,7 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
           )
         })}
         {items.length > 10 && (
-          <div className="flex-1 bg-white/5" style={{ minWidth: '2px' }} />
+          <div className="flex-1 bg-overlay/5" style={{ minWidth: '2px' }} />
         )}
       </div>
 
@@ -74,16 +75,16 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
         {hoveredItem && (
           <div
             className="w-full px-4 py-2 rounded-xl border flex items-center justify-between transition-all duration-150"
-            style={{ borderColor: `${colorForItem(hoveredItem, hoveredIdx)}40`, background: `${colorForItem(hoveredItem, hoveredIdx)}0d` }}
+            style={{ borderColor: `${alpha(colorForItem(hoveredItem, hoveredIdx), 25)}`, background: `${alpha(colorForItem(hoveredItem, hoveredIdx), 5)}` }}
           >
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full" style={{ background: colorForItem(hoveredItem, hoveredIdx) }} />
-              <span className="text-sm font-semibold" style={{ color: colorForItem(hoveredItem, hoveredIdx) }}>{hoveredItem.name}</span>
-              {hoveredItem.isFiat && <span className="text-[10px] text-gray-500">cash</span>}
+              <span className="text-sm font-semibold" style={{ color: ink(colorForItem(hoveredItem, hoveredIdx)) }}>{hoveredItem.name}</span>
+              {hoveredItem.isFiat && <span className="text-xs text-fg-subtle">cash</span>}
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-500 font-mono">{hoveredPct.toFixed(2)}%</span>
-              <span className="text-sm font-semibold font-mono text-white">{formatMoney(hoveredItem.value, currency)}</span>
+              <span className="text-xs text-fg-subtle mono">{hoveredPct.toFixed(2)}%</span>
+              <span className="text-sm font-semibold mono text-fg">{formatMoney(hoveredItem.value, currency)}</span>
             </div>
           </div>
         )}
@@ -101,27 +102,27 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
               key={item.name}
               className="flex items-center gap-3 px-2 py-1.5 rounded-lg transition-all duration-150 cursor-default"
               style={{
-                background: isHover ? `${color}12` : 'transparent',
+                background: isHover ? `${alpha(color, 7)}` : 'transparent',
                 opacity: dimmed ? 0.35 : 1,
               }}
               onMouseEnter={() => setHovered(item.name)}
               onMouseLeave={() => setHovered(null)}
             >
-              <span className="text-[10px] text-gray-700 w-3 text-right shrink-0">{idx + 1}</span>
+              <span className="text-xs text-fg-subtle w-3 text-right shrink-0">{idx + 1}</span>
               <div className="flex items-center gap-1.5 w-16 shrink-0">
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-                <span className="text-xs font-medium truncate" style={{ color: isHover ? color : (item.isFiat ? color : 'rgb(209 213 219)') }}>
+                <span className="text-xs font-medium truncate" style={{ color: isHover || item.isFiat ? ink(color) : T.fg }}>
                   {item.name}
                 </span>
               </div>
-              <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div className="flex-1 h-1.5 bg-overlay/5 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-300"
                   style={{ width: `${pct}%`, background: color, opacity: isHover ? 1 : 0.5 }}
                 />
               </div>
-              <span className="text-[11px] text-gray-500 font-mono w-10 text-right shrink-0">{pct.toFixed(1)}%</span>
-              <span className="text-[11px] text-gray-400 font-mono w-20 text-right shrink-0">{formatMoney(item.value, currency)}</span>
+              <span className="text-xs text-fg-subtle mono w-10 text-right shrink-0">{pct.toFixed(1)}%</span>
+              <span className="text-xs text-fg-muted mono w-20 text-right shrink-0">{formatMoney(item.value, currency)}</span>
             </div>
           )
         })}

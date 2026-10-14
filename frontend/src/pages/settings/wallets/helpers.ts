@@ -19,10 +19,10 @@ export function truncateAddress(addr: string) {
 }
 
 export const SYNC_BADGE: Record<'ok' | 'discrepancy' | 'error' | 'pending', { label: string; className: string }> = {
-  ok:          { label: 'Verificado', className: 'bg-accent-green/15 text-accent-green' },
-  discrepancy: { label: 'Revisar',    className: 'bg-accent-amber/15 text-accent-amber' },
-  error:       { label: 'Sin conexión', className: 'bg-accent-red/15 text-accent-red' },
-  pending:     { label: 'Pendiente',  className: 'bg-gray-700/30 text-gray-500' },
+  ok:          { label: 'Verificado', className: 'bg-positive/15 text-positive' },
+  discrepancy: { label: 'Revisar',    className: 'bg-warning/15 text-warning' },
+  error:       { label: 'Sin conexión', className: 'bg-negative/15 text-negative' },
+  pending:     { label: 'Pendiente',  className: 'bg-overlay/30 text-fg-subtle' },
 }
 
 export const NETWORKS_REQUIRING_KEY = ['Ethereum', 'Cardano', 'Polkadot Asset Hub']
@@ -46,4 +46,4 @@ export function getAddressPlaceholder(network: Network | undefined): string {
 
 // Compartido por AddAddressForm y AddWalletForm — antes declarado por
 // duplicado e idéntico en ambos.
-export const inputClass = "w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm placeholder-gray-600 focus:outline-hidden focus:border-accent-blue"
+export const inputClass = "w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm placeholder-fg-subtle focus:outline-hidden focus:border-brand"

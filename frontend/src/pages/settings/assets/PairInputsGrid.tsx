@@ -21,10 +21,10 @@ export function PairInputsGrid({ symbol, eurPair, setEurPair, usdtPair, setUsdtP
         { label: 'Par BTC',  val: btcPair,  set: setBtcPair,  ph: `${symbol}BTC`  },
       ] as const).map(({ label, val, set, ph }) => (
         <div key={label} className="space-y-1">
-          <label className="text-xs text-gray-500">{label}</label>
+          <label className="text-xs text-fg-subtle">{label}</label>
           <input value={val} onChange={e => set(e.target.value.toUpperCase())} placeholder={ph} className={inputClass} />
           {detectRan && !val && (
-            <p className="flex items-center gap-1 text-xs text-gray-600">
+            <p className="flex items-center gap-1 text-xs text-fg-subtle">
               <XCircle size={10} /> No disponible
             </p>
           )}

@@ -22,8 +22,8 @@ export function ImportsList({ imports, onDelete }: {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between px-1">
-        <h3 className="text-sm font-medium text-gray-400">Historial de importaciones</h3>
-        <span className="text-xs text-gray-600">
+        <h3 className="text-sm font-medium text-fg-muted">Historial de importaciones</h3>
+        <span className="text-xs text-fg-subtle">
           {imports.length} archivo{imports.length !== 1 ? 's' : ''} · {totalTx} transacciones totales
         </span>
       </div>
@@ -42,10 +42,10 @@ export function ImportsList({ imports, onDelete }: {
         const fmtImported = new Date(imp.imported_at).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })
 
         const tagCounts = [
-          buyCount > 0      && { label: `${buyCount} compras`,    color: 'text-accent-green bg-accent-green/10' },
-          sellCount > 0     && { label: `${sellCount} ventas`,    color: 'text-accent-red bg-accent-red/10' },
-          withdrawCount > 0 && { label: `${withdrawCount} retiros`, color: 'text-accent-amber bg-accent-amber/10' },
-          depositCount > 0  && { label: `${depositCount} depósitos`, color: 'text-accent-blue bg-accent-blue/10' },
+          buyCount > 0      && { label: `${buyCount} compras`,    color: 'text-positive bg-positive/10' },
+          sellCount > 0     && { label: `${sellCount} ventas`,    color: 'text-negative bg-negative/10' },
+          withdrawCount > 0 && { label: `${withdrawCount} retiros`, color: 'text-warning bg-warning/10' },
+          depositCount > 0  && { label: `${depositCount} depósitos`, color: 'text-brand bg-brand/10' },
         ].filter(Boolean) as { label: string; color: string }[]
 
         return (
@@ -59,24 +59,24 @@ export function ImportsList({ imports, onDelete }: {
             <div className="px-4 py-3 flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-background-tertiary">
                 {isDeleting
-                  ? <RefreshCw size={16} className="text-gray-500 animate-spin" />
-                  : <FileText size={16} className="text-gray-500" />
+                  ? <RefreshCw size={16} className="text-fg-subtle animate-spin" />
+                  : <FileText size={16} className="text-fg-subtle" />
                 }
               </div>
 
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{imp.filename}</p>
-                <p className="text-xs text-gray-600 mt-0.5">
+                <p className="text-xs text-fg-subtle mt-0.5">
                   Importado {fmtImported}
                 </p>
               </div>
 
               {dateFrom && dateTo && (
-                <div className="text-xs text-gray-500 mono text-right shrink-0 hidden sm:block">
+                <div className="text-xs text-fg-subtle mono text-right shrink-0 hidden sm:block">
                   <p className="flex items-center gap-1 justify-end">
-                    <Calendar size={10} className="text-gray-700" /> {fmtDate(dateFrom)}
+                    <Calendar size={10} className="text-fg-subtle" /> {fmtDate(dateFrom)}
                   </p>
-                  <p className="text-gray-700 flex items-center gap-1 justify-end">
+                  <p className="text-fg-subtle flex items-center gap-1 justify-end">
                     <ChevronRight size={10} /> {fmtDate(dateTo)}
                   </p>
                 </div>
@@ -85,7 +85,7 @@ export function ImportsList({ imports, onDelete }: {
               <button
                 type="button"
                 onClick={() => setConfirmId(imp.id)}
-                className="p-1.5 rounded-lg transition-colors shrink-0 text-gray-600 hover:text-accent-red hover:bg-accent-red/10"
+                className="p-1.5 rounded-lg transition-colors shrink-0 text-fg-subtle hover:text-negative hover:bg-negative/10"
                 title="Borrar importación"
               >
                 <Trash2 size={14} />
@@ -95,11 +95,11 @@ export function ImportsList({ imports, onDelete }: {
             {/* Tags de resumen */}
             {txCount > 0 && (
               <div className="px-4 pb-3 flex items-center gap-2 flex-wrap">
-                <span className="text-xs px-2 py-0.5 rounded-md bg-background-tertiary text-gray-400 flex items-center gap-1">
-                  <Hash size={10} className="text-gray-600" /> {txCount} transacciones
+                <span className="text-xs px-2 py-0.5 rounded-lg bg-background-tertiary text-fg-muted flex items-center gap-1">
+                  <Hash size={10} className="text-fg-subtle" /> {txCount} transacciones
                 </span>
                 {tagCounts.map(t => (
-                  <span key={t.label} className={`text-xs px-2 py-0.5 rounded-md ${t.color}`}>
+                  <span key={t.label} className={`text-xs px-2 py-0.5 rounded-lg ${t.color}`}>
                     {t.label}
                   </span>
                 ))}

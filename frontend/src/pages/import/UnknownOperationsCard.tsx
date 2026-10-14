@@ -11,10 +11,10 @@ export function UnknownOperationsCard({ unknownOperations, resolvedOps, unknownO
   return (
     <div className="card space-y-3">
       <div className="flex items-center gap-2">
-        <AlertCircle size={15} className="text-accent-amber" />
+        <AlertCircle size={15} className="text-warning" />
         <h2 className="font-medium text-sm">Operaciones desconocidas</h2>
       </div>
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-fg-subtle">
         Cataloga cada operación para incluirla en el cálculo fiscal, o ignórala para excluirla del import.
       </p>
       <div className="space-y-2">
@@ -27,19 +27,19 @@ export function UnknownOperationsCard({ unknownOperations, resolvedOps, unknownO
               <div className="flex flex-col gap-0.5 min-w-0">
                 <div className="flex items-center gap-2">
                   {!resolved
-                    ? <AlertCircle size={14} className="text-accent-amber shrink-0" />
+                    ? <AlertCircle size={14} className="text-warning shrink-0" />
                     : isIgnored
-                      ? <X size={14} className="text-gray-500 shrink-0" />
-                      : <CheckCircle size={14} className="text-accent-green shrink-0" />
+                      ? <X size={14} className="text-fg-subtle shrink-0" />
+                      : <CheckCircle size={14} className="text-positive shrink-0" />
                   }
-                  <span className="font-mono text-xs text-gray-300 truncate">{op}</span>
+                  <span className="mono text-xs text-fg truncate">{op}</span>
                   {resolved && !isIgnored && (
-                    <span className="text-xs text-accent-green shrink-0">{resolved.operationTypeId}</span>
+                    <span className="text-xs text-positive shrink-0">{resolved.operationTypeId}</span>
                   )}
-                  {isIgnored && <span className="text-xs text-gray-600 shrink-0">Ignorada</span>}
+                  {isIgnored && <span className="text-xs text-fg-subtle shrink-0">Ignorada</span>}
                 </div>
                 {sample && (
-                  <div className="text-xs text-gray-600 ml-5">
+                  <div className="text-xs text-fg-subtle ml-5">
                     {new Date(sample.timestamp).toLocaleDateString('es-ES')}
                     {sample.asset && ` · ${sample.asset}`}
                     {sample.amount > 0 && ` · ${sample.amount}`}
@@ -52,8 +52,8 @@ export function UnknownOperationsCard({ unknownOperations, resolvedOps, unknownO
                   onClick={() => onIgnoreOp(op)}
                   className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
                     isIgnored
-                      ? 'bg-background-card border border-border text-gray-400'
-                      : 'text-gray-600 hover:text-gray-300 hover:bg-background-card'
+                      ? 'bg-background-card border border-border text-fg-muted'
+                      : 'text-fg-subtle hover:text-fg hover:bg-background-card'
                   }`}
                 >
                   {isIgnored ? 'Ignorada' : 'Ignorar'}
@@ -63,10 +63,10 @@ export function UnknownOperationsCard({ unknownOperations, resolvedOps, unknownO
                   onClick={() => onCatalog(op)}
                   className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
                     resolved && !isIgnored
-                      ? 'bg-background-card text-gray-400 hover:text-white'
+                      ? 'bg-background-card text-fg-muted hover:text-on-warning'
                       : isIgnored
-                        ? 'bg-background-card text-gray-500 hover:text-white'
-                        : 'bg-accent-amber text-black hover:bg-accent-amber/80'
+                        ? 'bg-background-card text-fg-subtle hover:text-on-warning'
+                        : 'bg-warning text-on-warning hover:bg-warning/80'
                   }`}
                 >
                   {resolved && !isIgnored ? 'Cambiar' : 'Catalogar'}

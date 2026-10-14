@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAssetIcons } from '../hooks/useAssetIcons'
 import { assetHue, assetInitials } from '../utils/assetInitials'
+import { alpha } from '../utils/colors'
 
 /**
  * Logo de un activo, servido por el propio backend (#201); si no hay logo,
@@ -14,7 +15,7 @@ export function CryptoIcon({ symbol, size = 28, ring }: { symbol: string; size?:
   const [failed, setFailed] = useState(false)
   const key = symbol.toUpperCase()
   const version = icons[key]
-  const ringStyle = ring ? { boxShadow: `0 0 0 2px ${ring}30` } : undefined
+  const ringStyle = ring ? { boxShadow: `0 0 0 2px ${alpha(ring, 19)}` } : undefined
 
   if (version === undefined || failed) {
     const hue = assetHue(symbol)

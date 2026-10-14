@@ -3,6 +3,7 @@ import { AlertTriangle, Info, ChevronDown, ChevronUp } from 'lucide-react'
 import { formatEur, pnlColor } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import type { Modelo721 } from './types'
+import { T, alpha, ink } from '../../utils/colors'
 
 export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYear: number }) {
   const [expanded, setExpanded] = useState(true)
@@ -13,27 +14,27 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
   const autocustodia = data.totalValor - data.totalValorCustodia
 
   return (
-    <div className={`bg-background-card border rounded-2xl overflow-hidden ${
-      data.superaUmbral ? 'border-accent-red/40' : 'border-border'
+    <div className={`bg-background-card border rounded-xl overflow-hidden ${
+      data.superaUmbral ? 'border-negative/40' : 'border-border'
     }`}>
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/2 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-overlay/2 transition-colors"
       >
         <div className="flex items-center gap-3">
           <div className="text-left">
             <div className="flex items-center gap-2">
               <h3 className="font-medium text-sm">Modelo 721</h3>
               {data.esAnioEnCurso && (
-                <span className="text-[10px] bg-accent-blue/15 text-accent-blue px-2 py-0.5 rounded-full">estimación actual</span>
+                <span className="text-xs bg-info/15 text-info px-2 py-0.5 rounded-full">estimación actual</span>
               )}
               {vencido && (
-                <span className="text-[10px] bg-background-tertiary text-gray-500 px-2 py-0.5 rounded-full">cerrado</span>
+                <span className="text-xs bg-background-tertiary text-fg-subtle px-2 py-0.5 rounded-full">cerrado</span>
               )}
             </div>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-fg-subtle mt-0.5">
               {data.esAnioEnCurso
                 ? `Valoración a ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}`
                 : `Valoración a 31 dic ${activeYear}`
@@ -42,13 +43,13 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
           </div>
 
           {data.superaUmbral ? (
-            <div className="flex items-center gap-1.5 bg-accent-red/10 border border-accent-red/20 text-accent-red text-xs px-2.5 py-1 rounded-xl">
+            <div className="flex items-center gap-1.5 bg-negative/10 border border-negative/20 text-negative text-xs px-2.5 py-1 rounded-xl">
               <AlertTriangle size={11} />
               <span className="font-medium">Obligatorio declarar</span>
               {!data.esAnioEnCurso && <span className="opacity-70">· {deadline}</span>}
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 bg-accent-green/10 text-accent-green text-xs px-2.5 py-1 rounded-xl">
+            <div className="flex items-center gap-1.5 bg-positive/10 text-positive text-xs px-2.5 py-1 rounded-xl">
               <span className="font-medium">Sin obligación</span>
             </div>
           )}
@@ -56,15 +57,15 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
 
         <div className="flex items-center gap-5">
           <div className="text-right">
-            <div className={`text-lg font-bold mono ${data.superaUmbral ? 'text-accent-red' : 'text-white'}`}>
+            <div className={`text-lg font-bold mono ${data.superaUmbral ? 'text-negative' : 'text-fg'}`}>
               {formatEur(data.totalValorCustodia)}
             </div>
-            <div className="text-[10px] text-gray-500">custodia de terceros · umbral {formatEur(data.umbral)}</div>
+            <div className="text-xs text-fg-subtle">custodia de terceros · umbral {formatEur(data.umbral)}</div>
             {autocustodia > 0.01 && (
-              <div className="text-[10px] text-gray-600">+ {formatEur(autocustodia)} en autocustodia (no computa)</div>
+              <div className="text-xs text-fg-subtle">+ {formatEur(autocustodia)} en autocustodia (no computa)</div>
             )}
           </div>
-          {expanded ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
+          {expanded ? <ChevronUp size={14} className="text-fg-subtle" /> : <ChevronDown size={14} className="text-fg-subtle" />}
         </div>
       </button>
 
@@ -74,11 +75,11 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
             className="h-full rounded-full transition-all"
             style={{
               width: `${pctUmbral}%`,
-              backgroundColor: data.superaUmbral ? '#ef4444' : pctUmbral > 75 ? '#f59e0b' : '#10b981',
+              backgroundColor: data.superaUmbral ? T.negative : pctUmbral > 75 ? T.warning : T.positive,
             }}
           />
         </div>
-        <div className="flex justify-between text-[10px] text-gray-600 mt-0.5">
+        <div className="flex justify-between text-xs text-fg-subtle mt-0.5">
           <span>0 €</span>
           <span>{pctUmbral.toFixed(0)}% del umbral</span>
           <span>{formatEur(data.umbral)}</span>
@@ -97,20 +98,20 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm mono">{a.asset}</span>
                       <span
-                        className="text-[10px] px-1.5 py-0.5 rounded-sm font-medium shrink-0"
+                        className="text-xs px-1.5 py-0.5 rounded-lg font-medium shrink-0"
                         style={{
-                          backgroundColor: a.wallet_kind === 'exchange' ? 'rgba(245,158,11,0.12)' : `${a.wallet_color}18`,
-                          color: a.wallet_kind === 'exchange' ? '#f59e0b' : a.wallet_color,
+                          backgroundColor: a.wallet_kind === 'exchange' ? alpha(T.warning, 12) : `${alpha(a.wallet_color, 9)}`,
+                          color: a.wallet_kind === 'exchange' ? T.warning : ink(a.wallet_color),
                         }}
                       >
                         {a.wallet_name}
                       </span>
                     </div>
-                    <div className="text-[10px] text-gray-500 mono mt-0.5">
+                    <div className="text-xs text-fg-subtle mono mt-0.5">
                       {a.quantity.toFixed(4)} × {formatEur(a.precioEur)}
                     </div>
                     {a.costBasisEur > 0 && (
-                      <div className="text-[10px] text-gray-600 mono">
+                      <div className="text-xs text-fg-subtle mono">
                         Coste adq.: {formatEur(a.costBasisEur)}
                       </div>
                     )}
@@ -118,7 +119,7 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
                   <div className="text-right shrink-0">
                     <div className="font-bold mono text-sm">{formatEur(a.valorEur)}</div>
                     {a.costBasisEur > 0 && (
-                      <div className={`text-[10px] mono ${pnlColor(pnl)}`}>
+                      <div className={`text-xs mono ${pnlColor(pnl)}`}>
                         {pnl >= 0 ? '+' : ''}{formatEur(pnl)}
                       </div>
                     )}
@@ -129,11 +130,11 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
           </div>
 
           <div className="px-5 pb-4 space-y-2">
-            <div className="flex items-start gap-2 p-3 bg-background-tertiary rounded-xl text-[11px] text-gray-500">
+            <div className="flex items-start gap-2 p-3 bg-background-tertiary rounded-xl text-xs text-fg-subtle">
               <Info size={11} className="shrink-0 mt-0.5" />
               Precios obtenidos de la API a fecha {data.fecha}. La columna de custodia indica dónde se encontraban los activos según el historial registrado.
             </div>
-            <div className="flex items-start gap-2 p-3 bg-accent-amber/5 border border-accent-amber/20 rounded-xl text-[11px] text-accent-amber">
+            <div className="flex items-start gap-2 p-3 bg-warning/5 border border-warning/20 rounded-xl text-xs text-warning">
               <AlertTriangle size={11} className="shrink-0 mt-0.5" />
               {data.aviso}
             </div>

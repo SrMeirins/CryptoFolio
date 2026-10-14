@@ -8,6 +8,7 @@ import { portfolioApi, type OperationType, type CatalogData } from '../api/portf
 import { DynamicField } from './DynamicField'
 import { WalletLabel } from './WalletPicker'
 import { buildInitialFields } from '../utils/operationWizardFields'
+import { T } from '../utils/colors'
 
 interface OperationWizardProps {
   unknownOperation?: {
@@ -36,20 +37,20 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  ACQUISITION: '#00c896',
-  DISPOSITION: '#e74c3c',
-  MOVEMENT:    '#6366f1',
-  INCOME:      '#8b5cf6',
-  FEE:         '#3b82f6',
-  SPECIAL:     '#6b7280',
+  ACQUISITION: T.positive,
+  DISPOSITION: T.negative,
+  MOVEMENT:    T.brand,
+  INCOME:      T.purple,
+  FEE:         T.info,
+  SPECIAL:     T.muted,
 }
 
 const BADGE_COLORS: Record<string, string> = {
-  green: 'bg-accent-green/10 text-accent-green',
-  red:   'bg-accent-red/10  text-accent-red',
-  blue:  'bg-accent-blue/10 text-accent-blue',
-  gray:  'bg-gray-700/50    text-gray-400',
-  amber: 'bg-accent-amber/10 text-accent-amber',
+  green: 'bg-positive/10 text-positive',
+  red:   'bg-negative/10  text-negative',
+  blue:  'bg-brand/10 text-brand',
+  gray:  'bg-overlay/50    text-fg-muted',
+  amber: 'bg-warning/10 text-warning',
 }
 
 const CATEGORIES_ORDER = ['ACQUISITION', 'DISPOSITION', 'INCOME', 'MOVEMENT', 'FEE', 'SPECIAL']
@@ -61,7 +62,7 @@ export function OperationWizard(props: OperationWizardProps) {
 
   if (!catalog) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
+      <div className="flex items-center justify-center h-64 text-fg-subtle text-sm">
         Cargando catálogo...
       </div>
     )
@@ -161,14 +162,14 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
             {unknownOperation ? 'Catalogar operación' : initialValues ? 'Editar transacción' : 'Nueva transacción'}
           </h2>
           {unknownOperation && (
-            <p className="text-xs text-gray-500 mt-0.5">
-              Original: <span className="text-accent-amber font-mono">{unknownOperation.originalLabel}</span>
+            <p className="text-xs text-fg-subtle mt-0.5">
+              Original: <span className="text-warning mono">{unknownOperation.originalLabel}</span>
               {' · '}{unknownOperation.asset} {unknownOperation.amount}
               {' · '}{new Date(unknownOperation.timestamp).toLocaleDateString('es-ES')}
             </p>
           )}
         </div>
-        <button type="button" onClick={onCancel} aria-label="Cerrar" className="text-gray-500 hover:text-white transition-colors p-1">
+        <button type="button" onClick={onCancel} aria-label="Cerrar" className="text-fg-subtle hover:text-fg transition-colors p-1">
           <X size={18} />
         </button>
       </div>
@@ -185,13 +186,13 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
           const idx = steps.indexOf(s.key)
           return (
             <div key={s.key} className="flex items-center gap-2">
-              {i > 0 && <ChevronRight size={11} className="text-gray-700" />}
+              {i > 0 && <ChevronRight size={11} className="text-fg-subtle" />}
               <div className={`flex items-center gap-1.5 text-xs font-medium ${
-                idx === cur ? 'text-accent-blue' : idx < cur ? 'text-accent-green' : 'text-gray-600'
+                idx === cur ? 'text-brand' : idx < cur ? 'text-positive' : 'text-fg-subtle'
               }`}>
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
-                  idx === cur ? 'bg-accent-blue text-white' :
-                  idx < cur  ? 'bg-accent-green text-white' : 'bg-background-tertiary text-gray-500'
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${
+                  idx === cur ? 'bg-brand-solid text-on-brand' :
+                  idx < cur  ? 'bg-positive text-on-positive' : 'bg-background-tertiary text-fg-subtle'
                 }`}>
                   {idx < cur ? <CheckCircle size={11} /> : i + 1}
                 </div>
@@ -213,7 +214,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
         {/* ── PASO 1: Tipo (todos agrupados por categoría) ── */}
         {step === 'type' && (
           <div className="p-4 space-y-1.5">
-            <p className="text-xs text-gray-500 px-1 pb-2">
+            <p className="text-xs text-fg-subtle px-1 pb-2">
               Selecciona el tipo de operación que quieres registrar
             </p>
             {CATEGORIES_ORDER.map(catKey => {
@@ -234,12 +235,12 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
                   >
                     <div className="flex items-center gap-2">
                       <span style={{ color }} className="opacity-80">{CATEGORY_ICONS[catKey]}</span>
-                      <span className="text-sm font-medium text-gray-200">{meta.label}</span>
-                      <span className="text-xs text-gray-600">{meta.description}</span>
+                      <span className="text-sm font-medium text-fg">{meta.label}</span>
+                      <span className="text-xs text-fg-subtle">{meta.description}</span>
                     </div>
                     <ChevronDown
                       size={14}
-                      className={`text-gray-600 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                      className={`text-fg-subtle transition-transform ${isOpen ? 'rotate-180' : ''}`}
                     />
                   </button>
 
@@ -255,16 +256,16 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
                         >
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-sm font-medium text-gray-200 group-hover:text-white">
+                              <span className="text-sm font-medium text-fg group-hover:text-fg">
                                 {op.label}
                               </span>
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${BADGE_COLORS[op.badgeColor]}`}>
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${BADGE_COLORS[op.badgeColor]}`}>
                                 {op.badge}
                               </span>
                             </div>
-                            <p className="text-xs text-gray-500">{op.description}</p>
+                            <p className="text-xs text-fg-subtle">{op.description}</p>
                           </div>
-                          <ChevronRight size={13} className="text-gray-600 group-hover:text-accent-blue shrink-0 ml-3" />
+                          <ChevronRight size={13} className="text-fg-subtle group-hover:text-brand shrink-0 ml-3" />
                         </button>
                       ))}
                     </div>
@@ -282,7 +283,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
             <button
               type="button"
               onClick={() => setShowHelper(!showHelper)}
-              className="flex items-center gap-2 text-xs text-accent-blue hover:text-accent-blue/80 transition-colors mb-4"
+              className="flex items-center gap-2 text-xs text-brand hover:text-brand/80 transition-colors mb-4"
             >
               <Info size={12} />
               {showHelper ? 'Ocultar ayuda fiscal' : 'Ver ayuda y tratamiento fiscal'}
@@ -291,33 +292,33 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
             {showHelper && (
               <div className="mb-5 space-y-2">
                 <div className="bg-background-tertiary rounded-xl p-4 text-xs space-y-2">
-                  <div className="font-medium text-white">{selectedType.label}</div>
-                  <p className="text-gray-400 leading-relaxed">{selectedType.helper}</p>
+                  <div className="font-medium text-fg">{selectedType.label}</div>
+                  <p className="text-fg-muted leading-relaxed">{selectedType.helper}</p>
                   {selectedType.example && (
-                    <div className="text-gray-500 italic border-l-2 border-border pl-3">
+                    <div className="text-fg-subtle italic border-l-2 border-border pl-3">
                       {selectedType.example}
                     </div>
                   )}
                 </div>
-                <div className="bg-accent-amber/5 border border-accent-amber/20 rounded-xl p-4 text-xs">
-                  <div className="flex items-center gap-1.5 text-accent-amber font-medium mb-2">
+                <div className="bg-warning/5 border border-warning/20 rounded-xl p-4 text-xs">
+                  <div className="flex items-center gap-1.5 text-warning font-medium mb-2">
                     <AlertCircle size={12} />
                     Tratamiento fiscal — España IRPF
                   </div>
-                  <p className="text-gray-400 leading-relaxed">{selectedType.fiscalHelper}</p>
+                  <p className="text-fg-muted leading-relaxed">{selectedType.fiscalHelper}</p>
                 </div>
               </div>
             )}
 
             {/* Precio auto */}
             {(autoPrice || autoPriceLoading) && (
-              <div className="mb-4 flex items-center gap-2 p-2.5 bg-accent-blue/5 border border-accent-blue/20 rounded-lg text-xs">
-                <Zap size={11} className="text-accent-blue shrink-0" />
+              <div className="mb-4 flex items-center gap-2 p-2.5 bg-brand/5 border border-brand/20 rounded-lg text-xs">
+                <Zap size={11} className="text-brand shrink-0" />
                 {autoPriceLoading
-                  ? <span className="text-gray-400">Consultando precio histórico...</span>
-                  : <span className="text-gray-400">
-                      Precio detectado: <span className="text-white font-medium mono">{autoPrice?.toFixed(6)} EUR</span>
-                      <span className="text-gray-600 ml-1">(se usará automáticamente)</span>
+                  ? <span className="text-fg-muted">Consultando precio histórico...</span>
+                  : <span className="text-fg-muted">
+                      Precio detectado: <span className="text-fg font-medium mono">{autoPrice?.toFixed(6)} EUR</span>
+                      <span className="text-fg-subtle ml-1">(se usará automáticamente)</span>
                     </span>
                 }
               </div>
@@ -325,7 +326,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
 
             {/* Advertencia fecha futura */}
             {isFutureDate && (
-              <div className="mb-4 flex items-center gap-2 p-2.5 bg-accent-amber/5 border border-accent-amber/20 rounded-lg text-xs text-accent-amber">
+              <div className="mb-4 flex items-center gap-2 p-2.5 bg-warning/5 border border-warning/20 rounded-lg text-xs text-warning">
                 <AlertCircle size={11} className="shrink-0" />
                 La fecha introducida es futura. Verifica que sea correcta.
               </div>
@@ -351,11 +352,11 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
                   id="applyToAll"
                   checked={applyToAll}
                   onChange={e => setApplyToAll(e.target.checked)}
-                  className="w-4 h-4 rounded-sm accent-accent-blue"
+                  className="w-4 h-4 rounded-lg accent-accent-blue"
                 />
-                <label htmlFor="applyToAll" className="text-xs text-gray-400">
+                <label htmlFor="applyToAll" className="text-xs text-fg-muted">
                   Aplicar a todas las operaciones del tipo{' '}
-                  <span className="text-accent-amber font-mono">{unknownOperation.originalLabel}</span>
+                  <span className="text-warning mono">{unknownOperation.originalLabel}</span>
                 </label>
               </div>
             )}
@@ -366,15 +367,15 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
         {step === 'confirm' && selectedType && (
           <div className="p-5 space-y-4">
             <div className="bg-background-tertiary rounded-xl p-5 space-y-3">
-              <h3 className="font-medium text-sm text-gray-300">Resumen de la operación</h3>
+              <h3 className="font-medium text-sm text-fg">Resumen de la operación</h3>
 
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Tipo</span>
-                  <span className="font-medium text-white">{selectedType.label}</span>
+                  <span className="text-fg-subtle">Tipo</span>
+                  <span className="font-medium text-fg">{selectedType.label}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Efecto fiscal</span>
+                  <span className="text-fg-subtle">Efecto fiscal</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${BADGE_COLORS[selectedType.badgeColor]}`}>
                     {selectedType.badge}
                   </span>
@@ -386,8 +387,8 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
                   .filter(f => fieldValues[f.name] !== undefined && fieldValues[f.name] !== '' && fieldValues[f.name] !== null)
                   .map(f => (
                     <div key={f.name} className="flex justify-between text-sm">
-                      <span className="text-gray-500">{f.label}</span>
-                      <span className="mono text-gray-200 text-xs">
+                      <span className="text-fg-subtle">{f.label}</span>
+                      <span className="mono text-fg text-xs">
                         {f.type === 'wallet'
                           ? <WalletLabel walletId={fieldValues[f.name] as string} />
                           : f.type === 'datetime'
@@ -400,17 +401,17 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
                 }
                 {autoPrice && !fieldValues.price_eur && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500 flex items-center gap-1">
-                      Precio EUR <Zap size={9} className="text-accent-blue" />
+                    <span className="text-fg-subtle flex items-center gap-1">
+                      Precio EUR <Zap size={9} className="text-brand" />
                     </span>
-                    <span className="mono text-accent-blue text-xs">{autoPrice.toFixed(6)} (auto)</span>
+                    <span className="mono text-brand text-xs">{autoPrice.toFixed(6)} (auto)</span>
                   </div>
                 )}
               </div>
             </div>
 
             {selectedType.fiscalTreatment !== 'NO_TAXABLE_EVENT' && (
-              <div className="flex items-start gap-2 p-3 bg-accent-amber/5 border border-accent-amber/20 rounded-lg text-xs text-accent-amber">
+              <div className="flex items-start gap-2 p-3 bg-warning/5 border border-warning/20 rounded-lg text-xs text-warning">
                 <AlertCircle size={12} className="shrink-0 mt-0.5" />
                 Esta operación generará un evento fiscal. Verifica los datos antes de confirmar.
               </div>
@@ -428,7 +429,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
             if (step === 'fields')  goToStep('type')
             if (step === 'confirm') goToStep('fields')
           }}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm text-fg-muted hover:text-fg transition-colors"
         >
           <ChevronLeft size={14} />
           {step === 'type' ? 'Cancelar' : 'Atrás'}
@@ -439,7 +440,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
             type="button"
             onClick={() => goToStep('confirm')}
             disabled={!isFormValid()}
-            className="flex items-center gap-2 px-5 py-2 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
+            className="flex items-center gap-2 px-5 py-2 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
           >
             Continuar
             <ChevronRight size={14} />
@@ -450,7 +451,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
           <button
             type="button"
             onClick={handleComplete}
-            className="flex items-center gap-2 px-5 py-2 bg-accent-green hover:bg-accent-green/80 rounded-lg text-sm font-medium transition-colors"
+            className="flex items-center gap-2 px-5 py-2 bg-positive text-on-positive hover:bg-positive/90 rounded-lg text-sm font-medium transition-colors"
           >
             <CheckCircle size={14} />
             Confirmar operación

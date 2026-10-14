@@ -70,7 +70,7 @@ export function Dashboard() {
       pctCompact: (result.pct >= 0 ? '+' : '') + result.pct.toFixed(1) + '%',
       positive: result.eur >= 0,
       note: result.excluded.length > 0
-        ? <p>Sin precio de hace 24h, excluidos del cálculo: <span className="mono text-white">{result.excluded.join(', ')}</span></p>
+        ? <p>Sin precio de hace 24h, excluidos del cálculo: <span className="mono text-fg">{result.excluded.join(', ')}</span></p>
         : undefined,
     }
   }, [assets, open24, fiatOpen24, hasPrices, currency])
@@ -81,13 +81,13 @@ export function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-fg-subtle text-sm mt-1">
             {lastUpdate ? `Actualizado ${lastUpdate.toLocaleTimeString('es-ES')}` : 'Cargando precios...'}
           </p>
         </div>
         <div className="flex items-center gap-2" title={live.title}>
           <div className={`w-2 h-2 rounded-full ${live.dot}`} aria-hidden="true" />
-          <span className="text-xs text-gray-500">{live.label}</span>
+          <span className="text-xs text-fg-subtle">{live.label}</span>
         </div>
       </div>
 
@@ -105,37 +105,37 @@ export function Dashboard() {
         valueTooltip={
           <>
             <p>Valoración total de la cartera a precio de mercado en tiempo real: cripto + saldos en efectivo.</p>
-            <div className="bg-white/5 rounded-lg px-3 py-2.5 space-y-1.5 text-[10px]">
-              <div className="flex justify-between text-gray-400">
+            <div className="bg-overlay/5 rounded-lg px-3 py-2.5 space-y-1.5 text-xs">
+              <div className="flex justify-between text-fg-muted">
                 <span>Cripto</span>
-                <span className="mono text-gray-200">{formatMoney(cryptoValue, currency)}</span>
+                <span className="mono text-fg">{formatMoney(cryptoValue, currency)}</span>
               </div>
-              <div className="flex justify-between text-gray-400">
+              <div className="flex justify-between text-fg-muted">
                 <span>Cash / Fiat</span>
-                <span className="mono text-gray-200">{formatMoney(totalFiat, currency)}</span>
+                <span className="mono text-fg">{formatMoney(totalFiat, currency)}</span>
               </div>
             </div>
           </>
         }
         costTooltip={
           <>
-            <p>Importe total pagado para adquirir los activos que <span className="text-white">aún mantienes en cartera</span>, según el método FIFO.</p>
+            <p>Importe total pagado para adquirir los activos que <span className="text-fg">aún mantienes en cartera</span>, según el método FIFO.</p>
             <p>Cada venta reduce este valor en proporción al lote consumido.</p>
           </>
         }
         pnlTooltip={
           <>
             <p>Diferencia entre la valoración actual y el coste FIFO de las posiciones abiertas.</p>
-            <p className="font-mono text-[10px] bg-white/5 px-2.5 py-1.5 rounded-lg text-gray-400">
+            <p className="mono text-xs bg-overlay/5 px-2.5 py-1.5 rounded-lg text-fg-muted">
               Valor actual − Coste de adquisición
             </p>
-            <p className="text-gray-500">No tiene impacto fiscal hasta que se materialice con una venta.</p>
+            <p className="text-fg-subtle">No tiene impacto fiscal hasta que se materialice con una venta.</p>
           </>
         }
         pnlPctTooltip={
           <>
             <p>Rendimiento porcentual sobre el capital invertido en las posiciones actuales.</p>
-            <p className="font-mono text-[10px] bg-white/5 px-2.5 py-1.5 rounded-lg text-gray-400">
+            <p className="mono text-xs bg-overlay/5 px-2.5 py-1.5 rounded-lg text-fg-muted">
               (Valor − Coste) ÷ Coste × 100
             </p>
           </>
@@ -143,15 +143,15 @@ export function Dashboard() {
         eurFlowTooltip={eurFlow && (
           <>
             <p>Capital real comprometido en cripto: euros ingresados al exchange desde tu banco, menos lo retirado.</p>
-            {flowCurrency === 'USD' && <p className="text-gray-500">En dólares, cada movimiento se convierte con el tipo de su fecha.</p>}
-            <div className="bg-white/5 rounded-lg px-3 py-2.5 space-y-1.5 text-[10px]">
-              <div className="flex justify-between text-gray-400">
+            {flowCurrency === 'USD' && <p className="text-fg-subtle">En dólares, cada movimiento se convierte con el tipo de su fecha.</p>}
+            <div className="bg-overlay/5 rounded-lg px-3 py-2.5 space-y-1.5 text-xs">
+              <div className="flex justify-between text-fg-muted">
                 <span>Depósitos al exchange</span>
-                <span className="mono text-gray-200">{formatMoney(eurFlow.deposited, flowCurrency)}</span>
+                <span className="mono text-fg">{formatMoney(eurFlow.deposited, flowCurrency)}</span>
               </div>
-              <div className="flex justify-between text-gray-400">
+              <div className="flex justify-between text-fg-muted">
                 <span>Retiradas al banco</span>
-                <span className="mono text-gray-200">− {formatMoney(eurFlow.withdrawn, flowCurrency)}</span>
+                <span className="mono text-fg">− {formatMoney(eurFlow.withdrawn, flowCurrency)}</span>
               </div>
             </div>
           </>

@@ -22,16 +22,16 @@ export function YearTabs({ years, activeYear, overview, currentYear, onSelect }:
             onClick={() => onSelect(year)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
               activeYear === year
-                ? 'bg-accent-blue/20 border border-accent-blue/40 text-white'
-                : 'bg-background-tertiary border border-border text-gray-400 hover:text-white hover:border-gray-500'
+                ? 'bg-brand/20 border border-brand/40 text-fg'
+                : 'bg-background-tertiary border border-border text-fg-muted hover:text-fg hover:border-fg-subtle'
             }`}
           >
             <span>{year}</span>
             {year === currentYear && (
-              <span className="text-[10px] bg-accent-blue/20 text-accent-blue px-1.5 py-0.5 rounded-full">EN CURSO</span>
+              <span className="text-xs bg-brand/20 text-brand px-1.5 py-0.5 rounded-full">EN CURSO</span>
             )}
             {ov && (
-              <span className={`text-[10px] font-mono font-bold ${neto >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+              <span className={`text-xs mono font-bold ${neto >= 0 ? 'text-positive' : 'text-negative'}`}>
                 {neto >= 0 ? '+' : ''}{formatEur(neto)}
               </span>
             )}

@@ -7,8 +7,8 @@ export function SortIcon<T extends string>({ col, activeCol, dir, size = 10 }: {
   dir: 'asc' | 'desc'
   size?: number
 }) {
-  if (col !== activeCol) return <ArrowUpDown size={size} className="text-gray-600" />
+  if (col !== activeCol) return <ArrowUpDown size={size} className="text-fg-subtle" />
   return dir === 'asc'
-    ? <ArrowUp size={size} className="text-accent-blue" />
-    : <ArrowDown size={size} className="text-accent-blue" />
+    ? <ArrowUp size={size} className="text-brand" />
+    : <ArrowDown size={size} className="text-brand" />
 }

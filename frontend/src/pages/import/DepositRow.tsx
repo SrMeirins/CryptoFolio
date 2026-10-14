@@ -30,17 +30,17 @@ export function DepositRow({ dep, cost, reviewed, onSetCost }: {
   return (
     <div className="px-4 py-3">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-xs text-gray-400 mono">{date}</span>
-        <span className="text-xs text-gray-600">·</span>
-        <span className="text-xs text-gray-300 mono">
+        <span className="text-xs text-fg-muted mono">{date}</span>
+        <span className="text-xs text-fg-subtle">·</span>
+        <span className="text-xs text-fg mono">
           {dep.amount.toLocaleString('es-ES', { maximumFractionDigits: 6 })} {dep.asset}
         </span>
         {statusLabel && (
-          <span className={`ml-auto text-[10px] font-medium ${cost != null ? 'text-accent-green' : 'text-gray-500'}`}>
+          <span className={`ml-auto text-xs font-medium ${cost != null ? 'text-positive' : 'text-fg-subtle'}`}>
             {cost != null ? `✓ ${statusLabel}` : `○ ${statusLabel}`}
           </span>
         )}
-        {!reviewed && <span className="ml-auto text-[10px] text-accent-amber">● pendiente</span>}
+        {!reviewed && <span className="ml-auto text-xs text-warning">● pendiente</span>}
       </div>
 
       <div className="flex items-center gap-2">
@@ -51,11 +51,11 @@ export function DepositRow({ dep, cost, reviewed, onSetCost }: {
             placeholder="0,000000"
             value={inputVal}
             onChange={e => handleInput(e.target.value)}
-            className={`w-full bg-background-primary border rounded-lg pl-3 pr-12 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-hidden mono transition-colors ${
-              reviewed && cost != null ? 'border-accent-green/40 focus:border-accent-green' : 'border-border focus:border-accent-blue'
+            className={`w-full bg-background-primary border rounded-lg pl-3 pr-12 py-1.5 text-xs text-fg placeholder-fg-subtle focus:outline-hidden mono transition-colors ${
+              reviewed && cost != null ? 'border-positive/40 focus:border-positive' : 'border-border focus:border-brand'
             }`}
           />
-          <span className="absolute right-3 text-[10px] text-gray-600 pointer-events-none">€/ud.</span>
+          <span className="absolute right-3 text-xs text-fg-subtle pointer-events-none">€/ud.</span>
         </div>
 
         <HistoricalPriceButton
@@ -67,10 +67,10 @@ export function DepositRow({ dep, cost, reviewed, onSetCost }: {
         <button
           type="button"
           onClick={() => { setInputVal('0'); onSetCost(dep.txKey, 0) }}
-          className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+          className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
             cost === 0 && reviewed
-              ? 'border-accent-green/40 bg-accent-green/10 text-accent-green'
-              : 'border-border text-gray-500 hover:text-white hover:border-gray-500 bg-background-card'
+              ? 'border-positive/40 bg-positive/10 text-positive'
+              : 'border-border text-fg-subtle hover:text-fg hover:border-fg-subtle bg-background-card'
           }`}
           title="Coste 0€ — airdrop, regalo, minería, etc."
         >
@@ -80,10 +80,10 @@ export function DepositRow({ dep, cost, reviewed, onSetCost }: {
         <button
           type="button"
           onClick={() => { setInputVal(''); onSetCost(dep.txKey, null) }}
-          className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+          className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
             cost == null && reviewed
-              ? 'border-gray-600 bg-gray-800 text-gray-300'
-              : 'border-border text-gray-500 hover:text-white hover:border-gray-500 bg-background-card'
+              ? 'border-border bg-background-tertiary text-fg'
+              : 'border-border text-fg-subtle hover:text-fg hover:border-fg-subtle bg-background-card'
           }`}
           title="Coste desconocido — se usará el precio de mercado en la fecha"
         >

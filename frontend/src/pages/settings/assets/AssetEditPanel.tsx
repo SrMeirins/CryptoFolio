@@ -5,6 +5,7 @@ import { portfolioApi, type AssetMetadata } from '../../../api/portfolio'
 import { Toggle } from '../../../components/Toggle'
 import { PairInputsGrid } from './PairInputsGrid'
 import { CoinGeckoIdEditor } from './CoinGeckoIdEditor'
+import { T } from '../../../utils/colors'
 
 export function AssetEditPanel({ asset, onSaved, onCancel }: {
   asset: AssetMetadata; onSaved: () => void; onCancel: () => void
@@ -59,10 +60,10 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
   return (
     <div className="border-t border-border bg-background-tertiary/20 px-4 py-4 space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-gray-400">Editar pares — <span className="mono">{asset.symbol}</span></p>
+        <p className="text-xs font-medium text-fg-muted">Editar pares — <span className="mono">{asset.symbol}</span></p>
         <button type="button" onClick={handleDetect} disabled={detecting}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-          style={{ backgroundColor: '#6366f118', color: '#6366f1' }}>
+          style={{ backgroundColor: '#6366f118', color: T.brand }}>
           {detecting ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}
           Auto-detectar
         </button>
@@ -79,19 +80,19 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
       <Toggle checked={isStable} onChange={setIsStable} label="Stablecoin o fiat (sin par de precio)" />
 
       <div className="pt-2 border-t border-border/50 space-y-2">
-        <p className="text-xs text-gray-600">Probar par en Binance</p>
+        <p className="text-xs text-fg-subtle">Probar par en Binance</p>
         <div className="flex gap-2">
           <input value={testPairVal} onChange={e => setTestPairVal(e.target.value.toUpperCase())}
             onKeyDown={e => e.key === 'Enter' && handleTest()}
             placeholder={`${asset.symbol}EUR, ${asset.symbol}USDT...`}
-            className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm mono placeholder-gray-600 focus:outline-hidden focus:border-accent-blue" />
+            className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm mono placeholder-fg-subtle focus:outline-hidden focus:border-brand" />
           <button type="button" onClick={handleTest} disabled={testLoading || !testPairVal}
             className="px-3 py-2 bg-background-tertiary hover:bg-border disabled:opacity-50 rounded-lg text-sm transition-colors">
             {testLoading ? <RefreshCw size={13} className="animate-spin" /> : <Search size={13} />}
           </button>
         </div>
         {testResult && (
-          <div className={`flex items-center gap-2 text-xs ${testResult.exists ? 'text-accent-green' : 'text-accent-red'}`}>
+          <div className={`flex items-center gap-2 text-xs ${testResult.exists ? 'text-positive' : 'text-negative'}`}>
             {testResult.exists
               ? <><CheckCircle size={12} /> Existe — precio: <span className="mono font-medium">{testResult.price?.toFixed(6)} EUR</span></>
               : <><XCircle size={12} /> Par no encontrado en Binance</>
@@ -103,9 +104,9 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
       {isCoinGeckoSource && <CoinGeckoIdEditor asset={asset} onSaved={onSaved} />}
 
       <div className="flex justify-end gap-2 pt-1">
-        <button type="button" onClick={onCancel} className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">Cancelar</button>
+        <button type="button" onClick={onCancel} className="px-3 py-1.5 text-sm text-fg-muted hover:text-fg transition-colors">Cancelar</button>
         <button type="button" onClick={handleSave} disabled={saving}
-          className="px-4 py-1.5 bg-accent-blue hover:bg-accent-blue/80 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
+          className="px-4 py-1.5 bg-brand-solid text-on-brand hover:bg-brand-solid/90 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors">
           {saving ? 'Guardando...' : 'Guardar'}
         </button>
       </div>

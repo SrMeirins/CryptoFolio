@@ -32,14 +32,14 @@ export function MetricCard({
   label, value, rawValue, format, positive, loading, tooltip, change24h,
 }: MetricCardProps) {
   const colorClass =
-    positive === undefined ? 'text-white' :
-    positive ? 'text-accent-green' : 'text-accent-red'
+    positive === undefined ? 'text-fg' :
+    positive ? 'text-positive' : 'text-negative'
 
   return (
-    <div className="metric-card bg-background-card border border-border rounded-2xl px-5 py-5 flex flex-col items-center text-center gap-2">
+    <div className="metric-card bg-background-card border border-border rounded-xl px-5 py-5 flex flex-col items-center text-center gap-2">
       {/* Si una variación muy grande no cabe, el chip baja de línea en vez de desbordar */}
       <div className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1">
-        <p className="text-[11px] text-gray-500 font-medium uppercase tracking-widest leading-none whitespace-nowrap">{label}</p>
+        <p className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest leading-none whitespace-nowrap">{label}</p>
         {tooltip && <InfoTooltip label={label}>{tooltip}</InfoTooltip>}
         {change24h && <Change24hChip change={change24h} />}
       </div>

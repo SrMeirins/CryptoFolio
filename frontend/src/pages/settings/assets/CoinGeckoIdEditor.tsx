@@ -42,15 +42,15 @@ export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; on
   return (
     <div className="pt-3 border-t border-border/50 space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-600">ID de CoinGecko</p>
+        <p className="text-xs text-fg-subtle">ID de CoinGecko</p>
         <a href={`https://www.coingecko.com/es/buscar?query=${asset.symbol}`}
           target="_blank" rel="noopener noreferrer"
-          className="text-xs text-accent-blue/70 hover:text-accent-blue transition-colors">
+          className="text-xs text-brand/70 hover:text-brand transition-colors">
           Buscar en CoinGecko ↗
         </a>
       </div>
-      <p className="text-xs text-gray-700">
-        Visible en la URL: <span className="mono">coingecko.com/coins/<span className="text-gray-500">bitcoin</span></span>
+      <p className="text-xs text-fg-subtle">
+        Visible en la URL: <span className="font-mono">coingecko.com/coins/<span className="text-fg-subtle">bitcoin</span></span>
       </p>
       <div className="flex gap-2">
         <input
@@ -58,7 +58,7 @@ export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; on
           onChange={e => { setGeckoId(e.target.value.toLowerCase().trim()); setTestResult(null); setError(null) }}
           onKeyDown={e => e.key === 'Enter' && handleTest()}
           placeholder="ej. bitcoin, ethereum, ethereumpow"
-          className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm mono placeholder-gray-600 focus:outline-hidden focus:border-accent-blue"
+          className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm font-mono placeholder-fg-subtle focus:outline-hidden focus:border-brand"
         />
         <button type="button" onClick={handleTest} disabled={testing || !geckoId.trim()}
           title="Verificar que este ID devuelve precio en CoinGecko"
@@ -67,20 +67,20 @@ export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; on
         </button>
         {isDirty && (
           <button type="button" onClick={handleSave} disabled={saving || !geckoId.trim()}
-            className="px-3 py-2 bg-accent-blue/20 hover:bg-accent-blue/30 disabled:opacity-50 rounded-lg text-xs font-medium text-accent-blue transition-colors whitespace-nowrap">
+            className="px-3 py-2 bg-brand/20 hover:bg-brand/30 disabled:opacity-50 rounded-lg text-xs font-medium text-brand transition-colors whitespace-nowrap">
             {saving ? <RefreshCw size={12} className="animate-spin" /> : 'Guardar'}
           </button>
         )}
       </div>
       {testResult && (
-        <div className={`flex items-center gap-2 text-xs ${testResult.valid ? 'text-accent-green' : 'text-accent-red'}`}>
+        <div className={`flex items-center gap-2 text-xs ${testResult.valid ? 'text-positive' : 'text-negative'}`}>
           {testResult.valid
             ? <><CheckCircle size={12} /> Válido — precio actual: <span className="mono font-medium">{testResult.price_eur?.toFixed(6)} EUR</span></>
             : <><XCircle size={12} /> Este ID no devuelve precio en CoinGecko</>
           }
         </div>
       )}
-      {error && <p className="flex items-center gap-1.5 text-xs text-accent-red"><AlertCircle size={12} />{error}</p>}
+      {error && <p className="flex items-center gap-1.5 text-xs text-negative"><AlertCircle size={12} />{error}</p>}
     </div>
   )
 }

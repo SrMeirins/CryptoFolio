@@ -140,7 +140,7 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="bg-background-card border border-border rounded-2xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl"
+        className="bg-background-card border border-border rounded-xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl"
       >
 
         {step === 'wizard' && (
@@ -155,7 +155,7 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
           <>
             <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
               <h2 id={titleId} className="font-semibold text-lg">{isEditMode ? 'Confirmar edición' : 'Confirmar transacción'}</h2>
-              <button type="button" onClick={onClose} aria-label="Cerrar" className="text-gray-500 hover:text-white transition-colors p-1">
+              <button type="button" onClick={onClose} aria-label="Cerrar" className="text-fg-subtle hover:text-fg transition-colors p-1">
                 <X size={18} />
               </button>
             </div>
@@ -163,7 +163,7 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
 
               {previewLoading ? (
-                <div className="flex items-center gap-2 text-gray-400 text-sm py-6 justify-center">
+                <div className="flex items-center gap-2 text-fg-muted text-sm py-6 justify-center">
                   <Loader size={14} className="animate-spin" />
                   Calculando impacto fiscal...
                 </div>
@@ -172,7 +172,7 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
               ) : null}
 
               {error && (
-                <div className="flex items-start gap-2 p-3 bg-accent-red/10 border border-accent-red/20 rounded-lg text-sm text-accent-red">
+                <div className="flex items-start gap-2 p-3 bg-negative/10 border border-negative/20 rounded-lg text-sm text-negative">
                   <AlertTriangle size={14} className="shrink-0 mt-0.5" />
                   {error}
                 </div>
@@ -183,7 +183,7 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
               <button
                 type="button"
                 onClick={() => setStep('wizard')}
-                className="text-sm text-gray-400 hover:text-white transition-colors"
+                className="text-sm text-fg-muted hover:text-fg transition-colors"
               >
                 ← {isEditMode ? 'Volver a editar' : 'Volver al wizard'}
               </button>
@@ -191,7 +191,7 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
                 type="button"
                 onClick={handleConfirm}
                 disabled={step === 'saving' || previewLoading}
-                className="flex items-center gap-2 px-5 py-2 bg-accent-green hover:bg-accent-green/80 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
+                className="flex items-center gap-2 px-5 py-2 bg-positive text-on-positive hover:bg-positive/90 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
               >
                 {step === 'saving'
                   ? <><Loader size={14} className="animate-spin" /> {isEditMode ? 'Actualizando y recalculando FIFO...' : 'Guardando y recalculando FIFO...'}</>

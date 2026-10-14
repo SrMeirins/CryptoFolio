@@ -37,17 +37,17 @@ function DayCell({ day, isFrom, isTo, isInRange, isToday, onClick, onHover, onHo
       onMouseLeave={onHoverEnd}
       className={`
         relative h-8 text-xs font-medium transition-all duration-100 select-none
-        ${isInRange ? 'bg-accent-blue/12 text-white' : ''}
+        ${isInRange ? 'bg-brand/12 text-fg' : ''}
         ${isStart   ? 'rounded-l-full' : ''}
         ${isEnd     ? 'rounded-r-full' : ''}
         ${isSingle  ? 'rounded-full' : ''}
-        ${!isFrom && !isTo && !isInRange ? 'hover:bg-white/8 rounded-full text-gray-300' : ''}
+        ${!isFrom && !isTo && !isInRange ? 'hover:bg-overlay/8 rounded-full text-fg' : ''}
       `}
     >
       {/* Fondo del día seleccionado (from/to) */}
       {(isFrom || isTo) && (
         <span className="absolute inset-0 flex items-center justify-center">
-          <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold bg-accent-blue text-white">
+          <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold bg-brand-solid text-on-brand">
             {dayNum}
           </span>
         </span>
@@ -55,14 +55,14 @@ function DayCell({ day, isFrom, isTo, isInRange, isToday, onClick, onHover, onHo
 
       {/* Número del día */}
       {!isFrom && !isTo && (
-        <span className={`relative z-10 ${isToday ? 'text-accent-blue font-bold' : ''}`}>
+        <span className={`relative z-10 ${isToday ? 'text-brand font-bold' : ''}`}>
           {dayNum}
         </span>
       )}
 
       {/* Punto "hoy" */}
       {isToday && !isFrom && !isTo && (
-        <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent-blue" />
+        <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-brand-solid text-on-brand" />
       )}
     </button>
   )
@@ -162,8 +162,8 @@ export function DateRangePicker({ from, to, onChange }: Props) {
         onClick={openPicker}
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border transition-all ${
           hasRange
-            ? 'bg-accent-blue/10 border-accent-blue/40 text-accent-blue'
-            : 'bg-background-tertiary border-border text-gray-400 hover:border-gray-500 hover:text-gray-300'
+            ? 'bg-brand/10 border-brand/40 text-brand'
+            : 'bg-background-tertiary border-border text-fg-muted hover:border-fg-subtle hover:text-fg'
         }`}
       >
         <Calendar size={11} />
@@ -173,7 +173,7 @@ export function DateRangePicker({ from, to, onChange }: Props) {
             type="button"
             onClick={e => { e.stopPropagation(); onChange('', '') }}
             aria-label="Quitar filtro de fechas"
-            className="ml-0.5 text-accent-blue/60 hover:text-accent-blue transition-colors"
+            className="ml-0.5 text-brand/60 hover:text-brand transition-colors"
           >
             <X size={10} />
           </button>
@@ -183,7 +183,7 @@ export function DateRangePicker({ from, to, onChange }: Props) {
       {/* Popover */}
       {open && (
         <div
-          className="absolute top-full mt-2 z-50 left-0 bg-background-primary border border-white/12 rounded-2xl shadow-2xl overflow-hidden animate-date-picker-in"
+          className="absolute top-full mt-2 z-50 left-0 bg-background-primary border border-overlay/12 rounded-xl shadow-2xl overflow-hidden animate-date-picker-in"
           style={{ minWidth: 280 }}
         >
           {/* Atajos */}
@@ -203,10 +203,10 @@ export function DateRangePicker({ from, to, onChange }: Props) {
                   type="button"
                   key={s.label}
                   onClick={s.f}
-                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     isActive
-                      ? 'bg-accent-blue/20 text-accent-blue border border-accent-blue/30'
-                      : 'bg-white/5 text-gray-400 hover:bg-white/8 hover:text-gray-200 border border-transparent'
+                      ? 'bg-brand/20 text-brand border border-brand/30'
+                      : 'bg-overlay/5 text-fg-muted hover:bg-overlay/8 hover:text-fg border border-transparent'
                   }`}
                 >
                   {s.label}
@@ -215,7 +215,7 @@ export function DateRangePicker({ from, to, onChange }: Props) {
             })}
           </div>
 
-          <div className="h-px bg-white/6 mx-3" />
+          <div className="h-px bg-overlay/6 mx-3" />
 
           {/* Navegación mes */}
           <div className="flex items-center justify-between px-3 py-2.5">
@@ -223,18 +223,18 @@ export function DateRangePicker({ from, to, onChange }: Props) {
               type="button"
               onClick={prevMonth}
               aria-label="Mes anterior"
-              className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all active:scale-90"
+              className="p-1.5 rounded-lg text-fg-subtle hover:text-fg hover:bg-overlay/8 transition-all active:scale-90"
             >
               <ChevronLeft size={14} />
             </button>
             <span className="text-sm font-semibold">
-              {MONTHS_ES[viewM]} <span className="text-gray-500 font-normal">{viewY}</span>
+              {MONTHS_ES[viewM]} <span className="text-fg-subtle font-normal">{viewY}</span>
             </span>
             <button
               type="button"
               onClick={nextMonth}
               aria-label="Mes siguiente"
-              className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all active:scale-90"
+              className="p-1.5 rounded-lg text-fg-subtle hover:text-fg hover:bg-overlay/8 transition-all active:scale-90"
             >
               <ChevronRight size={14} />
             </button>
@@ -245,7 +245,7 @@ export function DateRangePicker({ from, to, onChange }: Props) {
             {/* Cabecera días */}
             <div className="grid grid-cols-7 mb-1">
               {DAYS_ES.map(d => (
-                <div key={d} className="text-center text-[10px] font-medium text-gray-600 py-1">{d}</div>
+                <div key={d} className="text-center text-xs font-medium text-fg-subtle py-1">{d}</div>
               ))}
             </div>
 
@@ -271,8 +271,8 @@ export function DateRangePicker({ from, to, onChange }: Props) {
 
             {/* Indicador de selección en curso */}
             {picking === 'to' && tmpFrom && (
-              <p className="text-center text-[10px] text-gray-600 mt-2">
-                Desde <span className="text-gray-400">{fmtShort(tmpFrom)}</span> — selecciona fecha de fin
+              <p className="text-center text-xs text-fg-subtle mt-2">
+                Desde <span className="text-fg-muted">{fmtShort(tmpFrom)}</span> — selecciona fecha de fin
               </p>
             )}
           </div>

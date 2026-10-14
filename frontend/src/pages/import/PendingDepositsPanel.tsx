@@ -65,29 +65,29 @@ export function PendingDepositsPanel({ deposits }: { deposits: PendingDeposit[] 
   }
 
   return (
-    <div className="card border-accent-amber/40 bg-accent-amber/5">
+    <div className="card border-warning/40 bg-warning/5">
       <div className="flex items-start gap-3 mb-5">
-        <div className="w-8 h-8 rounded-xl bg-accent-amber/15 flex items-center justify-center shrink-0">
-          <AlertTriangle size={16} className="text-accent-amber" />
+        <div className="w-8 h-8 rounded-xl bg-warning/15 flex items-center justify-center shrink-0">
+          <AlertTriangle size={16} className="text-warning" />
         </div>
         <div className="flex-1">
-          <h3 className="font-semibold text-sm text-white">
+          <h3 className="font-semibold text-sm text-fg">
             Revisión obligatoria — depósitos sin coste de adquisición
           </h3>
-          <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+          <p className="text-xs text-fg-muted mt-1 leading-relaxed">
             {deposits.length} depósito{deposits.length > 1 ? 's' : ''} recibido{deposits.length > 1 ? 's' : ''} desde fuera de Binance
             {deposits.length > 1 ? ' no tienen' : ' no tiene'} precio de adquisición registrado.
             Esto afecta al cálculo FIFO y a tu declaración fiscal.
-            <strong className="text-accent-amber"> Debes revisar todos para poder importar nuevos datos.</strong>
+            <strong className="text-warning"> Debes revisar todos para poder importar nuevos datos.</strong>
           </p>
           <div className="flex items-center gap-2 mt-2">
             <div className="flex-1 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
               <div
-                className="h-full bg-accent-amber transition-all duration-300 rounded-full"
+                className="h-full bg-warning transition-all duration-300 rounded-full"
                 style={{ width: `${(reviewed.length / deposits.length) * 100}%` }}
               />
             </div>
-            <span className="text-xs text-gray-500 shrink-0">{reviewed.length}/{deposits.length} revisados</span>
+            <span className="text-xs text-fg-subtle shrink-0">{reviewed.length}/{deposits.length} revisados</span>
           </div>
         </div>
       </div>
@@ -107,7 +107,7 @@ export function PendingDepositsPanel({ deposits }: { deposits: PendingDeposit[] 
       </div>
 
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-fg-subtle">
           {!allReviewed
             ? `Faltan ${deposits.length - reviewed.length} por revisar`
             : hasValues
@@ -119,7 +119,7 @@ export function PendingDepositsPanel({ deposits }: { deposits: PendingDeposit[] 
           type="button"
           onClick={handleSave}
           disabled={!allReviewed || saving}
-          className="flex items-center gap-2 px-5 py-2 bg-accent-amber hover:bg-accent-amber/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium text-black transition-colors"
+          className="flex items-center gap-2 px-5 py-2 bg-warning hover:bg-warning/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium text-on-warning transition-colors"
         >
           {saving ? <RefreshCw size={13} className="animate-spin" /> : <Check size={13} />}
           {saving ? 'Guardando...' : 'Guardar y desbloquear importación'}

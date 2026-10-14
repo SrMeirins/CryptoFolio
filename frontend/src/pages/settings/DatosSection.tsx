@@ -4,6 +4,7 @@ import { portfolioApi } from '../../api/portfolio'
 import { RefreshCw, Trash2, Zap, Download } from 'lucide-react'
 import { useToast } from '../../hooks/useToast'
 import { useRunFifo } from '../../hooks/useRunFifo'
+import { T } from '../../utils/colors'
 
 const CONFIRM_WORD = 'CONFIRMAR'
 
@@ -68,11 +69,11 @@ export function DatosSection() {
   }
 
   const statCards = [
-    { label: 'Transacciones',    value: stats?.transactions, color: '#6366f1' },
-    { label: 'Lotes FIFO',       value: stats?.fifoLots,     color: '#00c896' },
-    { label: 'Importaciones',    value: stats?.imports,      color: '#f59e0b' },
-    { label: 'Precios en caché', value: stats?.priceCache,   color: '#3b82f6' },
-    { label: 'Wallets',          value: stats?.wallets,      color: '#8b5cf6' },
+    { label: 'Transacciones',    value: stats?.transactions, color: T.brand },
+    { label: 'Lotes FIFO',       value: stats?.fifoLots,     color: T.positive },
+    { label: 'Importaciones',    value: stats?.imports,      color: T.warning },
+    { label: 'Precios en caché', value: stats?.priceCache,   color: T.info },
+    { label: 'Wallets',          value: stats?.wallets,      color: T.purple },
     { label: 'Activos',          value: stats?.assets,       color: '#ec4899' },
   ]
 
@@ -88,7 +89,7 @@ export function DatosSection() {
               <p className="text-xl font-bold mono">
                 {statsLoading ? '—' : (s.value ?? 0).toLocaleString('es-ES')}
               </p>
-              <p className="text-xs text-gray-500">{s.label}</p>
+              <p className="text-xs text-fg-subtle">{s.label}</p>
             </div>
           ))}
         </div>
@@ -103,11 +104,11 @@ export function DatosSection() {
           <div className="flex items-center justify-between py-3 border-b border-border/50">
             <div>
               <p className="text-sm font-medium">Limpiar caché de precios</p>
-              <p className="text-xs text-gray-500 mt-0.5">Fuerza la reconsulta de precios históricos en el próximo FIFO.</p>
+              <p className="text-xs text-fg-subtle mt-0.5">Fuerza la reconsulta de precios históricos en el próximo FIFO.</p>
             </div>
             <div className="flex items-center gap-3">
               {cacheResult !== null && (
-                <span className="text-xs text-accent-green">{cacheResult} entradas eliminadas</span>
+                <span className="text-xs text-positive">{cacheResult} entradas eliminadas</span>
               )}
               <button type="button" onClick={handleClearCache} disabled={clearingCache}
                 className="flex items-center gap-2 px-4 py-2 bg-background-tertiary hover:bg-border border border-border rounded-lg text-sm transition-colors disabled:opacity-50">
@@ -121,17 +122,17 @@ export function DatosSection() {
           <div className="flex items-center justify-between py-3 border-b border-border/50">
             <div>
               <p className="text-sm font-medium">Re-ejecutar motor FIFO</p>
-              <p className="text-xs text-gray-500 mt-0.5">Recalcula todos los lotes y plusvalías desde cero.</p>
+              <p className="text-xs text-fg-subtle mt-0.5">Recalcula todos los lotes y plusvalías desde cero.</p>
             </div>
             <div className="flex items-center gap-3">
               {fifoResult && (
-                <span className={`text-xs ${fifoResult.startsWith('Error') ? 'text-accent-red' : 'text-accent-green'}`}>
+                <span className={`text-xs ${fifoResult.startsWith('Error') ? 'text-negative' : 'text-positive'}`}>
                   {fifoResult}
                 </span>
               )}
               <button type="button" onClick={handleRunFifo} disabled={runningFifo}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                style={{ backgroundColor: '#6366f118', color: '#6366f1' }}>
+                style={{ backgroundColor: '#6366f118', color: T.brand }}>
                 {runningFifo ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
                 Ejecutar
               </button>
@@ -142,7 +143,7 @@ export function DatosSection() {
           <div className="flex items-center justify-between py-3">
             <div>
               <p className="text-sm font-medium">Exportar backup</p>
-              <p className="text-xs text-gray-500 mt-0.5">Descarga un JSON con todas las transacciones, wallets y configuración.</p>
+              <p className="text-xs text-fg-subtle mt-0.5">Descarga un JSON con todas las transacciones, wallets y configuración.</p>
             </div>
             <button type="button" onClick={handleExport} disabled={exporting}
               className="flex items-center gap-2 px-4 py-2 bg-background-tertiary hover:bg-border border border-border rounded-lg text-sm transition-colors disabled:opacity-50">
@@ -155,46 +156,46 @@ export function DatosSection() {
       </div>
 
       {/* Zona de peligro */}
-      <div className="rounded-xl border border-accent-red/30 bg-accent-red/5 p-5 space-y-3">
-        <h3 className="font-semibold text-sm text-accent-red">Zona de peligro</h3>
+      <div className="rounded-xl border border-negative/30 bg-negative/5 p-5 space-y-3">
+        <h3 className="font-semibold text-sm text-negative">Zona de peligro</h3>
 
         {!showResetConfirm ? (
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">Eliminar todos los datos</p>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-fg-subtle mt-0.5">
                 Borra transacciones, lotes FIFO, importaciones y caché de precios. Irreversible.
               </p>
             </div>
             <button type="button" onClick={() => setShowResetConfirm(true)}
-              className="px-4 py-2 border border-accent-red/50 text-accent-red hover:bg-accent-red/10 rounded-lg text-sm font-medium transition-colors">
+              className="px-4 py-2 border border-negative/50 text-negative hover:bg-negative/10 rounded-lg text-sm font-medium transition-colors">
               Eliminar todo
             </button>
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="px-4 py-3 rounded-xl border border-accent-red/40 bg-accent-red/8 space-y-1">
-              <p className="text-sm font-medium text-accent-red">¿Estás seguro?</p>
-              <p className="text-xs text-gray-400">
+            <div className="px-4 py-3 rounded-xl border border-negative/40 bg-negative/8 space-y-1">
+              <p className="text-sm font-medium text-negative">¿Estás seguro?</p>
+              <p className="text-xs text-fg-muted">
                 Esta acción borrará TODAS las transacciones, importaciones, lotes FIFO y caché de precios.
                 La configuración de wallets y activos se mantiene. Esta acción es <strong>irreversible</strong>.
               </p>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs text-gray-400">
-                Escribe <span className="mono font-semibold text-accent-red">{CONFIRM_WORD}</span> para confirmar:
+              <label className="text-xs text-fg-muted">
+                Escribe <span className="mono font-semibold text-negative">{CONFIRM_WORD}</span> para confirmar:
               </label>
               <input value={resetInput} onChange={e => setResetInput(e.target.value)}
                 placeholder={CONFIRM_WORD}
-                className="w-full bg-background-tertiary border border-accent-red/30 focus:border-accent-red rounded-lg px-3 py-2.5 text-sm mono placeholder-gray-700 focus:outline-hidden" />
+                className="w-full bg-background-tertiary border border-negative/30 focus:border-negative rounded-lg px-3 py-2.5 text-sm mono placeholder-fg-subtle focus:outline-hidden" />
             </div>
             <div className="flex items-center gap-2 justify-end">
               <button type="button" onClick={() => { setShowResetConfirm(false); setResetInput('') }}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">
+                className="px-4 py-2 text-sm text-fg-muted hover:text-fg transition-colors">
                 Cancelar
               </button>
               <button type="button" onClick={handleReset} disabled={resetInput !== CONFIRM_WORD || resetting}
-                className="px-4 py-2 bg-accent-red hover:bg-accent-red/80 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors">
+                className="px-4 py-2 bg-negative text-on-negative hover:bg-negative/90 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors">
                 {resetting ? 'Eliminando...' : 'Sí, eliminar todo'}
               </button>
             </div>

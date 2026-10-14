@@ -171,10 +171,10 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
 
   function groupStatus(txs: PreviewTransaction[]) {
     const dests = txs.map(tx => destinations[txKey(tx)]).filter(Boolean)
-    if (dests.length === 0) return { label: null, color: 'text-gray-600' }
+    if (dests.length === 0) return { label: null, color: 'text-fg-subtle' }
     const unique = [...new Set(dests)]
-    if (unique.length === 1) return { label: unique[0], color: 'text-accent-green' }
-    return { label: 'múltiples', color: 'text-accent-amber' }
+    if (unique.length === 1) return { label: unique[0], color: 'text-positive' }
+    return { label: 'múltiples', color: 'text-warning' }
   }
 
   // Para la copia de grupo anterior: buscar si hay un grupo previo con destino uniforme
@@ -189,35 +189,35 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
   }
 
   return (
-    <div className={`rounded-2xl border-2 transition-all duration-300 ${
-      allDone ? 'border-accent-green/40' : 'border-accent-amber/40'
+    <div className={`rounded-xl border-2 transition-all duration-300 ${
+      allDone ? 'border-positive/40' : 'border-warning/40'
     }`}>
       {/* Header */}
-      <div className={`px-5 py-4 ${allDone ? 'bg-accent-green/8' : 'bg-accent-amber/8'}`}>
+      <div className={`px-5 py-4 ${allDone ? 'bg-positive/8' : 'bg-warning/8'}`}>
         <div className="flex items-start justify-between gap-4 mb-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className={`text-sm font-semibold ${allDone ? 'text-accent-green' : 'text-accent-amber'}`}>
+              <span className={`text-sm font-semibold ${allDone ? 'text-positive' : 'text-warning'}`}>
                 {allDone ? '✓ Revisión completada' : 'Revisión obligatoria antes de importar'}
               </span>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                allDone ? 'bg-accent-green/20 text-accent-green' : 'bg-accent-amber/20 text-accent-amber'
+                allDone ? 'bg-positive/20 text-positive' : 'bg-warning/20 text-warning'
               }`}>
                 {doneItems}/{totalItems}
               </span>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-fg-subtle mt-1">
               Asigna el destino de cada retiro y el coste de cada depósito externo.
             </p>
           </div>
           <div className="text-right shrink-0">
-            <span className="text-xs text-gray-600">{withdrawals.length} retiro{withdrawals.length !== 1 ? 's' : ''}</span>
-            {deposits.length > 0 && <span className="text-xs text-gray-600 ml-2">{deposits.length} depósito{deposits.length !== 1 ? 's' : ''}</span>}
+            <span className="text-xs text-fg-subtle">{withdrawals.length} retiro{withdrawals.length !== 1 ? 's' : ''}</span>
+            {deposits.length > 0 && <span className="text-xs text-fg-subtle ml-2">{deposits.length} depósito{deposits.length !== 1 ? 's' : ''}</span>}
           </div>
         </div>
         <div className="h-1.5 bg-background-tertiary rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-500 ${allDone ? 'bg-accent-green' : 'bg-accent-amber'}`}
+            className={`h-full rounded-full transition-all duration-500 ${allDone ? 'bg-positive' : 'bg-warning'}`}
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -227,7 +227,7 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
 
         {/* Aviso de wallets — no bloquea los controles */}
         {coldWallets.length === 0 && (
-          <div className="flex items-center gap-2 text-xs text-accent-amber bg-accent-amber/10 rounded-xl px-4 py-2.5 border border-accent-amber/20">
+          <div className="flex items-center gap-2 text-xs text-warning bg-warning/10 rounded-xl px-4 py-2.5 border border-warning/20">
             <AlertTriangle size={12} className="shrink-0" />
             Sin wallets frías configuradas — solo disponibles: Pérdida, Externa, Regalo.
           </div>
@@ -259,12 +259,12 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
           {/* Cabecera con filtro "solo pendientes" */}
           {uniqueAssets.length > 1 && (
             <div className="flex items-center justify-between px-1 pb-1">
-              <span className="text-xs text-gray-600">{uniqueAssets.length} activo{uniqueAssets.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-fg-subtle">{uniqueAssets.length} activo{uniqueAssets.length !== 1 ? 's' : ''}</span>
               <button
                 type="button"
                 onClick={() => setShowOnlyPending(v => !v)}
                 className={`flex items-center gap-1.5 text-xs transition-colors ${
-                  showOnlyPending ? 'text-accent-amber' : 'text-gray-500 hover:text-gray-300'
+                  showOnlyPending ? 'text-warning' : 'text-fg-subtle hover:text-fg'
                 }`}
               >
                 {showOnlyPending ? <Eye size={12} /> : <EyeOff size={12} />}

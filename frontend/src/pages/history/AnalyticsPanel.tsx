@@ -12,9 +12,9 @@ function ChartTooltip({ active, payload, label }: {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-background-card border border-border rounded-xl px-3 py-2 text-xs shadow-lg">
-      <p className="text-gray-400 mb-1 font-medium">{label}</p>
+      <p className="text-fg-muted mb-1 font-medium">{label}</p>
       {payload.map((p, i) => (
-        <p key={i} className="text-white mono">{p.name}: <span className="font-bold">{p.value}</span></p>
+        <p key={i} className="text-fg mono">{p.name}: <span className="font-bold">{p.value}</span></p>
       ))}
     </div>
   )
@@ -42,29 +42,29 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
   const maxOps = Math.max(...stats.monthly.map(m => m.total_ops), 1)
 
   return (
-    <div className="bg-background-card border border-border rounded-2xl overflow-hidden">
+    <div className="bg-background-card border border-border rounded-xl overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/2 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-overlay/2 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <BarChart2 size={14} className="text-gray-500" />
+          <BarChart2 size={14} className="text-fg-subtle" />
           <span className="text-sm font-medium">Analítica de actividad</span>
-          <span className="text-[10px] text-gray-600">últimos 18 meses · top activos · fees</span>
+          <span className="text-xs text-fg-subtle">últimos 18 meses · top activos · fees</span>
         </div>
-        {open ? <ChevronUp size={14} className="text-gray-500" /> : <ChevronDown size={14} className="text-gray-500" />}
+        {open ? <ChevronUp size={14} className="text-fg-subtle" /> : <ChevronDown size={14} className="text-fg-subtle" />}
       </button>
 
       {open && (
         <div className="border-t border-border p-5 space-y-5">
           {/* Gráfico — ancho completo */}
           <div>
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-3">Operaciones por mes</p>
+            <p className="text-[11px] text-fg-subtle uppercase tracking-widest mb-3">Operaciones por mes</p>
             <ResponsiveContainer width="100%" height={130}>
               <BarChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} barSize={10} barGap={1}>
-                <XAxis dataKey="name" tick={{ fontSize: 9, fill: c.axisMuted }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: c.axisMuted }} axisLine={false} tickLine={false} />
                 <YAxis hide domain={[0, maxOps * 1.2]} />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: c.cursorSoft }} />
                 <Bar dataKey="Compras"        stackId="a" fill={c.gain} />
@@ -76,8 +76,8 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
             </ResponsiveContainer>
             <div className="flex items-center gap-4 mt-2">
               {[['Compras',c.gain],['Ventas',c.loss],['Ingresos',c.warn],['Transferencias',c.neutral],['Otros',c.neutralSoft]].map(([l,c]) => (
-                <div key={l} className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                  <div className="w-2 h-2 rounded-xs" style={{ backgroundColor: c }} />{l}
+                <div key={l} className="flex items-center gap-1.5 text-xs text-fg-subtle">
+                  <div className="w-2 h-2 rounded-lg" style={{ backgroundColor: c }} />{l}
                 </div>
               ))}
             </div>
@@ -87,8 +87,8 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1 border-t border-border/50">
             {/* Top activos */}
             <div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">
-                Top activos <span className="text-gray-700 normal-case">· último año</span>
+              <p className="text-[11px] text-fg-subtle uppercase tracking-widest mb-2">
+                Top activos <span className="text-fg-subtle normal-case">· último año</span>
               </p>
               <div className="space-y-1.5">
                 {stats.topAssets.slice(0, 6).map((row) => (
@@ -100,36 +100,36 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
                     title={`Filtrar por ${row.asset}`}
                   >
                     <CryptoIcon symbol={row.asset} size={16} />
-                    <span className="text-xs mono font-bold text-gray-300 w-12 shrink-0 group-hover/asset:text-white transition-colors">{row.asset}</span>
+                    <span className="text-xs mono font-bold text-fg w-12 shrink-0 group-hover/asset:text-fg transition-colors">{row.asset}</span>
                     <div className="flex-1 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-accent-blue/60 group-hover/asset:bg-accent-blue transition-colors"
+                      <div className="h-full rounded-full bg-brand/60 group-hover/asset:bg-brand-solid text-on-brand transition-colors"
                         style={{ width: `${(row.ops / (stats.topAssets[0]?.ops ?? 1)) * 100}%` }} />
                     </div>
-                    <span className="text-[10px] text-gray-500 w-5 text-right shrink-0">{row.ops}</span>
+                    <span className="text-xs text-fg-subtle w-5 text-right shrink-0">{row.ops}</span>
                   </button>
                 ))}
               </div>
-              <p className="text-[9px] text-gray-700 mt-1.5 pl-1">Click para filtrar</p>
+              <p className="text-xs text-fg-subtle mt-1.5 pl-1">Click para filtrar</p>
             </div>
 
             {/* Fees por activo */}
             {stats.fees.length > 0 && (
               <div>
-                <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">
-                  Fees por activo <span className="text-gray-700 normal-case">· último año</span>
+                <p className="text-[11px] text-fg-subtle uppercase tracking-widest mb-2">
+                  Fees por activo <span className="text-fg-subtle normal-case">· último año</span>
                 </p>
                 <div className="space-y-1.5">
                   {stats.fees.map((row) => (
                     <div key={row.asset} className="flex items-center gap-2">
                       <CryptoIcon symbol={row.asset} size={16} />
-                      <span className="text-xs mono font-bold text-gray-300 w-12 shrink-0">{row.asset}</span>
+                      <span className="text-xs mono font-bold text-fg w-12 shrink-0">{row.asset}</span>
                       <div className="flex-1 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
-                        <div className="h-full rounded-full bg-accent-amber/50"
+                        <div className="h-full rounded-full bg-warning/50"
                           style={{ width: `${(row.total_eur / (stats.fees[0]?.total_eur ?? 1)) * 100}%` }} />
                       </div>
                       {row.total_eur > 0
-                        ? <span className="text-[11px] text-gray-400 mono font-semibold shrink-0">{formatMoney(row.total_eur, stats.currency ?? 'EUR')}</span>
-                        : <span className="text-[10px] text-gray-600 mono shrink-0">{formatAmount(row.total_amount, 4)}</span>
+                        ? <span className="text-xs text-fg-muted mono font-semibold shrink-0">{formatMoney(row.total_eur, stats.currency ?? 'EUR')}</span>
+                        : <span className="text-xs text-fg-subtle mono shrink-0">{formatAmount(row.total_amount, 4)}</span>
                       }
                     </div>
                   ))}

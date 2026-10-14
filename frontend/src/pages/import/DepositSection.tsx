@@ -19,16 +19,16 @@ export function DepositSection({ deposits, depositCosts, onSetCost, allReviewed,
     <div className="border-t border-border pt-4 space-y-2">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <span className={`text-sm font-semibold ${allReviewed ? 'text-accent-green' : 'text-accent-amber'}`}>
+          <span className={`text-sm font-semibold ${allReviewed ? 'text-positive' : 'text-warning'}`}>
             {allReviewed ? '✓ Depósitos revisados' : 'Depósitos externos — coste de adquisición'}
           </span>
           <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-            allReviewed ? 'bg-accent-green/20 text-accent-green' : 'bg-accent-amber/20 text-accent-amber'
+            allReviewed ? 'bg-positive/20 text-positive' : 'bg-warning/20 text-warning'
           }`}>
             {reviewedCount}/{deposits.length}
           </span>
         </div>
-        <p className="text-[11px] text-gray-600">Activos recibidos desde fuera de Binance — el precio de mercado es una estimación, indica tu coste real si lo conoces</p>
+        <p className="text-xs text-fg-subtle">Activos recibidos desde fuera de Binance — el precio de mercado es una estimación, indica tu coste real si lo conoces</p>
       </div>
 
       {Object.entries(byAsset).map(([asset, deps]) => (

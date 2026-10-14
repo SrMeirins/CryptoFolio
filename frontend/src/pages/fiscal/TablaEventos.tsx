@@ -67,7 +67,7 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
   const hasAnyFilter  = filterAsset || filterTipo !== 'all' || hasDateFilter
 
   return (
-    <div className="bg-background-card border border-border rounded-2xl overflow-hidden">
+    <div className="bg-background-card border border-border rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-wrap gap-2">
         <TableExpandToggle
           icon={TrendingUp}
@@ -84,37 +84,37 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
                 type="date"
                 value={filterFrom}
                 onChange={e => setFilterFrom(e.target.value)}
-                className="px-2 py-1 bg-background-tertiary border border-border rounded-lg text-[11px] text-gray-300 cursor-pointer hover:border-gray-500 transition-colors"
+                className="px-2 py-1 bg-background-tertiary border border-border rounded-lg text-xs text-fg cursor-pointer hover:border-fg-subtle transition-colors"
                 title="Desde"
               />
-              <span className="text-gray-600 text-[10px]">—</span>
+              <span className="text-fg-subtle text-xs">—</span>
               <input
                 type="date"
                 value={filterTo}
                 onChange={e => setFilterTo(e.target.value)}
-                className="px-2 py-1 bg-background-tertiary border border-border rounded-lg text-[11px] text-gray-300 cursor-pointer hover:border-gray-500 transition-colors"
+                className="px-2 py-1 bg-background-tertiary border border-border rounded-lg text-xs text-fg cursor-pointer hover:border-fg-subtle transition-colors"
                 title="Hasta"
               />
               {hasDateFilter && (
-                <button type="button" onClick={() => { setFilterFrom(''); setFilterTo('') }} className="text-gray-500 hover:text-gray-300 ml-0.5">
+                <button type="button" onClick={() => { setFilterFrom(''); setFilterTo('') }} className="text-fg-subtle hover:text-fg ml-0.5">
                   <ChevronDown size={12} className="rotate-90" />
                 </button>
               )}
             </div>
 
             <div className="relative">
-              <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 pointer-events-none" />
+              <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
               <select
                 value={filterAsset}
                 onChange={e => setFilterAsset(e.target.value)}
-                className="pl-6 pr-6 py-1 bg-background-tertiary border border-border rounded-lg text-[11px] text-gray-300 appearance-none cursor-pointer hover:border-gray-500 transition-colors"
+                className="pl-6 pr-6 py-1 bg-background-tertiary border border-border rounded-lg text-xs text-fg appearance-none cursor-pointer hover:border-fg-subtle transition-colors"
               >
                 <option value="">Todos los activos</option>
                 {activos.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
 
-            <div className="flex bg-background-tertiary border border-border rounded-lg overflow-hidden text-[11px]">
+            <div className="flex bg-background-tertiary border border-border rounded-lg overflow-hidden text-xs">
               {(['all', 'gain', 'loss'] as const).map(t => (
                 <button
                   key={t}
@@ -122,10 +122,10 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
                   onClick={() => setFilterTipo(t)}
                   className={`px-2.5 py-1 transition-colors ${
                     filterTipo === t
-                      ? t === 'gain' ? 'bg-accent-green/20 text-accent-green'
-                        : t === 'loss' ? 'bg-accent-red/20 text-accent-red'
-                        : 'bg-white/10 text-white'
-                      : 'text-gray-500 hover:text-gray-300'
+                      ? t === 'gain' ? 'bg-positive/20 text-positive'
+                        : t === 'loss' ? 'bg-negative/20 text-negative'
+                        : 'bg-overlay/10 text-fg'
+                      : 'text-fg-subtle hover:text-fg'
                   }`}
                 >
                   {t === 'all' ? 'Todos' : t === 'gain' ? '▲ Ganancias' : '▼ Pérdidas'}
@@ -137,7 +137,7 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
               <button
                 type="button"
                 onClick={() => { setFilterAsset(''); setFilterTipo('all'); setFilterFrom(''); setFilterTo('') }}
-                className="text-[11px] text-gray-500 hover:text-gray-300 px-2 py-1 border border-border rounded-lg transition-colors"
+                className="text-xs text-fg-subtle hover:text-fg px-2 py-1 border border-border rounded-lg transition-colors"
               >
                 Limpiar
               </button>
@@ -150,22 +150,22 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-gray-500 text-[10px] uppercase tracking-wider border-b border-border bg-background-tertiary/30">
+              <tr className="text-fg-subtle text-[11px] uppercase tracking-wider border-b border-border bg-background-tertiary/30">
                 <th className="text-left px-4 py-2.5">
-                  <button type="button" onClick={() => toggleSort('fecha')} className="flex items-center gap-1 hover:text-gray-300">
+                  <button type="button" onClick={() => toggleSort('fecha')} className="flex items-center gap-1 hover:text-fg">
                     Fecha <SortIcon col="fecha" activeCol={sortKey} dir={sortDir} />
                   </button>
                 </th>
                 <th className="text-left px-4 py-2.5">Tipo</th>
                 <th className="text-left px-4 py-2.5">
-                  <button type="button" onClick={() => toggleSort('activoTransmitido')} className="flex items-center gap-1 hover:text-gray-300">
+                  <button type="button" onClick={() => toggleSort('activoTransmitido')} className="flex items-center gap-1 hover:text-fg">
                     Operación <SortIcon col="activoTransmitido" activeCol={sortKey} dir={sortDir} />
                   </button>
                 </th>
                 <th className="text-right px-4 py-2.5">Cantidad</th>
                 <th className="text-left px-4 py-2.5">Clave AEAT</th>
                 <th className="text-right px-4 py-2.5">
-                  <button type="button" onClick={() => toggleSort('valorTransmisionEur')} className="flex items-center gap-1 hover:text-gray-300 ml-auto">
+                  <button type="button" onClick={() => toggleSort('valorTransmisionEur')} className="flex items-center gap-1 hover:text-fg ml-auto">
                     Val. Transmisión <SortIcon col="valorTransmisionEur" activeCol={sortKey} dir={sortDir} />
                   </button>
                 </th>
@@ -173,7 +173,7 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
                 <th className="text-right px-4 py-2.5">Val. Adquisición</th>
                 <th className="text-right px-4 py-2.5">Gtos.</th>
                 <th className="text-right px-4 py-2.5">
-                  <button type="button" onClick={() => toggleSort('gananciaPerdidaEur')} className="flex items-center gap-1 hover:text-gray-300 ml-auto">
+                  <button type="button" onClick={() => toggleSort('gananciaPerdidaEur')} className="flex items-center gap-1 hover:text-fg ml-auto">
                     G/P € <SortIcon col="gananciaPerdidaEur" activeCol={sortKey} dir={sortDir} />
                   </button>
                 </th>
@@ -182,7 +182,7 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
             <tbody className="divide-y divide-border">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-gray-600 text-xs">
+                  <td colSpan={10} className="px-4 py-8 text-center text-fg-subtle text-xs">
                     <Filter size={20} className="mx-auto mb-2 opacity-30" />
                     Sin operaciones con los filtros actuales
                   </td>
@@ -192,7 +192,7 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
             {filtered.length > 0 && (
               <tfoot>
                 <tr className="border-t-2 border-border bg-background-tertiary/20">
-                  <td className="px-4 py-2.5 text-xs text-gray-500" colSpan={5}>
+                  <td className="px-4 py-2.5 text-xs text-fg-subtle" colSpan={5}>
                     {filtered.length < events.length
                       ? `${filtered.length} de ${events.length} operaciones`
                       : `${filtered.length} operaciones`}
@@ -200,19 +200,19 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
                   <td className="px-4 py-2.5 text-right mono text-xs">
                     {formatEur(totales.valorTransmision)}
                   </td>
-                  <td className="px-4 py-2.5 text-right mono text-xs text-gray-500">
+                  <td className="px-4 py-2.5 text-right mono text-xs text-fg-subtle">
                     {formatEur(totales.gastosTransmision)}
                   </td>
                   <td className="px-4 py-2.5 text-right mono text-xs">
                     {formatEur(totales.valorAdquisicion)}
                   </td>
-                  <td className="px-4 py-2.5 text-right mono text-xs text-gray-500">
+                  <td className="px-4 py-2.5 text-right mono text-xs text-fg-subtle">
                     {formatEur(totales.gastosAdquisicion)}
                   </td>
                   <td className={`px-4 py-2.5 text-right mono font-bold ${pnlColor(totales.gananciaPerdida)}`}>
                     {totales.gananciaPerdida >= 0 ? '+' : ''}{formatEur(totales.gananciaPerdida)}
                     {filtered.length < events.length && (
-                      <div className="text-[10px] text-gray-500 font-normal">
+                      <div className="text-xs text-fg-subtle font-normal">
                         neto total: {summary.netoPatrimonial >= 0 ? '+' : ''}{formatEur(summary.netoPatrimonial)}
                       </div>
                     )}

@@ -68,8 +68,8 @@ export function UploadZone({ dragOver, loading, error, fileRef, exchange, onExch
             type="button"
             onClick={() => onExchangeChange(ex)}
             disabled={loading}
-            className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors capitalize
-              ${exchange === ex ? 'bg-accent-blue/15 text-accent-blue' : 'text-gray-400 hover:text-gray-200'}
+            className={`px-4 py-1.5 text-sm rounded-lg font-medium transition-colors capitalize
+              ${exchange === ex ? 'bg-brand/15 text-brand' : 'text-fg-muted hover:text-fg'}
             `}
           >
             {ex}
@@ -77,15 +77,15 @@ export function UploadZone({ dragOver, loading, error, fileRef, exchange, onExch
         ))}
       </div>
 
-      <div className="card bg-accent-blue/5 border-accent-blue/20 p-4">
+      <div className="card bg-info/5 border-info/20 p-4">
         <div className="flex items-start gap-3">
-          <Info size={16} className="text-accent-blue shrink-0 mt-0.5" />
+          <Info size={16} className="text-info shrink-0 mt-0.5" />
           <div className="text-xs space-y-1">
-            <p className="font-medium text-accent-blue">{help.title}</p>
-            <ol className="text-gray-400 space-y-0.5 list-decimal list-inside">
+            <p className="font-medium text-info">{help.title}</p>
+            <ol className="text-fg-muted space-y-0.5 list-decimal list-inside">
               {help.steps.map(step => <li key={step}>{step}</li>)}
             </ol>
-            <p className="text-gray-600 mt-1">{help.note}</p>
+            <p className="text-fg-subtle mt-1">{help.note}</p>
           </div>
         </div>
       </div>
@@ -95,7 +95,7 @@ export function UploadZone({ dragOver, loading, error, fileRef, exchange, onExch
         tabIndex={loading ? -1 : 0}
         aria-label="Seleccionar o arrastrar archivo CSV"
         className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors cursor-pointer
-          ${dragOver ? 'border-accent-blue bg-accent-blue/5' : 'border-border hover:border-gray-500'}
+          ${dragOver ? 'border-brand bg-brand/5' : 'border-border hover:border-fg-subtle'}
           ${loading ? 'opacity-50 pointer-events-none' : ''}
         `}
         onClick={openPicker}
@@ -113,15 +113,15 @@ export function UploadZone({ dragOver, loading, error, fileRef, exchange, onExch
       >
         {loading ? (
           <div className="flex flex-col items-center gap-3">
-            <RefreshCw size={32} className="text-accent-blue animate-spin" />
-            <p className="text-gray-400 text-sm">Analizando CSV...</p>
+            <RefreshCw size={32} className="text-brand animate-spin" />
+            <p className="text-fg-muted text-sm">Analizando CSV...</p>
           </div>
         ) : (
           <>
-            <Upload size={32} className="mx-auto text-gray-500 mb-3" />
-            <p className="text-gray-300 font-medium capitalize">Arrastra tu CSV de {exchange} aquí</p>
-            <p className="text-gray-600 text-sm mt-1">o haz click para seleccionar</p>
-            <div className="flex items-center justify-center gap-3 mt-3 text-xs text-gray-700">
+            <Upload size={32} className="mx-auto text-fg-subtle mb-3" />
+            <p className="text-fg font-medium capitalize">Arrastra tu CSV de {exchange} aquí</p>
+            <p className="text-fg-subtle text-sm mt-1">o haz click para seleccionar</p>
+            <div className="flex items-center justify-center gap-3 mt-3 text-xs text-fg-subtle">
               <span>Transaction History export</span>
               <span>·</span>
               <span className="flex items-center gap-1"><FileText size={11} /> Solo .csv</span>
@@ -140,7 +140,7 @@ export function UploadZone({ dragOver, loading, error, fileRef, exchange, onExch
       </div>
 
       {(validationError || error) && (
-        <div className="flex items-start gap-2 p-4 bg-accent-red/10 border border-accent-red/20 rounded-lg text-sm text-accent-red">
+        <div className="flex items-start gap-2 p-4 bg-negative/10 border border-negative/20 rounded-lg text-sm text-negative">
           <AlertCircle size={15} className="shrink-0 mt-0.5" />
           {validationError ?? error}
         </div>

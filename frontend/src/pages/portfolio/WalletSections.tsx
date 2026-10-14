@@ -1,5 +1,6 @@
 import type { FifoLot, FiatBalance } from '../../api/portfolio'
 import { AssetTable } from '../../components/AssetTable'
+import { ink } from '../../utils/colors'
 
 const KIND_LABEL: Record<string, string> = {
   exchange: 'Exchange',
@@ -62,14 +63,14 @@ export function WalletSections({ lots, fiatBalances, onSimulate }: {
         <div key={g.key} className="space-y-2">
           <div className="flex items-center gap-2.5">
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
-            <h2 className="text-sm font-semibold tracking-wide" style={{ color: g.color }}>
+            <h2 className="text-sm font-semibold tracking-wide" style={{ color: ink(g.color) }}>
               {g.name}
             </h2>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-md border font-medium uppercase tracking-wide text-gray-600 border-gray-700/60">
+            <span className="text-[11px] px-1.5 py-0.5 rounded-lg border font-medium uppercase tracking-wide text-fg-subtle border-border/60">
               {KIND_LABEL[g.kind] ?? g.kind}
             </span>
             {g.assetCount > 0 && (
-              <span className="text-xs text-gray-600">
+              <span className="text-xs text-fg-subtle">
                 {g.assetCount} activo{g.assetCount !== 1 ? 's' : ''}
               </span>
             )}

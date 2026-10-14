@@ -25,9 +25,9 @@ export function fmtAmt(n: number): string {
 }
 
 export function destLabel(dest: string, coldWallets: { id: string; name: string; color: string }[]) {
-  if (dest === '__lost__')     return { text: '💀 Pérdida',  cls: 'text-accent-red'   }
-  if (dest === '__gift__')     return { text: '🎁 Regalo',   cls: 'text-accent-blue'  }
-  if (dest === '__external__') return { text: '📱 Externa',  cls: 'text-gray-400'     }
+  if (dest === '__lost__')     return { text: '💀 Pérdida',  cls: 'text-negative'   }
+  if (dest === '__gift__')     return { text: '🎁 Regalo',   cls: 'text-brand'  }
+  if (dest === '__external__') return { text: '📱 Externa',  cls: 'text-fg-muted'     }
   const w = coldWallets.find(w => w.id === dest)
-  return w ? { text: w.name, cls: 'text-accent-green' } : { text: 'pendiente', cls: 'text-gray-600 italic' }
+  return w ? { text: w.name, cls: 'text-positive' } : { text: 'pendiente', cls: 'text-fg-subtle italic' }
 }

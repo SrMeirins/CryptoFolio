@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { portfolioApi } from '../../api/portfolio'
 import { formatAmount } from '../../utils/format'
 import { OP_META } from '../../constants/operations'
+import { T, alpha, ink } from '../../utils/colors'
 
 function relativeDate(ts: string): string {
   const diff = Date.now() - new Date(ts).getTime()
@@ -26,10 +27,10 @@ export function RecentActivity() {
   const txs = data?.transactions ?? []
 
   return (
-    <div className="bg-background-card border border-border rounded-2xl overflow-hidden">
+    <div className="bg-background-card border border-border rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
         <h3 className="text-sm font-semibold">Actividad reciente</h3>
-        <Link to="/history" className="text-xs text-accent-blue hover:underline">Ver todo →</Link>
+        <Link to="/history" className="text-xs text-brand hover:underline">Ver todo →</Link>
       </div>
 
       {isLoading ? (
@@ -37,13 +38,13 @@ export function RecentActivity() {
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3 px-5 py-3.5">
               <div className="w-16 h-6 skeleton rounded-lg" />
-              <div className="flex-1 h-4 skeleton rounded-sm" />
-              <div className="w-16 h-4 skeleton rounded-sm" />
+              <div className="flex-1 h-4 skeleton rounded-lg" />
+              <div className="w-16 h-4 skeleton rounded-lg" />
             </div>
           ))}
         </div>
       ) : txs.length === 0 ? (
-        <div className="flex items-center justify-center py-10 text-sm text-gray-600">
+        <div className="flex items-center justify-center py-10 text-sm text-fg-subtle">
           Sin transacciones aún
         </div>
       ) : (
@@ -55,7 +56,7 @@ export function RecentActivity() {
             // desincronizarse de OP_META si se añade un tipo de operación
             // nuevo (p. ej. MARGIN_BORROW/MARGIN_REPAY, añadidos en el
             // Nivel 2 y ya ausentes de esta lista hasta ahora).
-            const meta = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: '#6b7280', group: 'other' as const, rowBg: 'transparent' }
+            const meta = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: T.muted, group: 'other' as const, rowBg: 'transparent' }
             const isIncome = meta.group === 'income'
             const isSell   = meta.group === 'sell'
             const isBuy    = meta.group === 'buy'
@@ -67,11 +68,11 @@ export function RecentActivity() {
               >
                 {/* Badge operación */}
                 <span
-                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0 min-w-[76px] text-center border"
+                  className="text-xs font-semibold px-2.5 py-1 rounded-lg shrink-0 min-w-[76px] text-center border"
                   style={{
-                    backgroundColor: `${meta.color}15`,
+                    backgroundColor: `${alpha(meta.color, 8)}`,
                     color: meta.color,
-                    borderColor: `${meta.color}30`,
+                    borderColor: `${alpha(meta.color, 19)}`,
                   }}
                 >
                   {meta.label}
@@ -80,25 +81,25 @@ export function RecentActivity() {
                 {/* Activo + wallet */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-white">{tx.asset}</span>
+                    <span className="text-sm font-bold text-fg">{tx.asset}</span>
                     {tx.wallet_name && (
                       <span
-                        className="text-[10px] px-1.5 py-0.5 rounded-md font-medium shrink-0"
-                        style={{ backgroundColor: `${tx.wallet_color}18`, color: tx.wallet_color }}
+                        className="text-xs px-1.5 py-0.5 rounded-lg font-medium shrink-0"
+                        style={{ backgroundColor: `${alpha(tx.wallet_color, 9)}`, color: ink(tx.wallet_color) }}
                       >
                         {tx.wallet_name}
                       </span>
                     )}
                   </div>
-                  <p className={`text-xs font-mono mt-0.5 ${
-                    isBuy ? 'text-accent-green/80' : isSell ? 'text-accent-red/80' : isIncome ? 'text-violet-400/80' : 'text-gray-500'
+                  <p className={`text-xs mono mt-0.5 ${
+                    isBuy ? 'text-positive/80' : isSell ? 'text-negative/80' : isIncome ? 'text-accent-purple/80' : 'text-fg-subtle'
                   }`}>
                     {isBuy ? '+' : isSell ? '−' : ''}{formatAmount(tx.amount, 6)}
                   </p>
                 </div>
 
                 {/* Fecha */}
-                <span className="text-[11px] text-gray-600 shrink-0 tabular-nums">{relativeDate(tx.timestamp)}</span>
+                <span className="text-xs text-fg-subtle shrink-0 tabular-nums">{relativeDate(tx.timestamp)}</span>
               </div>
             )
           })}

@@ -6,6 +6,7 @@ import { formatMoney, formatPrice, formatAmount, pnlColor } from '../utils/forma
 import { useCurrency } from '../hooks/useDisplayCurrency'
 import { type CryptoRow, walletShortName } from '../utils/assetTable'
 import { CryptoIcon } from './CryptoIcon'
+import { T, alpha, ink } from '../utils/colors'
 
 export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate, lockedAmounts = [] }: {
   row: CryptoRow
@@ -50,8 +51,8 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
             <div className="w-4 shrink-0 flex items-center justify-center">
               {canExpand
                 ? expanded
-                  ? <ChevronDown size={12} className="text-gray-500" />
-                  : <ChevronRight size={12} className="text-gray-500" />
+                  ? <ChevronDown size={12} className="text-fg-subtle" />
+                  : <ChevronRight size={12} className="text-fg-subtle" />
                 : <span className="w-3" />
               }
             </div>
@@ -61,15 +62,15 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
               <div className="flex gap-1 ml-1 flex-wrap">
                 {row.wallets.map(w => (
                   <span key={w.wallet_id}
-                    className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-                    style={{ backgroundColor: `${w.wallet_color}18`, color: w.wallet_color }}>
+                    className="text-xs px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap"
+                    style={{ backgroundColor: `${alpha(w.wallet_color, 9)}`, color: ink(w.wallet_color) }}>
                     {walletShortName(w.wallet_name, w.wallet_kind)}
                   </span>
                 ))}
                 {lockedAmounts.length > 0 && (() => {
                   const onlyLaunchpool = lockedAmounts.every(l => l.lock_kind === 'launchpool')
                   return (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex items-center gap-0.5 ${onlyLaunchpool ? 'bg-violet-500/10 text-violet-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium flex items-center gap-0.5 ${onlyLaunchpool ? 'bg-accent-purple/10 text-accent-purple' : 'bg-warning/10 text-warning'}`}>
                       <Lock size={8} />
                       {formatAmount(lockedAmounts.reduce((s, l) => s + parseFloat(l.locked_amount), 0))}
                     </span>
@@ -81,7 +82,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
               <button
                 type="button"
                 onClick={e => { e.stopPropagation(); onSimulate(row.asset, row.totalQuantity) }}
-                className="ml-auto p-1 text-gray-600 hover:text-accent-blue hover:bg-accent-blue/10 rounded-md transition-colors shrink-0"
+                className="ml-auto p-1 text-fg-subtle hover:text-brand hover:bg-brand/10 rounded-lg transition-colors shrink-0"
                 title="Simular venta"
               >
                 <Calculator size={13} />
@@ -91,7 +92,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
         </td>
 
         {/* Cantidad */}
-        <td className={`px-4 ${compact ? 'py-2' : 'py-3'} text-right mono text-gray-300`}>{formatAmount(row.totalQuantity)}</td>
+        <td className={`px-4 ${compact ? 'py-2' : 'py-3'} text-right mono text-fg`}>{formatAmount(row.totalQuantity)}</td>
 
         {/* Precio actual + 24h */}
         <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono`}>
@@ -99,10 +100,10 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
             <div className="flex flex-col items-end gap-0.5">
               <span>{formatPrice(price, currency)}</span>
               {change24h !== null && (
-                <span className={`text-[10px] font-semibold px-1.5 py-px rounded-full ${
+                <span className={`text-xs font-semibold px-1.5 py-px rounded-full ${
                   change24h >= 0
-                    ? 'text-accent-green bg-accent-green/10'
-                    : 'text-accent-red bg-accent-red/10'
+                    ? 'text-positive bg-positive/10'
+                    : 'text-negative bg-negative/10'
                 }`}>
                   {change24h >= 0 ? '▲' : '▼'} {Math.abs(change24h).toFixed(2)}%
                 </span>
@@ -110,7 +111,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
             </div>
           ) : (
             <Link to="/settings?tab=assets"
-              className="inline-flex items-center gap-1 text-[11px] text-accent-amber/80 hover:text-accent-amber bg-accent-amber/8 border border-accent-amber/20 px-2 py-0.5 rounded-md transition-colors"
+              className="inline-flex items-center gap-1 text-xs text-warning/80 hover:text-warning bg-warning/8 border border-warning/20 px-2 py-0.5 rounded-lg transition-colors"
               title="Configura el par de precio en Settings → Activos"
             >
               <Settings size={10} />Sin precio
@@ -120,31 +121,31 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
 
         {/* Break-even — oculto en compacto */}
         {!compact && (
-          <td className="px-4 py-3 text-right mono text-gray-400">
-            {breakEvenPrice !== null ? formatPrice(breakEvenPrice, currency) : <span className="text-gray-600">—</span>}
+          <td className="px-4 py-3 text-right mono text-fg-muted">
+            {breakEvenPrice !== null ? formatPrice(breakEvenPrice, currency) : <span className="text-fg-subtle">—</span>}
           </td>
         )}
 
         {/* Valor en la moneda de visualización */}
         <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono font-medium`}>
           {hasPrice ? formatMoney(row.value, currency)
-            : <span className="text-gray-600 text-xs">—</span>}
+            : <span className="text-fg-subtle text-xs">—</span>}
         </td>
 
         {/* Coste base — oculto en compacto */}
         {!compact && (
-          <td className="px-4 py-3 text-right mono text-gray-400">{formatMoney(row.totalCostBasis, currency)}</td>
+          <td className="px-4 py-3 text-right mono text-fg-muted">{formatMoney(row.totalCostBasis, currency)}</td>
         )}
 
         {/* P&L € — oculto en compacto */}
         {!compact && (
-          <td className={`px-4 py-3 text-right mono font-medium ${hasPrice ? pnlColor(pnl) : 'text-gray-600'}`}>
+          <td className={`px-4 py-3 text-right mono font-medium ${hasPrice ? pnlColor(pnl) : 'text-fg-subtle'}`}>
             {hasPrice ? (pnl >= 0 ? '+' : '') + formatMoney(pnl, currency) : '—'}
           </td>
         )}
 
         {/* P&L % */}
-        <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-sm ${hasPrice ? pnlColor(pnlPct) : 'text-gray-600'}`}>
+        <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-sm ${hasPrice ? pnlColor(pnlPct) : 'text-fg-subtle'}`}>
           {hasPrice ? (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%' : '—'}
         </td>
 
@@ -152,16 +153,16 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
         <td className="px-4 py-3">
           {portfolioWeight !== null ? (
             <div className="flex flex-col items-end gap-1">
-              <span className="text-xs mono text-gray-400">{portfolioWeight.toFixed(1)}%</span>
+              <span className="text-xs mono text-fg-muted">{portfolioWeight.toFixed(1)}%</span>
               <div className="w-16 h-1 bg-background-tertiary rounded-full overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-accent-blue/60 transition-all duration-500"
+                  className="h-full rounded-full bg-brand/60 transition-all duration-500"
                   style={{ width: `${Math.min(portfolioWeight, 100)}%` }}
                 />
               </div>
             </div>
           ) : (
-            <span className="text-gray-700 text-xs">—</span>
+            <span className="text-fg-subtle text-xs">—</span>
           )}
         </td>
       </tr>
@@ -184,49 +185,49 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
               <td className="pl-12 pr-4 py-2">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: w.wallet_color }} />
-                  <span className="text-xs text-gray-400">{w.wallet_name}</span>
+                  <span className="text-xs text-fg-muted">{w.wallet_name}</span>
                 </div>
               </td>
-              <td className="px-4 py-2 text-right mono text-xs text-gray-400">{formatAmount(w.quantity)}</td>
-              <td className="px-4 py-2 text-right mono text-xs text-gray-600">—</td>
-              {!compact && <td className="px-4 py-2 text-right mono text-xs text-gray-600">—</td>}
+              <td className="px-4 py-2 text-right mono text-xs text-fg-muted">{formatAmount(w.quantity)}</td>
+              <td className="px-4 py-2 text-right mono text-xs text-fg-subtle">—</td>
+              {!compact && <td className="px-4 py-2 text-right mono text-xs text-fg-subtle">—</td>}
               <td className="px-4 py-2 text-right mono text-xs">
-                {hasPrice ? <span className="text-gray-300">{formatMoney(wValue, currency)}</span> : <span className="text-gray-600">—</span>}
+                {hasPrice ? <span className="text-fg">{formatMoney(wValue, currency)}</span> : <span className="text-fg-subtle">—</span>}
               </td>
-              {!compact && <td className="px-4 py-2 text-right mono text-xs text-gray-500">{formatMoney(w.costBasis, currency)}</td>}
+              {!compact && <td className="px-4 py-2 text-right mono text-xs text-fg-subtle">{formatMoney(w.costBasis, currency)}</td>}
               {!compact && (
-                <td className={`px-4 py-2 text-right mono text-xs ${wPnl !== null ? pnlColor(wPnl) : 'text-gray-600'}`}>
+                <td className={`px-4 py-2 text-right mono text-xs ${wPnl !== null ? pnlColor(wPnl) : 'text-fg-subtle'}`}>
                   {wPnl !== null ? (wPnl >= 0 ? '+' : '') + formatMoney(wPnl, currency) : '—'}
                 </td>
               )}
-              <td className={`px-4 py-2 text-right mono text-xs ${wPnlPct !== null ? pnlColor(wPnlPct) : 'text-gray-600'}`}>
+              <td className={`px-4 py-2 text-right mono text-xs ${wPnlPct !== null ? pnlColor(wPnlPct) : 'text-fg-subtle'}`}>
                 {wPnlPct !== null ? (wPnlPct >= 0 ? '+' : '') + wPnlPct.toFixed(2) + '%' : '—'}
               </td>
               <td className="px-4 py-2 text-right">
                 {hasPrice && totalPortfolioValue > 0 ? (
-                  <span className="text-[10px] mono text-gray-600">
+                  <span className="text-xs mono text-fg-subtle">
                     {((wValue / totalPortfolioValue) * 100).toFixed(1)}%
                   </span>
-                ) : <span className="text-gray-700 text-xs">—</span>}
+                ) : <span className="text-fg-subtle text-xs">—</span>}
               </td>
             </tr>
             {/* Sub-filas de staking bloqueado */}
             {wLocked.map((l, i) => {
               const isLaunchpool = l.lock_kind === 'launchpool'
-              const clr = isLaunchpool ? { bg: 'rgba(139,92,246,0.03)', border: 'rgba(139,92,246,0.3)', icon: 'text-violet-500/70', text: 'text-violet-400/80', amount: 'text-violet-400/70', label: 'text-violet-500/50' }
-                                       : { bg: 'rgba(245,158,11,0.03)',  border: 'rgba(245,158,11,0.3)',  icon: 'text-amber-500/70',  text: 'text-amber-400/80',  amount: 'text-amber-400/70',  label: 'text-amber-500/50'  }
+              const clr = isLaunchpool ? { bg: alpha(T.purple, 3), border: alpha(T.purple, 30), icon: 'text-accent-purple/70', text: 'text-accent-purple/80', amount: 'text-accent-purple/70', label: 'text-accent-purple/50' }
+                                       : { bg: alpha(T.warning, 3),  border: alpha(T.warning, 30),  icon: 'text-warning/70',  text: 'text-warning/80',  amount: 'text-warning/70',  label: 'text-warning/50'  }
               return (
                 <tr key={`locked-${i}`} style={{ backgroundColor: clr.bg, borderLeft: `2px solid ${clr.border}` }}>
                   <td className="pl-16 pr-4 py-1.5">
                     <div className="flex items-center gap-1.5">
                       <Lock size={10} className={`${clr.icon} shrink-0`} />
-                      <span className={`text-[11px] ${clr.text}`}>{l.staking_type}</span>
+                      <span className={`text-xs ${clr.text}`}>{l.staking_type}</span>
                     </div>
                   </td>
-                  <td className={`px-4 py-1.5 text-right mono text-[11px] ${clr.amount}`}>
+                  <td className={`px-4 py-1.5 text-right mono text-xs ${clr.amount}`}>
                     {formatAmount(parseFloat(l.locked_amount))}
                   </td>
-                  <td colSpan={compact ? 3 : 5} className={`px-4 py-1.5 text-[10px] ${clr.label} italic`}>
+                  <td colSpan={compact ? 3 : 5} className={`px-4 py-1.5 text-xs ${clr.label} italic`}>
                     {isLaunchpool ? 'bloqueado en launchpool' : 'bloqueado en staking'}
                   </td>
                 </tr>

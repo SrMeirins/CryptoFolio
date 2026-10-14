@@ -3,7 +3,7 @@ import { type FieldDefinition } from '../api/portfolio'
 import { WalletPicker } from './WalletPicker'
 import { useWalletsQuery } from '../hooks/useWallets'
 
-const baseInput = 'w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-hidden focus:border-accent-blue transition-colors'
+const baseInput = 'w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-hidden focus:border-brand transition-colors'
 
 /** Renderiza el input adecuado (número, texto, fecha, wallet, select...) según `field.type`. */
 export function DynamicField({ field, value, onChange }: {
@@ -13,15 +13,15 @@ export function DynamicField({ field, value, onChange }: {
 
   return (
     <div className="space-y-1">
-      <label className="flex items-center gap-1.5 text-xs font-medium text-gray-400">
+      <label className="flex items-center gap-1.5 text-xs font-medium text-fg-muted">
         {field.label}
         {field.required
-          ? <span className="text-accent-red text-[10px]">requerido</span>
+          ? <span className="text-negative text-xs">requerido</span>
           : field.auto
-          ? <span className="flex items-center gap-0.5 text-accent-blue bg-accent-blue/10 px-1.5 py-0.5 rounded-sm text-[10px]">
+          ? <span className="flex items-center gap-0.5 text-brand bg-brand/10 px-1.5 py-0.5 rounded-lg text-xs">
               <Zap size={8} /> auto
             </span>
-          : <span className="text-gray-700 text-[10px]">opcional</span>
+          : <span className="text-fg-subtle text-xs">opcional</span>
         }
       </label>
 
@@ -60,7 +60,7 @@ export function DynamicField({ field, value, onChange }: {
           placeholder={field.placeholder ?? 'BTC, ETH, XRP...'}
           value={(value as string) ?? ''}
           onChange={e => onChange(e.target.value.toUpperCase())}
-          className={`${baseInput} font-mono uppercase tracking-wider`}
+          className={`${baseInput} mono uppercase tracking-wider`}
         />
       )}
 
@@ -81,7 +81,7 @@ export function DynamicField({ field, value, onChange }: {
         </select>
       )}
 
-      {field.hint && <p className="text-[11px] text-gray-600 leading-tight">{field.hint}</p>}
+      {field.hint && <p className="text-xs text-fg-subtle leading-tight">{field.hint}</p>}
     </div>
   )
 }

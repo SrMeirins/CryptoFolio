@@ -41,13 +41,13 @@ export function WithdrawalAssetGroup({
           type="button"
           onClick={onToggleGroupSelect}
           className={`w-4 h-4 shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
-            groupAllSelected  ? 'bg-accent-blue border-accent-blue' :
-            groupSomeSelected ? 'bg-accent-blue/30 border-accent-blue' :
-                                'border-gray-600 hover:border-gray-400'
+            groupAllSelected  ? 'bg-brand-solid text-on-brand border-brand' :
+            groupSomeSelected ? 'bg-brand/30 border-brand' :
+                                'border-border hover:border-fg-subtle'
           }`}
         >
-          {groupAllSelected  && <span className="text-white text-[9px] font-bold leading-none">✓</span>}
-          {groupSomeSelected && <span className="text-accent-blue text-[9px] font-bold leading-none">−</span>}
+          {groupAllSelected  && <span className="text-fg text-xs font-bold leading-none">✓</span>}
+          {groupSomeSelected && <span className="text-brand text-xs font-bold leading-none">−</span>}
         </button>
 
         <button
@@ -56,11 +56,11 @@ export function WithdrawalAssetGroup({
           className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
         >
           <div className={`w-2 h-2 rounded-full shrink-0 ${
-            assetAssignedCount === txs.length ? 'bg-accent-green' :
-            assetAssignedCount > 0           ? 'bg-accent-amber' : 'bg-gray-600'
+            assetAssignedCount === txs.length ? 'bg-positive' :
+            assetAssignedCount > 0           ? 'bg-warning' : 'bg-fg-subtle/50'
           }`} />
           <span className="font-bold mono">{asset}</span>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-fg-subtle">
             {txs.length} retiro{txs.length !== 1 ? 's' : ''} · {fmtAmt(totalAmt)} · desde {firstDate}
           </span>
           {status.label && (
@@ -75,25 +75,25 @@ export function WithdrawalAssetGroup({
             <button
               type="button"
               onClick={onCopyPrevGroupDest}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors px-1.5 py-1 rounded-sm hover:bg-white/5"
+              className="flex items-center gap-1 text-xs text-fg-subtle hover:text-fg transition-colors px-1.5 py-1 rounded-lg hover:bg-overlay/5"
               title={`Aplicar mismo destino que grupo anterior: ${destLabel(prevDest, coldWallets).text}`}
             >
               <Copy size={11} />
-              <span className="text-[10px]">{destLabel(prevDest, coldWallets).text}</span>
+              <span className="text-xs">{destLabel(prevDest, coldWallets).text}</span>
             </button>
           )}
           {bulkDest && hasUnassigned && (
             <button
               type="button"
               onClick={onApplyToGroup}
-              className="text-xs text-accent-blue hover:text-accent-blue/80 font-medium transition-colors whitespace-nowrap"
+              className="text-xs text-brand hover:text-brand/80 font-medium transition-colors whitespace-nowrap"
               title={`Aplicar destino seleccionado a todos los retiros de ${asset}`}
             >
               Aplicar al grupo
             </button>
           )}
           {txs.length > 1 && (
-            <button type="button" onClick={onToggleExpand} className="text-gray-500 hover:text-gray-300 transition-colors">
+            <button type="button" onClick={onToggleExpand} className="text-fg-subtle hover:text-fg transition-colors">
               {isOpen ? '▲' : '▶'}
             </button>
           )}

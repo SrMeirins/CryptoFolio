@@ -22,13 +22,13 @@ export function DepositAssetGroup({ asset, deposits, depositCosts, onSetCost }: 
   }
 
   return (
-    <div className={`rounded-xl border ${allReviewed ? 'border-accent-green/30' : 'border-border'}`}>
-      <div className={`flex items-center gap-3 px-4 py-3 rounded-t-xl ${allReviewed ? 'bg-accent-green/5' : 'bg-background-tertiary/60'}`}>
+    <div className={`rounded-xl border ${allReviewed ? 'border-positive/30' : 'border-border'}`}>
+      <div className={`flex items-center gap-3 px-4 py-3 rounded-t-xl ${allReviewed ? 'bg-positive/5' : 'bg-background-tertiary/60'}`}>
         <div className={`w-2 h-2 rounded-full shrink-0 ${
-          allReviewed ? 'bg-accent-green' : reviewedCount > 0 ? 'bg-accent-amber' : 'bg-gray-600'
+          allReviewed ? 'bg-positive' : reviewedCount > 0 ? 'bg-warning' : 'bg-fg-subtle/50'
         }`} />
         <span className="font-bold mono text-sm">{asset}</span>
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-fg-subtle">
           {hasMany
             ? `${deposits.length} entradas · ${totalAmt.toLocaleString('es-ES', { maximumFractionDigits: 6 })}`
             : `${totalAmt.toLocaleString('es-ES', { maximumFractionDigits: 6 })} · ${
@@ -44,14 +44,14 @@ export function DepositAssetGroup({ asset, deposits, depositCosts, onSetCost }: 
             <button
               type="button"
               onClick={() => applyAll(0)}
-              className="text-[10px] px-2 py-1 rounded-md border border-border text-gray-500 hover:text-white hover:border-gray-500 bg-background-card transition-colors"
+              className="text-xs px-2 py-1 rounded-lg border border-border text-fg-subtle hover:text-fg hover:border-fg-subtle bg-background-card transition-colors"
             >
               Gratis a todos
             </button>
             <button
               type="button"
               onClick={() => applyAll(null)}
-              className="text-[10px] px-2 py-1 rounded-md border border-border text-gray-500 hover:text-white hover:border-gray-500 bg-background-card transition-colors"
+              className="text-xs px-2 py-1 rounded-lg border border-border text-fg-subtle hover:text-fg hover:border-fg-subtle bg-background-card transition-colors"
             >
               No sé a todos
             </button>
@@ -62,14 +62,14 @@ export function DepositAssetGroup({ asset, deposits, depositCosts, onSetCost }: 
           <button
             type="button"
             onClick={() => setExpanded(e => !e)}
-            className="text-gray-500 hover:text-gray-300 transition-colors ml-1"
+            className="text-fg-subtle hover:text-fg transition-colors ml-1"
           >
-            <span className={`text-gray-500 text-xs transition-transform inline-block ${expanded ? 'rotate-90' : ''}`}>▶</span>
+            <span className={`text-fg-subtle text-xs transition-transform inline-block ${expanded ? 'rotate-90' : ''}`}>▶</span>
           </button>
         )}
 
         {allReviewed && (
-          <span className="text-[10px] text-accent-green flex items-center gap-0.5">
+          <span className="text-xs text-positive flex items-center gap-0.5">
             <Check size={9} /> listo
           </span>
         )}

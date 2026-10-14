@@ -16,7 +16,7 @@ export function SettingsCard({ title, description, action, children }: {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="font-semibold text-sm">{title}</h3>
-          {description && <p className="text-xs text-gray-500 mt-1">{description}</p>}
+          {description && <p className="text-xs text-fg-subtle mt-1">{description}</p>}
         </div>
         {action}
       </div>
