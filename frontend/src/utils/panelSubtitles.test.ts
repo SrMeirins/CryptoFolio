@@ -28,6 +28,7 @@ describe('subtítulos de página y panel', () => {
   it('Distribución: número de activos y el de mayor peso', () => {
     expect(allocationSubtitle([{ name: 'XRP', value: 40 }, { name: 'HBAR', value: 60 }], 100)).toBe('2 activos · HBAR 60%')
     expect(allocationSubtitle([], 0)).toBe('Sin activos con valor')
+    expect(allocationSubtitle([{ name: 'Ledger', value: 3 }], 3, 'wallet')).toBe('1 wallet · Ledger 100%')
   })
 
   it('Fiscal, actividad, variación y calendario', () => {

@@ -39,11 +39,12 @@ export function evolutionSubtitle(period: PnlPeriod, firstX: number | null, rang
   return PERIOD_TEXT[period] ?? ''
 }
 
-/** «13 activos · XRP 40 %». */
-export function allocationSubtitle(items: ReadonlyArray<{ name: string; value: number }>, total: number): string {
+/** «13 activos · XRP 40 %» o, por wallet, «2 wallets · Ledger 60 %». */
+export function allocationSubtitle(items: ReadonlyArray<{ name: string; value: number }>, total: number, unit: 'asset' | 'wallet' = 'asset'): string {
   if (items.length === 0 || total <= 0) return 'Sin activos con valor'
   const top = items.reduce((a, b) => (b.value > a.value ? b : a))
-  return `${plural(items.length, 'activo', 'activos')} · ${top.name} ${formatPercent((top.value / total) * 100, 0)}`
+  const count = unit === 'asset' ? plural(items.length, 'activo', 'activos') : plural(items.length, 'wallet', 'wallets')
+  return `${count} · ${top.name} ${formatPercent((top.value / total) * 100, 0)}`
 }
 
 /** «Ejercicio 2026 · 45 operaciones». */
