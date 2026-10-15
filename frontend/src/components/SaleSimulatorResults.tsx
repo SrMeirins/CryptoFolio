@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { TrendingUp, TrendingDown, ChevronDown } from 'lucide-react'
-import { formatEur, formatAmount, formatPrice, pnlColor } from '../utils/format'
+import { formatEur, formatAmount, formatPrice, pnlColor, formatPercent } from '../utils/format'
 import { type TramoDesglose } from '../utils/tramosIrpf'
 import { type SimulationResult } from '../api/portfolio'
 import { T, alpha } from '../utils/colors'
@@ -18,7 +18,7 @@ export function SaleSimulatorResults({ result, loading, net, tramosDesglose }: {
 
   const irpfFrontend = tramosDesglose.reduce((s, t) => s + t.cuota, 0)
   const efectivo = isGain && irpfFrontend > 0
-    ? (irpfFrontend / net * 100).toFixed(1)
+    ? formatPercent(irpfFrontend / net * 100, 1)
     : null
 
   return (
@@ -72,7 +72,7 @@ export function SaleSimulatorResults({ result, loading, net, tramosDesglose }: {
               <span className="text-2xl font-bold mono text-warning">{formatEur(irpfFrontend)}</span>
               {efectivo && (
                 <span className="text-xs text-fg-subtle mb-0.5">
-                  tipo efectivo <span className="text-warning font-medium">{efectivo}%</span>
+                  tipo efectivo <span className="text-warning font-medium">{efectivo}</span>
                 </span>
               )}
             </div>

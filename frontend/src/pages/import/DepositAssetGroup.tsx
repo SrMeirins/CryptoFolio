@@ -3,6 +3,7 @@ import { Check } from 'lucide-react'
 import type { DepositReview } from './types'
 import { HistoricalPriceButton } from './HistoricalPriceButton'
 import { DepositRow } from './DepositRow'
+import { formatNumber } from '../../utils/format'
 
 // Grupo de depósitos por activo
 export function DepositAssetGroup({ asset, deposits, depositCosts, onSetCost }: {
@@ -30,8 +31,8 @@ export function DepositAssetGroup({ asset, deposits, depositCosts, onSetCost }: 
         <span className="font-bold mono text-sm">{asset}</span>
         <span className="text-xs text-fg-subtle">
           {hasMany
-            ? `${deposits.length} entradas · ${totalAmt.toLocaleString('es-ES', { maximumFractionDigits: 6 })}`
-            : `${totalAmt.toLocaleString('es-ES', { maximumFractionDigits: 6 })} · ${
+            ? `${deposits.length} entradas · ${formatNumber(totalAmt, 6)}`
+            : `${formatNumber(totalAmt, 6)} · ${
                 new Date(deposits[0].timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
               }`
           }

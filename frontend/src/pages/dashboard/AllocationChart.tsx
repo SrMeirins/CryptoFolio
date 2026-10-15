@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import type { FifoLot, FiatBalance } from '../../api/portfolio'
 import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
-import { formatMoney } from '../../utils/format'
+import { formatMoney, formatPercent } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
 import { T, alpha, ink } from '../../utils/colors'
 import { cardClasses } from '../../components/ui'
@@ -84,7 +84,7 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
               {hoveredItem.isFiat && <span className="text-xs text-fg-subtle">cash</span>}
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-xs text-fg-subtle mono">{hoveredPct.toFixed(2)}%</span>
+              <span className="text-xs text-fg-subtle mono">{formatPercent(hoveredPct)}</span>
               <span className="text-sm font-semibold mono text-fg">{formatMoney(hoveredItem.value, currency)}</span>
             </div>
           </div>
@@ -122,7 +122,7 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
                   style={{ width: `${pct}%`, background: color, opacity: isHover ? 1 : 0.5 }}
                 />
               </div>
-              <span className="text-xs text-fg-subtle mono w-10 text-right shrink-0">{pct.toFixed(1)}%</span>
+              <span className="text-xs text-fg-subtle mono w-10 text-right shrink-0">{formatPercent(pct, 1)}</span>
               <span className="text-xs text-fg-muted mono w-20 text-right shrink-0">{formatMoney(item.value, currency)}</span>
             </div>
           )

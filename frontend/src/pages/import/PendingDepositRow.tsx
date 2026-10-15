@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react'
 import type { PendingDeposit } from './PendingDepositsPanel'
 import { badgeClasses, fieldClasses } from '../../components/ui'
+import { formatNumber } from '../../utils/format'
 
 export function PendingDepositRow({ dep, cost, isReviewed, onChangeCost, onUseHistorical, onToggleUnknown }: {
   dep: PendingDeposit
@@ -27,7 +28,7 @@ export function PendingDepositRow({ dep, cost, isReviewed, onChangeCost, onUseHi
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
             <span className="font-bold mono text-sm text-fg">{dep.asset}</span>
-            <span className="text-xs text-fg-muted mono">{amount.toLocaleString('es-ES', { maximumFractionDigits: 6 })}</span>
+            <span className="text-xs text-fg-muted mono">{formatNumber(amount, 6)}</span>
             <span className="text-fg-subtle">·</span>
             <span className="text-xs text-fg-subtle">{date}</span>
             {!isReviewed && (
@@ -37,7 +38,7 @@ export function PendingDepositRow({ dep, cost, isReviewed, onChangeCost, onUseHi
             )}
             {isReviewed && cost != null && (
               <span className={badgeClasses('positive', 'sm', 'ml-auto flex gap-0.5')}>
-                <Check size={9} /> {cost.toLocaleString('es-ES', { maximumFractionDigits: 4 })} €/ud.
+                <Check size={9} /> {formatNumber(cost, 4)} €/ud.
               </span>
             )}
             {isReviewed && cost == null && (
@@ -64,7 +65,7 @@ export function PendingDepositRow({ dep, cost, isReviewed, onChangeCost, onUseHi
                 title="Precio de mercado en esa fecha — puede no coincidir con lo que pagaste realmente. Corrígelo si sabes tu coste real."
                 className="text-xs px-3 py-1.5 bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand rounded-lg transition-colors whitespace-nowrap"
               >
-                {dep.historicalPrice.toLocaleString('es-ES', { maximumFractionDigits: 4 })} € (mercado, estimación)
+                {formatNumber(dep.historicalPrice, 4)} € (mercado, estimación)
               </button>
             )}
             <button

@@ -1,4 +1,5 @@
 import type { PreviewTransaction } from './types'
+import { formatNumber } from '../../utils/format'
 
 export function txKey(tx: PreviewTransaction): string {
   return tx.rawRowHashes?.[0] ?? `${tx.timestamp}|${tx.asset}|${tx.amountNet}`
@@ -19,9 +20,9 @@ export function saveMemory(assetAccount: string, dest: string) {
 }
 
 export function fmtAmt(n: number): string {
-  if (Math.abs(n) >= 1000) return n.toLocaleString('es-ES', { maximumFractionDigits: 4 })
-  if (Math.abs(n) >= 1)    return n.toFixed(6)
-  return n.toFixed(8)
+  if (Math.abs(n) >= 1000) return formatNumber(n, 4)
+  if (Math.abs(n) >= 1)    return formatNumber(n, 6, 6)
+  return formatNumber(n, 8, 8)
 }
 
 export function destLabel(dest: string, coldWallets: { id: string; name: string; color: string }[]) {

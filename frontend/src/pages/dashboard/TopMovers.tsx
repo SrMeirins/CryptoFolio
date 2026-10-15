@@ -5,7 +5,7 @@ import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
 import { useDisplayMarket } from '../../hooks/useDisplayMarket'
 import { useFlashOnChange, type FlashDirection } from '../../hooks/useFlashOnChange'
 import { rankMovers, type MoverItem, type MoversMode } from '../../utils/topMovers'
-import { formatMoney } from '../../utils/format'
+import { formatMoney, formatPercent } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
 import { T, alpha } from '../../utils/colors'
 import { SegmentedControl, cardClasses } from '../../components/ui'
@@ -39,7 +39,7 @@ function MoverRow({ asset, pct, value, rank, mode }: MoverItem & { mode: MoversM
           className={`text-[13px] font-bold mono px-2 py-0.5 rounded-lg ${flashClass(pctFlash)}`}
           style={{ background: `${alpha(color, 9)}`, color }}
         >
-          {isUp ? '+' : ''}{pct.toFixed(2)}%
+          {formatPercent(pct, 2, isUp)}
         </span>
         <div className="w-16 h-1 rounded-full overflow-hidden bg-overlay/5">
           <div

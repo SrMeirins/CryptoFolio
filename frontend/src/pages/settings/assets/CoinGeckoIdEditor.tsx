@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Search, RefreshCw, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { portfolioApi, type AssetMetadata } from '../../../api/portfolio'
 import { fieldClasses } from '../../../components/ui'
+import { formatNumber } from '../../../utils/format'
 
 export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; onSaved: () => void }) {
   const queryClient = useQueryClient()
@@ -76,7 +77,7 @@ export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; on
       {testResult && (
         <div className={`flex items-center gap-2 text-xs ${testResult.valid ? 'text-positive' : 'text-negative'}`}>
           {testResult.valid
-            ? <><CheckCircle size={12} /> Válido — precio actual: <span className="mono font-medium">{testResult.price_eur?.toFixed(6)} EUR</span></>
+            ? <><CheckCircle size={12} /> Válido — precio actual: <span className="mono font-medium">{formatNumber(testResult.price_eur ?? 0, 6, 6)} EUR</span></>
             : <><XCircle size={12} /> Este ID no devuelve precio en CoinGecko</>
           }
         </div>

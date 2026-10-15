@@ -5,6 +5,7 @@ import { ACCOUNT_COLORS } from './types'
 import type { PreviewTransaction } from './types'
 import { T } from '../../utils/colors'
 import { cardClasses, tableHeadRowClasses, tableRowClasses } from '../../components/ui'
+import { formatNumber } from '../../utils/format'
 
 export function TransactionsTable({ newCount, newTxs, showTxTable, setShowTxTable, txPage, setTxPage, txPageSize }: {
   newCount: number
@@ -61,9 +62,9 @@ export function TransactionsTable({ newCount, newTxs, showTxTable, setShowTxTabl
                         {meta.label}
                       </td>
                       <td className="px-4 py-2.5 mono font-medium">{tx.asset}</td>
-                      <td className="px-4 py-2.5 text-right mono">{tx.amountNet.toFixed(4)}</td>
+                      <td className="px-4 py-2.5 text-right mono">{formatNumber(tx.amountNet, 4, 4)}</td>
                       <td className="px-4 py-2.5 text-right mono text-fg-muted">
-                        {tx.costAmount ? `${tx.costAmount.toFixed(2)} ${tx.costAsset}` : '—'}
+                        {tx.costAmount ? `${formatNumber(tx.costAmount, 2, 2)} ${tx.costAsset}` : '—'}
                       </td>
                     </tr>
                   )

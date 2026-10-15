@@ -1,5 +1,5 @@
 import { TrendingUp, BarChart2, Zap, TrendingDown } from 'lucide-react'
-import { formatMoney, type Currency } from '../../utils/format'
+import { formatMoney, type Currency, formatNumber } from '../../utils/format'
 import { T, alpha } from '../../utils/colors'
 
 const CARD_META = {
@@ -23,9 +23,9 @@ export function StatsBar({ stats }: {
   const money = (v: number) => formatMoney(v, stats.currency ?? 'EUR')
   const cards = [
     { ...CARD_META.invested, title: 'Invertido',    value: money(totals.total_invested),  sub: `${totals.total_buys} compras`        },
-    { ...CARD_META.ops,      title: 'Operaciones',  value: totals.total_ops.toLocaleString('es-ES'), sub: `${totals.unique_assets} activos únicos` },
+    { ...CARD_META.ops,      title: 'Operaciones',  value: formatNumber(totals.total_ops, 0), sub: `${totals.unique_assets} activos únicos` },
     { ...CARD_META.fees,     title: 'Comisiones',   value: money(totals.total_fees_eur),   sub: `${totals.total_fee_ops} ops con fee` },
-    { ...CARD_META.sells,    title: 'Ventas',       value: totals.total_sells.toLocaleString('es-ES'), sub: `${totals.total_manual} manuales`    },
+    { ...CARD_META.sells,    title: 'Ventas',       value: formatNumber(totals.total_sells, 0), sub: `${totals.total_manual} manuales`    },
   ]
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

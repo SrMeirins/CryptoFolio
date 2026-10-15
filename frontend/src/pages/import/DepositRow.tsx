@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { DepositReview } from './types'
 import { HistoricalPriceButton } from './HistoricalPriceButton'
+import { formatNumber } from '../../utils/format'
 
 // Fila de depósito individual
 export function DepositRow({ dep, cost, reviewed, onSetCost }: {
@@ -24,7 +25,7 @@ export function DepositRow({ dep, cost, reviewed, onSetCost }: {
   }
 
   const statusLabel = !reviewed ? null
-    : cost != null ? `${cost.toLocaleString('es-ES', { maximumFractionDigits: 6 })} €/ud.`
+    : cost != null ? `${formatNumber(cost, 6)} €/ud.`
     : 'desconocido'
 
   return (
@@ -33,7 +34,7 @@ export function DepositRow({ dep, cost, reviewed, onSetCost }: {
         <span className="text-xs text-fg-muted mono">{date}</span>
         <span className="text-xs text-fg-subtle">·</span>
         <span className="text-xs text-fg mono">
-          {dep.amount.toLocaleString('es-ES', { maximumFractionDigits: 6 })} {dep.asset}
+          {formatNumber(dep.amount, 6)} {dep.asset}
         </span>
         {statusLabel && (
           <span className={`ml-auto text-xs font-medium ${cost != null ? 'text-positive' : 'text-fg-subtle'}`}>

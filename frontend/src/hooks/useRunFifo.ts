@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../api/portfolio'
+import { formatEur } from '../utils/format'
 
 /**
  * Recalcula el motor FIFO. Antes esta acción estaba reimplementada por
@@ -21,7 +22,7 @@ export function useRunFifo() {
     setResult(null)
     try {
       const data = await portfolioApi.runFifo()
-      setResult(`${data.lotsCreated} lotes creados, ${data.lotsConsumed} consumos procesados (G/P neto ${(data.totalGainEur + data.totalLossEur).toFixed(2)} €)`)
+      setResult(`${data.lotsCreated} lotes creados, ${data.lotsConsumed} consumos procesados (G/P neto ${formatEur(data.totalGainEur + data.totalLossEur)})`)
       queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
       queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
       queryClient.invalidateQueries({ queryKey: ['settings-stats'] })

@@ -1,4 +1,4 @@
-import { formatEur, pnlColor } from '../../utils/format'
+import { formatEur, pnlColor, formatNumber } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { PNL_THRESHOLD } from './constants'
 import type { FiscalEvent } from './types'
@@ -9,9 +9,9 @@ const LOST_TYPES = ['LOST', 'GIFT_SENT']
 
 function formatQtyTransmitida(qty: number): string {
   if (qty < 0.01) return qty.toExponential(2)
-  if (qty >= 1000) return qty.toLocaleString('es-ES', { maximumFractionDigits: 2 })
-  if (qty >= 1) return qty.toFixed(4)
-  return qty.toFixed(6)
+  if (qty >= 1000) return formatNumber(qty, 2)
+  if (qty >= 1) return formatNumber(qty, 4, 4)
+  return formatNumber(qty, 6, 6)
 }
 
 export function FiscalEventRow({ e }: { e: FiscalEvent }) {

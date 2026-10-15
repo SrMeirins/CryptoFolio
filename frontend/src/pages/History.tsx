@@ -9,7 +9,7 @@ import {
 import { useToast } from '../hooks/useToast'
 import { ManualTxModal } from '../components/ManualTxModal'
 import { DateRangePicker } from '../components/DateRangePicker'
-import { formatMoney } from '../utils/format'
+import { formatMoney, formatNumber } from '../utils/format'
 import { useCurrency } from '../hooks/useDisplayCurrency'
 import { useCurrencyQuery } from '../hooks/useCurrencyQuery'
 import { txStatsQuery } from '../queries/currencyQueries'
@@ -182,7 +182,7 @@ export function History() {
             <h1 className="text-2xl font-semibold">Historial</h1>
             <p className="text-xs text-fg-subtle mt-0.5">
               {total > 0
-                ? `${total.toLocaleString('es-ES')} transacciones${hasActiveFilters ? ' filtradas' : ''}`
+                ? `${formatNumber(total, 0)} transacciones${hasActiveFilters ? ' filtradas' : ''}`
                 : 'Sin transacciones importadas'}
               {hasActiveFilters && totalAmount > 0 && (
                 <span className="ml-2 text-brand font-semibold mono">· {formatMoney(totalAmount, currency)} total</span>
@@ -354,7 +354,7 @@ export function History() {
       {total > PAGE_SIZE && (
         <div className="shrink-0 border-t border-border px-4 py-3 flex items-center justify-between bg-background-primary">
           <span className="text-xs text-fg-subtle">
-            {filters.offset + 1}–{Math.min(filters.offset + PAGE_SIZE, total)} de {total.toLocaleString('es-ES')}
+            {filters.offset + 1}–{Math.min(filters.offset + PAGE_SIZE, total)} de {formatNumber(total, 0)}
           </span>
           <div className="flex items-center gap-1">
             <button

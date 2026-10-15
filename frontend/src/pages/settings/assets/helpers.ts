@@ -1,4 +1,5 @@
 import { fieldClasses } from '../../../components/ui/classes'
+import { formatNumber } from '../../../utils/format'
 export const SOURCE_META: Record<string, { label: string; color: string }> = {
   eur_direct: { label: 'EUR directo', color: '#00c896' },
   usdt_proxy: { label: 'Vía USDT',    color: '#6366f1' },
@@ -9,10 +10,10 @@ export const SOURCE_META: Record<string, { label: string; color: string }> = {
 }
 
 export function fmtPrice(p: number): string {
-  if (p >= 10000)   return `€${p.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  if (p >= 1)       return `€${p.toFixed(4)}`
-  if (p >= 0.001)   return `€${p.toFixed(6)}`
-  if (p >= 0.00001) return `€${p.toFixed(8)}`
+  if (p >= 10000)   return `€${formatNumber(p, 2, 2)}`
+  if (p >= 1)       return `€${formatNumber(p, 4, 4)}`
+  if (p >= 0.001)   return `€${formatNumber(p, 6, 6)}`
+  if (p >= 0.00001) return `€${formatNumber(p, 8, 8)}`
   return `€${p.toExponential(4)}`
 }
 

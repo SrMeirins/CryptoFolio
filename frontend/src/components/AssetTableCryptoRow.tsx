@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react'
 import { ChevronDown, ChevronRight, Settings, Calculator, Lock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { type LockedAmount } from '../api/portfolio'
-import { formatMoney, formatPrice, formatAmount, pnlColor } from '../utils/format'
+import { formatMoney, formatPrice, formatAmount, pnlColor, formatPercent } from '../utils/format'
 import { useCurrency } from '../hooks/useDisplayCurrency'
 import { type CryptoRow, walletShortName } from '../utils/assetTable'
 import { CryptoIcon } from './CryptoIcon'
@@ -106,7 +106,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                     ? 'text-positive bg-positive/10'
                     : 'text-negative bg-negative/10'
                 }`}>
-                  {change24h >= 0 ? '▲' : '▼'} {Math.abs(change24h).toFixed(2)}%
+                  {change24h >= 0 ? '▲' : '▼'} {formatPercent(Math.abs(change24h))}
                 </span>
               )}
             </div>
@@ -147,14 +147,14 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
 
         {/* P&L % */}
         <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-sm ${hasPrice ? pnlColor(pnlPct) : 'text-fg-subtle'}`}>
-          {hasPrice ? (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%' : '—'}
+          {hasPrice ? formatPercent(pnlPct, 2, true) : '—'}
         </td>
 
         {/* % Cartera */}
         <td className="px-4 py-3">
           {portfolioWeight !== null ? (
             <div className="flex flex-col items-end gap-1">
-              <span className="text-xs mono text-fg-muted">{portfolioWeight.toFixed(1)}%</span>
+              <span className="text-xs mono text-fg-muted">{formatPercent(portfolioWeight, 1)}</span>
               <div className="w-16 h-1 bg-background-tertiary rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full bg-brand/60 transition-all duration-500"
@@ -202,12 +202,12 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                 </td>
               )}
               <td className={`px-4 py-2 text-right mono text-xs ${wPnlPct !== null ? pnlColor(wPnlPct) : 'text-fg-subtle'}`}>
-                {wPnlPct !== null ? (wPnlPct >= 0 ? '+' : '') + wPnlPct.toFixed(2) + '%' : '—'}
+                {wPnlPct !== null ? formatPercent(wPnlPct, 2, true) : '—'}
               </td>
               <td className="px-4 py-2 text-right">
                 {hasPrice && totalPortfolioValue > 0 ? (
                   <span className="text-xs mono text-fg-subtle">
-                    {((wValue / totalPortfolioValue) * 100).toFixed(1)}%
+                    {formatPercent((wValue / totalPortfolioValue) * 100, 1)}
                   </span>
                 ) : <span className="text-fg-subtle text-xs">—</span>}
               </td>

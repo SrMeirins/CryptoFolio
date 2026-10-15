@@ -6,6 +6,7 @@ import { useToast } from '../../hooks/useToast'
 import { useRunFifo } from '../../hooks/useRunFifo'
 import { T } from '../../utils/colors'
 import { cardClasses, buttonClasses, fieldClasses } from '../../components/ui'
+import { formatNumber } from '../../utils/format'
 
 const CONFIRM_WORD = 'CONFIRMAR'
 
@@ -88,7 +89,7 @@ export function DatosSection() {
           {statCards.map(s => (
             <div key={s.label} className="rounded-lg bg-background-tertiary p-3 space-y-1" style={{ borderLeft: `3px solid ${s.color}` }}>
               <p className="text-xl font-bold mono">
-                {statsLoading ? '—' : (s.value ?? 0).toLocaleString('es-ES')}
+                {statsLoading ? '—' : formatNumber(s.value ?? 0, 0)}
               </p>
               <p className="text-xs text-fg-subtle">{s.label}</p>
             </div>

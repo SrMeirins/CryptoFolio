@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 import { MetricCard, type Change24h } from './MetricCard'
-import { formatMoney, type Currency } from '../utils/format'
+import { formatMoney, type Currency, formatPercent } from '../utils/format'
+import { costSecondary, flowSecondary, returnSecondary, todaySecondary } from '../utils/summaryCards'
 
 interface EurFlow {
   deposited:    number
@@ -18,7 +19,7 @@ export function PortfolioSummaryCards({
   totalValue, totalCost, pnl, pnlPct, hasPrices, loading,
   valueTooltip, costTooltip, pnlTooltip, pnlPctTooltip,
   eurFlow, eurFlowTooltip,
-  change24h, currency = 'EUR',
+  change24h, currency = 'EUR', assetCount, todayPnl = null,
 }: {
   totalValue: number
   totalCost:  number
@@ -34,6 +35,9 @@ export function PortfolioSummaryCards({
   eurFlowTooltip?: ReactNode
   change24h?: Change24h
   currency?: Currency
+  assetCount: number
+  /** P&L de hoy en vivo (#213), en `currency`; null mientras no hay dato. */
+  todayPnl?: number | null
 }) {
   // Las tarjetas llevan la moneda en la key: al cambiarla se remontan en vez de
   // animar la cifra de un importe en EUR a uno en USD.
@@ -65,6 +69,7 @@ export function PortfolioSummaryCards({
         format={money}
         loading={loading}
         tooltip={costTooltip}
+        secondary={costSecondary(assetCount)}
       />
 
       <MetricCard
@@ -76,28 +81,33 @@ export function PortfolioSummaryCards({
         positive={hasPrices ? pnl >= 0 : undefined}
         loading={loading}
         tooltip={pnlTooltip}
+        secondary={todayPnl !== null && (
+          <span className={todayPnl > 0.005 ? 'text-positive' : todayPnl < -0.005 ? 'text-negative' : ''}>{todaySecondary(todayPnl, currency)}</span>
+        )}
       />
 
       <MetricCard
         key={`pct-${currency}`}
         label="Rentabilidad"
-        value={hasPrices ? (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%' : '—'}
+        value={hasPrices ? formatPercent(pnlPct, 2, true) : '—'}
         rawValue={hasPrices ? pnlPct : undefined}
-        format={v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%'}
+        format={v => formatPercent(v, 2, true)}
         positive={hasPrices ? pnlPct >= 0 : undefined}
         loading={loading}
         tooltip={pnlPctTooltip}
+        secondary={returnSecondary(totalCost, currency)}
       />
 
       {eurFlow && (
         <MetricCard
-        key={`flow-${flowCurrency}`}
+          key={`flow-${flowCurrency}`}
           label={flowCurrency === 'EUR' ? 'EUR neto en cripto' : 'Neto en cripto'}
           value={flowMoney(eurFlow.netFromBank)}
           rawValue={eurFlow.netFromBank}
           format={flowMoney}
           loading={loading}
           tooltip={eurFlowTooltip}
+          secondary={flowSecondary(eurFlow.deposited, eurFlow.withdrawn, flowCurrency).map(line => <span key={line}>{line}</span>)}
         />
       )}
     </div>

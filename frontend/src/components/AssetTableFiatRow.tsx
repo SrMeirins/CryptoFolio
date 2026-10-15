@@ -1,5 +1,5 @@
 import { type FiatRow } from '../utils/assetTable'
-import { formatAmount, formatMoney, formatPrice } from '../utils/format'
+import { formatAmount, formatMoney, formatPrice, formatPercent } from '../utils/format'
 import { useCurrency } from '../hooks/useDisplayCurrency'
 import { tableRowClasses } from './ui'
 
@@ -42,7 +42,7 @@ export function FiatRowComponent({ row, totalPortfolioValue, compact = false }: 
         {totalPortfolioValue > 0 ? (
           <div className="flex flex-col items-end gap-1">
             <span className="text-xs mono text-fg-muted">
-              {((row.value / totalPortfolioValue) * 100).toFixed(1)}%
+              {formatPercent((row.value / totalPortfolioValue) * 100, 1)}
             </span>
             <div className="w-16 h-1 bg-background-tertiary rounded-full overflow-hidden">
               <div

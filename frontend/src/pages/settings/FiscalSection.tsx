@@ -5,6 +5,7 @@ import { AlertCircle, Check, RotateCcw } from 'lucide-react'
 import { TRAMOS_DEFAULT } from '../../utils/tramosIrpf'
 import { SettingsCard } from './SettingsCard'
 import { buttonClasses } from '../../components/ui'
+import { formatNumber } from '../../utils/format'
 
 export function FiscalSection() {
   const { data: config = {} } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
@@ -102,7 +103,7 @@ export function FiscalSection() {
                   ? 'border-brand bg-brand/10 text-brand'
                   : 'border-border bg-background-tertiary text-fg-muted hover:border-fg-subtle hover:text-fg'
               }`}>
-              €{preset.toLocaleString('es-ES')}
+              €{formatNumber(preset, 0)}
             </button>
           ))}
           <span className="text-xs text-fg-subtle ml-1">o introduce un valor personalizado:</span>
@@ -122,7 +123,7 @@ export function FiscalSection() {
           </button>
           {thresholdInput === String(threshold) && threshold > 0 && (
             <div className="flex items-center gap-1.5 text-xs text-positive">
-              <Check size={12} /> Guardado: €{threshold.toLocaleString('es-ES')}
+              <Check size={12} /> Guardado: €{formatNumber(threshold, 0)}
             </div>
           )}
         </div>
