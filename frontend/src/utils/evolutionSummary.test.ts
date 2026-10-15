@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EvolutionPoint } from './evolutionSeries'
-import { applyLiveToday, flowBuckets, flowUnit, maxDrawdown, periodSummary } from './evolutionSummary'
+import { applyLiveToday, flowBuckets, flowUnit, maxDrawdown, minBase, periodSummary } from './evolutionSummary'
 
 // Resumen del periodo del gráfico de evolución (#214).
 const D = 86_400_000
@@ -21,6 +21,57 @@ describe('periodSummary — mejor y peor día', () => {
     expect(periodSummary([pt(0, 1, 1), pt(1, 2, 3)], false)!.worst).toBeNull()
     expect(periodSummary([pt(0, -1, -1)], false)!.best).toBeNull()
     expect(periodSummary([], false)).toBeNull()
+  })
+})
+
+describe('periodSummary — días con capital ínfimo (#245)', () => {
+  // Cartera pequeña al principio (80) que se pierde entera; después, cartera de 10 000.
+  const points = [
+    pt(0, null, 0, { value: 0.01 }),
+    pt(1, 30, 19, { value: 80, deposit: 61 }),     // +30 % sobre 61: capital ínfimo
+    pt(2, -99.99, -61, { value: 0.01 }),           // −100 % sobre 80: capital ínfimo
+    pt(3, null, -61, { value: 10_000, deposit: 10_000 }),
+    pt(4, 2, 139, { value: 10_200 }),
+    pt(5, -1, 37, { value: 10_098 }),
+  ]
+
+  it('el umbral es el 1 % del valor máximo del periodo, con un mínimo absoluto', () => {
+    expect(minBase(points)).toBeCloseTo(102, 6)
+    expect(minBase([pt(0, 1, 0, { value: 10 })])).toBe(1)
+  })
+
+  it('mejor y peor día por importe, como el calendario', () => {
+    const s = periodSummary(points, false)!
+    expect(s.best).toEqual({ x: 4 * D, pct: 2, pnl: 200 })
+    expect(s.worst).toEqual({ x: 5 * D, pct: -1, pnl: -102 })
+  })
+
+  it('un día de capital ínfimo puede salir por importe, pero sin %', () => {
+    // Igual, pero sin días negativos con la cartera grande.
+    const s = periodSummary(points.slice(0, 5), false)!
+    expect(s.worst).toEqual({ x: 2 * D, pct: null, pnl: -80 })
+  })
+
+  it('la máxima caída ignora esos días y no llega al −100 %', () => {
+    const dd = maxDrawdown(points)!
+    expect(dd.pct).toBeCloseTo(-1, 6)
+    expect(dd.fromX).toBe(4 * D)
+    expect(dd.toX).toBe(5 * D)
+  })
+
+  it('sin días válidos no hay máxima caída', () => {
+    expect(maxDrawdown(points.slice(0, 4))).toBeNull()
+  })
+
+  it('el umbral es relativo al periodo: si toda la cartera era pequeña, su % sí cuenta', () => {
+    const s = periodSummary(points.slice(0, 3), false)!
+    expect(s.worst?.pct).toBeCloseTo(-99.99, 6)
+  })
+
+  it('una pérdida real sobre capital suficiente sí cuenta', () => {
+    const crash = [pt(0, null, 0, { value: 1000 }), pt(1, -60, -600, { value: 400 })]
+    expect(periodSummary(crash, false)!.worst).toEqual({ x: 1 * D, pct: -60, pnl: -600 })
+    expect(maxDrawdown(crash)?.pct).toBeCloseTo(-60, 6)
   })
 })
 

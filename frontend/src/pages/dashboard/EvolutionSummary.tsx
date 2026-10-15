@@ -2,11 +2,11 @@ import type { ReactNode } from 'react'
 import { InfoTooltip } from '../../components/InfoTooltip'
 import { formatMoney, formatPercent, type Currency } from '../../utils/format'
 import { formatTick } from '../../utils/chartAxes'
-import type { PeriodSummary } from '../../utils/evolutionSummary'
+import type { Extreme, PeriodSummary } from '../../utils/evolutionSummary'
 
 // Fila de resumen del periodo (#214): cifra principal a la izquierda (rentabilidad
 // y P&L, o variación del valor en la pestaña Valor) y, en pequeño, mejor y peor
-// día (u hora en 24H) y máxima caída.
+// día (u hora en 24H) por importe y máxima caída.
 
 const signedMoney = (n: number, currency: Currency) => `${n >= 0 ? '+' : ''}${formatMoney(n, currency)}`
 const HOUR = 3_600_000
@@ -18,6 +18,11 @@ const short = (x: number, intraday: boolean) => (intraday ? formatTick(x, 'hour3
 /** Día del extremo o, en 24H, la franja horaria («14:00–15:00»). */
 function when(x: number, intraday: boolean): string {
   return intraday ? `${formatTick(x, 'hour3')}–${formatTick(x + HOUR, 'hour3')}` : short(x, false)
+}
+
+/** «+4,20 % · 12 oct 26»; sin % si el capital de partida era ínfimo (#245). */
+function extremeDetail(e: Extreme, intraday: boolean): string {
+  return e.pct === null ? when(e.x, intraday) : `${formatPercent(e.pct, 2, true)} · ${when(e.x, intraday)}`
 }
 
 function Stat({ label, value, detail, tone }: { label: string; value: string; detail: string; tone: string }) {
@@ -65,12 +70,12 @@ export function EvolutionSummary({ summary, currency, intraday, mode, valueChang
         {summary && (
           <dl className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs">
             {summary.best && (
-              <Stat label={intraday ? 'Mejor hora' : 'Mejor día'} value={formatPercent(summary.best.pct, 2, true)}
-                detail={when(summary.best.x, intraday)} tone="text-positive" />
+              <Stat label={intraday ? 'Mejor hora' : 'Mejor día'} value={signedMoney(summary.best.pnl, currency)}
+                detail={extremeDetail(summary.best, intraday)} tone="text-positive" />
             )}
             {summary.worst && (
-              <Stat label={intraday ? 'Peor hora' : 'Peor día'} value={formatPercent(summary.worst.pct, 2, true)}
-                detail={when(summary.worst.x, intraday)} tone="text-negative" />
+              <Stat label={intraday ? 'Peor hora' : 'Peor día'} value={signedMoney(summary.worst.pnl, currency)}
+                detail={extremeDetail(summary.worst, intraday)} tone="text-negative" />
             )}
             {summary.drawdown && (
               <Stat label="Máx. caída" value={formatPercent(summary.drawdown.pct, 2)}
