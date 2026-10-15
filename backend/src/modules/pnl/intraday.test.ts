@@ -64,6 +64,19 @@ describe('buildIntradaySeries', () => {
     expect(r.points[1].pct).toBeCloseTo(6.6667, 3);   // 10 sobre 150
     expect(r.points.at(-1)?.live).toBe(true);
     expect(r.totalPnl).toBe(-1);
+    // Rentabilidad de cada tramo y flujo de capital propio, para el tooltip y los marcadores (#214).
+    expect(r.points.map(p => p.flow)).toEqual([0, 50, 0]);
+    expect(r.points[0].stepPct).toBeNull();
+    expect(r.points[2].stepPct).toBeCloseTo(-6.875, 3);   // −11 sobre 160
+  });
+
+  it('los préstamos de margen no se marcan como depósitos', () => {
+    const r = buildIntradaySeries({
+      instants: [0, 1], holdings: [new Map([['EUR', 10]]), new Map([['EUR', 110]])],
+      flows: [{ asset: 'EUR', at: 1, quantity: 100, kind: 'margin' }],
+      priceOf: () => null, fxAt: () => 1,
+    });
+    expect(r.points[1]).toMatchObject({ flow: 0, pnl: 0 });
   });
 });
 

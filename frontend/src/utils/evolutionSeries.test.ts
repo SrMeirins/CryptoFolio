@@ -35,15 +35,15 @@ describe('serie común de P&L y Valor', () => {
   it('diaria: fecha a medianoche UTC, valor del día y métrica del periodo', () => {
     const days = [day('2026-10-14', 100, 0, 0), day('2026-10-15', 110, 10, 10, true)]
     expect(fromDaily(days, '7D')).toEqual([
-      { x: Date.UTC(2026, 9, 14), pct: 0, pnl: 0, value: 100, live: false },
-      { x: Date.UTC(2026, 9, 15), pct: 10, pnl: 10, value: 110, live: true },
+      { x: Date.UTC(2026, 9, 14), pct: 0, pnl: 0, value: 100, stepPct: 0, flow: 0, live: false },
+      { x: Date.UTC(2026, 9, 15), pct: 10, pnl: 10, value: 110, stepPct: 10, flow: 0, live: true },
     ])
     expect(fromDaily(days, 'Todo')[1].pct).toBe(5)   // sobre capital aportado
   })
 
   it('intradía: instante exacto de cada punto', () => {
-    expect(fromIntraday([{ at: '2026-10-15T09:15:00.000Z', value: 5, pnl: 1, pct: 2, live: false }]))
-      .toEqual([{ x: Date.UTC(2026, 9, 15, 9, 15), pct: 2, pnl: 1, value: 5, live: false }])
+    expect(fromIntraday([{ at: '2026-10-15T09:15:00.000Z', value: 5, pnl: 1, pct: 2, stepPct: 0.5, flow: 3, live: false }]))
+      .toEqual([{ x: Date.UTC(2026, 9, 15, 9, 15), pct: 2, pnl: 1, value: 5, stepPct: 0.5, flow: 3, live: false }])
   })
 })
 

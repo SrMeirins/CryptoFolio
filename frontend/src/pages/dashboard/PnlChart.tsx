@@ -1,145 +1,102 @@
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ReferenceLine, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ReferenceLine, ReferenceDot, ResponsiveContainer,
 } from 'recharts'
-import { InfoTooltip } from '../../components/InfoTooltip'
-import { formatMoney, formatPercent, type Currency } from '../../utils/format'
-import { METRIC_LABELS, type PnlMetric } from '../../utils/pnlChart'
-import { formatPointDate, type EvolutionPoint } from '../../utils/evolutionSeries'
+import { formatMoneyCompact, formatMoney, formatPercent, type Currency } from '../../utils/format'
+import type { EvolutionPoint } from '../../utils/evolutionSeries'
+import { flowMarkers } from '../../utils/evolutionSummary'
 import { formatTick, niceTicks, tickDecimals, timeAxis } from '../../utils/chartAxes'
 import { useChartColors } from '../../hooks/useChartColors'
+import { useReducedMotion } from '../../hooks/useReducedMotion'
+import { EvolutionTooltip } from './EvolutionTooltip'
+import { LiveDot } from './LiveDot'
+import { ChartFrame } from './ChartFrame'
 
-// Pestaña P&L del gráfico de evolución (#166): rentabilidad acumulada del
-// periodo. Datos, periodo y cabecera los gestiona EvolutionCard (#215).
+// Pestaña P&L del gráfico de evolución (#166, #214): rentabilidad acumulada en
+// % o P&L acumulado en la moneda. Verde por encima de 0 y rojo por debajo, con
+// el área entre la curva y el 0; marcadores de depósitos y retiradas y punto
+// final vivo. Datos y cabecera los gestiona EvolutionCard.
 
-const signed = (n: number, digits = 2) => formatPercent(n, digits, true)
-const signedMoney = (n: number, currency: Currency) => `${n >= 0 ? '+' : ''}${formatMoney(n, currency)}`
+export type PnlUnit = 'pct' | 'eur'
 
-function ChartTooltip({ active, payload, currency, intraday }: {
-  active?: boolean; payload?: { payload: EvolutionPoint }[]; currency: Currency; intraday: boolean
-}) {
-  if (!active || !payload?.[0]) return null
-  const p = payload[0].payload
-  const color = p.pct >= 0 ? 'text-positive' : 'text-negative'
-  return (
-    <div className="bg-tooltip/95 border border-overlay/10 rounded-xl px-3 py-2.5 shadow-xl text-xs space-y-0.5">
-      <p className="text-fg-muted">{formatPointDate(p.x, intraday)}{p.live ? ' · en vivo' : ''}</p>
-      <p className={`mono font-semibold ${color}`}>{signed(p.pct)}</p>
-      <p className="text-fg mono">{signedMoney(p.pnl, currency)} acumulado</p>
-    </div>
-  )
-}
-
-export function PnlChart({ points, currency, intraday, metric, loading, error, refreshing, approximate }: {
+export function PnlChart({ points, currency, intraday, unit, animationKey, loading, error }: {
   points: EvolutionPoint[]
   currency: Currency
   intraday: boolean
-  metric: PnlMetric
+  unit: PnlUnit
+  /** Cambia con el periodo: la curva se vuelve a dibujar al cambiarlo. */
+  animationKey: string
   loading: boolean
   error: boolean
-  refreshing: boolean
-  approximate: string[]
 }) {
   const c = useChartColors()
-  const labels = METRIC_LABELS[metric]
-  const last = points[points.length - 1]
-  const positive = (last?.pct ?? 0) >= 0
-  const color = positive ? c.up : c.down
+  const reduceMotion = useReducedMotion()
+  const gradientId = useId().replace(/:/g, '')
+  const key: 'pct' | 'pnl' = unit === 'pct' ? 'pct' : 'pnl'
 
   // Ejes alineados al calendario (o cada 3 h en 24H) y con valores redondos (#212, #215).
   const xAxis = useMemo(() => timeAxis(points.map(p => p.x), intraday), [points, intraday])
   const yTicks = useMemo(() => {
-    const pcts = points.map(p => p.pct)
-    return pcts.length ? niceTicks(Math.min(...pcts), Math.max(...pcts), 4, true) : []
-  }, [points])
+    const vals = points.map(p => p[key])
+    return vals.length ? niceTicks(Math.min(...vals), Math.max(...vals), 4, true) : []
+  }, [points, key])
   const yDecimals = tickDecimals(yTicks)
+  const yMin = yTicks[0] ?? 0
+  const yMax = yTicks[yTicks.length - 1] ?? 0
+  // Punto del degradado donde está el 0: verde por encima, rojo por debajo.
+  const zero = yMax <= 0 ? 0 : yMin >= 0 ? 1 : yMax / (yMax - yMin)
+  const markers = useMemo(() => flowMarkers(points), [points])
+  const last = points[points.length - 1]
+  const lastColor = (last?.[key] ?? 0) >= 0 ? c.up : c.down
+  const yFormat = (v: number) => (unit === 'pct' ? formatPercent(v, yDecimals) : yDecimals === 0 ? formatMoneyCompact(v, currency) : formatMoney(v, currency))
 
   return (
-    <>
-      <div className="flex items-center gap-3 mb-4 min-h-6 flex-wrap" aria-live="polite">
-        {last && (
-          <p className={`text-sm mono font-semibold ${positive ? 'text-positive' : 'text-negative'}`}>
-            <span aria-hidden="true">{positive ? '▲' : '▼'} </span>
-            {signed(last.pct)} <span className="text-xs font-normal opacity-80">({signedMoney(last.pnl, currency)})</span>
-          </p>
-        )}
-        <span className="inline-flex items-center gap-1 text-xs text-fg-subtle">
-          {labels.short}
-          <InfoTooltip label={labels.short}>
-            {labels.help}
-            {intraday && <p>Últimas 24 horas, un punto cada 15 minutos y el último con los precios en vivo.</p>}
-            {approximate.length > 0 && (
-              <p>Sin precios de 15 min (valorados con el precio actual): <span className="mono">{approximate.join(', ')}</span></p>
-            )}
-          </InfoTooltip>
-        </span>
-        {refreshing && (
-          <span className="flex items-center gap-1.5 text-xs text-fg-subtle">
-            <span className="w-2.5 h-2.5 border border-border border-t-fg-subtle rounded-full animate-spin" aria-hidden="true" />
-            Descargando precios de cierre…
-          </span>
-        )}
-      </div>
-
-      <div className="h-52 relative">
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-fg-subtle">Cargando…</div>
-        )}
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-fg-subtle">No se pudo cargar la rentabilidad.</div>
-        )}
-        {!loading && !error && points.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-fg-subtle">Sin datos para este periodo</div>
-        )}
-        {points.length > 0 && (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={points} margin={{ top: 4, right: 20, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="pnlGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={color} stopOpacity={0.2} />
-                  <stop offset="95%" stopColor={color} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid vertical={false} stroke={c.grid} />
-              <XAxis
-                dataKey="x"
-                type="number"
-                scale="time"
-                domain={xAxis.domain}
-                ticks={xAxis.ticks}
-                interval={0}
-                tickFormatter={(x: number) => formatTick(x, xAxis.unit)}
-                tick={{ fontSize: 12, fill: c.axis }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                domain={[yTicks[0], yTicks[yTicks.length - 1]]}
-                ticks={yTicks}
-                interval={0}
-                tick={{ fontSize: 12, fill: c.axis }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v: number) => formatPercent(v, yDecimals)}
-                width={52}
-              />
-              {/* Línea del 0 % destacada sobre la rejilla */}
-              <ReferenceLine y={0} stroke={c.axis} strokeWidth={1.25} />
-              <RechartsTooltip content={<ChartTooltip currency={currency} intraday={intraday} />} />
-              <Area
-                type="monotone"
-                dataKey="pct"
-                stroke={color}
-                strokeWidth={2}
-                fill="url(#pnlGradient)"
-                dot={false}
-                activeDot={{ r: 4, fill: color, strokeWidth: 0 }}
-                isAnimationActive={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-    </>
+    <ChartFrame loading={loading} error={error} empty={points.length === 0} errorText="No se pudo cargar la rentabilidad.">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart key={animationKey} data={points} margin={{ top: 8, right: 20, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id={`${gradientId}-fill`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset={0} stopColor={c.up} stopOpacity={0.28} />
+              <stop offset={zero} stopColor={c.up} stopOpacity={0.03} />
+              <stop offset={zero} stopColor={c.down} stopOpacity={0.03} />
+              <stop offset={1} stopColor={c.down} stopOpacity={0.28} />
+            </linearGradient>
+            <linearGradient id={`${gradientId}-stroke`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset={zero} stopColor={c.up} />
+              <stop offset={zero} stopColor={c.down} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} stroke={c.grid} />
+          <XAxis
+            dataKey="x" type="number" scale="time" domain={xAxis.domain} ticks={xAxis.ticks} interval={0}
+            tickFormatter={(x: number) => formatTick(x, xAxis.unit)}
+            tick={{ fontSize: 12, fill: c.axis }} axisLine={false} tickLine={false}
+          />
+          <YAxis
+            domain={[yMin, yMax]} ticks={yTicks} interval={0} tickFormatter={yFormat}
+            tick={{ fontSize: 12, fill: c.axis }} axisLine={false} tickLine={false} width={unit === 'pct' ? 52 : 76}
+          />
+          {/* Línea del 0 destacada sobre la rejilla */}
+          <ReferenceLine y={0} stroke={c.axis} strokeWidth={1.25} />
+          <RechartsTooltip
+            cursor={{ stroke: c.cursorLine, strokeWidth: 1, strokeDasharray: '4 4' }}
+            content={<EvolutionTooltip currency={currency} intraday={intraday} primary={unit === 'pct' ? 'pct' : 'pnl'} />}
+          />
+          <Area
+            type="monotone" dataKey={key} baseValue={0}
+            stroke={`url(#${gradientId}-stroke)`} strokeWidth={2} fill={`url(#${gradientId}-fill)`}
+            dot={false} activeDot={{ r: 4, fill: lastColor, strokeWidth: 0 }}
+            isAnimationActive={!reduceMotion} animationDuration={700} animationEasing="ease-out"
+          />
+          {markers.map(m => (
+            <ReferenceDot key={m.x} x={m.x} y={m[key]} r={4} ifOverflow="visible"
+              fill={m.flow > 0 ? c.up : c.down} stroke={c.tooltipBg} strokeWidth={2} />
+          ))}
+          {last?.live && (
+            <ReferenceDot x={last.x} y={last[key]} ifOverflow="visible" shape={<LiveDot color={lastColor} />} />
+          )}
+        </AreaChart>
+      </ResponsiveContainer>
+    </ChartFrame>
   )
 }

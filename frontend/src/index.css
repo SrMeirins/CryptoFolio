@@ -303,3 +303,14 @@
   to   { opacity: 1; transform: translateY(0)    scale(1); }
 }
 .animate-date-picker-in { animation: datePickerIn 0.18s ease-out both; }
+
+/* Punto final «vivo» del gráfico de evolución (#214): un halo que se expande y se desvanece. */
+@keyframes chartLivePulse {
+  from { transform: scale(1); opacity: 0.55; }
+  to   { transform: scale(2.8); opacity: 0; }
+}
+.chart-live-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: chartLivePulse 1.8s ease-out infinite;
+}

@@ -20,6 +20,8 @@ export interface IntradayPoint {
   value: number;  // valor de la cartera en la moneda pedida
   pnl: number;    // P&L acumulado desde el inicio de la ventana
   pct: number;    // rentabilidad acumulada (TWR) desde el inicio
+  stepPct: number | null; // rentabilidad del tramo de 15 min que termina aquí (null si la base es < 1)
+  flow: number;   // flujo neto de capital propio del tramo (+ depósito, − retirada), sin margen
   live: boolean;  // último punto, con precios en vivo
 }
 
@@ -74,6 +76,7 @@ export function buildIntradaySeries({ instants, holdings, flows, priceOf, fxAt }
   const valueAt = (i: number) => valueHoldings(holdings[i], a => priceOf(a, i), fxAt(i)).value;
   const inflow = new Array<number>(instants.length).fill(0);
   const outflow = new Array<number>(instants.length).fill(0);
+  const capital = new Array<number>(instants.length).fill(0);
   for (const f of flows) {
     // Tramo (instants[i-1], instants[i]] que contiene el flujo.
     const i = instants.findIndex((t, k) => k > 0 && f.at > instants[k - 1] && f.at <= t);
@@ -82,19 +85,23 @@ export function buildIntradaySeries({ instants, holdings, flows, priceOf, fxAt }
     if (price === null) continue;
     const amount = Math.abs(f.quantity) * price;
     if (f.quantity > 0) inflow[i] += amount; else outflow[i] += amount;
+    if (f.kind === 'capital') capital[i] += f.quantity > 0 ? amount : -amount;
   }
   const valuations: DayValuation[] = instants.slice(1).map((t, k) => ({
     date: new Date(t).toISOString(), value: valueAt(k + 1), inflow: inflow[k + 1], outflow: outflow[k + 1],
-    netCapitalFlow: 0, complete: true, live: k + 1 === instants.length - 1,
+    netCapitalFlow: capital[k + 1], complete: true, live: k + 1 === instants.length - 1,
   }));
   const base = valueAt(0);
   const { days, totalPnl, twrPct } = computeDailyPnl(base, valuations);
   let cumulative = 0;
   const points: IntradayPoint[] = [
-    { at: new Date(instants[0]).toISOString(), value: Math.round(base * 100) / 100, pnl: 0, pct: 0, live: false },
+    { at: new Date(instants[0]).toISOString(), value: Math.round(base * 100) / 100, pnl: 0, pct: 0, stepPct: null, flow: 0, live: false },
     ...days.map(d => {
       cumulative += d.pnl;
-      return { at: d.date, value: d.value, pnl: Math.round(cumulative * 100) / 100, pct: d.cumulativePct, live: d.live };
+      return {
+        at: d.date, value: d.value, pnl: Math.round(cumulative * 100) / 100, pct: d.cumulativePct,
+        stepPct: d.pct, flow: d.netCapitalFlow, live: d.live,
+      };
     }),
   ];
   return { points, totalPnl, twrPct };

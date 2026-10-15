@@ -58,7 +58,7 @@ export interface IntradayPnlResponse {
   totalPnl: number
   twrPct: number
   approximate: string[]   // activos valorados con el precio en vivo en toda la ventana
-  points: Array<{ at: string; value: number; pnl: number; pct: number; live: boolean }>
+  points: Array<{ at: string; value: number; pnl: number; pct: number; stepPct: number | null; flow: number; live: boolean }>
 }
 
 export interface LiveDayBase {
