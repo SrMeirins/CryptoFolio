@@ -3,13 +3,15 @@ import { PnlChart, type PnlUnit } from './PnlChart'
 import { ValueChart } from './ValueChart'
 import { EvolutionSummary } from './EvolutionSummary'
 import { DateRangePicker } from '../../components/DateRangePicker'
-import { SegmentedControl, Tabs, cardClasses, tabId, tabPanelId } from '../../components/ui'
+import { SegmentedControl, Tabs, cardClasses, tabId, tabPanelId, PanelHeader } from '../../components/ui'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
 import { useLiveDayPnl } from '../../hooks/useLiveDayPnl'
 import { dailyPnlQuery, intradayPnlQuery } from '../../queries/currencyQueries'
 import { METRIC_LABELS, PERIOD_TITLES, PNL_PERIODS, madridToday, metricFor, type PnlPeriod } from '../../utils/pnlChart'
 import { evolutionQuery, fromDaily, fromIntraday } from '../../utils/evolutionSeries'
 import { applyLiveToday, periodSummary } from '../../utils/evolutionSummary'
+import { evolutionSubtitle } from '../../utils/panelSubtitles'
+import { LineChart } from 'lucide-react'
 
 // Bloque de evolución del Dashboard (#166): pestaña P&L (rentabilidad
 // acumulada, por defecto) y pestaña Valor (valor de la cartera). Desde #215
@@ -70,13 +72,14 @@ export function EvolutionCard() {
 
   return (
     <div className={cardClasses('none', 'px-5 py-5')}>
-      <div className="flex items-center justify-between mb-1 gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest">Evolución</span>
-          <Tabs label="Evolución del portfolio" idBase={baseId} value={tab} onChange={setTab}
-            items={TABS.map(t => ({ value: t.id, label: t.label }))} />
-        </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
+      <PanelHeader
+        icon={LineChart}
+        title="Evolución"
+        className="mb-3"
+        subtitle={evolutionSubtitle(period, series[0]?.x ?? null, range)}
+        extra={<Tabs label="Evolución del portfolio" idBase={baseId} value={tab} onChange={setTab}
+          items={TABS.map(t => ({ value: t.id, label: t.label }))} />}
+        actions={<>
           <SegmentedControl label="Periodo del gráfico de evolución" value={period} onChange={p => { setPeriod(p); setRange(null) }}
             options={PNL_PERIODS.map(p => ({ value: p, label: p, title: PERIOD_TITLES[p] }))} />
           <DateRangePicker
@@ -87,8 +90,8 @@ export function EvolutionCard() {
             to={period === 'Rango' ? range?.to ?? '' : ''}
             onChange={pickRange}
           />
-        </div>
-      </div>
+        </>}
+      />
 
       <div id={tabPanelId(baseId)} role="tabpanel" aria-labelledby={tabId(baseId, tab)}>
         <EvolutionSummary

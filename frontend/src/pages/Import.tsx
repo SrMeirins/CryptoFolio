@@ -16,7 +16,8 @@ import { useSetupSeen } from '../hooks/useSetupSeen'
 import { portfolioApi } from '../api/portfolio'
 import { waitForImportCommit, readProgressStream } from './import/importStream'
 import { useWithdrawalDestinations, useDepositCosts, clearImportSessionStorage } from './import/useImportSessionState'
-import { cardClasses, buttonClasses, iconButtonClasses } from '../components/ui'
+import { cardClasses, buttonClasses, iconButtonClasses, PageHeader } from '../components/ui'
+import { navIcon } from '../constants/navigation'
 
 export function ImportPage() {
   const queryClient = useQueryClient()
@@ -198,9 +199,11 @@ export function ImportPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Importar CSV</h1>
-        <div className="flex items-center gap-3">
+      <PageHeader
+        icon={navIcon('/import')}
+        title="Importar"
+        subtitle="CSV de Binance y operaciones manuales"
+        actions={<>
           <button
             type="button"
             onClick={() => setShowManualTx(true)}
@@ -214,8 +217,8 @@ export function ImportPage() {
               Volver al inicio
             </button>
           )}
-        </div>
-      </div>
+        </>}
+      />
 
       {stage === 'upload' && hasPendingDeposits && (
         <PendingDepositsPanel deposits={pendingDeposits} />

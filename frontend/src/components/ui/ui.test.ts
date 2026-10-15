@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  badgeClasses, buttonClasses, cardClasses, fieldClasses, iconButtonClasses, modalOverlayClasses, modalPanelClasses, segmentClasses, segmentThumbClasses,
+  badgeClasses, buttonClasses, cardClasses, fieldClasses, iconButtonClasses, modalOverlayClasses, modalPanelClasses, panelClasses, panelEnterStyle, segmentClasses, segmentThumbClasses,
   skeletonClasses, stateClasses, tabClasses, tabId, tabPanelId, tableFootRowClasses, tableHeadRowClasses, tableRowClasses,
 } from './classes'
 
@@ -177,5 +177,20 @@ describe('selector segmentado, variante accent (#200)', () => {
     expect(segmentThumbClasses()).toContain('transition-[transform,width]')
     expect(segmentThumbClasses()).toContain('motion-reduce:transition-none')
     expect(segmentThumbClasses()).not.toMatch(THEME_ONLY)
+  })
+})
+
+describe('paneles (#232)', () => {
+  it('entrada escalonada: 60 ms por posición, acotada', () => {
+    expect(panelEnterStyle(0)).toEqual({ animationDelay: '0ms' })
+    expect(panelEnterStyle(3)).toEqual({ animationDelay: '180ms' })
+    expect(panelEnterStyle(99)).toEqual({ animationDelay: '720ms' })
+    expect(panelEnterStyle(-2)).toEqual({ animationDelay: '0ms' })
+  })
+  it('animación de entrada y sombra al pasar el cursor, con clases extra', () => {
+    const c = panelClasses('rounded-xl lg:col-span-2')
+    expect(c).toContain('panel-in')
+    expect(c).toContain('hover:shadow-lg')
+    expect(c).toContain('lg:col-span-2')
   })
 })

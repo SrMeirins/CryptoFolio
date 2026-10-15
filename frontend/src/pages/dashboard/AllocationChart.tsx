@@ -4,7 +4,9 @@ import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
 import { formatMoney, formatPercent } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
 import { T, alpha, ink } from '../../utils/colors'
-import { cardClasses } from '../../components/ui'
+import { cardClasses, PanelHeader } from '../../components/ui'
+import { allocationSubtitle } from '../../utils/panelSubtitles'
+import { PieChart } from 'lucide-react'
 
 const ALLOC_COLORS = [
   '#6366f1','#F0B90B','#00c896','#e74c3c','#8b5cf6',
@@ -42,7 +44,7 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
 
   return (
     <div className={cardClasses('none', 'px-5 py-5')}>
-      <h3 className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest mb-4">Distribución</h3>
+      <PanelHeader icon={PieChart} title="Distribución" className="mb-4" subtitle={allocationSubtitle(items, total)} />
 
       {/* Barra apilada interactiva */}
       <div className="flex h-5 rounded-xl overflow-hidden gap-px mb-2">

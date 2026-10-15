@@ -2,8 +2,11 @@ import { Link } from 'react-router-dom'
 import type { FiscalYear } from '../../api/portfolio'
 import { formatEur } from '../../utils/format'
 import { EurOnlyBadge } from '../../components/EurOnlyBadge'
+import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { T, alpha } from '../../utils/colors'
-import { cardClasses } from '../../components/ui'
+import { cardClasses, PanelHeader } from '../../components/ui'
+import { fiscalSubtitle } from '../../utils/panelSubtitles'
+import { Landmark } from 'lucide-react'
 
 export function FiscalCard({ data }: { data: FiscalYear[] }) {
   const currentYear = new Date().getFullYear()
@@ -20,22 +23,20 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
   return (
     <div className={cardClasses('none', 'overflow-hidden flex flex-col h-full')}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold tracking-widest text-fg-subtle uppercase">Fiscal</span>
-          <span className="text-xs font-bold text-fg bg-overlay/6 border border-overlay/10 px-2 py-0.5 rounded-lg">
-            {current.fiscal_year}
-          </span>
-          <EurOnlyBadge />
-        </div>
-        <Link to="/fiscal" className="text-xs text-brand hover:underline">Detalle →</Link>
-      </div>
+      <PanelHeader
+        icon={Landmark}
+        title="Fiscal"
+        className="px-5 py-4 border-b border-border"
+        extra={<EurOnlyBadge />}
+        subtitle={fiscalSubtitle(current.fiscal_year, ops)}
+        actions={<Link to="/fiscal" className="text-xs text-brand hover:underline">Detalle →</Link>}
+      />
 
       {/* Métrica principal — centrada */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-5 gap-1">
         <p className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest">G/P neto realizado</p>
         <p className={`mono text-[1.7rem] font-bold tracking-tight leading-none ${isPos ? 'text-positive' : 'text-negative'}`}>
-          {isPos ? '+' : ''}{formatEur(gainLoss)}
+          <AnimatedNumber value={gainLoss} countUp format={v => `${v >= 0 ? '+' : ''}${formatEur(v)}`} />
         </p>
         <div
           className="mt-1 px-2 py-0.5 rounded-lg text-xs font-semibold"

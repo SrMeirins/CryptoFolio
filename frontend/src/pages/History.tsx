@@ -21,7 +21,8 @@ import { fmtDateGroup, calcEurValue } from './history/helpers'
 import { TxRow } from './history/TxRow'
 import { StatsBar } from './history/StatsBar'
 import { AnalyticsPanel } from './history/AnalyticsPanel'
-import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses, tableHeadRowClasses, Button, EmptyState, LoadingState } from '../components/ui'
+import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses, tableHeadRowClasses, Button, EmptyState, LoadingState, PageHeader } from '../components/ui'
+import { navIcon } from '../constants/navigation'
 
 type SortKey = 'fecha' | 'eur' | 'activo'
 type SortDir = 'asc' | 'desc'
@@ -177,19 +178,18 @@ export function History() {
 
       {/* ── Cabecera ── */}
       <div className="shrink-0 px-6 pt-6 pb-4 space-y-4 border-b border-border">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Historial</h1>
-            <p className="text-xs text-fg-subtle mt-0.5">
+        <PageHeader
+          icon={navIcon('/history')}
+          title="Historial"
+          subtitle={<>
               {total > 0
                 ? `${formatNumber(total, 0)} transacciones${hasActiveFilters ? ' filtradas' : ''}`
                 : 'Sin transacciones importadas'}
               {hasActiveFilters && totalAmount > 0 && (
                 <span className="ml-2 text-brand font-semibold mono">· {formatMoney(totalAmount, currency)} total</span>
               )}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+            </>}
+          actions={<>
             {hasActiveFilters && (
               <button type="button" onClick={clearFilters}
                 className="flex items-center gap-1.5 text-xs text-fg-subtle hover:text-fg px-3 py-1.5 border border-border rounded-lg hover:border-fg-subtle transition-colors">
@@ -204,8 +204,8 @@ export function History() {
               className="flex items-center gap-1.5 px-3 py-1.5 bg-brand/15 border border-brand/30 rounded-lg text-xs text-brand hover:bg-brand/25 transition-colors font-medium">
               + Nueva
             </button>
-          </div>
-        </div>
+</>}
+        />
 
         {/* ── Filtros ── */}
         <div className="flex items-center gap-2 flex-wrap">

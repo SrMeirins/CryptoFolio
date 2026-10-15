@@ -13,7 +13,8 @@ import { ExportPanel } from './fiscal/ExportPanel'
 import { YearTabs } from './fiscal/YearTabs'
 import { FiscalSummaryCards, FiscalSummaryCardsSkeleton } from './fiscal/FiscalSummaryCards'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
-import { cardClasses, EmptyState, ErrorState, Skeleton } from '../components/ui'
+import { cardClasses, EmptyState, ErrorState, Skeleton, PageHeader } from '../components/ui'
+import { navIcon } from '../constants/navigation'
 
 export function Fiscal() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
@@ -111,22 +112,21 @@ export function Fiscal() {
     <div className="p-6 space-y-5 max-w-5xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold">Módulo Fiscal</h1>
-            <EurOnlyBadge />
-          </div>
-          <p className="text-xs text-fg-subtle mt-0.5">Método FIFO · Normativa española vigente · Importes en EUR</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 text-xs text-fg-subtle">
-            <Info size={11} />
-            Información orientativa
-          </div>
-          <ExportPanel year={activeYear} />
-        </div>
-      </div>
+      <PageHeader
+        icon={navIcon('/fiscal')}
+        title="Fiscal"
+        badges={<EurOnlyBadge />}
+        subtitle="Método FIFO · normativa española · importes en EUR"
+        actions={
+          <>
+            <div className="flex items-center gap-1 text-xs text-fg-subtle">
+              <Info size={11} />
+              Información orientativa
+            </div>
+            <ExportPanel year={activeYear} />
+          </>
+        }
+      />
 
       <YearTabs years={years} activeYear={activeYear} overview={overview} currentYear={currentYear} onSelect={setSelectedYear} />
 

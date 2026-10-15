@@ -160,3 +160,13 @@ export function skeletonClasses(extra = ''): string {
 export function stateClasses(compact = false, extra = ''): string {
   return twMerge(['flex flex-col items-center justify-center text-center gap-2', compact ? 'py-8' : 'py-16', extra].join(' '))
 }
+
+// ── Paneles (#232) ──
+/** Entrada escalonada: cada panel aparece con un leve retraso según su posición. */
+export function panelEnterStyle(index: number): { animationDelay: string } {
+  return { animationDelay: `${Math.max(0, Math.min(index, 12)) * 60}ms` }
+}
+/** Panel con entrada animada y elevación suave al pasar el cursor. */
+export function panelClasses(extra = ''): string {
+  return twMerge('panel-in transition-shadow duration-200 hover:shadow-lg hover:shadow-black/10', extra)
+}
