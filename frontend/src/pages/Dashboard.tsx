@@ -178,11 +178,12 @@ export function Dashboard() {
       </div>
 
       {/* Distribución + Fiscal */}
+      {/* Distribución y Fiscal con la misma altura; el fiscal la llena con su gráfico mensual (#236) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className={panelClasses('rounded-xl lg:col-span-2')} style={panelEnterStyle(4)}>
+        <div className={panelClasses('rounded-xl lg:col-span-2 h-full')} style={panelEnterStyle(4)}>
           <AllocationChart lots={lots} fiatBalances={fiatBalances} />
         </div>
-        <div className={panelClasses('rounded-xl')} style={panelEnterStyle(5)}>
+        <div className={panelClasses('rounded-xl h-full')} style={panelEnterStyle(5)}>
           <FiscalCard data={fiscal} />
         </div>
       </div>

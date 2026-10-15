@@ -1,28 +1,66 @@
 import { Link } from 'react-router-dom'
-import type { FiscalYear } from '../../api/portfolio'
-import { formatEur } from '../../utils/format'
+import { useQuery } from '@tanstack/react-query'
+import { CalendarClock, Landmark, Scale } from 'lucide-react'
+import { portfolioApi, type FiscalYear } from '../../api/portfolio'
+import { formatEur, formatPercent } from '../../utils/format'
 import { EurOnlyBadge } from '../../components/EurOnlyBadge'
 import { AnimatedNumber } from '../../components/AnimatedNumber'
-import { T, alpha } from '../../utils/colors'
-import { cardClasses, PanelHeader } from '../../components/ui'
+import { PanelHeader, badgeClasses, cardClasses } from '../../components/ui'
 import { fiscalSubtitle } from '../../utils/panelSubtitles'
-import { Landmark } from 'lucide-react'
+import { baseTramosCompensada } from '../../utils/tramosIrpf'
+import { estimatedTax, gainLossShares, nextFiscalDeadline } from '../../utils/fiscalPanel'
+import { madridToday } from '../../utils/pnlChart'
+import { useTramos } from '../../hooks/useTramos'
+import { FISCAL_STALE_TIME } from '../fiscal/constants'
+import { FiscalMonthly } from './FiscalMonthly'
+
+// Panel fiscal del Dashboard (#236): resumen compacto del ejercicio en curso
+// con el G/P neto realizado, la comparación de ganancias y pérdidas, la cuota
+// IRPF estimada (con pérdidas compensadas, mismo cálculo que la página Fiscal),
+// el estado del Modelo 721 y la cuenta atrás a la próxima fecha fiscal.
+
+const SHORT_DATE = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
 export function FiscalCard({ data }: { data: FiscalYear[] }) {
   const currentYear = new Date().getFullYear()
   const current = data.find((fy) => fy.fiscal_year === currentYear) ?? data[data.length - 1]
+  const year = current?.fiscal_year
+  const tramos = useTramos()
+
+  // Mismas consultas (y caché) que la página Fiscal.
+  const { data: summary } = useQuery({
+    queryKey: ['fiscal-summary-detail', year],
+    queryFn: () => portfolioApi.getFiscalSummaryDetail(year!),
+    enabled: !!year, staleTime: FISCAL_STALE_TIME,
+  })
+  const { data: carryforward } = useQuery({ queryKey: ['fiscal-carryforward'], queryFn: portfolioApi.getFiscalCarryforward, staleTime: FISCAL_STALE_TIME })
+  const { data: monthly } = useQuery({
+    queryKey: ['fiscal-monthly', year],
+    queryFn: () => portfolioApi.getFiscalMonthly(year!),
+    enabled: !!year, staleTime: FISCAL_STALE_TIME,
+  })
+  const { data: modelo721 } = useQuery({
+    queryKey: ['fiscal-721', year],
+    queryFn: () => portfolioApi.getFiscalModelo721(year!),
+    enabled: !!year, staleTime: FISCAL_STALE_TIME,
+  })
+
   if (!current) return null
 
   const gainLoss = parseFloat(current.total_gain_loss_eur)
   const gains    = parseFloat(current.total_gains_eur)
   const losses   = parseFloat(current.total_losses_eur)
   const ops      = parseInt(current.num_operations, 10)
-  const isPos    = gainLoss >= 0
-  const accentColor = isPos ? T.positive : T.negative
+  const shares   = gainLossShares(gains, losses)
+  const cfYear   = carryforward?.detalle.find(d => d.year === year)
+  const base     = summary ? baseTramosCompensada(cfYear, summary.netoPatrimonial, summary.totalRendimientos) : null
+  const tax      = base === null ? null : estimatedTax(base, tramos)
+  const umbralPct = modelo721 ? Math.min(100, (modelo721.totalValorCustodia / modelo721.umbral) * 100) : null
+  const deadline = nextFiscalDeadline(madridToday(), !!modelo721?.superaUmbral)
 
   return (
-    <div className={cardClasses('none', 'overflow-hidden flex flex-col h-full')}>
-      {/* Header */}
+    // Misma altura que Distribución: el gráfico mensual ocupa el espacio libre (#236).
+    <div className={cardClasses('none', 'overflow-hidden h-full flex flex-col')}>
       <PanelHeader
         icon={Landmark}
         title="Fiscal"
@@ -32,29 +70,67 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
         actions={<Link to="/fiscal" className="text-xs text-brand hover:underline">Detalle →</Link>}
       />
 
-      {/* Métrica principal — centrada */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-5 gap-1">
-        <p className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest">G/P neto realizado</p>
-        <p className={`mono text-[1.7rem] font-bold tracking-tight leading-none ${isPos ? 'text-positive' : 'text-negative'}`}>
-          <AnimatedNumber value={gainLoss} countUp format={v => `${v >= 0 ? '+' : ''}${formatEur(v)}`} />
-        </p>
-        <div
-          className="mt-1 px-2 py-0.5 rounded-lg text-xs font-semibold"
-          style={{ background: `${alpha(accentColor, 8)}`, color: accentColor }}
-        >
-          {ops} operacion{ops !== 1 ? 'es' : ''}
+      <div className="p-5 flex flex-col gap-4 flex-1">
+        {/* G/P neto y cuota estimada */}
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-fg-subtle">G/P neto realizado</p>
+            <p className={`mono text-2xl font-bold tracking-tight leading-tight ${gainLoss >= 0 ? 'text-positive' : 'text-negative'}`}>
+              <AnimatedNumber value={gainLoss} countUp format={v => `${v >= 0 ? '+' : ''}${formatEur(v)}`} />
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] uppercase tracking-wider text-fg-subtle">IRPF estimado</p>
+            <p className="mono text-lg font-semibold text-fg leading-tight">{tax === null ? '—' : formatEur(tax)}</p>
+            {cfYear && cfYear.compensado > 0.01 && <p className="text-[11px] text-fg-subtle">tras compensar pérdidas</p>}
+          </div>
         </div>
-      </div>
 
-      {/* Desglose */}
-      <div className="mx-3 mb-3 rounded-xl bg-overlay/3 border border-overlay/5 divide-y divide-overlay/5">
-        <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-xs text-fg-subtle">Ganancias</span>
-          <span className="mono text-xs font-semibold text-positive">+{formatEur(gains)}</span>
+        {/* Ganancias frente a pérdidas */}
+        <div>
+          <div className="flex h-2 rounded-full overflow-hidden bg-overlay/6" role="img"
+            aria-label={`Ganancias ${formatEur(gains)}, pérdidas ${formatEur(losses)}`}>
+            <span className="h-full bg-positive transition-[width] duration-700" style={{ width: `${shares.gains}%` }} />
+            <span className="h-full bg-negative transition-[width] duration-700" style={{ width: `${shares.losses}%` }} />
+          </div>
+          <div className="flex justify-between mt-1.5 text-xs mono" aria-hidden="true">
+            <span className="text-positive">▲ +{formatEur(gains)}</span>
+            <span className="text-negative">▼ {formatEur(losses)}</span>
+          </div>
         </div>
-        <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-xs text-fg-subtle">Pérdidas</span>
-          <span className="mono text-xs font-semibold text-negative">{formatEur(losses)}</span>
+
+        {monthly && <FiscalMonthly meses={monthly.meses} />}
+
+        <div className="grid grid-cols-2 gap-2">
+          {/* Modelo 721 */}
+          <div className="rounded-xl border border-border bg-overlay/2 p-3 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-fg-subtle"><Scale size={12} aria-hidden="true" /> Modelo 721</span>
+            </div>
+            {modelo721 ? (
+              <>
+                <span className={badgeClasses(modelo721.superaUmbral ? 'negative' : 'positive')}>
+                  {modelo721.superaUmbral ? 'Obligatorio' : 'Sin obligación'}
+                </span>
+                <div className="h-1.5 rounded-full bg-overlay/6 overflow-hidden" role="img" aria-label={`${formatPercent(umbralPct ?? 0, 0)} del umbral`}>
+                  <span className={`block h-full rounded-full ${modelo721.superaUmbral ? 'bg-negative' : (umbralPct ?? 0) > 75 ? 'bg-warning' : 'bg-positive'}`}
+                    style={{ width: `${umbralPct}%` }} />
+                </div>
+                <p className="text-[11px] text-fg-subtle">{formatPercent(umbralPct ?? 0, 0)} del umbral de {formatEur(modelo721.umbral)}</p>
+              </>
+            ) : <p className="text-xs text-fg-subtle">—</p>}
+          </div>
+
+          {/* Cuenta atrás */}
+          <div className="rounded-xl border border-border bg-overlay/2 p-3 space-y-1"
+            title="Fechas habituales; consulta el calendario oficial de la AEAT">
+            <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-fg-subtle"><CalendarClock size={12} aria-hidden="true" /> Próximo plazo</span>
+            <p className="text-sm font-semibold text-fg leading-tight">{deadline.label}</p>
+            <p className="text-lg font-bold mono text-brand leading-tight">
+              {deadline.days === 0 ? 'Hoy' : `${deadline.days} ${deadline.days === 1 ? 'día' : 'días'}`}
+            </p>
+            <p className="text-[11px] text-fg-subtle">hasta el {SHORT_DATE.format(new Date(`${deadline.date}T00:00:00Z`)).replace('.', '')}</p>
+          </div>
         </div>
       </div>
     </div>
