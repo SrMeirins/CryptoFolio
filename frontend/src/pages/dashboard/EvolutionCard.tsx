@@ -1,13 +1,15 @@
 import { useId, useMemo, useState } from 'react'
-import { PnlChart } from './PnlChart'
+import { PnlChart, type PnlUnit } from './PnlChart'
 import { ValueChart } from './ValueChart'
+import { EvolutionSummary } from './EvolutionSummary'
 import { DateRangePicker } from '../../components/DateRangePicker'
 import { SegmentedControl, Tabs, cardClasses, tabId, tabPanelId } from '../../components/ui'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
 import { useLiveDayPnl } from '../../hooks/useLiveDayPnl'
 import { dailyPnlQuery, intradayPnlQuery } from '../../queries/currencyQueries'
-import { PERIOD_TITLES, PNL_PERIODS, madridToday, metricFor, type PnlPeriod } from '../../utils/pnlChart'
+import { METRIC_LABELS, PERIOD_TITLES, PNL_PERIODS, madridToday, metricFor, type PnlPeriod } from '../../utils/pnlChart'
 import { evolutionQuery, fromDaily, fromIntraday } from '../../utils/evolutionSeries'
+import { MAX_FLOW_MARKERS, applyLiveToday, periodSummary } from '../../utils/evolutionSummary'
 
 // Bloque de evolución del Dashboard (#166): pestaña P&L (rentabilidad
 // acumulada, por defecto) y pestaña Valor (valor de la cartera). Desde #215
@@ -25,6 +27,7 @@ export function EvolutionCard() {
   const [tab, setTab] = useState<Tab>('pnl')
   const [period, setPeriod] = useState<PnlPeriod>('Todo')
   const [range, setRange] = useState<{ from: string; to: string } | null>(null)
+  const [unit, setUnit] = useState<PnlUnit>('pct')
   const baseId = useId()
   const today = madridToday()
   const query = evolutionQuery(period, today, range)
@@ -38,12 +41,20 @@ export function EvolutionCard() {
   const active = query.intraday ? intraday : daily
   const currency = active.data?.currency ?? active.currency
 
-  const points = useMemo(
+  const metric = metricFor(period)
+  const series = useMemo(
     () => (query.intraday ? fromIntraday(intraday.data?.points ?? []) : fromDaily(daily.data?.days ?? [], period)),
     [query.intraday, intraday.data, daily.data, period],
   )
-  // Valor de hoy con los precios en vivo (#213), con el mismo modelo que la serie.
+  // El día de hoy se mueve con los precios en vivo (#213, #214).
   const liveToday = useLiveDayPnl(query.intraday ? null : daily.data?.today, currency)
+  const points = useMemo(() => applyLiveToday(series, liveToday, metric), [series, liveToday, metric])
+  const summary = useMemo(() => periodSummary(points, query.intraday), [points, query.intraday])
+  const valueChange = points.length >= 2 ? points[points.length - 1].value - points[0].value : null
+  const labels = METRIC_LABELS[metric]
+  const approximate = query.intraday ? intraday.data?.approximate ?? [] : []
+  const refreshing = !query.intraday && !!daily.data?.refreshing
+  const animationKey = `${period}-${range?.from ?? ''}-${range?.to ?? ''}-${tab}-${unit}`
 
   function pickRange(from: string, to: string) {
     if (!from && !to) {
@@ -55,7 +66,7 @@ export function EvolutionCard() {
     setPeriod('Rango')
   }
 
-  const state = { loading: active.isLoading, error: active.isError, intraday: query.intraday, currency, points }
+  const state = { loading: active.isLoading, error: active.isError, intraday: query.intraday, currency, points, animationKey }
 
   return (
     <div className={cardClasses('none', 'px-5 py-5')}>
@@ -80,10 +91,35 @@ export function EvolutionCard() {
       </div>
 
       <div id={tabPanelId(baseId)} role="tabpanel" aria-labelledby={tabId(baseId, tab)}>
-        {tab === 'pnl'
-          ? <PnlChart {...state} metric={metricFor(period)} refreshing={!query.intraday && !!daily.data?.refreshing}
-              approximate={query.intraday ? intraday.data?.approximate ?? [] : []} />
-          : <ValueChart {...state} liveValue={liveToday?.value ?? null} />}
+        <EvolutionSummary
+          summary={summary}
+          currency={currency}
+          intraday={query.intraday}
+          mode={tab}
+          valueChange={valueChange}
+          metricLabel={labels.short}
+          metricHelp={
+            <>
+              <p>{labels.help}</p>
+              {query.intraday && <p>Últimas 24 horas, un punto cada 15 minutos y el último con los precios en vivo.</p>}
+              <p>Los puntos verdes y rojos sobre la curva son depósitos y retiradas de capital (en periodos largos, los {MAX_FLOW_MARKERS} de mayor importe).</p>
+              <p>Máxima caída: mayor bajada de la rentabilidad desde un máximo del periodo, sin contar depósitos ni retiradas.</p>
+              {approximate.length > 0 && (
+                <p>Sin precios de 15 min (valorados con el precio actual): <span className="mono">{approximate.join(', ')}</span></p>
+              )}
+            </>
+          }
+          extra={
+            <>
+              {refreshing && <span className="text-xs text-fg-subtle">Descargando precios de cierre…</span>}
+              {tab === 'pnl' && (
+                <SegmentedControl label="Unidad de la curva" value={unit} onChange={setUnit}
+                  options={[{ value: 'pct', label: '%', title: 'Rentabilidad en %' }, { value: 'eur', label: currency === 'USD' ? '$' : '€', title: `P&L en ${currency}` }]} />
+              )}
+            </>
+          }
+        />
+        {tab === 'pnl' ? <PnlChart {...state} unit={unit} /> : <ValueChart {...state} />}
       </div>
     </div>
   )
