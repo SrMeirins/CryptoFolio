@@ -1,4 +1,5 @@
 import { Fragment, useState, useMemo, useRef, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi, Transaction } from '../api/portfolio'
 import {
@@ -53,7 +54,10 @@ export function History() {
   const toast       = useToast()
   const searchRef   = useRef<HTMLInputElement>(null)
 
-  const [filters, setFilters]         = useState<Filters>(INITIAL)
+  // ?buscar=XRP&tx=<id> llega desde la actividad reciente del Dashboard (#237).
+  const [params] = useSearchParams()
+  const focusTx = params.get('tx')
+  const [filters, setFilters]         = useState<Filters>(() => ({ ...INITIAL, search: params.get('buscar') ?? '' }))
   const [sortKey, setSortKey]         = useState<SortKey>('fecha')
   const [sortDir, setSortDir]         = useState<SortDir>('desc')
   const [deletingId, setDeletingId]   = useState<string | null>(null)
@@ -330,6 +334,7 @@ export function History() {
                           isDeleting={deletingId === tx.id}
                           searchTerm={filters.search}
                           currency={currency}
+                          defaultExpanded={tx.id === focusTx}
                         />
                       ))}
                     </Fragment>
