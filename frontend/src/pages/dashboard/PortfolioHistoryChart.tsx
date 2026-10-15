@@ -3,7 +3,9 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { formatMoney } from '../../utils/format'
+import { formatMoney, formatMoneyCompact, type Currency } from '../../utils/format'
+import { dayMs, formatTick, niceTicks, tickDecimals, timeAxis } from '../../utils/chartAxes'
+import { madridToday } from '../../utils/pnlChart'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
 import { portfolioHistoryQuery } from '../../queries/currencyQueries'
 import { useChartColors } from '../../hooks/useChartColors'
@@ -17,11 +19,11 @@ const PERIODS = [
   { key: 'all', label: 'Todo' },
 ]
 
-function fmtChartDate(dateStr: string, period: string): string {
-  const d = new Date(dateStr)
-  if (period === '1m')  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
-  if (period === '3m')  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
-  return d.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
+const LONG_DATE = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+
+/** Importe de una marca del eje: sin decimales salvo que el paso los necesite. */
+function axisMoney(v: number, decimals: number, currency: Currency): string {
+  return decimals === 0 ? formatMoneyCompact(v, currency) : formatMoney(v, currency)
 }
 
 // `headerLeft` sustituye al título (lo usa EvolutionCard para poner las pestañas).
@@ -48,25 +50,29 @@ export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentVal
   // datos reales.
   const points = useMemo(() => data?.points ?? [], [data])
 
-  const { minVal, maxVal, eurChange, isPositive } = useMemo(() => {
-    if (points.length < 2) return { minVal: 0, maxVal: 0, eurChange: 0, isPositive: true }
-    const last = currentValue ?? points[points.length - 1].value
-    const vals = [...points.map(p => p.value)]
-    if (currentValue != null) vals[vals.length - 1] = currentValue
-    const minVal    = Math.min(...vals)
-    const maxVal    = Math.max(...vals)
-    const first     = points[0].value
-    const eurChange = last - first
-    return { minVal, maxVal, eurChange, isPositive: eurChange >= 0 }
+  // Serie con fechas reales (#212). El valor en vivo es el punto de hoy: si el
+  // último punto ya es de hoy lo sustituye; si no (series semanales), se añade
+  // con su fecha, en lugar de renombrar el último y descuadrar el eje.
+  const chartData = useMemo(() => {
+    const series = points.map(p => ({ x: dayMs(p.date.slice(0, 10)), value: p.value }))
+    if (currentValue != null && series.length > 0) {
+      const todayMs = dayMs(madridToday())
+      if (series[series.length - 1].x >= todayMs) series[series.length - 1] = { x: series[series.length - 1].x, value: currentValue }
+      else series.push({ x: todayMs, value: currentValue })
+    }
+    return series
   }, [points, currentValue])
 
+  const eurChange = chartData.length >= 2 ? chartData[chartData.length - 1].value - chartData[0].value : 0
+  const isPositive = eurChange >= 0
   const color = isPositive ? c.up : c.down
 
-  const today = new Date().toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
-  const chartData = points.map((p, i) => ({
-    date: i === points.length - 1 ? today : fmtChartDate(p.date, period),
-    value: i === points.length - 1 && currentValue != null ? currentValue : p.value,
-  }))
+  const xAxis = useMemo(() => timeAxis(chartData.map(p => p.x)), [chartData])
+  const yTicks = useMemo(() => {
+    const vals = chartData.map(p => p.value)
+    return vals.length ? niceTicks(Math.min(...vals), Math.max(...vals), 4) : []
+  }, [chartData])
+  const yDecimals = tickDecimals(yTicks)
 
   return (
     <div className={cardClasses('none', 'px-5 py-5')}>
@@ -79,7 +85,7 @@ export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentVal
 
       {/* Variación del periodo + estado de actualización */}
       <div className="flex items-center gap-3 mb-4">
-        {points.length >= 2 && (
+        {chartData.length >= 2 && (
           <p className={`text-xs mono ${isPositive ? 'text-positive' : 'text-negative'}`}>
             {isPositive ? '▲' : '▼'} {eurChange >= 0 ? '+' : ''}{formatMoney(eurChange, currency)} en el periodo
           </p>
@@ -120,19 +126,26 @@ export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentVal
               </defs>
               <CartesianGrid vertical={false} stroke={c.grid} />
               <XAxis
-                dataKey="date"
+                dataKey="x"
+                type="number"
+                scale="time"
+                domain={xAxis.domain}
+                ticks={xAxis.ticks}
+                interval={0}
+                tickFormatter={(x: number) => formatTick(x, xAxis.unit)}
                 tick={{ fontSize: 12, fill: c.axis }}
                 axisLine={false}
                 tickLine={false}
-                interval="preserveStartEnd"
               />
               <YAxis
-                domain={[minVal * 0.97, maxVal * 1.02]}
+                domain={[yTicks[0], yTicks[yTicks.length - 1]]}
+                ticks={yTicks}
+                interval={0}
                 tick={{ fontSize: 12, fill: c.axis }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(v: number) => formatMoney(v, currency)}
-                width={72}
+                tickFormatter={(v: number) => axisMoney(v, yDecimals, currency)}
+                width={76}
               />
               <RechartsTooltip
                 contentStyle={{
@@ -142,6 +155,7 @@ export function PortfolioHistoryChart({ currentValue, headerLeft }: { currentVal
                   fontSize: 12,
                 }}
                 labelStyle={{ color: c.tooltipLabel, marginBottom: 4 }}
+                labelFormatter={(x: number) => LONG_DATE.format(new Date(x))}
                 formatter={(v: number) => [formatMoney(v, currency), 'Valor']}
               />
               <Area

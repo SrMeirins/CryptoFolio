@@ -9,6 +9,7 @@ import { dailyPnlQuery } from '../../queries/currencyQueries'
 import {
   PNL_PERIODS, METRIC_LABELS, buildPnlSeries, madridToday, metricFor, periodFrom, type PnlPeriod, type PnlPoint,
 } from '../../utils/pnlChart'
+import { dayMs, formatTick, niceTicks, tickDecimals, timeAxis } from '../../utils/chartAxes'
 import { useChartColors } from '../../hooks/useChartColors'
 import { SegmentedControl, cardClasses } from '../../components/ui'
 
@@ -18,13 +19,6 @@ import { SegmentedControl, cardClasses } from '../../components/ui'
 
 const signed = (n: number, digits = 2) => formatPercent(n, digits, true)
 const signedMoney = (n: number, currency: Currency) => `${n >= 0 ? '+' : ''}${formatMoney(n, currency)}`
-
-function fmtAxisDate(date: string, period: PnlPeriod): string {
-  const d = new Date(`${date}T12:00:00Z`)
-  return period === '7D' || period === '30D'
-    ? d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', timeZone: 'Europe/Madrid' })
-    : d.toLocaleDateString('es-ES', { month: 'short', year: '2-digit', timeZone: 'Europe/Madrid' })
-}
 
 function fmtLongDate(date: string): string {
   return new Date(`${date}T12:00:00Z`).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Madrid' })
@@ -55,7 +49,14 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
   )
   const currency = data?.currency ?? requested
 
-  const series = useMemo(() => buildPnlSeries(data?.days ?? [], period), [data, period])
+  const series = useMemo(() => buildPnlSeries(data?.days ?? [], period).map(p => ({ ...p, x: dayMs(p.date) })), [data, period])
+  // Ejes alineados al calendario y con valores redondos (#212).
+  const xAxis = useMemo(() => timeAxis(series.map(p => p.x)), [series])
+  const yTicks = useMemo(() => {
+    const pcts = series.map(p => p.pct)
+    return pcts.length ? niceTicks(Math.min(...pcts), Math.max(...pcts), 4, true) : []
+  }, [series])
+  const yDecimals = tickDecimals(yTicks)
   const metric = METRIC_LABELS[metricFor(period)]
   const last = series[series.length - 1]
   const positive = (last?.pct ?? 0) >= 0
@@ -109,22 +110,29 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
               </defs>
               <CartesianGrid vertical={false} stroke={c.grid} />
               <XAxis
-                dataKey="date"
-                tickFormatter={(d: string) => fmtAxisDate(d, period)}
+                dataKey="x"
+                type="number"
+                scale="time"
+                domain={xAxis.domain}
+                ticks={xAxis.ticks}
+                interval={0}
+                tickFormatter={(x: number) => formatTick(x, xAxis.unit)}
                 tick={{ fontSize: 12, fill: c.axis }}
                 axisLine={false}
                 tickLine={false}
-                interval="preserveStartEnd"
-                minTickGap={24}
               />
               <YAxis
+                domain={[yTicks[0], yTicks[yTicks.length - 1]]}
+                ticks={yTicks}
+                interval={0}
                 tick={{ fontSize: 12, fill: c.axis }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(v: number) => formatPercent(v, 0)}
-                width={44}
+                tickFormatter={(v: number) => formatPercent(v, yDecimals)}
+                width={52}
               />
-              <ReferenceLine y={0} stroke={c.cursor} strokeDasharray="3 3" />
+              {/* Línea del 0 % destacada sobre la rejilla */}
+              <ReferenceLine y={0} stroke={c.axis} strokeWidth={1.25} />
               <RechartsTooltip content={<ChartTooltip currency={currency} />} />
               <Area
                 type="monotone"
