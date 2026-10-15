@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { getDailyPnl } from '../modules/pnl/pnlService';
 import { getIntradayPnl } from '../modules/pnl/intraday';
+import { getDayDetail } from '../modules/pnl/dayDetail';
 import { madridDateOf } from '../modules/prices/closePrices';
 import { currencySchema } from '../modules/fiat/displayCurrency';
 import { sendInternalError } from '../middleware/errorHandler';
@@ -63,6 +64,29 @@ router.get('/intraday', async (req: Request, res: Response) => {
     res.json(await getIntradayPnl(parsed.data.currency));
   } catch (e) {
     sendInternalError(res, e, 'GET /api/v1/pnl/intraday');
+  }
+});
+
+const dayQuerySchema = z.object({ date: daySchema, currency: currencySchema }).strict()
+  .refine(q => q.date <= madridDateOf(Date.now()), { message: 'date no puede ser futura' });
+
+// GET /api/v1/pnl/day?date=YYYY-MM-DD&currency=EUR|USD
+// Detalle de un día del calendario: cifras y reparto del P&L por activo (#216).
+router.get('/day', async (req: Request, res: Response) => {
+  const parsed = dayQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Parámetros inválidos: date en formato YYYY-MM-DD, no futura; currency=EUR|USD' });
+    return;
+  }
+  try {
+    const detail = await getDayDetail(parsed.data.date, parsed.data.currency);
+    if (!detail) {
+      res.status(404).json({ error: 'Sin actividad ese día' });
+      return;
+    }
+    res.json(detail);
+  } catch (e) {
+    sendInternalError(res, e, 'GET /api/v1/pnl/day');
   }
 });
 
