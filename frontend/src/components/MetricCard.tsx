@@ -3,9 +3,8 @@ import { AnimatedNumber } from './AnimatedNumber'
 import { Change24hChip } from './Change24hChip'
 import { cardClasses } from './ui'
 
-// Variación de 24h, mostrada como chip en la cabecera de la tarjeta para que
-// todas las tarjetas tengan la misma altura (#152). Nunca se oculta: sin dato
-// se muestra "24h —" con el motivo (#147).
+// Variación de 24h, mostrada como chip en la línea secundaria de la tarjeta
+// Valor (#210). Nunca se oculta: sin dato se muestra "24h —" con el motivo (#147).
 export type Change24h =
   | {
       kind: 'value'
@@ -27,22 +26,25 @@ interface MetricCardProps {
   loading?: boolean
   tooltip?: React.ReactNode
   change24h?: Change24h
+  /** Línea secundaria bajo el valor (#210); hasta dos líneas. */
+  secondary?: React.ReactNode
 }
 
 export function MetricCard({
-  label, value, rawValue, format, positive, loading, tooltip, change24h,
+  label, value, rawValue, format, positive, loading, tooltip, change24h, secondary,
 }: MetricCardProps) {
   const colorClass =
     positive === undefined ? 'text-fg' :
     positive ? 'text-positive' : 'text-negative'
 
   return (
-    <div className={cardClasses('none', 'metric-card px-5 py-5 flex flex-col items-center text-center gap-2')}>
-      {/* Si una variación muy grande no cabe, el chip baja de línea en vez de desbordar */}
-      <div className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1">
+    // Rejilla fija de tres filas (#210): etiqueta, valor y línea secundaria
+    // ocupan la misma altura en todas las tarjetas, haya o no dato secundario,
+    // así que quedan alineadas entre sí en cualquier ancho.
+    <div className={cardClasses('none', 'metric-card px-5 py-5 grid grid-rows-[1.25rem_2rem_2.5rem] justify-items-center items-center text-center gap-y-2')}>
+      <div className="flex items-center justify-center gap-1.5 min-w-0">
         <p className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest leading-none whitespace-nowrap">{label}</p>
         {tooltip && <InfoTooltip label={label}>{tooltip}</InfoTooltip>}
-        {change24h && <Change24hChip change={change24h} />}
       </div>
 
       {loading
@@ -57,6 +59,10 @@ export function MetricCard({
         )
       }
 
+      <div className="self-start flex flex-col items-center gap-0.5 text-xs text-fg-subtle mono leading-tight">
+        {change24h && <Change24hChip change={change24h} />}
+        {secondary}
+      </div>
     </div>
   )
 }

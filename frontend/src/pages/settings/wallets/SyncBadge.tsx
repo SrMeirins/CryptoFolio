@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react'
 import type { WalletAddress } from '../../../api/portfolio'
 import { SYNC_BADGE } from './helpers'
 import { iconButtonClasses } from '../../../components/ui'
+import { formatNumber } from '../../../utils/format'
 
 export function SyncBadge({ addr, onSync, syncing }: { addr: WalletAddress; onSync: () => void; syncing: boolean }) {
   const [showDetail, setShowDetail] = useState(false)
@@ -25,7 +26,7 @@ export function SyncBadge({ addr, onSync, syncing }: { addr: WalletAddress; onSy
             <p key={d.asset} className="text-xs text-fg-muted">
               <span className="font-medium text-fg">{d.asset}</span> — Real: {d.onchain_balance ?? '—'} · App: {d.expected_balance}
               {d.status === 'discrepancy' && d.onchain_balance !== null && (
-                <span className="text-warning"> · Diferencia: {(d.onchain_balance - d.expected_balance).toFixed(6)}</span>
+                <span className="text-warning"> · Diferencia: {formatNumber(d.onchain_balance - d.expected_balance, 6, 6)}</span>
               )}
             </p>
           ))}

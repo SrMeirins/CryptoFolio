@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { formatMoney, type Currency } from '../../utils/format'
+import { formatMoney, type Currency, formatPercent } from '../../utils/format'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
 import { dailyPnlQuery } from '../../queries/currencyQueries'
 import { madridToday } from '../../utils/pnlChart'
@@ -21,7 +21,7 @@ const GREEN_BG = ['', 'bg-positive/[0.07]', 'bg-positive/13', 'bg-positive/20', 
 const RED_BG = ['', 'bg-negative/[0.07]', 'bg-negative/13', 'bg-negative/20', 'bg-negative/30']
 
 const signedMoney = (n: number, currency: Currency) => `${n > 0 ? '+' : ''}${formatMoney(n, currency)}`
-const signedPct = (n: number) => `${n > 0 ? '+' : ''}${n.toFixed(2)}%`
+const signedPct = (n: number) => formatPercent(n, 2, true)
 
 function longDate(date: string): string {
   return new Date(`${date}T12:00:00Z`).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })

@@ -3,13 +3,20 @@ export type Currency = 'EUR' | 'USD'
 
 // Formatters cacheados por moneda y decimales: crear un Intl.NumberFormat es
 // caro y estos formateadores se llaman en cada tick de precios.
+//
+// Separador de miles siempre (#210): es-ES por defecto no agrupa los números de
+// cuatro cifras ("8981,02 €" junto a "10.931,61 €"); useGrouping 'always'
+// (Intl.NumberFormat v3, tipos de ES2023.Intl) los agrupa todos.
+const esFormat = (options: Intl.NumberFormatOptions) =>
+  new Intl.NumberFormat('es-ES', { ...options, useGrouping: 'always' })
+
 const _moneyFormatters = new Map<string, Intl.NumberFormat>()
 function moneyFmt(currency: Currency, decimals: number): Intl.NumberFormat {
   const key = `${currency}:${decimals}`
   let fmt = _moneyFormatters.get(key)
   if (!fmt) {
     // narrowSymbol: "$" en lugar de "US$" en es-ES.
-    fmt = new Intl.NumberFormat('es-ES', {
+    fmt = esFormat({
       style: 'currency', currency, currencyDisplay: 'narrowSymbol',
       minimumFractionDigits: decimals, maximumFractionDigits: decimals,
     })
@@ -18,7 +25,28 @@ function moneyFmt(currency: Currency, decimals: number): Intl.NumberFormat {
   return fmt
 }
 
-/** Importe con 2 decimales en la moneda indicada (p. ej. "1234,56 €", "-10,00 $"). */
+const _numberFormatters = new Map<string, Intl.NumberFormat>()
+
+/**
+ * Número en formato español con separador de miles siempre y coma decimal
+ * (p. ej. "1.234,5"). `maxDecimals` y `minDecimals` acotan los decimales.
+ */
+export function formatNumber(value: number, maxDecimals = 2, minDecimals = 0): string {
+  const key = `${minDecimals}:${maxDecimals}`
+  let fmt = _numberFormatters.get(key)
+  if (!fmt) {
+    fmt = esFormat({ minimumFractionDigits: minDecimals, maximumFractionDigits: maxDecimals })
+    _numberFormatters.set(key, fmt)
+  }
+  return fmt.format(value)
+}
+
+/** Porcentaje con coma decimal y decimales fijos (p. ej. "-17,84%"); `signed` añade "+" a los positivos. */
+export function formatPercent(value: number, decimals = 2, signed = false): string {
+  return `${signed && value > 0 ? '+' : ''}${formatNumber(value, decimals, decimals)}%`
+}
+
+/** Importe con 2 decimales en la moneda indicada (p. ej. "1.234,56 €", "-10,00 $"). */
 export function formatMoney(value: number, currency: Currency = 'EUR'): string {
   return moneyFmt(currency, 2).format(value)
 }
@@ -75,10 +103,10 @@ export function formatAmount(value: number | string | null | undefined, decimals
   const v = typeof value === 'string' ? parseFloat(value) : value
   if (isNaN(v)) return '—'
   const abs = Math.abs(v)
-  if (abs >= 1_000_000) return v.toLocaleString('es-ES', { maximumFractionDigits: 0 })
-  if (abs >= 1000)      return v.toLocaleString('es-ES', { maximumFractionDigits: 2 })
-  if (abs >= 1)         return v.toLocaleString('es-ES', { maximumFractionDigits: 4 })
-  return v.toLocaleString('es-ES', { maximumFractionDigits: decimals })
+  if (abs >= 1_000_000) return formatNumber(v, 0)
+  if (abs >= 1000)      return formatNumber(v, 2)
+  if (abs >= 1)         return formatNumber(v, 4)
+  return formatNumber(v, decimals)
 }
 
 export function pnlColor(value: number): string {
@@ -88,7 +116,7 @@ export function pnlColor(value: number): string {
 }
 
 export function formatPct(value: number): string {
-  return (value >= 0 ? '+' : '') + value.toFixed(2) + '%'
+  return (value >= 0 ? '+' : '') + formatNumber(value, 2, 2) + '%'
 }
 
 /** Importe en EUR sin decimales, para espacios reducidos (p. ej. "-203 €"). */

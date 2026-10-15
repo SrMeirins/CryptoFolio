@@ -3,7 +3,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ReferenceLine, ResponsiveContainer,
 } from 'recharts'
 import { InfoTooltip } from '../../components/InfoTooltip'
-import { formatMoney, type Currency } from '../../utils/format'
+import { formatMoney, type Currency, formatPercent } from '../../utils/format'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
 import { dailyPnlQuery } from '../../queries/currencyQueries'
 import {
@@ -16,7 +16,7 @@ import { SegmentedControl, cardClasses } from '../../components/ui'
 // GET /api/v1/pnl/daily. Mientras el backend descarga precios de cierre
 // (`refreshing`) se reconsulta cada 5 s; después, cada minuto para el día en curso.
 
-const signed = (n: number, digits = 2) => `${n >= 0 ? '+' : ''}${n.toFixed(digits)}%`
+const signed = (n: number, digits = 2) => formatPercent(n, digits, true)
 const signedMoney = (n: number, currency: Currency) => `${n >= 0 ? '+' : ''}${formatMoney(n, currency)}`
 
 function fmtAxisDate(date: string, period: PnlPeriod): string {
@@ -121,7 +121,7 @@ export function PnlChart({ headerLeft }: { headerLeft?: ReactNode }) {
                 tick={{ fontSize: 12, fill: c.axis }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                tickFormatter={(v: number) => formatPercent(v, 0)}
                 width={44}
               />
               <ReferenceLine y={0} stroke={c.cursor} strokeDasharray="3 3" />

@@ -1,5 +1,6 @@
 import type { Transaction } from '../../api/portfolio'
 import type { Currency } from '../../utils/format'
+import { formatNumber } from '../../utils/format'
 
 export function fmtDate(ts: string): { date: string; time: string } {
   const d = new Date(ts)
@@ -66,8 +67,8 @@ export function formatPriceLine(tx: Transaction): string | null {
   const p = parseFloat(tx.price_per_unit)
   if (isNaN(p) || p <= 0) return null
   const sym = tx.cost_asset ?? 'EUR'
-  if (p >= 10000) return `${p.toLocaleString('es-ES', { maximumFractionDigits: 0 })} ${sym}`
-  if (p >= 100)   return `${p.toFixed(2)} ${sym}`
-  if (p >= 1)     return `${p.toFixed(4)} ${sym}`
-  return `${p.toFixed(6)} ${sym}`
+  if (p >= 10000) return `${formatNumber(p, 0)} ${sym}`
+  if (p >= 100)   return `${formatNumber(p, 2, 2)} ${sym}`
+  if (p >= 1)     return `${formatNumber(p, 4, 4)} ${sym}`
+  return `${formatNumber(p, 6, 6)} ${sym}`
 }

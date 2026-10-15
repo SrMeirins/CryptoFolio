@@ -5,7 +5,7 @@ import {
 import type { Transaction } from '../../api/portfolio'
 import { CopyButton } from '../../components/CopyButton'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import { formatMoney, formatPrice, formatAmount, type Currency } from '../../utils/format'
+import { formatMoney, formatPrice, formatAmount, type Currency, formatNumber } from '../../utils/format'
 import { OP_META } from '../../constants/operations'
 import { fmtDate, calcEurValue, calcFeeEur, formatPriceLine, toDisplayAmount } from './helpers'
 import { T, alpha, ink } from '../../utils/colors'
@@ -214,7 +214,7 @@ export function TxRow({
               {tx.price_per_unit && (
                 <div>
                   <div className="text-[11px] text-fg-subtle uppercase tracking-widest mb-1">Precio unitario</div>
-                  <div className="mono text-fg">{parseFloat(tx.price_per_unit).toFixed(8)} {tx.cost_asset ?? 'EUR'}</div>
+                  <div className="mono text-fg">{formatNumber(parseFloat(tx.price_per_unit), 8, 8)} {tx.cost_asset ?? 'EUR'}</div>
                 </div>
               )}
               {tx.destination_wallet_name && (
@@ -241,7 +241,7 @@ export function TxRow({
                   <div className="text-xs text-warning/80 mono">
                     {new Date(tx.linked_tx_timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
                     {' · '}
-                    {tx.linked_tx_amount ? parseFloat(tx.linked_tx_amount).toFixed(6) : ''} {tx.linked_tx_asset}
+                    {tx.linked_tx_amount ? formatNumber(parseFloat(tx.linked_tx_amount), 6, 6) : ''} {tx.linked_tx_asset}
                   </div>
                 </div>
               )}

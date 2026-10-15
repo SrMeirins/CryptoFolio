@@ -1,5 +1,5 @@
 import { Scale, Info } from 'lucide-react'
-import { formatEur } from '../../utils/format'
+import { formatEur, formatPercent } from '../../utils/format'
 import { useTramos } from '../../hooks/useTramos'
 import { calcularTramos, tramoActivo } from '../../utils/tramosIrpf'
 import { FiscalChartCard } from './FiscalChartCard'
@@ -21,7 +21,7 @@ export function TramosIRPF({ base, label }: { base: number; label: string }) {
       title={label}
       right={
         <div className="flex items-center gap-3 text-xs">
-          <span className="text-fg-subtle">Tipo medio <span className="text-fg font-bold mono">{tipoMedio.toFixed(1)}%</span></span>
+          <span className="text-fg-subtle">Tipo medio <span className="text-fg font-bold mono">{formatPercent(tipoMedio, 1)}</span></span>
           <span className="text-fg-subtle">Tipo marginal <span className="text-warning font-bold mono">{tipoMarginal}%</span></span>
         </div>
       }

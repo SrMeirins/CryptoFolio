@@ -2,14 +2,14 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { portfolioApi } from '../api/portfolio'
 import { usePricesStore } from '../store/pricesStore'
-import { formatMoney, formatMoneyCompact } from '../utils/format'
+import { formatMoney, formatMoneyCompact, formatPercent } from '../utils/format'
 import { type Change24h } from '../components/MetricCard'
 import { PortfolioSummaryCards } from '../components/PortfolioSummaryCards'
 import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
 import { useDisplayMarket } from '../hooks/useDisplayMarket'
 import { useCurrencyQuery } from '../hooks/useCurrencyQuery'
 import { LIVE_STATUS_META, useLiveStatus } from '../hooks/useLiveStatus'
-import { eurFlowQuery } from '../queries/currencyQueries'
+import { dailyPnlQuery, eurFlowQuery } from '../queries/currencyQueries'
 import { computeChange24h } from '../utils/change24h'
 import { TopMovers } from './dashboard/TopMovers'
 import { RecentActivity } from './dashboard/RecentActivity'
@@ -17,6 +17,9 @@ import { EvolutionCard } from './dashboard/EvolutionCard'
 import { PnlCalendar } from './dashboard/PnlCalendar'
 import { AllocationChart } from './dashboard/AllocationChart'
 import { FiscalCard } from './dashboard/FiscalCard'
+import { madridToday } from '../utils/pnlChart'
+import { monthRange, ymOf } from '../utils/pnlCalendar'
+import { useLiveDayPnl } from '../hooks/useLiveDayPnl'
 
 export function Dashboard() {
   // Precios en la moneda de visualización (#177): en USD sin USDT aún, vacíos.
@@ -47,8 +50,18 @@ export function Dashboard() {
 
   const {
     assets, cryptoValue, fiatValue: totalFiat, totalValue, totalCost,
-    pnl: totalPnl, pnlPct: totalPnlPct,
+    pnl: totalPnl, pnlPct: totalPnlPct, assetCount,
   } = usePortfolioValuation(lots, fiatBalances)
+
+  // «Hoy» de la tarjeta de P&L (#210): misma consulta (y caché) que el mes en
+  // curso del calendario y mismo cálculo en vivo, así que ambas cifras coinciden.
+  const today = madridToday()
+  const month = monthRange(ymOf(today), today)
+  const { data: monthPnl } = useCurrencyQuery(
+    c => dailyPnlQuery(c, month?.from, month?.to),
+    { refetchInterval: 60_000, enabled: month !== null },
+  )
+  const liveToday = useLiveDayPnl(monthPnl?.currency === currency ? monthPnl.today : null, currency)
   const hasPrices = Object.keys(prices).length > 0
 
   // Variación de 24h en tiempo real con el precio de hace 24h del WebSocket (#147).
@@ -65,9 +78,9 @@ export function Dashboard() {
     return {
       kind: 'value',
       eur: (result.eur >= 0 ? '+' : '') + formatMoney(result.eur, currency),
-      pct: (result.pct >= 0 ? '+' : '') + result.pct.toFixed(2) + '%',
+      pct: formatPercent(result.pct, 2, true),
       eurCompact: (result.eur >= 0 ? '+' : '') + formatMoneyCompact(result.eur, currency),
-      pctCompact: (result.pct >= 0 ? '+' : '') + result.pct.toFixed(1) + '%',
+      pctCompact: formatPercent(result.pct, 1, true),
       positive: result.eur >= 0,
       note: result.excluded.length > 0
         ? <p>Sin precio de hace 24h, excluidos del cálculo: <span className="mono text-fg">{result.excluded.join(', ')}</span></p>
@@ -101,6 +114,8 @@ export function Dashboard() {
         loading={lotsLoading}
         change24h={change24h}
         currency={currency}
+        assetCount={assetCount}
+        todayPnl={liveToday?.pnl ?? null}
         eurFlow={eurFlow}
         valueTooltip={
           <>

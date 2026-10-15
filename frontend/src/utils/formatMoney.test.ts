@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatEur, formatEurCompact, formatMoney, formatMoneyCompact, formatPrice } from './format'
+import { formatAmount, formatEur, formatEurCompact, formatMoney, formatMoneyCompact, formatNumber, formatPct, formatPercent, formatPrice } from './format'
 
 // Intl separa con espacio no separable (U+00A0) antes del símbolo; se normaliza para comparar.
 const norm = (s: string) => s.replace(/\u00a0/g, ' ')
@@ -35,5 +35,26 @@ describe('formatPrice con moneda', () => {
   it('cero o no finito: 0,00 en la moneda pedida', () => {
     expect(norm(formatPrice(0))).toBe('0,00 €')
     expect(norm(formatPrice(NaN, 'USD'))).toBe('0,00 $')
+  })
+})
+
+describe('separador de miles y coma decimal en toda la app (#210)', () => {
+  it('los importes de cuatro cifras también se agrupan, igual que los de cinco', () => {
+    expect(norm(formatMoney(8981.02))).toBe('8.981,02 €')
+    expect(norm(formatMoney(10931.61))).toBe('10.931,61 €')
+    expect(norm(formatMoneyCompact(-1950, 'USD'))).toBe('-1.950 $')
+    expect(norm(formatMoney(999.5))).toBe('999,50 €')
+  })
+  it('números y cantidades con el mismo criterio', () => {
+    expect(formatNumber(1234.5)).toBe('1.234,5')
+    expect(formatNumber(1234.5678, 0)).toBe('1.235')
+    expect(formatNumber(0.5, 2, 2)).toBe('0,50')
+    expect(formatAmount(2500)).toBe('2.500')
+  })
+  it('porcentajes con coma decimal y signo opcional', () => {
+    expect(formatPercent(-17.844)).toBe('-17,84%')
+    expect(formatPercent(5.5, 1, true)).toBe('+5,5%')
+    expect(formatPercent(0, 2, true)).toBe('0,00%')
+    expect(formatPct(3.2)).toBe('+3,20%')
   })
 })

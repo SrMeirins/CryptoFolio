@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import type { FifoLot, FiatBalance } from '../../api/portfolio'
 import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
-import { formatMoney } from '../../utils/format'
+import { formatMoney, formatPercent } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
 import { cardClasses } from '../../components/ui'
 
@@ -23,7 +23,7 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: { payl
     <div className="bg-tooltip/95 backdrop-blur-xs border border-overlay/10 rounded-xl px-3 py-2.5 shadow-xl text-xs">
       <p className="font-semibold text-fg mono mb-0.5">{item.name}</p>
       <p className="text-fg">{formatMoney(item.value, currency)}</p>
-      <p className="text-fg-subtle">{item.pct.toFixed(1)}% del portfolio</p>
+      <p className="text-fg-subtle">{formatPercent(item.pct, 1)} del portfolio</p>
     </div>
   )
 }
@@ -92,7 +92,7 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
             {hoveredEntry ? (
               <>
                 <p className="text-base font-bold text-fg mono tracking-tight">{hoveredEntry.name}</p>
-                <p className="text-2xl font-semibold mono text-fg">{hoveredEntry.pct.toFixed(1)}%</p>
+                <p className="text-2xl font-semibold mono text-fg">{formatPercent(hoveredEntry.pct, 1)}</p>
                 <p className="text-xs text-fg-subtle mono">{formatMoney(hoveredEntry.value, currency)}</p>
               </>
             ) : (
@@ -124,7 +124,7 @@ export function AllocationDonut({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
                   </div>
                   <div className="flex items-center gap-3 shrink-0 ml-2">
                     <span className="text-xs text-fg-subtle mono">{formatMoney(entry.value, currency)}</span>
-                    <span className="text-xs font-semibold mono w-10 text-right" style={{ color }}>{entry.pct.toFixed(1)}%</span>
+                    <span className="text-xs font-semibold mono w-10 text-right" style={{ color }}>{formatPercent(entry.pct, 1)}</span>
                   </div>
                 </div>
                 {/* Barra proporcional */}

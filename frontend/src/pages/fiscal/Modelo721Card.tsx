@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AlertTriangle, Info, ChevronDown, ChevronUp } from 'lucide-react'
-import { formatEur, pnlColor } from '../../utils/format'
+import { formatEur, pnlColor, formatPercent, formatNumber } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import type { Modelo721 } from './types'
 import { T, alpha, ink } from '../../utils/colors'
@@ -82,7 +82,7 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
         </div>
         <div className="flex justify-between text-xs text-fg-subtle mt-0.5">
           <span>0 €</span>
-          <span>{pctUmbral.toFixed(0)}% del umbral</span>
+          <span>{formatPercent(pctUmbral, 0)} del umbral</span>
           <span>{formatEur(data.umbral)}</span>
         </div>
       </div>
@@ -109,7 +109,7 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
                       </span>
                     </div>
                     <div className="text-xs text-fg-subtle mono mt-0.5">
-                      {a.quantity.toFixed(4)} × {formatEur(a.precioEur)}
+                      {formatNumber(a.quantity, 4, 4)} × {formatEur(a.precioEur)}
                     </div>
                     {a.costBasisEur > 0 && (
                       <div className="text-xs text-fg-subtle mono">

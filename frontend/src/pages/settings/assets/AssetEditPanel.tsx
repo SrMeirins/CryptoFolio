@@ -7,6 +7,7 @@ import { PairInputsGrid } from './PairInputsGrid'
 import { CoinGeckoIdEditor } from './CoinGeckoIdEditor'
 import { T } from '../../../utils/colors'
 import { buttonClasses, fieldClasses } from '../../../components/ui'
+import { formatNumber } from '../../../utils/format'
 
 export function AssetEditPanel({ asset, onSaved, onCancel }: {
   asset: AssetMetadata; onSaved: () => void; onCancel: () => void
@@ -95,7 +96,7 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
         {testResult && (
           <div className={`flex items-center gap-2 text-xs ${testResult.exists ? 'text-positive' : 'text-negative'}`}>
             {testResult.exists
-              ? <><CheckCircle size={12} /> Existe — precio: <span className="mono font-medium">{testResult.price?.toFixed(6)} EUR</span></>
+              ? <><CheckCircle size={12} /> Existe — precio: <span className="mono font-medium">{formatNumber(testResult.price ?? 0, 6, 6)} EUR</span></>
               : <><XCircle size={12} /> Par no encontrado en Binance</>
             }
           </div>

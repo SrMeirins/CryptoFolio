@@ -10,6 +10,7 @@ import { WalletLabel } from './WalletPicker'
 import { buildInitialFields } from '../utils/operationWizardFields'
 import { T } from '../utils/colors'
 import { buttonClasses, iconButtonClasses } from './ui'
+import { formatNumber } from '../utils/format'
 
 interface OperationWizardProps {
   unknownOperation?: {
@@ -320,7 +321,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
                 {autoPriceLoading
                   ? <span className="text-fg-muted">Consultando precio histórico...</span>
                   : <span className="text-fg-muted">
-                      Precio detectado: <span className="text-fg font-medium mono">{autoPrice?.toFixed(6)} EUR</span>
+                      Precio detectado: <span className="text-fg font-medium mono">{formatNumber(autoPrice ?? 0, 6, 6)} EUR</span>
                       <span className="text-fg-subtle ml-1">(se usará automáticamente)</span>
                     </span>
                 }
@@ -407,7 +408,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
                     <span className="text-fg-subtle flex items-center gap-1">
                       Precio EUR <Zap size={9} className="text-brand" />
                     </span>
-                    <span className="mono text-brand text-xs">{autoPrice.toFixed(6)} (auto)</span>
+                    <span className="mono text-brand text-xs">{formatNumber(autoPrice, 6, 6)} (auto)</span>
                   </div>
                 )}
               </div>

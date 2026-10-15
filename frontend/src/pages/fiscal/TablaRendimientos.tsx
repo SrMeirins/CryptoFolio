@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { TrendingDown, Download } from 'lucide-react'
-import { formatEur } from '../../utils/format'
+import { formatEur, formatNumber } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { TableExpandToggle } from './TableExpandToggle'
 import type { RendimientoEvent } from './types'
@@ -113,7 +113,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
                       <span className="font-bold mono">{r.activo}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-right mono text-fg-muted">{r.cantidad.toFixed(6)}</td>
+                  <td className="px-4 py-2.5 text-right mono text-fg-muted">{formatNumber(r.cantidad, 6, 6)}</td>
                   <td className="px-4 py-2.5 text-right mono font-medium text-warning">{formatEur(r.valorEur)}</td>
                   <td className="px-4 py-2.5 text-fg-subtle text-xs">{r.wallet}</td>
                 </tr>

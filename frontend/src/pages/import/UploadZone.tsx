@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Upload, FileText, RefreshCw, AlertCircle, Info } from 'lucide-react'
 import { cardClasses } from '../../components/ui'
 import { SegmentedControl } from '../../components/ui'
+import { formatNumber } from '../../utils/format'
 
 const EXCHANGE_HELP: Record<'binance' | 'bitvavo', { title: string; steps: string[]; note: string }> = {
   binance: {
@@ -34,7 +35,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024
 
 function validateFile(file: File): string | null {
   if (!file.name.toLowerCase().endsWith('.csv')) return 'Solo se aceptan archivos CSV'
-  if (file.size > MAX_FILE_SIZE) return `El archivo supera el máximo de 10 MB (${(file.size / 1024 / 1024).toFixed(1)} MB)`
+  if (file.size > MAX_FILE_SIZE) return `El archivo supera el máximo de 10 MB (${formatNumber(file.size / 1024 / 1024, 1, 1)} MB)`
   return null
 }
 
