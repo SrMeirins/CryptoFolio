@@ -88,7 +88,7 @@ export function FlowMarkerTooltip({ marker, intraday, currency }: { marker: Acti
   const x = cx < EDGE ? '-16px' : chartWidth && cx > chartWidth - EDGE ? 'calc(-100% + 16px)' : '-50%'
   return (
     <div role="tooltip"
-      className="absolute z-10 pointer-events-none bg-tooltip/95 border border-overlay/10 rounded-xl px-3 py-2 shadow-xl text-xs whitespace-nowrap"
+      className="absolute z-10 pointer-events-none glass-tooltip rounded-xl px-3 py-2 text-xs whitespace-nowrap"
       style={{ left: cx, top: cy, transform: `translate(${x}, ${below ? '16px' : 'calc(-100% - 16px)'})` }}>
       <p className="text-fg-muted mb-1 first-letter:uppercase">{bucketLabel(b, intraday)}</p>
       {b.deposits >= 0.01 && <p className="mono text-positive">Depósitos +{formatMoney(b.deposits, currency)}</p>}
