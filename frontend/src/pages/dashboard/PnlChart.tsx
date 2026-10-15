@@ -6,6 +6,7 @@ import { formatMoneyCompact, formatMoney, formatPercent, type Currency } from '.
 import type { EvolutionPoint } from '../../utils/evolutionSeries'
 import { flowBuckets } from '../../utils/evolutionSummary'
 import { formatTick, niceTicks, tickDecimals, timeAxis } from '../../utils/chartAxes'
+import { zeroSplit } from '../../utils/zeroSplit'
 import { useChartColors } from '../../hooks/useChartColors'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { EvolutionTooltip } from './EvolutionTooltip'
@@ -44,8 +45,8 @@ export function PnlChart({ points, currency, intraday, unit, animationKey, loadi
   const yDecimals = tickDecimals(yTicks)
   const yMin = yTicks[0] ?? 0
   const yMax = yTicks[yTicks.length - 1] ?? 0
-  // Punto del degradado donde está el 0: verde por encima, rojo por debajo.
-  const zero = yMax <= 0 ? 0 : yMin >= 0 ? 1 : yMax / (yMax - yMin)
+  // Corte verde/rojo en el 0, relativo a la caja real del área y de la línea (#231).
+  const split = useMemo(() => zeroSplit(points.map(p => p[key])), [points, key])
   const buckets = useMemo(() => flowBuckets(points, intraday), [points, intraday])
   const [activeMarker, setActiveMarker] = useState<ActiveMarker | null>(null)
   const last = points[points.length - 1]
@@ -59,13 +60,13 @@ export function PnlChart({ points, currency, intraday, unit, animationKey, loadi
           <defs>
             <linearGradient id={`${gradientId}-fill`} x1="0" y1="0" x2="0" y2="1">
               <stop offset={0} stopColor={c.up} stopOpacity={0.28} />
-              <stop offset={zero} stopColor={c.up} stopOpacity={0.03} />
-              <stop offset={zero} stopColor={c.down} stopOpacity={0.03} />
+              <stop offset={split.fill} stopColor={c.up} stopOpacity={0.03} />
+              <stop offset={split.fill} stopColor={c.down} stopOpacity={0.03} />
               <stop offset={1} stopColor={c.down} stopOpacity={0.28} />
             </linearGradient>
             <linearGradient id={`${gradientId}-stroke`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset={zero} stopColor={c.up} />
-              <stop offset={zero} stopColor={c.down} />
+              <stop offset={split.stroke ?? 0} stopColor={c.up} />
+              <stop offset={split.stroke ?? 0} stopColor={c.down} />
             </linearGradient>
           </defs>
           <CartesianGrid vertical={false} stroke={c.grid} />
@@ -87,7 +88,7 @@ export function PnlChart({ points, currency, intraday, unit, animationKey, loadi
           />
           <Area
             type="monotone" dataKey={key} baseValue={0}
-            stroke={`url(#${gradientId}-stroke)`} strokeWidth={2} fill={`url(#${gradientId}-fill)`}
+            stroke={split.stroke === null ? (split.solid === 'up' ? c.up : c.down) : `url(#${gradientId}-stroke)`} strokeWidth={2} fill={`url(#${gradientId}-fill)`}
             dot={false} activeDot={{ r: 4, fill: lastColor, strokeWidth: 0 }}
             isAnimationActive={!reduceMotion} animationDuration={700} animationEasing="ease-out"
           />
