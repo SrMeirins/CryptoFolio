@@ -8,6 +8,7 @@ import { useClickOutside } from '../hooks/useClickOutside'
 import { StatusIndicator } from './StatusIndicator'
 import { CurrencyToggle } from './CurrencyToggle'
 import { ThemeToggle } from './ThemeToggle'
+import { PrivacyToggle } from './PrivacyToggle'
 import { T, alpha } from '../utils/colors'
 import { cardClasses, iconButtonClasses } from './ui'
 
@@ -108,6 +109,7 @@ export function TopBar() {
       <StatusIndicator />
       <CurrencyToggle />
       <ThemeToggle />
+      <PrivacyToggle />
       <NotificationsButton />
     </div>
   )

@@ -1,6 +1,24 @@
 /** Moneda de visualización (#155): los importes se guardan en EUR; USD se convierte con USDT. */
 export type Currency = 'EUR' | 'USD'
 
+// Modo privacidad (#254): con él activo, importes y cantidades se sustituyen
+// por «••••» en el propio texto (no se leen con lector de pantalla ni al
+// copiar). Precios de mercado y porcentajes siguen visibles. El estado lo fija
+// el store de privacidad; la app se vuelve a pintar al cambiarlo.
+export const HIDDEN_AMOUNT = '••••'
+const CURRENCY_SYMBOL: Record<Currency, string> = { EUR: '€', USD: '$' }
+let amountsHidden = false
+
+export function setAmountsHidden(hidden: boolean): void {
+  amountsHidden = hidden
+}
+
+export function amountsAreHidden(): boolean {
+  return amountsHidden
+}
+
+const hiddenMoney = (currency: Currency) => `${HIDDEN_AMOUNT} ${CURRENCY_SYMBOL[currency]}`
+
 // Formatters cacheados por moneda y decimales: crear un Intl.NumberFormat es
 // caro y estos formateadores se llaman en cada tick de precios.
 //
@@ -48,11 +66,13 @@ export function formatPercent(value: number, decimals = 2, signed = false): stri
 
 /** Importe con 2 decimales en la moneda indicada (p. ej. "1.234,56 €", "-10,00 $"). */
 export function formatMoney(value: number, currency: Currency = 'EUR'): string {
+  if (amountsHidden) return hiddenMoney(currency)
   return moneyFmt(currency, 2).format(value)
 }
 
 /** Importe sin decimales en la moneda indicada, para espacios reducidos (p. ej. "-203 $"). */
 export function formatMoneyCompact(value: number, currency: Currency = 'EUR'): string {
+  if (amountsHidden) return hiddenMoney(currency)
   return moneyFmt(currency, 0).format(value)
 }
 
@@ -102,6 +122,7 @@ export function formatAmount(value: number | string | null | undefined, decimals
   if (value === null || value === undefined || value === '') return '—'
   const v = typeof value === 'string' ? parseFloat(value) : value
   if (isNaN(v)) return '—'
+  if (amountsHidden) return HIDDEN_AMOUNT
   const abs = Math.abs(v)
   if (abs >= 1_000_000) return formatNumber(v, 0)
   if (abs >= 1000)      return formatNumber(v, 2)

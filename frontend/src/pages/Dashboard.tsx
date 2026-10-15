@@ -74,10 +74,16 @@ export function Dashboard() {
   )
 
   // Variación de 24h en tiempo real con el precio de hace 24h del WebSocket (#147).
-  const change24h = useMemo((): Change24h => {
+  // Se memoriza el cálculo, no el texto: el formato depende de la moneda y del
+  // modo privacidad (#254), y se aplica en cada render.
+  const change24hResult = useMemo(
+    () => (hasPrices ? computeChange24h(assets, open24, fiatOpen24) : null),
+    [assets, open24, fiatOpen24, hasPrices],
+  )
+  const change24h = ((): Change24h => {
     const waiting = 'Esperando los precios en vivo. Aparecerá en cuanto llegue el primer dato.'
-    if (!hasPrices) return { kind: 'unavailable', reason: waiting }
-    const result = computeChange24h(assets, open24, fiatOpen24)
+    const result = change24hResult
+    if (!result) return { kind: 'unavailable', reason: waiting }
     if (result.status === 'unavailable') {
       return {
         kind: 'unavailable',
@@ -95,7 +101,7 @@ export function Dashboard() {
         ? <p>Sin precio de hace 24h, excluidos del cálculo: <span className="mono text-fg">{result.excluded.join(', ')}</span></p>
         : undefined,
     }
-  }, [assets, open24, fiatOpen24, hasPrices, currency])
+  })()
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
