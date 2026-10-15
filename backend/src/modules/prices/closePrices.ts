@@ -110,11 +110,14 @@ export { nextDay };
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-// Velas de 1 h de Binance (hasta 1000 por petición). [] si el par no existe;
-// espera y reintenta ante 429; lanza error ante otros fallos.
-async function fetchHourlyKlines(pair: string, startMs: number, limit: number, endMs?: number): Promise<unknown[][]> {
+export type KlineInterval = '15m' | '1h';
+
+// Velas de Binance (hasta 1000 por petición). [] si el par no existe; espera
+// y reintenta ante 429; lanza error ante otros fallos. Las de 15 min las usa
+// la serie intradía del gráfico de evolución (#215).
+export async function fetchKlines(pair: string, interval: KlineInterval, startMs: number, limit: number, endMs?: number): Promise<unknown[][]> {
   const end = endMs !== undefined ? `&endTime=${endMs}` : '';
-  const url = `${REST_BASE}/klines?symbol=${encodeURIComponent(pair)}&interval=1h&startTime=${startMs}${end}&limit=${limit}`;
+  const url = `${REST_BASE}/klines?symbol=${encodeURIComponent(pair)}&interval=${interval}&startTime=${startMs}${end}&limit=${limit}`;
   for (let attempt = 1; attempt <= MAX_429_RETRIES; attempt++) {
     const res = await fetchWithTimeout(url);
     if (res.status === 429) {
@@ -129,6 +132,9 @@ async function fetchHourlyKlines(pair: string, startMs: number, limit: number, e
   }
   throw new Error(`Binance klines: reintentos agotados por rate limit para ${pair}`);
 }
+
+const fetchHourlyKlines = (pair: string, startMs: number, limit: number, endMs?: number) =>
+  fetchKlines(pair, '1h', startMs, limit, endMs);
 
 // Cierre de la vela de 1 h que abre una hora antes de `closeMs`. null si
 // Binance no tiene vela (par inexistente en esa fecha).

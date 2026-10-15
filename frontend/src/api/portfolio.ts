@@ -50,6 +50,17 @@ export interface DailyPnlResponse {
   today: LiveDayBase | null
 }
 
+export interface IntradayPnlResponse {
+  currency: Currency
+  from: string
+  to: string
+  stepMinutes: 15
+  totalPnl: number
+  twrPct: number
+  approximate: string[]   // activos valorados con el precio en vivo en toda la ventana
+  points: Array<{ at: string; value: number; pnl: number; pct: number; live: boolean }>
+}
+
 export interface LiveDayBase {
   date: string
   previousValue: number              // cierre de ayer, en la moneda de la respuesta
@@ -430,12 +441,8 @@ export const portfolioApi = {
     const query = params.toString()
     return api.get<DailyPnlResponse>(`/v1/pnl/daily${query ? `?${query}` : ''}`)
   },
-  getPortfolioHistory: (period: string, currency: Currency = 'EUR') => api.get<{
-    points: { date: string; value: number }[]
-    period: string
-    currency?: Currency
-    refreshing: boolean
-  }>(`/fifo/portfolio-history?${new URLSearchParams({ period, currency })}`),
+  // Evolución de las últimas 24 h cada 15 min (#215).
+  getIntradayPnl: (currency: Currency = 'EUR') => api.get<IntradayPnlResponse>(`/v1/pnl/intraday?${new URLSearchParams({ currency })}`),
   getPendingDeposits: () => api.get<Array<{
     id: string; timestamp: string; asset: string; amount: string;
     wallet_name: string; historicalPrice: number | null;

@@ -1,10 +1,18 @@
-import { useId, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { PnlChart } from './PnlChart'
-import { PortfolioHistoryChart } from './PortfolioHistoryChart'
-import { Tabs, tabId, tabPanelId } from '../../components/ui'
+import { ValueChart } from './ValueChart'
+import { DateRangePicker } from '../../components/DateRangePicker'
+import { SegmentedControl, Tabs, cardClasses, tabId, tabPanelId } from '../../components/ui'
+import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
+import { useLiveDayPnl } from '../../hooks/useLiveDayPnl'
+import { dailyPnlQuery, intradayPnlQuery } from '../../queries/currencyQueries'
+import { PERIOD_TITLES, PNL_PERIODS, madridToday, metricFor, type PnlPeriod } from '../../utils/pnlChart'
+import { evolutionQuery, fromDaily, fromIntraday } from '../../utils/evolutionSeries'
 
 // Bloque de evolución del Dashboard (#166): pestaña P&L (rentabilidad
-// acumulada, por defecto) y pestaña Valor (valor de mercado de la cartera).
+// acumulada, por defecto) y pestaña Valor (valor de la cartera). Desde #215
+// ambas comparten periodo (24H, 7D…Todo y rango personalizado) y la misma
+// consulta, así que cambiar de pestaña es inmediato y conserva el periodo.
 
 type Tab = 'pnl' | 'value'
 
@@ -13,23 +21,70 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'value', label: 'Valor' },
 ]
 
-export function EvolutionCard({ currentValue }: { currentValue?: number }) {
+export function EvolutionCard() {
   const [tab, setTab] = useState<Tab>('pnl')
+  const [period, setPeriod] = useState<PnlPeriod>('Todo')
+  const [range, setRange] = useState<{ from: string; to: string } | null>(null)
   const baseId = useId()
+  const today = madridToday()
+  const query = evolutionQuery(period, today, range)
 
-  const tabs = (
-    <div className="flex items-center gap-2">
-      <span className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest">Evolución</span>
-      <Tabs label="Evolución del portfolio" idBase={baseId} value={tab} onChange={setTab}
-        items={TABS.map(t => ({ value: t.id, label: t.label }))} />
-    </div>
+  // Mientras el servidor descarga cierres se reconsulta cada 5 s; después, cada minuto.
+  const daily = useCurrencyQuery(
+    c => dailyPnlQuery(c, query.intraday ? undefined : query.from, query.intraday ? undefined : query.to),
+    { enabled: !query.intraday, refetchInterval: q => (q.state.data?.refreshing ? 5_000 : 60_000) },
   )
+  const intraday = useCurrencyQuery(intradayPnlQuery, { enabled: query.intraday, refetchInterval: 60_000 })
+  const active = query.intraday ? intraday : daily
+  const currency = active.data?.currency ?? active.currency
+
+  const points = useMemo(
+    () => (query.intraday ? fromIntraday(intraday.data?.points ?? []) : fromDaily(daily.data?.days ?? [], period)),
+    [query.intraday, intraday.data, daily.data, period],
+  )
+  // Valor de hoy con los precios en vivo (#213), con el mismo modelo que la serie.
+  const liveToday = useLiveDayPnl(query.intraday ? null : daily.data?.today, currency)
+
+  function pickRange(from: string, to: string) {
+    if (!from && !to) {
+      setRange(null)
+      if (period === 'Rango') setPeriod('Todo')
+      return
+    }
+    setRange({ from, to })
+    setPeriod('Rango')
+  }
+
+  const state = { loading: active.isLoading, error: active.isError, intraday: query.intraday, currency, points }
 
   return (
-    <div id={tabPanelId(baseId)} role="tabpanel" aria-labelledby={tabId(baseId, tab)}>
-      {tab === 'pnl'
-        ? <PnlChart headerLeft={tabs} />
-        : <PortfolioHistoryChart currentValue={currentValue} headerLeft={tabs} />}
+    <div className={cardClasses('none', 'px-5 py-5')}>
+      <div className="flex items-center justify-between mb-1 gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest">Evolución</span>
+          <Tabs label="Evolución del portfolio" idBase={baseId} value={tab} onChange={setTab}
+            items={TABS.map(t => ({ value: t.id, label: t.label }))} />
+        </div>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <SegmentedControl label="Periodo del gráfico de evolución" value={period} onChange={p => { setPeriod(p); setRange(null) }}
+            options={PNL_PERIODS.map(p => ({ value: p, label: p, title: PERIOD_TITLES[p] }))} />
+          <DateRangePicker
+            placeholder="Rango"
+            align="right"
+            max={today}
+            from={period === 'Rango' ? range?.from ?? '' : ''}
+            to={period === 'Rango' ? range?.to ?? '' : ''}
+            onChange={pickRange}
+          />
+        </div>
+      </div>
+
+      <div id={tabPanelId(baseId)} role="tabpanel" aria-labelledby={tabId(baseId, tab)}>
+        {tab === 'pnl'
+          ? <PnlChart {...state} metric={metricFor(period)} refreshing={!query.intraday && !!daily.data?.refreshing}
+              approximate={query.intraday ? intraday.data?.approximate ?? [] : []} />
+          : <ValueChart {...state} liveValue={liveToday?.value ?? null} />}
+      </div>
     </div>
   )
 }

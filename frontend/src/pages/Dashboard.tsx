@@ -163,7 +163,7 @@ export function Dashboard() {
       <TopMovers lots={lots} />
 
       {/* Gráfico histórico */}
-      <EvolutionCard currentValue={hasPrices ? cryptoValue : undefined} />
+      <EvolutionCard />
 
       {/* Calendario de P&L diario */}
       <PnlCalendar />

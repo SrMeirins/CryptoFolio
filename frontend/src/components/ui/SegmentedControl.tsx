@@ -66,11 +66,13 @@ export function SegmentedControl<T extends string>({
     <div role="radiogroup" aria-label={label} onKeyDown={onKeyDown}
       className={`relative inline-flex shrink-0 items-center gap-0.5 p-0.5 rounded-lg border border-border bg-background-tertiary ${className}`}>
       {variant === 'accent' && <span ref={thumbRef} aria-hidden="true" className={segmentThumbClasses()} />}
-      {options.map(opt => {
+      {options.map((opt, i) => {
         const active = opt.value === value
+        // Sin opción activa (p. ej. un rango personalizado elegido fuera), la primera recibe el foco con Tab.
+        const focusable = active || (i === 0 && !values.includes(value))
         return (
           <button key={opt.value} ref={el => { refs.current[opt.value] = el }} type="button" role="radio"
-            aria-checked={active} aria-label={opt.title} title={opt.title} tabIndex={active ? 0 : -1} disabled={disabled}
+            aria-checked={active} aria-label={opt.title} title={opt.title} tabIndex={focusable ? 0 : -1} disabled={disabled}
             onClick={() => onChange(opt.value)} className={segmentClasses(active, size, variant)}>
             {opt.label}
           </button>
