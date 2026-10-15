@@ -1,18 +1,28 @@
 // Serie del gráfico de rentabilidad acumulada del Dashboard (#166).
 //
 // Métrica por periodo:
-// - 7D…1A: rentabilidad ponderada en el tiempo (TWR), la de los exchanges:
+// - 24H…1A, YTD y Rango: rentabilidad ponderada en el tiempo (TWR), la de los exchanges:
 //   mide cómo rinde cada euro sin que los depósitos distorsionen el %.
 // - Todo:  P&L acumulado sobre el máximo capital neto aportado (sin margen).
 //   Con un historial largo y aportaciones tardías es la cifra más intuitiva:
 //   el TWR se hunde para siempre tras una pérdida total puntual, y dividir por
 //   el capital que queda dispara el % tras una retirada grande.
 
-export type PnlPeriod = '7D' | '30D' | '90D' | '180D' | '1A' | 'Todo'
+// Periodos comunes a las pestañas P&L y Valor (#215). 24H es intradía (cada
+// 15 min); YTD, desde el 1 de enero; Rango, fechas elegidas por el usuario.
+export type PnlPeriod = '24H' | '7D' | '30D' | '90D' | '180D' | '1A' | 'YTD' | 'Todo' | 'Rango'
 
-export const PNL_PERIODS: readonly PnlPeriod[] = ['7D', '30D', '90D', '180D', '1A', 'Todo']
+/** Periodos del selector; «Rango» se elige con el selector de fechas. */
+export const PNL_PERIODS: readonly PnlPeriod[] = ['24H', '7D', '30D', '90D', '180D', '1A', 'YTD', 'Todo']
 
-const PERIOD_DAYS: Record<Exclude<PnlPeriod, 'Todo'>, number> = { '7D': 7, '30D': 30, '90D': 90, '180D': 180, '1A': 365 }
+export const PERIOD_TITLES: Partial<Record<PnlPeriod, string>> = {
+  '24H': 'Últimas 24 horas',
+  YTD: 'Este año, desde el 1 de enero',
+  '1A': 'Último año',
+}
+
+type DayPeriod = '7D' | '30D' | '90D' | '180D' | '1A'
+const PERIOD_DAYS: Record<DayPeriod, number> = { '7D': 7, '30D': 30, '90D': 90, '180D': 180, '1A': 365 }
 
 export interface PnlDay {
   date: string
@@ -48,11 +58,12 @@ export function madridToday(now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
 }
 
-/** Primer día del periodo (incluido), o undefined para 'Todo'. */
+/** Primer día del periodo (incluido), o undefined para 'Todo' (y para 24H y Rango, que no son por días fijos). */
 export function periodFrom(period: PnlPeriod, today: string): string | undefined {
-  if (period === 'Todo') return undefined
+  if (period === 'Todo' || period === '24H' || period === 'Rango') return undefined
+  if (period === 'YTD') return `${today.slice(0, 4)}-01-01`
   const [y, m, d] = today.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, d - (PERIOD_DAYS[period] - 1))).toISOString().slice(0, 10)
+  return new Date(Date.UTC(y, m - 1, d - (PERIOD_DAYS[period as DayPeriod] - 1))).toISOString().slice(0, 10)
 }
 
 export function metricFor(period: PnlPeriod): PnlMetric {

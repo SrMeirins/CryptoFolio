@@ -8,7 +8,7 @@
 //   año. Una marca por unidad, así que ninguna etiqueta se repite.
 // - Eje de valores con números «redondos» (1, 2, 2,5 o 5 × 10ⁿ) equiespaciados.
 
-export type TickUnit = 'day' | 'monday' | 'month' | 'month2' | 'quarter' | 'year'
+export type TickUnit = 'hour3' | 'day' | 'monday' | 'month' | 'month2' | 'quarter' | 'year'
 
 const DAY_MS = 86_400_000
 
@@ -28,9 +28,19 @@ export function tickUnit(spanDays: number): TickUnit {
   return 'year'
 }
 
+const HOUR_MS = 3_600_000
+const MADRID_HOUR = new Intl.DateTimeFormat('es-ES', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Europe/Madrid' })
+
 /** Marcas (ms UTC) de la unidad dentro de [from, to], ambos incluidos. */
 export function timeTicks(from: number, to: number, unit: TickUnit): number[] {
   const ticks: number[] = []
+  if (unit === 'hour3') {
+    // Horas en punto múltiplos de 3 en hora de Madrid (00:00, 03:00, …), también con cambio de horario.
+    for (let t = Math.ceil(from / HOUR_MS) * HOUR_MS; t <= to; t += HOUR_MS) {
+      if (Number(MADRID_HOUR.format(new Date(t))) % 3 === 0) ticks.push(t)
+    }
+    return ticks
+  }
   const start = new Date(from)
   if (unit === 'day' || unit === 'monday') {
     let t = from
@@ -55,10 +65,12 @@ export function timeTicks(from: number, to: number, unit: TickUnit): number[] {
 }
 
 const DAY_FMT = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+const TIME_FMT = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Madrid' })
 const MONTH_FMT = new Intl.DateTimeFormat('es-ES', { month: 'short', year: '2-digit', timeZone: 'UTC' })
 
-/** Etiqueta de una marca según la granularidad: «15 oct», «oct 26» o «2026». */
+/** Etiqueta de una marca según la granularidad: «15:00», «15 oct», «oct 26» o «2026». */
 export function formatTick(ms: number, unit: TickUnit): string {
+  if (unit === 'hour3') return TIME_FMT.format(new Date(ms))
   if (unit === 'year') return String(new Date(ms).getUTCFullYear())
   const fmt = unit === 'day' || unit === 'monday' ? DAY_FMT : MONTH_FMT
   return fmt.format(new Date(ms)).replace('.', '')
@@ -103,11 +115,14 @@ export function tickDecimals(ticks: readonly number[]): number {
   return 3
 }
 
-/** Eje de fechas completo para unos puntos (ms UTC): dominio, unidad y marcas. */
-export function timeAxis(xs: readonly number[]): { domain: [number, number]; unit: TickUnit; ticks: number[] } {
-  if (xs.length === 0) return { domain: [0, 0], unit: 'day', ticks: [] }
+/**
+ * Eje de fechas completo para unos puntos (ms UTC): dominio, unidad y marcas.
+ * `intraday`: serie de horas (24H), con marcas cada 3 horas en hora de Madrid.
+ */
+export function timeAxis(xs: readonly number[], intraday = false): { domain: [number, number]; unit: TickUnit; ticks: number[] } {
+  if (xs.length === 0) return { domain: [0, 0], unit: intraday ? 'hour3' : 'day', ticks: [] }
   const from = Math.min(...xs)
   const to = Math.max(...xs)
-  const unit = tickUnit((to - from) / DAY_MS)
+  const unit = intraday ? 'hour3' : tickUnit((to - from) / DAY_MS)
   return { domain: [from, to], unit, ticks: timeTicks(from, to, unit) }
 }

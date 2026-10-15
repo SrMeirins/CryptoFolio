@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { getDailyPnl } from '../modules/pnl/pnlService';
+import { getIntradayPnl } from '../modules/pnl/intraday';
 import { madridDateOf } from '../modules/prices/closePrices';
 import { currencySchema } from '../modules/fiat/displayCurrency';
 import { sendInternalError } from '../middleware/errorHandler';
@@ -45,6 +46,23 @@ router.get('/daily', async (req: Request, res: Response) => {
     res.json(await getDailyPnl(parsed.data));
   } catch (e) {
     sendInternalError(res, e, 'GET /api/v1/pnl/daily');
+  }
+});
+
+const intradaySchema = z.object({ currency: currencySchema }).strict();
+
+// GET /api/v1/pnl/intraday?currency=EUR|USD
+// Evolución de las últimas 24 h cada 15 min más el instante actual (#215).
+router.get('/intraday', async (req: Request, res: Response) => {
+  const parsed = intradaySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Parámetros inválidos: solo se admite currency=EUR|USD' });
+    return;
+  }
+  try {
+    res.json(await getIntradayPnl(parsed.data.currency));
+  } catch (e) {
+    sendInternalError(res, e, 'GET /api/v1/pnl/intraday');
   }
 });
 

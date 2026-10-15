@@ -36,6 +36,7 @@ describe('eje de fechas', () => {
       expect(new Set(labels).size).toBe(labels.length)
       const dates = ticks.map(iso)
       const rules: Record<TickUnit, (d: string) => boolean> = {
+        hour3: () => true,
         day: () => true,
         monday: d => new Date(`${d}T00:00:00Z`).getUTCDay() === 1,
         month: d => d.endsWith('-01'),
@@ -106,5 +107,21 @@ describe('timeAxis', () => {
   })
   it('sin puntos no hay marcas', () => {
     expect(timeAxis([]).ticks).toEqual([])
+  })
+})
+
+describe('eje horario de 24H (#215)', () => {
+  it('cada 3 horas en hora de Madrid, sin repetir y con formato hh:mm', () => {
+    const to = Date.UTC(2026, 9, 15, 9, 10)          // 11:10 en Madrid (CEST)
+    const a = timeAxis([to - 24 * 3_600_000, to], true)
+    expect(a.unit).toBe('hour3')
+    const labels = a.ticks.map(t => formatTick(t, 'hour3'))
+    expect(labels).toEqual(['12:00', '15:00', '18:00', '21:00', '00:00', '03:00', '06:00', '09:00'])
+    expect(new Set(gaps(a.ticks))).toEqual(new Set([3 * 3_600_000]))
+  })
+  it('el día del cambio de horario sigue marcando horas múltiplos de 3 en Madrid', () => {
+    const to = Date.UTC(2026, 9, 25, 12, 0)          // 25 oct: fin del horario de verano
+    const labels = timeAxis([to - 24 * 3_600_000, to], true).ticks.map(t => formatTick(t, 'hour3'))
+    expect(labels.every(l => Number(l.slice(0, 2)) % 3 === 0 && l.endsWith(':00'))).toBe(true)
   })
 })

@@ -3,8 +3,9 @@ import request from 'supertest';
 import { createTestDatabase, TestDatabase } from '../test/setup-test-db';
 
 // GET /api/v1/pnl/daily (#165): validación de parámetros y respuesta.
-const { getDailyPnlMock } = vi.hoisted(() => ({ getDailyPnlMock: vi.fn() }));
+const { getDailyPnlMock, getIntradayPnlMock } = vi.hoisted(() => ({ getDailyPnlMock: vi.fn(), getIntradayPnlMock: vi.fn() }));
 vi.mock('../modules/pnl/pnlService', () => ({ getDailyPnl: getDailyPnlMock }));
+vi.mock('../modules/pnl/intraday', () => ({ getIntradayPnl: getIntradayPnlMock }));
 
 let testDb: TestDatabase;
 let app: import('express').Express;
@@ -48,6 +49,47 @@ describe('GET /api/v1/pnl/daily', () => {
   it('un error interno devuelve un mensaje genérico', async () => {
     getDailyPnlMock.mockRejectedValueOnce(new Error('detalle interno sensible'));
     const res = await request(app).get('/api/v1/pnl/daily');
+    expect(res.status).toBe(500);
+    expect(JSON.stringify(res.body)).not.toContain('sensible');
+  });
+});
+
+describe('GET /api/v1/pnl/intraday (#215)', () => {
+  beforeAll(async () => {
+    testDb = await createTestDatabase();
+    process.env.DATABASE_URL = testDb.connectionString;
+    app = (await import('../app')).default;
+  });
+
+  afterAll(async () => {
+    if (testDb) await testDb.teardown();
+  });
+
+  it.each([
+    ['moneda no soportada', '?currency=GBP'],
+    ['parámetro desconocido', '?from=2026-01-01'],
+  ])('400 con %s, sin calcular', async (_caso, query) => {
+    getIntradayPnlMock.mockClear();
+    const res = await request(app).get(`/api/v1/pnl/intraday${query}`);
+    expect(res.status).toBe(400);
+    expect(getIntradayPnlMock).not.toHaveBeenCalled();
+  });
+
+  it('devuelve la serie del servicio en la moneda pedida (EUR por defecto)', async () => {
+    const body = { currency: 'USD', stepMinutes: 15, points: [] };
+    getIntradayPnlMock.mockResolvedValueOnce(body);
+    const res = await request(app).get('/api/v1/pnl/intraday?currency=USD');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(body);
+    expect(getIntradayPnlMock).toHaveBeenCalledWith('USD');
+    getIntradayPnlMock.mockResolvedValueOnce(body);
+    await request(app).get('/api/v1/pnl/intraday');
+    expect(getIntradayPnlMock).toHaveBeenLastCalledWith('EUR');
+  });
+
+  it('un error interno devuelve un mensaje genérico', async () => {
+    getIntradayPnlMock.mockRejectedValueOnce(new Error('detalle interno sensible'));
+    const res = await request(app).get('/api/v1/pnl/intraday');
     expect(res.status).toBe(500);
     expect(JSON.stringify(res.body)).not.toContain('sensible');
   });
