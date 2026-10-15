@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
+import ExcelJS from 'exceljs';
 import { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
 
@@ -62,6 +63,33 @@ describe('GET /api/fiscal/:year/export — excel y pdf', () => {
     expect(res.headers['content-type']).toContain('spreadsheetml');
     expect(res.headers['content-disposition']).toContain('fiscal_2023.xlsx');
     expect((res.body as Buffer).length).toBeGreaterThan(0);
+
+    // El fichero se puede leer y contiene las hojas y la fila esperadas (#204).
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(res.body as Buffer);
+    expect(wb.worksheets.map(w => w.name)).toEqual(['Ganancias Patrimoniales', 'Rendimientos Capital Mob.']);
+    const gains = wb.getWorksheet('Ganancias Patrimoniales')!;
+    expect(gains.getRow(1).getCell(1).value).toBe('Fecha');
+    expect(gains.getRow(2).getCell(2).value).toBe('BTC');
+    expect(gains.getRow(2).getCell(10).value).toBe(50);
+  });
+
+  it('exceljs genera identificadores con uuid (versión forzada por overrides, #204)', async () => {
+    // Única ruta de exceljs que usa uuid: el formato condicional con conjuntos de iconos.
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Prueba');
+    ws.addRow([1]); ws.addRow([2]);
+    ws.addConditionalFormatting({
+      ref: 'A1:A2',
+      rules: [{
+        type: 'iconSet', iconSet: '3Triangles', priority: 1,
+        cfvo: [{ type: 'percent', value: 0 }, { type: 'percent', value: 33 }, { type: 'percent', value: 67 }],
+      }],
+    });
+    const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+    const reloaded = new ExcelJS.Workbook();
+    await reloaded.xlsx.load(buffer);
+    expect(reloaded.getWorksheet('Prueba')?.getRow(2).getCell(1).value).toBe(2);
   });
 
   it('format=pdf devuelve un PDF no vacío con el content-type correcto', async () => {
