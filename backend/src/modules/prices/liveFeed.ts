@@ -358,8 +358,16 @@ export function stopLivePrices(): void {
 }
 
 /** Estado del feed de Binance: instante del último mensaje recibido (null si aún no ha llegado ninguno). */
-export function getFeedStatus(): { lastTickAt: number | null } {
-  return { lastTickAt };
+/**
+ * Estado del feed para el indicador de la cabecera (#194, #200): último dato
+ * recibido, pares suscritos en el stream de Binance y si la conexión está abierta.
+ */
+export function getFeedStatus(): { lastTickAt: number | null; pairs: number; binanceConnected: boolean } {
+  return {
+    lastTickAt,
+    pairs: pairIndex.size > 0 ? streamPairs(pairIndex).length : 0,
+    binanceConnected: ws?.readyState === WebSocket.OPEN,
+  };
 }
 
 export function getLivePrice(symbol: string): number | null {

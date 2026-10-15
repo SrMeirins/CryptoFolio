@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  badgeClasses, buttonClasses, cardClasses, fieldClasses, iconButtonClasses, modalOverlayClasses, modalPanelClasses, segmentClasses,
+  badgeClasses, buttonClasses, cardClasses, fieldClasses, iconButtonClasses, modalOverlayClasses, modalPanelClasses, segmentClasses, segmentThumbClasses,
   skeletonClasses, stateClasses, tabClasses, tabId, tabPanelId, tableFootRowClasses, tableHeadRowClasses, tableRowClasses,
 } from './classes'
 
@@ -163,5 +163,19 @@ describe('estados', () => {
   it('versión compacta con menos aire vertical', () => {
     expect(stateClasses()).toContain('py-16')
     expect(stateClasses(true)).toContain('py-8')
+  })
+})
+
+describe('selector segmentado, variante accent (#200)', () => {
+  it('la opción activa usa el color de acento y queda sobre el indicador deslizante', () => {
+    expect(segmentClasses(true, 'sm', 'accent')).toContain('text-brand')
+    expect(segmentClasses(true, 'sm', 'accent')).toContain('z-10')
+    expect(segmentClasses(true, 'sm', 'accent')).not.toContain('bg-background-card')
+    expect(segmentClasses(false, 'sm', 'accent')).toContain('text-fg-subtle')
+  })
+  it('el indicador se anima y respeta «reducir movimiento»', () => {
+    expect(segmentThumbClasses()).toContain('transition-[transform,width]')
+    expect(segmentThumbClasses()).toContain('motion-reduce:transition-none')
+    expect(segmentThumbClasses()).not.toMatch(THEME_ONLY)
   })
 })

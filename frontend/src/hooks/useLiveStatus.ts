@@ -12,7 +12,7 @@ export function useLiveStatus(): LiveStatus {
 }
 
 export const LIVE_STATUS_META: Record<LiveStatus, { label: string; dot: string; title: string }> = {
-  live: { label: 'Live', dot: 'bg-positive animate-pulse', title: 'Precios en vivo' },
+  live: { label: 'En vivo', dot: 'bg-positive animate-pulse motion-reduce:animate-none', title: 'Precios en vivo' },
   stale: { label: 'Sin actualizaciones', dot: 'bg-warning', title: 'Conectado, pero no llegan precios nuevos de Binance desde hace más de un minuto' },
-  offline: { label: 'Offline', dot: 'bg-gray-500', title: 'Sin conexión con el servidor de precios' },
+  offline: { label: 'Offline', dot: 'bg-fg-subtle', title: 'Sin conexión con el servidor de precios' },
 }

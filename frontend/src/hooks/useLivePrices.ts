@@ -43,8 +43,13 @@ export function useLivePrices() {
         if (message.type === 'prices') mergePrices(message.payload as Record<string, number>)
         else if (message.type === 'open24') mergeOpen24(message.payload as Record<string, number>)
         else if (message.type === 'status') {
-          const age = (message.payload as { feedAgeMs?: unknown } | undefined)?.feedAgeMs
-          setFeedStatus(typeof age === 'number' ? age : null, Date.now())
+          const payload = message.payload as { feedAgeMs?: unknown; pairs?: unknown; binanceConnected?: unknown } | undefined
+          setFeedStatus({
+            feedAgeMs: typeof payload?.feedAgeMs === 'number' ? payload.feedAgeMs : null,
+            statusAt: Date.now(),
+            pairs: typeof payload?.pairs === 'number' ? payload.pairs : null,
+            binanceConnected: typeof payload?.binanceConnected === 'boolean' ? payload.binanceConnected : null,
+          })
         }
       },
     })

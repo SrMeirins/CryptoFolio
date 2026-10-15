@@ -1,78 +1,15 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Bell, X, RefreshCw } from 'lucide-react'
-import { usePricesStore } from '../store/pricesStore'
+import { Bell, X } from 'lucide-react'
 import { portfolioApi, type Notification } from '../api/portfolio'
 import { NOTIFICATION_ROUTES, NOTIFICATION_TYPE_META } from '../constants/notifications'
 import { useClickOutside } from '../hooks/useClickOutside'
-import { useNow } from '../hooks/useNow'
-import { LIVE_STATUS_META, useLiveStatus } from '../hooks/useLiveStatus'
+import { StatusIndicator } from './StatusIndicator'
 import { CurrencyToggle } from './CurrencyToggle'
 import { ThemeToggle } from './ThemeToggle'
 import { T, alpha } from '../utils/colors'
 import { cardClasses, iconButtonClasses } from './ui'
-
-function PriceRefreshButton() {
-  const status = useLiveStatus()
-  const { lastUpdate, setPrices } = usePricesStore(s => ({
-    lastUpdate: s.lastUpdate,
-    setPrices:  s.setPrices,
-  }))
-  const [refreshing, setRefreshing] = useState(false)
-  const [done,       setDone]       = useState(false)
-  const now = useNow()
-
-  async function refresh() {
-    if (refreshing) return
-    setRefreshing(true)
-    setDone(false)
-    try {
-      const data: Record<string, number> = await fetch('/api/prices/live').then(r => r.json())
-      if (Object.keys(data).length > 0) setPrices(data)
-      setDone(true)
-      setTimeout(() => setDone(false), 1500)
-    } catch { /* silencioso */ } finally {
-      setRefreshing(false)
-    }
-  }
-
-  const timeAgo = lastUpdate
-    ? (() => {
-        const secs = Math.max(0, Math.floor((now - lastUpdate.getTime()) / 1000))
-        if (secs < 60)  return `${secs}s`
-        if (secs < 3600) return `${Math.floor(secs / 60)}m`
-        return `${Math.floor(secs / 3600)}h`
-      })()
-    : null
-
-  const title = status === 'live'
-    ? `Precios en vivo · actualizado hace ${timeAgo ?? '…'}`
-    : `${LIVE_STATUS_META[status].title} · haz clic para refrescar`
-
-  return (
-    <button
-      type="button"
-      onClick={refresh}
-      title={title}
-      aria-label={title}
-      className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-xs ${
-        refreshing
-          ? 'text-brand bg-brand/10'
-          : done
-          ? 'text-positive bg-positive/10'
-          : 'text-fg-subtle hover:text-fg hover:bg-background-tertiary'
-      }`}
-    >
-      <RefreshCw
-        size={14}
-        className={refreshing ? 'animate-spin' : 'transition-transform hover:rotate-180 duration-300'}
-      />
-      {/* Indicador de estado: en vivo, sin actualizaciones o sin conexión (#194) */}
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${LIVE_STATUS_META[status].dot}`} />
-    </button>
-  )
-}
 
 function NotificationsButton() {
   const [open, setOpen] = useState(false)
@@ -163,14 +100,14 @@ function NotificationsButton() {
   )
 }
 
+// Barra superior (#200): 64 px, igual que la cabecera de la barra lateral, para
+// que sus bordes inferiores coincidan. Solo estado, moneda, tema y avisos.
 export function TopBar() {
   return (
-    <div className="shrink-0 h-12 flex items-center justify-end gap-1 px-4 border-b border-border bg-background-secondary">
-      <ThemeToggle />
-      <div className="w-2" aria-hidden="true" />
+    <div className="shrink-0 h-16 flex items-center justify-end gap-3 px-5 border-b border-border bg-background-secondary">
+      <StatusIndicator />
       <CurrencyToggle />
-      <div className="w-2" aria-hidden="true" />
-      <PriceRefreshButton />
+      <ThemeToggle />
       <NotificationsButton />
     </div>
   )

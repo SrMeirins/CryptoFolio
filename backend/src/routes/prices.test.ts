@@ -12,7 +12,7 @@ const onPriceUpdateMock = vi.fn();
 const offPriceUpdateMock = vi.fn();
 const onOpen24UpdateMock = vi.fn();
 const offOpen24UpdateMock = vi.fn();
-const feedStatus = { lastTickAt: null as number | null };
+const feedStatus = { lastTickAt: null as number | null, pairs: 0, binanceConnected: false };
 vi.mock('../modules/prices/binance', () => ({
   getAllLivePrices: () => new Map([['BTC', 50000], ['EUR', 1], ['NFT', 0.0012]]),
   onPriceUpdate: onPriceUpdateMock,
@@ -187,7 +187,7 @@ describe('setupPricesWebSocket — estado del feed (#194)', () => {
     await new Promise<void>(resolve => httpServer.listen(0, resolve));
     const port = (httpServer.address() as { port: number }).port;
     const client = new WebSocket(`ws://127.0.0.1:${port}/ws/prices`);
-    const status: Array<{ feedAgeMs: number | null }> = [];
+    const status: Array<{ feedAgeMs: number | null; pairs: number; binanceConnected: boolean }> = [];
     client.on('message', d => { const m = JSON.parse(d.toString()); if (m.type === 'status') status.push(m.payload); });
     await new Promise<void>((resolve, reject) => { client.on('open', resolve); client.on('error', reject); });
     await new Promise(resolve => setTimeout(resolve, 50));
@@ -196,9 +196,9 @@ describe('setupPricesWebSocket — estado del feed (#194)', () => {
   }
 
   it('sin datos del feed todavía, informa feedAgeMs nulo', async () => {
-    feedStatus.lastTickAt = null;
+    Object.assign(feedStatus, { lastTickAt: null, pairs: 0, binanceConnected: false });
     const { status, close } = await connect();
-    expect(status).toEqual([{ feedAgeMs: null }]);
+    expect(status).toEqual([{ feedAgeMs: null, pairs: 0, binanceConnected: false }]);
     await close();
   });
 
@@ -207,6 +207,13 @@ describe('setupPricesWebSocket — estado del feed (#194)', () => {
     const { status, close } = await connect();
     expect(status[0].feedAgeMs).toBeGreaterThanOrEqual(90_000);
     expect(status[0].feedAgeMs).toBeLessThan(95_000);
+    await close();
+  });
+
+  it('incluye los pares suscritos y si Binance está conectado (#200)', async () => {
+    Object.assign(feedStatus, { lastTickAt: Date.now(), pairs: 36, binanceConnected: true });
+    const { status, close } = await connect();
+    expect(status[0]).toMatchObject({ pairs: 36, binanceConnected: true });
     await close();
   });
 });
