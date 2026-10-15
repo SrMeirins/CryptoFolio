@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Trash2, AlertTriangle, PenLine, ChevronDown, ChevronUp, X, RefreshCw, ArrowRight,
 } from 'lucide-react'
@@ -37,16 +37,20 @@ function OpChip({ type }: { type: string }) {
 }
 
 export function TxRow({
-  tx, onDelete, onEdit, isDeleting, searchTerm, currency,
+  tx, onDelete, onEdit, isDeleting, searchTerm, currency, defaultExpanded = false,
 }: {
   tx: Transaction
   currency: Currency
+  /** Abierta y visible al cargar (enlace desde la actividad del Dashboard, #237). */
+  defaultExpanded?: boolean
   onDelete: (id: string) => void
   onEdit:   (tx: Transaction) => void
   isDeleting: boolean
   searchTerm: string
 }) {
-  const [expanded, setExpanded]           = useState(false)
+  const [expanded, setExpanded]           = useState(defaultExpanded)
+  const rowRef = useRef<HTMLTableRowElement>(null)
+  useEffect(() => { if (defaultExpanded) rowRef.current?.scrollIntoView({ block: 'center' }) }, [defaultExpanded])
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const meta   = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: T.muted, group: 'other', rowBg: 'transparent' }
@@ -64,6 +68,7 @@ export function TxRow({
   return (
     <>
       <tr
+        ref={rowRef}
         className={`group border-b border-border/40 transition-colors cursor-pointer ${expanded ? 'bg-background-tertiary/50' : ''}`}
         style={{ backgroundColor: expanded ? undefined : meta.rowBg }}
         onClick={() => setExpanded(e => !e)}

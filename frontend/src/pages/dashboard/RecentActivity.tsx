@@ -1,33 +1,48 @@
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import { portfolioApi } from '../../api/portfolio'
-import { formatAmount } from '../../utils/format'
-import { OP_META } from '../../constants/operations'
-import { T, alpha, ink } from '../../utils/colors'
-import { cardClasses, PanelHeader } from '../../components/ui'
-import { activitySubtitle } from '../../utils/panelSubtitles'
+import { Link, useNavigate } from 'react-router-dom'
 import { History } from 'lucide-react'
+import { portfolioApi, type Transaction } from '../../api/portfolio'
+import { formatAmount, formatMoney } from '../../utils/format'
+import { OP_META, type OpGroup } from '../../constants/operations'
+import { T, alpha, ink } from '../../utils/colors'
+import { useCurrency } from '../../hooks/useDisplayCurrency'
+import { calcEurValue, toDisplayAmount } from '../history/helpers'
+import { madridToday } from '../../utils/pnlChart'
+import { filterActivity, groupByDay, madridTime, selectRecent, type ActivityFilter } from '../../utils/recentActivity'
+import { activitySubtitle } from '../../utils/panelSubtitles'
+import { CryptoIcon } from '../../components/CryptoIcon'
+import { EmptyState, PanelHeader, SegmentedControl, Skeleton, cardClasses } from '../../components/ui'
 
-function relativeDate(ts: string): string {
-  const diff = Date.now() - new Date(ts).getTime()
-  const mins  = Math.floor(diff / 60_000)
-  const hours = Math.floor(diff / 3_600_000)
-  const days  = Math.floor(diff / 86_400_000)
-  if (mins  < 1)   return 'ahora mismo'
-  if (mins  < 60)  return `hace ${mins} min`
-  if (hours < 24)  return `hace ${hours} h`
-  if (days  < 7)   return `hace ${days} día${days > 1 ? 's' : ''}`
-  return new Date(ts).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
-}
+// Actividad reciente (#237): línea de tiempo de los últimos 7 días (máx. 12
+// operaciones; si no hay, las 8 últimas) agrupada por día en hora de Madrid,
+// con icono del activo, tipo, cantidad, valor en la moneda de visualización,
+// wallet y hora. Filtros rápidos por tipo; cada operación abre el Historial.
+
+const FILTERS: Array<{ value: ActivityFilter; label: string }> = [
+  { value: 'all', label: 'Todas' },
+  { value: 'buy', label: 'Compras' },
+  { value: 'sell', label: 'Ventas' },
+  { value: 'transfer', label: 'Movimientos' },
+]
+
+interface Item { tx: Transaction; timestamp: string; group: OpGroup }
 
 export function RecentActivity() {
+  const currency = useCurrency()
+  const navigate = useNavigate()
+  const [filter, setFilter] = useState<ActivityFilter>('all')
   const { data, isLoading } = useQuery({
-    queryKey: ['recent-transactions'],
-    queryFn: () => portfolioApi.getTransactions({ limit: '8', offset: '0' }),
+    queryKey: ['recent-transactions', currency],
+    queryFn: () => portfolioApi.getTransactions({ limit: '20', offset: '0' }, currency),
     refetchInterval: 60_000,
   })
 
-  const txs = data?.transactions ?? []
+  const today = madridToday()
+  const items = useMemo<Item[]>(() => selectRecent(data?.transactions ?? [], today).map(tx => ({
+    tx, timestamp: tx.timestamp, group: OP_META[tx.operation_type]?.group ?? 'other',
+  })), [data, today])
+  const groups = useMemo(() => groupByDay(filterActivity(items, filter), today), [items, filter, today])
 
   return (
     <div className={cardClasses('none', 'overflow-hidden')}>
@@ -35,80 +50,67 @@ export function RecentActivity() {
         icon={History}
         title="Actividad reciente"
         className="px-5 py-4 border-b border-border"
-        subtitle={isLoading ? undefined : activitySubtitle(txs.length)}
-        actions={<Link to="/history" className="text-xs text-brand hover:underline">Ver todo →</Link>}
+        subtitle={isLoading ? undefined : activitySubtitle(items.length)}
+        actions={
+          <>
+            <SegmentedControl label="Filtrar la actividad" variant="accent" value={filter} onChange={setFilter} options={FILTERS} />
+            <Link to="/history" className="text-xs text-brand hover:underline">Ver todo →</Link>
+          </>
+        }
       />
 
       {isLoading ? (
-        <div className="divide-y divide-border/40">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 px-5 py-3.5">
-              <div className="w-16 h-6 skeleton rounded-lg" />
-              <div className="flex-1 h-4 skeleton rounded-lg" />
-              <div className="w-16 h-4 skeleton rounded-lg" />
-            </div>
-          ))}
+        <div className="p-5 space-y-3" role="status" aria-label="Cargando la actividad">
+          {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-10 w-full" />)}
         </div>
-      ) : txs.length === 0 ? (
-        <div className="flex items-center justify-center py-10 text-sm text-fg-subtle">
-          Sin transacciones aún
-        </div>
+      ) : groups.length === 0 ? (
+        <EmptyState compact title={items.length === 0 ? 'Sin transacciones aún' : 'Sin operaciones de este tipo en el periodo'} />
       ) : (
-        <div className="divide-y divide-border/30">
-          {txs.map(tx => {
-            // Clasificación vía meta.group (constants/operations.ts), no un
-            // array hardcodeado aparte: antes este fichero reimplementaba su
-            // propia lista de tipos por categoría, con riesgo real de
-            // desincronizarse de OP_META si se añade un tipo de operación
-            // nuevo (p. ej. MARGIN_BORROW/MARGIN_REPAY, añadidos en el
-            // Nivel 2 y ya ausentes de esta lista hasta ahora).
-            const meta = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: T.muted, group: 'other' as const, rowBg: 'transparent' }
-            const isIncome = meta.group === 'income'
-            const isSell   = meta.group === 'sell'
-            const isBuy    = meta.group === 'buy'
-            return (
-              <div
-                key={tx.id}
-                className="flex items-center gap-3 px-5 py-3 transition-all hover:brightness-105"
-                style={{ background: meta.rowBg }}
-              >
-                {/* Badge operación */}
-                <span
-                  className="text-xs font-semibold px-2.5 py-1 rounded-lg shrink-0 min-w-[76px] text-center border"
-                  style={{
-                    backgroundColor: `${alpha(meta.color, 8)}`,
-                    color: meta.color,
-                    borderColor: `${alpha(meta.color, 19)}`,
-                  }}
-                >
-                  {meta.label}
-                </span>
-
-                {/* Activo + wallet */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-fg">{tx.asset}</span>
-                    {tx.wallet_name && (
-                      <span
-                        className="text-xs px-1.5 py-0.5 rounded-lg font-medium shrink-0"
-                        style={{ backgroundColor: `${alpha(tx.wallet_color, 9)}`, color: ink(tx.wallet_color) }}
+        <div className="px-5 py-4 space-y-4">
+          {groups.map(g => (
+            <section key={g.day} aria-label={g.label}>
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-fg-subtle mb-2">{g.label}</h3>
+              {/* Línea de tiempo: un punto por operación con el color de su tipo */}
+              <ol className="relative ml-1.5 border-l border-border space-y-1">
+                {g.items.map(({ tx, group }) => {
+                  const meta = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: T.muted, group: 'other' as const }
+                  const value = toDisplayAmount(calcEurValue(tx), tx, currency)
+                  const sign = group === 'buy' || group === 'income' ? '+' : group === 'sell' ? '−' : ''
+                  const amountTone = group === 'buy' ? 'text-positive' : group === 'sell' ? 'text-negative' : group === 'income' ? 'text-accent-purple' : 'text-fg-muted'
+                  return (
+                    <li key={tx.id} className="relative pl-5">
+                      <span aria-hidden="true" className="absolute -left-[5px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full ring-4 ring-background-card"
+                        style={{ background: meta.color }} />
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/history?buscar=${encodeURIComponent(tx.asset)}&tx=${encodeURIComponent(tx.id)}`)}
+                        aria-label={`${meta.label} de ${formatAmount(tx.amount, 6)} ${tx.asset}${value != null ? `, ${formatMoney(value, currency)}` : ''}, ${madridTime(tx.timestamp)}. Abrir en el Historial`}
+                        className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-left transition-colors hover:bg-overlay/4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand"
                       >
-                        {tx.wallet_name}
-                      </span>
-                    )}
-                  </div>
-                  <p className={`text-xs mono mt-0.5 ${
-                    isBuy ? 'text-positive/80' : isSell ? 'text-negative/80' : isIncome ? 'text-accent-purple/80' : 'text-fg-subtle'
-                  }`}>
-                    {isBuy ? '+' : isSell ? '−' : ''}{formatAmount(tx.amount, 6)}
-                  </p>
-                </div>
-
-                {/* Fecha */}
-                <span className="text-xs text-fg-subtle shrink-0 tabular-nums">{relativeDate(tx.timestamp)}</span>
-              </div>
-            )
-          })}
+                        <CryptoIcon symbol={tx.asset} size={28} />
+                        <span className="flex-1 min-w-0">
+                          <span className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-fg">{tx.asset}</span>
+                            <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md"
+                              style={{ backgroundColor: alpha(meta.color, 10), color: meta.color }}>{meta.label}</span>
+                            {tx.wallet_name && (
+                              <span className="text-[11px] px-1.5 py-0.5 rounded-md"
+                                style={{ backgroundColor: alpha(tx.wallet_color, 10), color: ink(tx.wallet_color) }}>{tx.wallet_name}</span>
+                            )}
+                          </span>
+                          <span className={`block text-xs mono mt-0.5 ${amountTone}`}>{sign}{formatAmount(tx.amount, 6)} {tx.asset}</span>
+                        </span>
+                        <span className="text-right shrink-0">
+                          <span className="block text-sm mono font-semibold text-fg">{value != null ? formatMoney(value, currency) : '—'}</span>
+                          <span className="block text-[11px] mono text-fg-subtle">{madridTime(tx.timestamp)}</span>
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ol>
+            </section>
+          ))}
         </div>
       )}
     </div>
