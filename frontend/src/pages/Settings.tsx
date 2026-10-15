@@ -11,7 +11,8 @@ import { SetupBanner } from './settings/SetupBanner'
 import { SettingsTabs } from './settings/SettingsTabs'
 import { VALID_TABS } from './settings/validTabs'
 import { useSetupSeen } from '../hooks/useSetupSeen'
-import { tabId, tabPanelId } from '../components/ui'
+import { tabId, tabPanelId, PageHeader } from '../components/ui'
+import { navIcon } from '../constants/navigation'
 
 export function Settings() {
   const { setupSeen, markSetupSeen } = useSetupSeen()
@@ -43,7 +44,7 @@ export function Settings() {
   return (
     <div className="flex flex-col h-full max-w-5xl mx-auto">
       <div className="px-6 pt-6 pb-0 space-y-4 shrink-0">
-        <h1 className="text-2xl font-semibold">Configuración</h1>
+        <PageHeader icon={navIcon('/settings')} title="Ajustes" subtitle="Wallets, activos, fiscalidad y datos" />
 
         {showBanner && (
           <SetupBanner

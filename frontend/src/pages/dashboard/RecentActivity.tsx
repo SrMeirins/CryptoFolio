@@ -4,7 +4,9 @@ import { portfolioApi } from '../../api/portfolio'
 import { formatAmount } from '../../utils/format'
 import { OP_META } from '../../constants/operations'
 import { T, alpha, ink } from '../../utils/colors'
-import { cardClasses } from '../../components/ui'
+import { cardClasses, PanelHeader } from '../../components/ui'
+import { activitySubtitle } from '../../utils/panelSubtitles'
+import { History } from 'lucide-react'
 
 function relativeDate(ts: string): string {
   const diff = Date.now() - new Date(ts).getTime()
@@ -29,10 +31,13 @@ export function RecentActivity() {
 
   return (
     <div className={cardClasses('none', 'overflow-hidden')}>
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-        <h3 className="text-sm font-semibold">Actividad reciente</h3>
-        <Link to="/history" className="text-xs text-brand hover:underline">Ver todo →</Link>
-      </div>
+      <PanelHeader
+        icon={History}
+        title="Actividad reciente"
+        className="px-5 py-4 border-b border-border"
+        subtitle={isLoading ? undefined : activitySubtitle(txs.length)}
+        actions={<Link to="/history" className="text-xs text-brand hover:underline">Ver todo →</Link>}
+      />
 
       {isLoading ? (
         <div className="divide-y divide-border/40">

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useReducedMotion } from '../hooks/useReducedMotion'
 
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
 
@@ -7,21 +8,25 @@ interface Props {
   format: (v: number) => string
   className?: string
   duration?: number
+  /** Al montarse, cuenta desde 0 hasta el valor (#232). */
+  countUp?: boolean
 }
 
 /**
  * Renderiza `format(value)` e interpola suavemente del valor anterior al
  * nuevo con requestAnimationFrame cada vez que cambia `value`.
- * En el montaje inicial el valor aparece al instante (sin animar desde 0).
+ * En el montaje inicial el valor aparece al instante, salvo con `countUp`,
+ * que cuenta desde 0. Con «reducir movimiento» siempre se muestra el valor final.
  */
-export function AnimatedNumber({ value, format, className = '', duration = 450 }: Props) {
-  const [displayed, setDisplayed] = useState(value)
+export function AnimatedNumber({ value, format, className = '', duration = 450, countUp = false }: Props) {
+  const reduceMotion = useReducedMotion()
+  const [displayed, setDisplayed] = useState(countUp ? 0 : value)
 
   // Ref sincronizado con el state para poder leer la posición actual de
   // forma síncrona si llega una actualización nueva a mitad de animación.
-  const displayedRef = useRef(value)
+  const displayedRef = useRef(countUp ? 0 : value)
   const rafRef       = useRef(0)
-  const isFirst      = useRef(true)
+  const isFirst      = useRef(!countUp)
 
   useEffect(() => {
     if (isFirst.current) {
@@ -55,5 +60,5 @@ export function AnimatedNumber({ value, format, className = '', duration = 450 }
     return () => cancelAnimationFrame(rafRef.current)
   }, [value, duration])
 
-  return <span className={className}>{format(displayed)}</span>
+  return <span className={className}>{format(reduceMotion ? value : displayed)}</span>
 }

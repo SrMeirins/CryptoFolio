@@ -7,7 +7,9 @@ import { RefreshCw, Wallet, Search, X } from 'lucide-react'
 import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
 import { AllocationDonut } from './portfolio/AllocationDonut'
 import { WalletSections } from './portfolio/WalletSections'
-import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState } from '../components/ui'
+import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState, PageHeader } from '../components/ui'
+import { navIcon } from '../constants/navigation'
+import { portfolioSubtitle } from '../utils/panelSubtitles'
 
 export function Portfolio() {
   const prices = usePricesStore(s => s.prices)
@@ -35,57 +37,56 @@ export function Portfolio() {
   const pricesMissing = unpricedAssets.length
 
   const hasPrices = Object.keys(prices).length > 0
+  const walletCount = new Set(lots.map(l => l.wallet_id)).size
 
   return (
     <>
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
 
       {/* Cabecera */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="shrink-0">
-          <h1 className="text-2xl font-semibold">Portfolio</h1>
-          {!isLoading && assetsTotal > 0 && (
-            <p className="text-xs text-fg-subtle mt-0.5">
-              {assetsTotal} activo{assetsTotal !== 1 ? 's' : ''}
-              {pricesMissing > 0 && (
-                <span className="text-warning ml-2">· {pricesMissing} sin precio</span>
+      <PageHeader
+        icon={navIcon('/portfolio')}
+        title="Portfolio"
+        subtitle={!isLoading && (
+          <>
+            {portfolioSubtitle(assetsTotal, walletCount)}
+            {pricesMissing > 0 && <span className="text-warning ml-2">· {pricesMissing} sin precio</span>}
+          </>
+        )}
+        actions={
+          <>
+            {/* Buscador */}
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
+              <input
+                ref={searchRef}
+                type="text"
+                placeholder="Buscar activo…"
+                aria-label="Buscar activo"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className={fieldClasses('md', false, 'pl-8 pr-8 w-44 uppercase mono')}
+              />
+              {search && (
+                <button
+                  type="button"
+                  aria-label="Borrar búsqueda"
+                  onClick={() => { setSearch(''); searchRef.current?.focus() }}
+                  className={iconButtonClasses('sm', false, 'absolute right-2.5 top-1/2 -translate-y-1/2')}
+                >
+                  <X size={12} />
+                </button>
               )}
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3 flex-1 justify-end">
-          {/* Buscador */}
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
-            <input
-              ref={searchRef}
-              type="text"
-              placeholder="Buscar activo…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className={fieldClasses('md', false, 'pl-8 pr-8 w-44 uppercase mono')}
-            />
-            {search && (
-              <button
-                type="button"
-                aria-label="Borrar búsqueda"
-                onClick={() => { setSearch(''); searchRef.current?.focus() }}
-                className={iconButtonClasses('sm', false, 'absolute right-2.5 top-1/2 -translate-y-1/2')}
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-
-          {!hasPrices && (
-            <div className="flex items-center gap-1.5 text-xs text-fg-subtle shrink-0">
-              <RefreshCw size={12} className="animate-spin" />
-              Cargando precios...
             </div>
-          )}
-        </div>
-      </div>
+            {!hasPrices && (
+              <div className="flex items-center gap-1.5 text-xs text-fg-subtle shrink-0">
+                <RefreshCw size={12} className="animate-spin" />
+                Cargando precios...
+              </div>
+            )}
+          </>
+        }
+      />
 
       {/* Gráfico de distribución — solo con precios disponibles */}
       {hasPrices && !isLoading && lots.length > 0 && (

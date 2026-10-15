@@ -18,6 +18,10 @@ import { FiscalCard } from './dashboard/FiscalCard'
 import { madridToday } from '../utils/pnlChart'
 import { monthRange, ymOf } from '../utils/pnlCalendar'
 import { useLiveDayPnl } from '../hooks/useLiveDayPnl'
+import { PageHeader, panelClasses, panelEnterStyle } from '../components/ui'
+import { navIcon } from '../constants/navigation'
+import { dashboardSubtitle } from '../utils/panelSubtitles'
+import { useNow } from '../hooks/useNow'
 
 export function Dashboard() {
   // Precios en la moneda de visualización (#177): en USD sin USDT aún, vacíos.
@@ -51,6 +55,7 @@ export function Dashboard() {
 
   // «Hoy» de la tarjeta de P&L (#210): misma consulta (y caché) que el mes en
   // curso del calendario y mismo cálculo en vivo, así que ambas cifras coinciden.
+  const now = useNow(60_000)
   const today = madridToday()
   const month = monthRange(ymOf(today), today)
   const { data: monthPnl } = useCurrencyQuery(
@@ -88,7 +93,7 @@ export function Dashboard() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       {/* El estado de los precios vive solo en la barra superior (#200) */}
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <PageHeader icon={navIcon('/')} title="Dashboard" subtitle={dashboardSubtitle(assetCount, new Date(now))} />
 
       {/* Métricas principales */}
       <PortfolioSummaryCards
@@ -159,25 +164,32 @@ export function Dashboard() {
         )}
       />
 
-      {/* Top movers */}
-      <TopMovers lots={lots} />
+      {/* Paneles con entrada escalonada y elevación al pasar el cursor (#232) */}
+      <div className={panelClasses('rounded-xl')} style={panelEnterStyle(1)}>
+        <TopMovers lots={lots} />
+      </div>
 
-      {/* Gráfico histórico */}
-      <EvolutionCard />
+      <div className={panelClasses('rounded-xl')} style={panelEnterStyle(2)}>
+        <EvolutionCard />
+      </div>
 
-      {/* Calendario de P&L diario */}
-      <PnlCalendar />
+      <div className={panelClasses('rounded-xl')} style={panelEnterStyle(3)}>
+        <PnlCalendar />
+      </div>
 
       {/* Distribución + Fiscal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
+        <div className={panelClasses('rounded-xl lg:col-span-2')} style={panelEnterStyle(4)}>
           <AllocationChart lots={lots} fiatBalances={fiatBalances} />
         </div>
-        <FiscalCard data={fiscal} />
+        <div className={panelClasses('rounded-xl')} style={panelEnterStyle(5)}>
+          <FiscalCard data={fiscal} />
+        </div>
       </div>
 
-      {/* Actividad reciente */}
-      <RecentActivity />
+      <div className={panelClasses('rounded-xl')} style={panelEnterStyle(6)}>
+        <RecentActivity />
+      </div>
 
     </div>
   )

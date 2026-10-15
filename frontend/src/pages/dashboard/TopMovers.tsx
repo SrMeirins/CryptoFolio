@@ -8,7 +8,9 @@ import { rankMovers, type MoverItem, type MoversMode } from '../../utils/topMove
 import { formatMoney, formatPercent } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
 import { T, alpha } from '../../utils/colors'
-import { SegmentedControl, cardClasses } from '../../components/ui'
+import { SegmentedControl, cardClasses, PanelHeader } from '../../components/ui'
+import { moversSubtitle } from '../../utils/panelSubtitles'
+import { Activity } from 'lucide-react'
 
 // Escala de la barra: el % de 24h suele ser mucho menor que el total.
 const BAR_SCALE: Record<MoversMode, number> = { '24h': 10, total: 2 }
@@ -93,11 +95,15 @@ export function TopMovers({ lots }: { lots: FifoLot[] }) {
 
   return (
     <div className={cardClasses('none', 'overflow-hidden')}>
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-        <span className="text-xs text-fg-subtle">{MODE_LABELS[mode].title}</span>
-        <SegmentedControl label="Métrica de mejores y peores" value={mode} onChange={changeMode}
-          options={(['24h', 'total'] as const).map(m => ({ value: m, label: MODE_LABELS[m].short }))} />
-      </div>
+      <PanelHeader
+        icon={Activity}
+        title="Variación"
+        className="px-5 py-4 border-b border-border"
+        help={<p>{MODE_LABELS[mode].title}. «24h» compara con el precio de hace 24 horas; «Total», con tu precio medio de compra.</p>}
+        subtitle={moversSubtitle(mode, assets.length)}
+        actions={<SegmentedControl label="Métrica de mejores y peores" value={mode} onChange={changeMode}
+          options={(['24h', 'total'] as const).map(m => ({ value: m, label: MODE_LABELS[m].short }))} />}
+      />
 
       {top.length === 0 ? (
         <p className="px-4 py-6 text-center text-xs text-fg-subtle">

@@ -321,3 +321,10 @@
   50%      { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cf-brand) 30%, transparent); }
 }
 .calendar-live { animation: calendarLive 2.4s ease-in-out infinite; }
+
+/* Entrada escalonada de los paneles (#232); el retraso lo da panelEnterStyle(). */
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.panel-in { animation: panelIn 0.38s ease-out both; }

@@ -1,18 +1,18 @@
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
 import { useLiveDayPnl } from '../../hooks/useLiveDayPnl'
 import { dailyPnlQuery } from '../../queries/currencyQueries'
 import { madridToday } from '../../utils/pnlChart'
 import { addMonths, compareYm, monthGrid, monthLabel, monthRange, monthSummary, ymOf, type YearMonth } from '../../utils/pnlCalendar'
 import { monthStats, weekTotals, yearMonths } from '../../utils/calendarStats'
-import { Button, SegmentedControl, Select, cardClasses, iconButtonClasses } from '../../components/ui'
-import { InfoTooltip } from '../../components/InfoTooltip'
+import { Button, SegmentedControl, Select, cardClasses, iconButtonClasses, PanelHeader, Skeleton } from '../../components/ui'
 import { CalendarMonthGrid } from './calendar/CalendarMonthGrid'
 import { CalendarStats } from './calendar/CalendarStats'
 import { CalendarLegend } from './calendar/CalendarLegend'
 import { CalendarDayDetail } from './calendar/CalendarDayDetail'
 import { CalendarYearView } from './calendar/CalendarYearView'
+import { calendarSubtitle } from '../../utils/panelSubtitles'
 
 // Calendario de ganancias y pérdidas diarias (#167), sobre GET /api/v1/pnl/daily.
 // El día de hoy se recalcula con cada precio en vivo (#213). Desde #216: vista
@@ -82,19 +82,19 @@ export function PnlCalendar() {
 
   return (
     <div className={cardClasses('none', 'px-5 py-5')}>
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest">P&L diario</h3>
-          <InfoTooltip label="Qué mide el P&L diario">
-            <p>Ganancia o pérdida de cada día natural, de 00:00 a 24:00 (hora de Madrid), sin contar depósitos ni retiradas.</p>
-            <p className="mt-1.5"><span className="text-brand">● hoy</span> se actualiza en vivo desde las 00:00. El chip «24h» de la tarjeta Valor mide en cambio las últimas 24 horas móviles, por eso las cifras no coinciden.</p>
-            <p className="mt-1.5">Pulsa un día para ver su detalle. Con el teclado, las flechas recorren los días.</p>
-          </InfoTooltip>
-          <SegmentedControl label="Vista del calendario" value={view} onChange={v => { setView(v); setSelected(null) }}
-            options={[{ value: 'month', label: 'Mes' }, { value: 'year', label: 'Año' }]} />
-        </div>
-
-        <div className="flex items-center gap-1.5 flex-wrap">
+      <PanelHeader
+        icon={CalendarDays}
+        title="P&L diario"
+        className="mb-3"
+        subtitle={calendarSubtitle(view, monthLabel(ym), ym.year)}
+        help={<>
+          <p>Ganancia o pérdida de cada día natural, de 00:00 a 24:00 (hora de Madrid), sin contar depósitos ni retiradas.</p>
+          <p><span className="text-brand">● hoy</span> se actualiza en vivo desde las 00:00. El chip «24h» de la tarjeta Valor mide en cambio las últimas 24 horas móviles, por eso las cifras no coinciden.</p>
+          <p>Pulsa un día para ver su detalle. Con el teclado, las flechas recorren los días.</p>
+        </>}
+        extra={<SegmentedControl label="Vista del calendario" value={view} onChange={v => { setView(v); setSelected(null) }}
+          options={[{ value: 'month', label: 'Mes' }, { value: 'year', label: 'Año' }]} />}
+        actions={<>
           <button type="button" onClick={() => step(-1)} disabled={!canPrev} aria-label={view === 'month' ? 'Mes anterior' : 'Año anterior'} className={navButton}>
             <ChevronLeft size={16} />
           </button>
@@ -118,8 +118,8 @@ export function PnlCalendar() {
             onClick={() => { setView('month'); go(current); setSelected(today) }}>
             Hoy
           </Button>
-        </div>
-      </div>
+        </>}
+      />
 
       {view === 'year' ? (
         <CalendarYearView year={ym.year} months={months} current={current} currency={currency}
@@ -129,7 +129,11 @@ export function PnlCalendar() {
           {complete.length > 0 && <CalendarStats stats={stats} total={monthSummary(complete)} currency={currency} />}
           {data?.refreshing && <p className="text-xs text-fg-subtle mb-2">Descargando precios de cierre…</p>}
           {isError && <p className="text-xs text-fg-subtle py-6 text-center">No se pudo cargar el P&L del mes.</p>}
-          {isLoading && <p className="text-xs text-fg-subtle py-6 text-center">Cargando…</p>}
+          {isLoading && (
+            <div role="status" aria-label="Cargando el calendario" className="grid grid-cols-7 gap-1.5">
+              {Array.from({ length: 35 }, (_, i) => <Skeleton key={i} className="h-16" />)}
+            </div>
+          )}
           {!isError && (
             <div key={`${ym.year}-${ym.month}`} className="animate-page-in">
               <CalendarMonthGrid weeks={weeks} byDate={byDate} totals={totals} today={today} maxAbs={maxAbs} currency={currency}
