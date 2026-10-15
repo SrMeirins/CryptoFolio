@@ -11,9 +11,13 @@ import { ToastProvider } from './components/Toast'
 import { UpdateBanner } from './components/UpdateBanner'
 import { TopBar } from './components/TopBar'
 import { useApplyTheme } from './hooks/useTheme'
+import { usePrivacyStore } from './store/privacyStore'
 
 function RoutedContent() {
   const { pathname } = useLocation()
+  // Modo privacidad (#254): al cambiarlo se vuelven a pintar las páginas, que
+  // formatean los importes con el estado nuevo.
+  usePrivacyStore(s => s.hidden)
   return (
     <div key={pathname} className="animate-page-in min-h-full">
       <Routes>

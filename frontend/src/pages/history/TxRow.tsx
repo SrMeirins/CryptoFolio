@@ -5,7 +5,7 @@ import {
 import type { Transaction } from '../../api/portfolio'
 import { CopyButton } from '../../components/CopyButton'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import { formatMoney, formatPrice, formatAmount, type Currency, formatNumber } from '../../utils/format'
+import { formatMoney, formatAmount, type Currency, formatNumber } from '../../utils/format'
 import { OP_META } from '../../constants/operations'
 import { fmtDate, calcEurValue, calcFeeEur, formatPriceLine, toDisplayAmount } from './helpers'
 import { T, alpha, ink } from '../../utils/colors'
@@ -113,7 +113,7 @@ export function TxRow({
         <td className="px-3 py-2.5 text-right align-middle">
           {eurValue != null ? (
             <>
-              <div className="text-sm mono font-semibold text-fg">{formatPrice(eurValue, currency)}</div>
+              <div className="text-sm mono font-semibold text-fg">{formatMoney(eurValue, currency)}</div>
               {priceLine && <div className="text-xs text-fg-subtle mono mt-0.5">@ {priceLine}</div>}
             </>
           ) : hasCost ? (
