@@ -7,8 +7,10 @@ import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
 vi.mock('../prices/binance', () => ({
   getHistoricalPriceEur: vi.fn(() => Promise.resolve(1)),
 }));
+// Precios en vivo controlables por test (vacíos por defecto).
+const livePrices = new Map<string, number>();
 vi.mock('../prices/liveFeed', () => ({
-  getAllLivePrices: () => new Map<string, number>(),
+  getAllLivePrices: () => livePrices,
 }));
 vi.mock('../prices/closePrices', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../prices/closePrices')>()),
@@ -187,5 +189,37 @@ describe('getDailyPnl — flujos de capital y rendimiento', () => {
     const r = await getDailyPnl({ from: '2026-04-01', to: '2026-04-02' });
     expect(r.refreshing).toBe(true);
     expect(r.days.map(x => x.complete)).toEqual([true, false]);
+  });
+
+  it('incluye la base del día en curso para recalcularlo en vivo en el cliente (#213)', async () => {
+    await reset();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-07-02T10:00:00Z'));   // 12:00 en Madrid
+    try {
+      await tx('DEPOSIT_FIAT', '2026-07-01T09:00:00Z', 'EUR', 100);
+      await tx('BUY', '2026-07-01T10:00:00Z', 'WBTC', 1, { cost_asset: 'EUR', cost_amount: 100 });  // alias de BTC
+      await tx('DEPOSIT_FIAT', '2026-07-02T08:00:00Z', 'EUR', 50);                                  // flujo de hoy
+      await runFifoEngine();
+      await closes('BTC', { '2026-06-30': 100, '2026-07-01': 100 });
+      livePrices.set('BTC', 120);
+
+      const r = await getDailyPnl({ from: '2026-07-01' });
+      expect(r.to).toBe('2026-07-02');
+      expect(r.today).toEqual({
+        date: '2026-07-02',
+        previousValue: 100,
+        holdings: { BTC: 1, EUR: 50 },
+        flows: [{ asset: 'EUR', quantity: 50 }],
+        pricesEur: { BTC: 120 },
+      });
+      // El día de hoy de la respuesta usa la misma fórmula: 170 − 100 − 50 = 20.
+      expect(r.days.at(-1)).toMatchObject({ date: '2026-07-02', value: 170, inflow: 50, pnl: 20, live: true });
+
+      // Sin hoy en el rango, no hay base en vivo.
+      expect((await getDailyPnl({ from: '2026-07-01', to: '2026-07-01' })).today).toBeNull();
+    } finally {
+      livePrices.clear();
+      vi.useRealTimers();
+    }
   });
 });
