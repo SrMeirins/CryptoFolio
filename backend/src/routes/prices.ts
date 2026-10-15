@@ -60,7 +60,8 @@ router.get('/historical', async (req, res) => {
 // - `prices`: último precio en EUR por activo.
 // - `open24`: precio en EUR de hace 24h (apertura de la ventana móvil de
 //   Binance), para la variación de 24h en tiempo real (#147).
-// - `status`: antigüedad del último dato recibido de Binance (#194), al
+// - `status`: antigüedad del último dato recibido de Binance (#194), pares
+//   suscritos y si la conexión con Binance está abierta (#200), al
 //   conectar y cada STATUS_INTERVAL_MS. Permite al frontend distinguir «en
 //   vivo» de «conectado pero sin precios», y detectar que el propio WebSocket
 //   ha dejado de recibir mensajes.
@@ -83,8 +84,11 @@ export function setupPricesWebSocket(server: Server): void {
 
     const sendStatus = () => {
       if (ws.readyState !== WebSocket.OPEN) return;
-      const { lastTickAt } = getFeedStatus();
-      ws.send(JSON.stringify({ type: 'status', payload: { feedAgeMs: lastTickAt === null ? null : Date.now() - lastTickAt } }));
+      const { lastTickAt, pairs, binanceConnected } = getFeedStatus();
+      ws.send(JSON.stringify({
+        type: 'status',
+        payload: { feedAgeMs: lastTickAt === null ? null : Date.now() - lastTickAt, pairs, binanceConnected },
+      }));
     };
     sendStatus();
     const statusTimer = setInterval(sendStatus, STATUS_INTERVAL_MS);

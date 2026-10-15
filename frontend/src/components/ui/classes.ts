@@ -73,13 +73,23 @@ export function badgeClasses(tone: BadgeTone = 'neutral', size: BadgeSize = 'sm'
 
 // ── SegmentedControl ──
 export type SegmentedSize = 'sm' | 'md'
-export function segmentClasses(active: boolean, size: SegmentedSize = 'sm'): string {
+/** `accent`: la opción activa la marca un indicador deslizante con el color de acento (cabecera, #200). */
+export type SegmentedVariant = 'default' | 'accent'
+export function segmentClasses(active: boolean, size: SegmentedSize = 'sm', variant: SegmentedVariant = 'default'): string {
+  const state = variant === 'accent'
+    ? (active ? 'relative z-10 text-brand' : 'relative z-10 text-fg-subtle hover:text-fg')
+    : (active ? 'bg-background-card text-fg shadow-xs' : 'text-fg-subtle hover:text-fg')
   return [
     'whitespace-nowrap rounded-md font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
     'focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand',
     size === 'md' ? 'px-3 py-1.5 text-sm' : 'px-2.5 py-1 text-xs',
-    active ? 'bg-background-card text-fg shadow-xs' : 'text-fg-subtle hover:text-fg',
+    state,
   ].join(' ')
+}
+/** Indicador deslizante de la variante `accent`; sin animación con «reducir movimiento». */
+export function segmentThumbClasses(): string {
+  return 'absolute top-0.5 bottom-0.5 left-0 rounded-md bg-brand/15 border border-brand/40 shadow-xs '
+    + 'transition-[transform,width] duration-200 ease-out motion-reduce:transition-none pointer-events-none'
 }
 
 // ── Tabs ──

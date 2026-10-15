@@ -15,5 +15,5 @@ const OPTIONS: readonly SegmentOption<EffectiveTheme>[] = [
 export function ThemeToggle() {
   const { theme } = useEffectiveTheme()
   const setTheme = useSetTheme()
-  return <SegmentedControl label="Tema" value={theme} onChange={setTheme} options={OPTIONS} />
+  return <SegmentedControl label="Tema" variant="accent" value={theme} onChange={setTheme} options={OPTIONS} />
 }

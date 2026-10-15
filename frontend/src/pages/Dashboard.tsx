@@ -1,14 +1,12 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { portfolioApi } from '../api/portfolio'
-import { usePricesStore } from '../store/pricesStore'
 import { formatMoney, formatMoneyCompact, formatPercent } from '../utils/format'
 import { type Change24h } from '../components/MetricCard'
 import { PortfolioSummaryCards } from '../components/PortfolioSummaryCards'
 import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
 import { useDisplayMarket } from '../hooks/useDisplayMarket'
 import { useCurrencyQuery } from '../hooks/useCurrencyQuery'
-import { LIVE_STATUS_META, useLiveStatus } from '../hooks/useLiveStatus'
 import { dailyPnlQuery, eurFlowQuery } from '../queries/currencyQueries'
 import { computeChange24h } from '../utils/change24h'
 import { TopMovers } from './dashboard/TopMovers'
@@ -24,8 +22,6 @@ import { useLiveDayPnl } from '../hooks/useLiveDayPnl'
 export function Dashboard() {
   // Precios en la moneda de visualización (#177): en USD sin USDT aún, vacíos.
   const { currency, prices, open24, fiatOpen24 } = useDisplayMarket()
-  const live = LIVE_STATUS_META[useLiveStatus()]
-  const lastUpdate = usePricesStore((s) => s.lastUpdate)
 
   const { data: lots = [], isLoading: lotsLoading } = useQuery({
     queryKey: ['fifo-lots'],
@@ -91,18 +87,8 @@ export function Dashboard() {
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-fg-subtle text-sm mt-1">
-            {lastUpdate ? `Actualizado ${lastUpdate.toLocaleTimeString('es-ES')}` : 'Cargando precios...'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2" title={live.title}>
-          <div className={`w-2 h-2 rounded-full ${live.dot}`} aria-hidden="true" />
-          <span className="text-xs text-fg-subtle">{live.label}</span>
-        </div>
-      </div>
+      {/* El estado de los precios vive solo en la barra superior (#200) */}
+      <h1 className="text-2xl font-semibold">Dashboard</h1>
 
       {/* Métricas principales */}
       <PortfolioSummaryCards

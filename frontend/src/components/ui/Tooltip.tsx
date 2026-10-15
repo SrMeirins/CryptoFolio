@@ -17,9 +17,13 @@ export interface TooltipProps {
   trigger?: ReactNode
   /** Nombre accesible del disparador; por defecto, `label`. */
   triggerLabel?: string
+  /** Acción del disparador al pulsarlo (p. ej. refrescar); sustituye a fijar el tooltip. */
+  onActivate?: () => void
+  /** Clases del botón disparador cuando se usa `trigger`. */
+  triggerClassName?: string
 }
 
-export function Tooltip({ label, children, direction = 'down', trigger, triggerLabel }: TooltipProps) {
+export function Tooltip({ label, children, direction = 'down', trigger, triggerLabel, onActivate, triggerClassName }: TooltipProps) {
   const [hovered, setHovered] = useState(false)
   const [pinned, setPinned] = useState(false)
   const [position, setPosition] = useState<TooltipPosition | null>(null)
@@ -73,13 +77,13 @@ export function Tooltip({ label, children, direction = 'down', trigger, triggerL
     onMouseLeave: () => setHovered(false),
     onFocus: () => setHovered(true),
     onBlur: () => { setHovered(false); setPinned(false) },
-    onClick: () => setPinned(p => !p),
+    onClick: onActivate ?? (() => setPinned(p => !p)),
   }
 
   return (
     <span className="relative inline-flex items-center">
       {trigger ? (
-        <button {...triggerProps} className="cursor-default rounded-lg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60">
+        <button {...triggerProps} className={triggerClassName ?? 'cursor-default rounded-lg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60'}>
           {trigger}
         </button>
       ) : (

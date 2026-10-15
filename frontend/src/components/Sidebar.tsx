@@ -77,24 +77,19 @@ export function Sidebar() {
         ${collapsed ? 'w-[60px]' : 'w-[220px]'}
       `}
     >
-      {/* Logo */}
+      {/* Logo: 64 px de alto, igual que la barra superior (#200) */}
       <div className={`
-        flex items-center border-b border-border shrink-0 overflow-hidden
-        ${collapsed ? 'px-[13px] py-[18px] justify-center' : 'px-4 py-[18px] gap-3'}
+        h-16 flex items-center border-b border-border shrink-0 overflow-hidden
+        ${collapsed ? 'justify-center' : 'px-4 gap-3'}
       `}>
         {/* Mismo logo que favicon.svg (fuente única) en vez de un SVG
             propio: evita que la marca más visible de la app se quede
             desincronizada del logo real, como ocurría antes. */}
-        <img src="/favicon.svg" width={34} height={34} alt="CryptoFolio" className="shrink-0" />
+        <img src="/favicon.svg" width={collapsed ? 36 : 44} height={collapsed ? 36 : 44} alt="CryptoFolio" className="shrink-0" />
         {!collapsed && (
-          <div className="flex flex-col min-w-0 overflow-hidden">
-            <span className="font-bold text-[15px] leading-tight tracking-tight bg-linear-to-r from-blue-400 to-accent-purple bg-clip-text text-transparent whitespace-nowrap">
-              CryptoFolio
-            </span>
-            <span className="text-xs text-fg-subtle font-medium tracking-wide whitespace-nowrap">
-              Portfolio · Fiscal
-            </span>
-          </div>
+          <span className="font-bold text-base leading-tight tracking-tight bg-linear-to-r from-blue-400 to-accent-purple bg-clip-text text-transparent whitespace-nowrap">
+            CryptoFolio
+          </span>
         )}
       </div>
 
