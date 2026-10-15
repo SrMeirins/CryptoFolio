@@ -8,7 +8,7 @@ import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { PanelHeader, badgeClasses, cardClasses } from '../../components/ui'
 import { fiscalSubtitle } from '../../utils/panelSubtitles'
 import { baseTramosCompensada } from '../../utils/tramosIrpf'
-import { estimatedTax, gainLossShares, nextFiscalDeadline } from '../../utils/fiscalPanel'
+import { deadlineUrgency, estimatedTax, gainLossShares, nextFiscalDeadline } from '../../utils/fiscalPanel'
 import { madridToday } from '../../utils/pnlChart'
 import { useTramos } from '../../hooks/useTramos'
 import { FISCAL_STALE_TIME } from '../fiscal/constants'
@@ -20,6 +20,12 @@ import { FiscalMonthly } from './FiscalMonthly'
 // el estado del Modelo 721 y la cuenta atrás a la próxima fecha fiscal.
 
 const SHORT_DATE = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+const MONTH_YEAR = new Intl.DateTimeFormat('es-ES', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+const utc = (d: string) => new Date(`${d}T00:00:00Z`)
+const shortDate = (d: string) => SHORT_DATE.format(utc(d)).replace('.', '')
+const plural = (n: number) => `${n} ${n === 1 ? 'día' : 'días'}`
+const URGENCY_TEXT = { calm: 'text-brand', soon: 'text-warning', urgent: 'text-negative' } as const
+const URGENCY_BAR = { calm: 'bg-brand', soon: 'bg-warning', urgent: 'bg-negative' } as const
 
 export function FiscalCard({ data }: { data: FiscalYear[] }) {
   const currentYear = new Date().getFullYear()
@@ -44,6 +50,15 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
     queryFn: () => portfolioApi.getFiscalModelo721(year!),
     enabled: !!year, staleTime: FISCAL_STALE_TIME,
   })
+  // De enero a marzo vence el 721 del año anterior (#249): hace falta saber si
+  // hubo obligación ese año.
+  const today = madridToday()
+  const todayYear = Number(today.slice(0, 4))
+  const { data: modelo721Prev } = useQuery({
+    queryKey: ['fiscal-721', todayYear - 1],
+    queryFn: () => portfolioApi.getFiscalModelo721(todayYear - 1),
+    enabled: today.slice(5) <= '03-31', staleTime: FISCAL_STALE_TIME,
+  })
 
   if (!current) return null
 
@@ -56,7 +71,11 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
   const base     = summary ? baseTramosCompensada(cfYear, summary.netoPatrimonial, summary.totalRendimientos) : null
   const tax      = base === null ? null : estimatedTax(base, tramos)
   const umbralPct = modelo721 ? Math.min(100, (modelo721.totalValorCustodia / modelo721.umbral) * 100) : null
-  const deadline = nextFiscalDeadline(madridToday(), !!modelo721?.superaUmbral)
+  const deadline = nextFiscalDeadline(today, {
+    previous: !!modelo721Prev?.superaUmbral,
+    current: year === todayYear && !!modelo721?.superaUmbral,
+  })
+  const urgency = deadlineUrgency(deadline)
 
   return (
     // Misma altura que Distribución: el gráfico mensual ocupa el espacio libre (#236).
@@ -121,15 +140,30 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
             ) : <p className="text-xs text-fg-subtle">—</p>}
           </div>
 
-          {/* Cuenta atrás */}
-          <div className="rounded-xl border border-border bg-overlay/2 p-3 space-y-1"
+          {/* Próximo plazo (#249): apertura, estado y progreso */}
+          <div className="rounded-xl border border-border bg-overlay/2 p-3 space-y-1.5"
             title="Fechas habituales; consulta el calendario oficial de la AEAT">
             <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-fg-subtle"><CalendarClock size={12} aria-hidden="true" /> Próximo plazo</span>
-            <p className="text-sm font-semibold text-fg leading-tight">{deadline.label}</p>
-            <p className="text-lg font-bold mono text-brand leading-tight">
-              {deadline.days === 0 ? 'Hoy' : `${deadline.days} ${deadline.days === 1 ? 'día' : 'días'}`}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-sm font-semibold text-fg leading-tight">{deadline.label}</p>
+              <span className={badgeClasses(deadline.status === 'open' ? (urgency === 'calm' ? 'positive' : urgency === 'soon' ? 'warning' : 'negative') : 'neutral')}>
+                {deadline.status === 'open' ? 'Abierta' : 'Pendiente de abrir'}
+              </span>
+            </div>
+            <p className={`text-lg font-bold mono leading-tight ${URGENCY_TEXT[urgency]}`}>
+              {deadline.status === 'pending'
+                ? <>{deadline.opensApprox ? '~' : ''}{plural(deadline.daysToOpen)} <span className="text-[11px] font-normal text-fg-subtle whitespace-nowrap">para abrir</span></>
+                : deadline.days === 0 ? 'Último día' : <>{plural(deadline.days)} <span className="text-[11px] font-normal text-fg-subtle whitespace-nowrap">para cerrar</span></>}
             </p>
-            <p className="text-[11px] text-fg-subtle">hasta el {SHORT_DATE.format(new Date(`${deadline.date}T00:00:00Z`)).replace('.', '')}</p>
+            {deadline.status === 'open' && (
+              <div className="h-1.5 rounded-full bg-overlay/6 overflow-hidden" role="img"
+                aria-label={`${formatPercent(deadline.progress, 0)} del plazo transcurrido`}>
+                <span className={`block h-full rounded-full ${URGENCY_BAR[urgency]}`} style={{ width: `${Math.max(2, deadline.progress)}%` }} />
+              </div>
+            )}
+            <p className="text-[11px] text-fg-subtle">
+              {deadline.opensApprox ? 'abre ~' + MONTH_YEAR.format(utc(deadline.opens)).replace('.', '') : 'abre ' + shortDate(deadline.opens)} · cierra {shortDate(deadline.date)}
+            </p>
           </div>
         </div>
       </div>
