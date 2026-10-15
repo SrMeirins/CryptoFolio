@@ -4,6 +4,7 @@ import { formatMoney, type Currency, formatPercent } from '../utils/format'
 import { costSecondary, flowSecondary, returnSecondary } from '../utils/summaryCards'
 import { todayChip } from '../utils/windowChip'
 import { WindowChip } from './WindowChip'
+import { Sparkline } from './Sparkline'
 
 interface EurFlow {
   deposited:    number
@@ -21,7 +22,7 @@ export function PortfolioSummaryCards({
   totalValue, totalCost, pnl, pnlPct, hasPrices, loading,
   valueTooltip, costTooltip, pnlTooltip, pnlPctTooltip,
   eurFlow, eurFlowTooltip,
-  change24h, currency = 'EUR', assetCount, todayPnl = null,
+  change24h, currency = 'EUR', assetCount, todayPnl = null, valueTrend = [],
 }: {
   totalValue: number
   totalCost:  number
@@ -40,6 +41,8 @@ export function PortfolioSummaryCards({
   assetCount: number
   /** P&L de hoy en vivo (#213), en `currency`; null mientras no hay dato. */
   todayPnl?: number | null
+  /** Valor de la cartera de los últimos 30 días para el mini-gráfico (#251). */
+  valueTrend?: readonly number[]
 }) {
   // Las tarjetas llevan la moneda en la key: al cambiarla se remontan en vez de
   // animar la cifra de un importe en EUR a uno en USD.
@@ -62,6 +65,7 @@ export function PortfolioSummaryCards({
         loading={loading}
         change24h={change24h}
         tooltip={valueTooltip}
+        sparkline={hasPrices && valueTrend.length > 1 ? <Sparkline values={valueTrend} days={valueTrend.length} className="w-full h-full" /> : undefined}
       />
 
       <MetricCard

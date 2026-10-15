@@ -22,6 +22,7 @@ import { PageHeader, panelClasses, panelEnterStyle } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 import { dashboardSubtitle } from '../utils/panelSubtitles'
 import { useNow } from '../hooks/useNow'
+import { valueSparkline } from '../utils/sparkline'
 
 export function Dashboard() {
   // Precios en la moneda de visualización (#177): en USD sin USDT aún, vacíos.
@@ -63,7 +64,14 @@ export function Dashboard() {
     { refetchInterval: 60_000, enabled: month !== null },
   )
   const liveToday = useLiveDayPnl(monthPnl?.currency === currency ? monthPnl.today : null, currency)
+  // Mini-gráfico de la tarjeta Valor (#251): misma consulta (y caché) que el
+  // gráfico de evolución en su periodo por defecto, «Todo».
+  const { data: allPnl } = useCurrencyQuery(c => dailyPnlQuery(c), { refetchInterval: 60_000 })
   const hasPrices = Object.keys(prices).length > 0
+  const valueTrend = useMemo(
+    () => (allPnl?.currency === currency ? valueSparkline(allPnl.days, hasPrices ? totalValue : null) : []),
+    [allPnl, currency, hasPrices, totalValue],
+  )
 
   // Variación de 24h en tiempo real con el precio de hace 24h del WebSocket (#147).
   const change24h = useMemo((): Change24h => {
@@ -107,6 +115,7 @@ export function Dashboard() {
         currency={currency}
         assetCount={assetCount}
         todayPnl={liveToday?.pnl ?? null}
+        valueTrend={valueTrend}
         eurFlow={eurFlow}
         valueTooltip={
           <>
