@@ -4,7 +4,7 @@ import type { Network } from '../../../api/portfolio'
 import { OTHER_NETWORK, getAddressPlaceholder, inputClass } from './helpers'
 import { NetworkPicker } from './NetworkPicker'
 import { NetworkApiKeyField } from './NetworkApiKeyField'
-import { buttonClasses } from '../../../components/ui'
+import { buttonClasses, fieldClasses } from '../../../components/ui'
 
 export function AddAddressForm({ networks, onSave, onCancel }: {
   networks: Network[]
@@ -64,7 +64,7 @@ export function AddAddressForm({ networks, onSave, onCancel }: {
         <label className="text-xs text-fg-subtle">Dirección pública (opcional)</label>
         <input value={address} onChange={e => setAddress(e.target.value)}
           placeholder={getAddressPlaceholder(selectedNetwork)}
-          className={`${inputClass} font-mono text-xs`} />
+          className={fieldClasses('md', false, 'font-mono text-xs')} />
       </div>
       <div className="flex justify-end gap-2 pt-1">
         <button type="button" onClick={onCancel} className="px-3 py-1.5 text-xs text-fg-muted hover:text-fg transition-colors">Cancelar</button>

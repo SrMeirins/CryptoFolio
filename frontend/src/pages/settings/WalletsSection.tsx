@@ -12,7 +12,7 @@ import { SyncBadge } from './wallets/SyncBadge'
 import { AddAddressForm } from './wallets/AddAddressForm'
 import { AddWalletForm } from './wallets/AddWalletForm'
 import { alpha, ink } from '../../utils/colors'
-import { cardClasses, buttonClasses, iconButtonClasses } from '../../components/ui'
+import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses } from '../../components/ui'
 
 export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => void }) {
   const queryClient = useQueryClient()
@@ -142,7 +142,7 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                   {isEditing ? (
                     <div className="flex-1 flex items-center gap-2">
                       <input value={editName} onChange={e => setEditName(e.target.value)}
-                        className="flex-1 bg-background-tertiary border border-border rounded-lg px-2.5 py-1.5 text-sm focus:outline-hidden focus:border-brand"
+                        className={fieldClasses('md', false, 'flex-1 px-2.5 py-1.5')}
                         onKeyDown={e => e.key === 'Enter' && handleSaveWallet(wallet.id)} />
                       <ColorPicker value={editColor} onChange={setEditColor} size="sm" />
                     </div>
@@ -210,7 +210,7 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                             <div className="flex-1 flex items-center gap-1">
                               <input value={editingAddressValue}
                                 onChange={e => setEditingAddressValue(e.target.value)}
-                                className="flex-1 bg-background-card border border-border rounded-lg px-2 py-1 text-xs mono focus:outline-hidden focus:border-brand"
+                                className={fieldClasses('sm', false, 'flex-1 bg-background-card px-2 py-1 mono')}
                                 placeholder="Dirección pública..."
                                 onKeyDown={e => e.key === 'Enter' && handleSaveAddress(wallet.id, addr.id)} />
                               <button type="button" onClick={() => handleSaveAddress(wallet.id, addr.id)} aria-label="Guardar dirección"

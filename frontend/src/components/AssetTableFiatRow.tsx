@@ -1,6 +1,7 @@
 import { type FiatRow } from '../utils/assetTable'
 import { formatAmount, formatMoney, formatPrice } from '../utils/format'
 import { useCurrency } from '../hooks/useDisplayCurrency'
+import { tableRowClasses } from './ui'
 
 const FIAT_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', CHF: '₣' }
 
@@ -14,7 +15,7 @@ export function FiatRowComponent({ row, totalPortfolioValue, compact = false }: 
     : `${formatAmount(row.quantity, 2)} ${row.asset}`
 
   return (
-    <tr className="hover:bg-background-tertiary/30 transition-colors">
+    <tr className={tableRowClasses()}>
       <td className="px-5 py-3">
         <div className="flex items-center gap-2">
           <span className="w-4 shrink-0" />

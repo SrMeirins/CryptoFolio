@@ -21,7 +21,7 @@ import { fmtDateGroup, calcEurValue } from './history/helpers'
 import { TxRow } from './history/TxRow'
 import { StatsBar } from './history/StatsBar'
 import { AnalyticsPanel } from './history/AnalyticsPanel'
-import { cardClasses, buttonClasses, iconButtonClasses } from '../components/ui'
+import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses, tableHeadRowClasses, Button, EmptyState, LoadingState } from '../components/ui'
 
 type SortKey = 'fecha' | 'eur' | 'activo'
 type SortDir = 'asc' | 'desc'
@@ -217,7 +217,7 @@ export function History() {
               placeholder="Buscar activo o nota…"
               value={filters.search}
               onChange={e => setFilter('search', e.target.value)}
-              className="bg-background-tertiary border border-border rounded-lg pl-7 pr-8 py-1.5 text-xs placeholder-fg-subtle focus:outline-hidden focus:border-brand w-48"
+              className={fieldClasses('sm', false, 'pl-7 pr-8 w-48')}
             />
             {filters.search && (
               <button type="button" onClick={() => setFilter('search', '')} aria-label="Limpiar búsqueda"
@@ -229,21 +229,21 @@ export function History() {
 
           {/* Tipo */}
           <select value={filters.type} onChange={e => setFilter('type', e.target.value)}
-            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-fg-muted focus:outline-hidden focus:border-brand">
+            className={fieldClasses('sm', false, 'w-auto px-3 text-fg-muted cursor-pointer')}>
             <option value="">Todos los tipos</option>
             {Object.entries(OP_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
 
           {/* Wallet */}
           <select value={filters.wallet_id} onChange={e => setFilter('wallet_id', e.target.value)}
-            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-fg-muted focus:outline-hidden focus:border-brand">
+            className={fieldClasses('sm', false, 'w-auto px-3 text-fg-muted cursor-pointer')}>
             <option value="">Todas las wallets</option>
             {walletList.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
 
           {/* Cuenta */}
           <select value={filters.account} onChange={e => setFilter('account', e.target.value)}
-            className="bg-background-tertiary border border-border rounded-lg px-3 py-1.5 text-xs text-fg-muted focus:outline-hidden focus:border-brand">
+            className={fieldClasses('sm', false, 'w-auto px-3 text-fg-muted cursor-pointer')}>
             <option value="">Todas las cuentas</option>
             {KNOWN_ACCOUNTS.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
@@ -281,24 +281,18 @@ export function History() {
           )}
 
           {isLoading ? (
-            <div className="flex items-center justify-center py-20 text-fg-subtle text-sm">
-              <RefreshCw size={16} className="animate-spin mr-2" /> Cargando…
-            </div>
+            <LoadingState />
           ) : transactions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-              <Package size={28} className="text-fg-subtle" />
-              <p className="text-fg-subtle text-sm">
-                {hasActiveFilters ? 'Sin resultados para estos filtros.' : 'No hay transacciones. Importa un CSV para empezar.'}
-              </p>
-              {hasActiveFilters && (
-                <button type="button" onClick={clearFilters} className="text-xs text-brand hover:underline">Limpiar filtros</button>
-              )}
-            </div>
+            <EmptyState
+              icon={<Package size={28} />}
+              title={hasActiveFilters ? 'Sin resultados para estos filtros.' : 'No hay transacciones. Importa un CSV para empezar.'}
+              action={hasActiveFilters && <Button variant="ghost" size="sm" onClick={clearFilters}>Limpiar filtros</Button>}
+            />
           ) : (
             <div className={cardClasses('none', 'overflow-hidden')}>
               <table className="w-full">
                 <thead>
-                  <tr className="text-[11px] text-fg-subtle uppercase tracking-wider border-b border-border bg-background-tertiary/40">
+                  <tr className={tableHeadRowClasses()}>
                     <th className="text-left px-4 py-2.5 font-medium">
                       <button type="button" onClick={() => toggleSort('fecha')} className="flex items-center hover:text-fg transition-colors">
                         Fecha <SortIcon col="fecha" sortKey={sortKey} sortDir={sortDir} />

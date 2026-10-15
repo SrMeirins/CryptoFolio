@@ -4,10 +4,9 @@ import { OperationWizard, type WizardResult } from './OperationWizard'
 import { portfolioApi, type ManualTxPreview, type Transaction, type FifoRunResult } from '../api/portfolio'
 import { OP_META } from '../constants/operations'
 import { useToast } from '../hooks/useToast'
-import { useModalA11y } from '../hooks/useModalA11y'
 import { ManualTxPreviewPanel } from './ManualTxPreviewPanel'
 import { ManualTxDoneScreen } from './ManualTxDoneScreen'
-import { cardClasses, buttonClasses, iconButtonClasses } from './ui'
+import { buttonClasses, iconButtonClasses, Modal } from './ui'
 
 interface ManualTxModalProps {
   onClose: () => void
@@ -79,7 +78,6 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
   // Escape cierra igual que la X (decisión del usuario): el riesgo de
   // perder el progreso del wizard ya existe hoy con la X/Cancelar, Escape
   // no añade ningún riesgo nuevo que no pueda darse ya con un click.
-  const dialogRef = useModalA11y<HTMLDivElement>(onClose)
 
   const initialValues = transaction ? txToInitialValues(transaction) : undefined
 
@@ -135,14 +133,7 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className={cardClasses('none', 'w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl')}
-      >
+    <Modal onClose={onClose} labelledBy={titleId} size="lg" closeOnOverlay={false}>
 
         {step === 'wizard' && (
           <OperationWizard
@@ -216,7 +207,6 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
             }}
           />
         )}
-      </div>
-    </div>
+    </Modal>
   )
 }

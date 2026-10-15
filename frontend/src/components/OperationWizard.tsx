@@ -46,12 +46,14 @@ const CATEGORY_COLORS: Record<string, string> = {
   SPECIAL:     T.muted,
 }
 
+// Mismos tonos que badgeClasses (#199); antes el gris era bg-overlay/50 y
+// quedaba casi blanco con texto claro en el tema oscuro.
 const BADGE_COLORS: Record<string, string> = {
-  green: 'bg-positive/10 text-positive',
-  red:   'bg-negative/10  text-negative',
-  blue:  'bg-brand/10 text-brand',
-  gray:  'bg-overlay/50    text-fg-muted',
-  amber: 'bg-warning/10 text-warning',
+  green: 'bg-positive/12 text-positive',
+  red:   'bg-negative/12 text-negative',
+  blue:  'bg-brand/12 text-brand',
+  gray:  'bg-overlay/8 text-fg-muted',
+  amber: 'bg-warning/12 text-warning',
 }
 
 const CATEGORIES_ORDER = ['ACQUISITION', 'DISPOSITION', 'INCOME', 'MOVEMENT', 'FEE', 'SPECIAL']

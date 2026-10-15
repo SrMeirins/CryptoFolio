@@ -23,10 +23,12 @@ export function alpha(color: string, percent: number): string {
 }
 
 /**
- * Color de categoría (wallet, cuenta…) usado como texto: en el tema claro se
- * oscurece para que sea legible sobre fondos claros; en el oscuro no cambia
- * (--cf-ink-shade vale 0% en oscuro).
+ * Color de categoría (wallet, cuenta…) usado como texto. Conserva tono y
+ * croma, pero acota la luminosidad OKLCH al rango del tema (--cf-ink-lmin /
+ * --cf-ink-lmax): en oscuro aclara los colores oscuros y en claro oscurece
+ * los claros, de modo que cualquier color guardado alcanza WCAG AA
+ * (comprobado en inkContrast.test.ts).
  */
 export function ink(color: string): string {
-  return `color-mix(in srgb, ${color}, black var(--cf-ink-shade))`
+  return `oklch(from ${color} clamp(var(--cf-ink-lmin), l, var(--cf-ink-lmax)) c h)`
 }

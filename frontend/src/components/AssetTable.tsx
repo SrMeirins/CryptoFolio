@@ -11,7 +11,7 @@ import { CryptoRowComponent } from './AssetTableCryptoRow'
 import { FiatRowComponent } from './AssetTableFiatRow'
 import { SortTh } from './AssetTableSortTh'
 import { valuePortfolio } from '../utils/portfolioValuation'
-import { cardClasses, buttonClasses } from './ui'
+import { cardClasses, buttonClasses, tableHeadRowClasses } from './ui'
 
 interface AssetTableProps {
   lots: FifoLot[]
@@ -88,7 +88,7 @@ export function AssetTable({ lots: rawLots, fiatBalances = NO_FIAT, onSimulate }
   const sortProps = { sortKey, sortDir, onSort: handleSort }
   const tableHeader = (
     <thead>
-      <tr className="text-xs text-fg-subtle uppercase tracking-wider border-b border-border">
+      <tr className={tableHeadRowClasses()}>
         <SortTh {...sortProps} label="Activo"     sk="asset"    right={false} />
         <SortTh {...sortProps} label="Cantidad"   sk="quantity"  />
         <SortTh {...sortProps} label="Precio"     sk="price"     />

@@ -7,7 +7,7 @@ import { RefreshCw, Wallet, Search, X } from 'lucide-react'
 import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
 import { AllocationDonut } from './portfolio/AllocationDonut'
 import { WalletSections } from './portfolio/WalletSections'
-import { cardClasses, iconButtonClasses } from '../components/ui'
+import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState } from '../components/ui'
 
 export function Portfolio() {
   const prices = usePricesStore(s => s.prices)
@@ -64,7 +64,7 @@ export function Portfolio() {
               placeholder="Buscar activo…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className={cardClasses('none', 'pl-8 pr-8 py-2 text-sm placeholder-fg-subtle focus:outline-hidden focus:border-brand/50 transition-colors w-44 uppercase mono')}
+              className={fieldClasses('md', false, 'pl-8 pr-8 w-44 uppercase mono')}
             />
             {search && (
               <button
@@ -94,26 +94,18 @@ export function Portfolio() {
 
       {/* Secciones por wallet — agrupación dinámica */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-12 text-fg-subtle text-sm gap-2">
-          <RefreshCw size={14} className="animate-spin" />
-          Cargando lotes FIFO...
-        </div>
+        <LoadingState label="Cargando lotes FIFO…" />
       ) : (
         <>
           {lots.length === 0 && fiatBalances.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-              <Wallet size={32} className="text-fg-subtle" />
-              <p className="text-fg-subtle text-sm">Sin activos en portfolio</p>
-              <p className="text-fg-subtle text-xs">Importa tu CSV de Binance para empezar</p>
-            </div>
+            <EmptyState icon={<Wallet size={32} />} title="Sin activos en portfolio" description="Importa tu CSV de Binance para empezar" />
           ) : filteredLots.length === 0 && filteredFiats.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
-              <Search size={22} className="text-fg-subtle" />
-              <p className="text-fg-subtle text-sm">Sin resultados para <span className="mono text-fg">"{search}"</span></p>
-              <button type="button" onClick={() => setSearch('')} className="text-xs text-brand hover:text-brand/80 transition-colors">
-                Limpiar búsqueda
-              </button>
-            </div>
+            <EmptyState
+              compact
+              icon={<Search size={22} />}
+              title={<>Sin resultados para <span className="mono text-fg">"{search}"</span></>}
+              action={<Button variant="ghost" size="sm" onClick={() => setSearch('')}>Limpiar búsqueda</Button>}
+            />
           ) : (
             <WalletSections lots={filteredLots} fiatBalances={filteredFiats} onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} />
           )}

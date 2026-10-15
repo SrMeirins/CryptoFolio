@@ -93,3 +93,60 @@ export function tabClasses(active: boolean, variant: TabsVariant = 'pill'): stri
 }
 export const tabId = (idBase: string, value: string) => `${idBase}-tab-${value}`
 export const tabPanelId = (idBase: string) => `${idBase}-panel`
+// ── Campos de formulario (Input, Select) ──
+export type FieldSize = 'sm' | 'md'
+export function fieldClasses(size: FieldSize = 'md', invalid = false, extra = ''): string {
+  return twMerge([
+    'w-full bg-background-tertiary border rounded-lg text-fg placeholder-fg-subtle transition-colors',
+    'focus:outline-hidden focus-visible:ring-2 disabled:opacity-50 disabled:cursor-not-allowed',
+    size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm',
+    invalid
+      ? 'border-negative/60 focus:border-negative focus-visible:ring-negative/25'
+      : 'border-border hover:border-fg-subtle/50 focus:border-brand focus-visible:ring-brand/25',
+    extra,
+  ].join(' '))
+}
+
+// ── Modal ──
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl'
+const MODAL_WIDTH: Record<ModalSize, string> = { sm: 'sm:max-w-sm', md: 'sm:max-w-lg', lg: 'sm:max-w-2xl', xl: 'sm:max-w-4xl' }
+/** Capa de fondo: en móvil el panel se ancla abajo (hoja), desde sm se centra. */
+export function modalOverlayClasses(): string {
+  return 'fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-xs'
+}
+export function modalPanelClasses(size: ModalSize = 'md', extra = ''): string {
+  return twMerge([
+    'w-full flex flex-col max-h-[92vh] bg-background-card border border-border shadow-2xl',
+    'rounded-t-xl sm:rounded-xl focus:outline-hidden',
+    MODAL_WIDTH[size],
+    extra,
+  ].join(' '))
+}
+
+// ── Tablas de datos ──
+/** Fila de cabecera: etiquetas pequeñas en mayúsculas sobre fondo tenue. */
+export function tableHeadRowClasses(extra = ''): string {
+  return twMerge('text-[11px] text-fg-subtle font-medium uppercase tracking-wider border-b border-border bg-background-tertiary/30 [&_button]:uppercase', extra)
+}
+/** Fila de datos: hover uniforme; `interactive` si la fila se expande al pulsarla. */
+export function tableRowClasses(interactive = false, expanded = false, extra = ''): string {
+  return twMerge([
+    'transition-colors hover:bg-background-tertiary/40',
+    interactive ? 'cursor-pointer' : '',
+    expanded ? 'bg-background-tertiary/40' : '',
+    extra,
+  ].filter(Boolean).join(' '))
+}
+/** Fila de totales al pie de la tabla. */
+export function tableFootRowClasses(extra = ''): string {
+  return twMerge('border-t-2 border-border bg-background-tertiary/20', extra)
+}
+
+// ── Estados (vacío / carga / error) ──
+/** Bloque de reemplazo con forma del contenido; sin animación si el usuario reduce movimiento. */
+export function skeletonClasses(extra = ''): string {
+  return twMerge('block rounded-lg bg-background-tertiary animate-pulse motion-reduce:animate-none', extra)
+}
+export function stateClasses(compact = false, extra = ''): string {
+  return twMerge(['flex flex-col items-center justify-center text-center gap-2', compact ? 'py-8' : 'py-16', extra].join(' '))
+}

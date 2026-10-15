@@ -6,7 +6,7 @@ import { PNL_THRESHOLD } from './constants'
 import { TableExpandToggle } from './TableExpandToggle'
 import { FiscalEventRow } from './FiscalEventRow'
 import type { FiscalEvent, FiscalSummary } from './types'
-import { cardClasses, iconButtonClasses } from '../../components/ui'
+import { cardClasses, iconButtonClasses, fieldClasses, tableFootRowClasses, tableHeadRowClasses } from '../../components/ui'
 
 type SortKey = 'fecha' | 'activoTransmitido' | 'gananciaPerdidaEur' | 'valorTransmisionEur'
 type SortDir  = 'asc' | 'desc'
@@ -85,7 +85,7 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
                 type="date"
                 value={filterFrom}
                 onChange={e => setFilterFrom(e.target.value)}
-                className="px-2 py-1 bg-background-tertiary border border-border rounded-lg text-xs text-fg cursor-pointer hover:border-fg-subtle transition-colors"
+                className={fieldClasses('sm', false, 'w-auto px-2 py-1 cursor-pointer')}
                 title="Desde"
               />
               <span className="text-fg-subtle text-xs">—</span>
@@ -93,7 +93,7 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
                 type="date"
                 value={filterTo}
                 onChange={e => setFilterTo(e.target.value)}
-                className="px-2 py-1 bg-background-tertiary border border-border rounded-lg text-xs text-fg cursor-pointer hover:border-fg-subtle transition-colors"
+                className={fieldClasses('sm', false, 'w-auto px-2 py-1 cursor-pointer')}
                 title="Hasta"
               />
               {hasDateFilter && (
@@ -108,7 +108,7 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
               <select
                 value={filterAsset}
                 onChange={e => setFilterAsset(e.target.value)}
-                className="pl-6 pr-6 py-1 bg-background-tertiary border border-border rounded-lg text-xs text-fg appearance-none cursor-pointer hover:border-fg-subtle transition-colors"
+                className={fieldClasses('sm', false, 'w-auto pl-6 pr-6 py-1 appearance-none cursor-pointer')}
               >
                 <option value="">Todos los activos</option>
                 {activos.map(a => <option key={a} value={a}>{a}</option>)}
@@ -151,7 +151,7 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-fg-subtle text-[11px] uppercase tracking-wider border-b border-border bg-background-tertiary/30">
+              <tr className={tableHeadRowClasses()}>
                 <th className="text-left px-4 py-2.5">
                   <button type="button" onClick={() => toggleSort('fecha')} className="flex items-center gap-1 hover:text-fg">
                     Fecha <SortIcon col="fecha" activeCol={sortKey} dir={sortDir} />
@@ -192,7 +192,7 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
             </tbody>
             {filtered.length > 0 && (
               <tfoot>
-                <tr className="border-t-2 border-border bg-background-tertiary/20">
+                <tr className={tableFootRowClasses()}>
                   <td className="px-4 py-2.5 text-xs text-fg-subtle" colSpan={5}>
                     {filtered.length < events.length
                       ? `${filtered.length} de ${events.length} operaciones`
