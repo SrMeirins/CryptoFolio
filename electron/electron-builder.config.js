@@ -104,8 +104,9 @@ module.exports = {
     // Electron/Chromium reporta WM_CLASS = "cryptofolio" (productName en minúsculas).
     // StartupWMClass debe coincidir exactamente (case-sensitive) para que GNOME
     // asocie la ventana al .desktop y muestre el logo en el dock.
+    // electron-builder 26 agrupa las claves de [Desktop Entry] bajo `entry` (#205).
     desktop: {
-      StartupWMClass: 'cryptofolio',
+      entry: { StartupWMClass: 'cryptofolio' },
     },
   },
 
