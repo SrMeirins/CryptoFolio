@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react'
-import { TrendingUp, Search, Filter, ChevronDown } from 'lucide-react'
+import { TrendingUp, Filter, ChevronDown } from 'lucide-react'
 import { formatEur, pnlColor } from '../../utils/format'
 import { SortIcon } from '../../components/SortIcon'
 import { PNL_THRESHOLD } from './constants'
 import { TableExpandToggle } from './TableExpandToggle'
 import { FiscalEventRow } from './FiscalEventRow'
 import type { FiscalEvent, FiscalSummary } from './types'
-import { cardClasses, iconButtonClasses, fieldClasses, tableFootRowClasses, tableHeadRowClasses } from '../../components/ui'
+import { cardClasses, iconButtonClasses, fieldClasses, tableFootRowClasses, tableHeadRowClasses, Dropdown } from '../../components/ui'
 
 type SortKey = 'fecha' | 'activoTransmitido' | 'gananciaPerdidaEur' | 'valorTransmisionEur'
 type SortDir  = 'asc' | 'desc'
@@ -103,17 +103,8 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
               )}
             </div>
 
-            <div className="relative">
-              <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
-              <select
-                value={filterAsset}
-                onChange={e => setFilterAsset(e.target.value)}
-                className={fieldClasses('sm', false, 'w-auto pl-6 pr-6 py-1 appearance-none cursor-pointer')}
-              >
-                <option value="">Todos los activos</option>
-                {activos.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
+            <Dropdown size="sm" label="Filtrar por activo" value={filterAsset} onChange={setFilterAsset} align="end"
+              options={[{ value: '', label: 'Todos los activos' }, ...activos.map(a => ({ value: a, label: a }))]} />
 
             <div className="flex bg-background-tertiary border border-border rounded-lg overflow-hidden text-xs">
               {(['all', 'gain', 'loss'] as const).map(t => (

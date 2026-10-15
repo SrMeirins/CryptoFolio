@@ -81,3 +81,12 @@ export function gridMove(date: string, key: string): string | null {
   if (next.getUTCMonth() !== m - 1) return null
   return next.toISOString().slice(0, 10)
 }
+
+/** P&L acumulado día a día del mes (días completos), para el gráfico del mes (#234). */
+export function monthCumulative(days: readonly CalendarDay[]): Array<{ date: string; day: number; pnl: number; cum: number }> {
+  let cum = 0
+  return days.filter(d => d.complete).map(d => {
+    cum += d.pnl
+    return { date: d.date, day: Number(d.date.slice(8)), pnl: d.pnl, cum: Math.round(cum * 100) / 100 }
+  })
+}

@@ -41,7 +41,10 @@ export function SegmentedControl<T extends string>({
     const place = () => {
       const active = refs.current[value]
       const thumb = thumbRef.current
-      if (!active || !thumb) return
+      if (!thumb) return
+      // Sin opción activa (p. ej. un rango personalizado elegido fuera) no se muestra el indicador.
+      thumb.style.opacity = active ? '1' : '0'
+      if (!active) return
       thumb.style.width = `${active.offsetWidth}px`
       thumb.style.transform = `translateX(${active.offsetLeft}px)`
     }

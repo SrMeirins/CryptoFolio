@@ -103,7 +103,7 @@ export function tabClasses(active: boolean, variant: TabsVariant = 'pill'): stri
 }
 export const tabId = (idBase: string, value: string) => `${idBase}-tab-${value}`
 export const tabPanelId = (idBase: string) => `${idBase}-panel`
-// ── Campos de formulario (Input, Select) ──
+// ── Campos de formulario (Input y el botón de Dropdown) ──
 export type FieldSize = 'sm' | 'md'
 export function fieldClasses(size: FieldSize = 'md', invalid = false, extra = ''): string {
   return twMerge([

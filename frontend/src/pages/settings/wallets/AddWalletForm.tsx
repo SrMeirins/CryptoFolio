@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { inputClass } from './helpers'
 import { ColorPicker } from './ColorPicker'
-import { cardClasses, buttonClasses } from '../../../components/ui'
+import { cardClasses, buttonClasses, Dropdown } from '../../../components/ui'
 
 export function AddWalletForm({ onSave, onCancel }: {
   onSave: (data: Record<string, unknown>) => void
@@ -23,12 +23,13 @@ export function AddWalletForm({ onSave, onCancel }: {
         </div>
         <div className="space-y-1">
           <label className="text-xs text-fg-subtle">Tipo *</label>
-          <select value={type} onChange={e => setType(e.target.value)} className={inputClass}>
-            <option value="hardware">Hardware wallet</option>
-            <option value="software">Software wallet</option>
-            <option value="exchange">Exchange</option>
-            <option value="bank">Banco / Fiat</option>
-          </select>
+          <Dropdown label="Tipo de wallet" value={type} onChange={setType} className="w-full"
+            options={[
+              { value: 'hardware', label: 'Hardware wallet' },
+              { value: 'software', label: 'Software wallet' },
+              { value: 'exchange', label: 'Exchange' },
+              { value: 'bank', label: 'Banco / Fiat' },
+            ]} />
         </div>
       </div>
       <div className="space-y-1">

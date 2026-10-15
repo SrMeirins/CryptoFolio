@@ -92,3 +92,69 @@ describe('rankMovers — umbral de polvo en la moneda de visualización (#177)',
     expect(rankMovers(assets, {}, 'total').bottom.map(i => i.asset)).toEqual(['A'])
   })
 })
+
+// ── Mapa de calor y ranking (#233) ──
+import { heatBackground, heatLevel, heatmapCells, moverData, moversSummary, rankLabels, type MoverData } from './topMovers'
+
+const mover = (asset: string, pct: number, value: number, impact = 0): MoverData =>
+  ({ asset, pct, value, price: 1, reference: 1, impact })
+
+describe('moverData (#233)', () => {
+  it('incluye precio, referencia e impacto en la cartera (cantidad × variación de precio)', () => {
+    const assets = [{ asset: 'BTC', kind: 'crypto', quantity: 2, cost: 100, price: 60, value: 120 }] as const
+    const [btc] = moverData(assets as never, { BTC: 50 }, '24h')
+    expect(btc).toMatchObject({ asset: 'BTC', price: 60, reference: 50, impact: 20, value: 120 })
+    expect(btc.pct).toBeCloseTo(20, 9)
+    expect(moverData(assets as never, {}, 'total')[0]).toMatchObject({ reference: 50, impact: 20 })
+  })
+})
+
+describe('rankLabels (#233)', () => {
+  it('cada columna se titula por lo que contiene', () => {
+    const items = [mover('A', 2, 1), mover('B', -1, 1), mover('C', -3, 1)]
+    expect(rankLabels(items, [items[0]], [items[2]])).toEqual({ first: 'Suben más', second: 'Bajan más', notice: null })
+    // Solo uno sube y la primera columna incluye uno que baja: «Mejor evolución».
+    expect(rankLabels(items, [items[0], items[1]], [items[2]]).first).toBe('Mejor evolución')
+    expect(rankLabels(items, [items[0]], [items[0], items[2]]).second).toBe('Peor evolución')
+  })
+  it('todo baja: «Caen menos» y aviso; todo sube: «Suben menos» y aviso', () => {
+    expect(rankLabels([mover('A', -2, 1), mover('B', -1, 1)])).toEqual({ first: 'Caen menos', second: 'Bajan más', notice: 'Mercado en rojo: 2 de 2 activos bajan' })
+    expect(rankLabels([mover('A', 2, 1)])).toEqual({ first: 'Suben más', second: 'Suben menos', notice: 'Mercado en verde: 1 de 1 activos suben' })
+  })
+})
+
+describe('heatmapCells (#233)', () => {
+  it('de mayor a menor valor y agrupa en «Otros» los de menos del 1 %, con % ponderado', () => {
+    const cells = heatmapCells([mover('A', 1, 900), mover('B', -2, 95, -2), mover('C', 4, 3, 0.1), mover('D', -8, 2, -0.2)])
+    expect(cells.map(c => c.asset)).toEqual(['A', 'B', 'Otros'])
+    expect(cells[2].members).toEqual(['C', 'D'])
+    expect(cells[2].value).toBe(5)
+    expect(cells[2].pct).toBeCloseTo((4 * 3 - 8 * 2) / 5, 9)
+    expect(cells[2].impact).toBeCloseTo(-0.1, 9)
+  })
+  it('un único activo pequeño no se agrupa; sin valor, sin celdas', () => {
+    expect(heatmapCells([mover('A', 1, 999), mover('B', 1, 1)]).map(c => c.asset)).toEqual(['A', 'B'])
+    expect(heatmapCells([])).toEqual([])
+  })
+})
+
+describe('heatAlpha y moversSummary (#233)', () => {
+  it('intensidad continua con curva de raíz hasta el tope y saturada después', () => {
+    expect(heatLevel(0, 5)).toBe(0)
+    expect(heatLevel(5, 5)).toBe(1)
+    expect(heatLevel(-40, 5)).toBe(1)
+    expect(heatLevel(1.25, 5)).toBeCloseTo(0.56, 9)       // 0,12 + 0,88 × √0,25
+    expect(heatLevel(0.5, 5)).toBeGreaterThan(0.3)        // un 0,5 % ya se distingue del gris
+  })
+  it('fondo: mezcla del tono del tema con el gris neutro', () => {
+    expect(heatBackground(-5, 5)).toBe('color-mix(in srgb, var(--cf-heat-down) calc(1.000 * var(--cf-heat-max) * 1%), var(--cf-bg-tertiary))')
+    expect(heatBackground(0, 5)).toContain('var(--cf-heat-up) calc(0.000')
+  })
+  it('posiciones en ganancia y pérdida, mejor y peor', () => {
+    const s = moversSummary([mover('A', 30, 1), mover('B', 5, 1), mover('C', -20, 1)])
+    expect(s).toMatchObject({ gains: 2, losses: 1 })
+    expect(s.best?.asset).toBe('A')
+    expect(s.worst?.asset).toBe('C')
+    expect(moversSummary([mover('A', -1, 1)]).best).toBeNull()
+  })
+})
