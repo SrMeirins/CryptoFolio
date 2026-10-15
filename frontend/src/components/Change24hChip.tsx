@@ -37,6 +37,7 @@ export function Change24hChip({ change }: { change: Change24h }) {
       }>
       <p><span className={`mono font-semibold ${color}`}>{change.eur} ({change.pct})</span> en las últimas 24 horas.</p>
       {change.note}
+      <p className="mt-1.5 text-fg-subtle">Ventana móvil de 24 h; el día de hoy del calendario de P&L cuenta desde las 00:00 y descuenta depósitos y retiradas.</p>
     </InfoTooltip>
   )
 }

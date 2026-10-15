@@ -9,9 +9,12 @@ import {
   type CalendarDay, type YearMonth,
 } from '../../utils/pnlCalendar'
 import { cardClasses, iconButtonClasses } from '../../components/ui'
+import { InfoTooltip } from '../../components/InfoTooltip'
+import { useLiveDayPnl } from '../../hooks/useLiveDayPnl'
 
 // Calendario mensual de ganancias y pérdidas diarias (#167), sobre
-// GET /api/v1/pnl/daily. El día de hoy se actualiza en vivo (reconsulta cada minuto).
+// GET /api/v1/pnl/daily. El día de hoy se recalcula con cada precio en vivo
+// sobre la base que devuelve el servidor (#213).
 
 const WEEKDAY_NAMES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
 const GREEN_BG = ['', 'bg-positive/[0.07]', 'bg-positive/13', 'bg-positive/20', 'bg-positive/30']
@@ -54,11 +57,11 @@ function DayCell({ date, data, today, maxAbs, currency }: {
     <td className="p-1 align-top">
       <div className={`h-16 rounded-lg border px-2 py-1.5 ${bg} ${data.live ? 'border-brand/60' : 'border-border/40'}`}>
         <span className="sr-only">
-          {`${longDate(date)}${data.live ? ' (hoy, en vivo)' : ''}: ${signedMoney(data.pnl, currency)}${data.pct === null ? '' : `, ${pctText}`}`}
+          {`${longDate(date)}${data.live ? ' (hoy desde las 00:00, en vivo)' : ''}: ${signedMoney(data.pnl, currency)}${data.pct === null ? '' : `, ${pctText}`}`}
         </span>
         <div className="flex items-center justify-between text-xs mono text-fg-subtle" aria-hidden="true">
           <span>{dayNumber}</span>
-          {data.live && <span className="text-brand">● en vivo</span>}
+          {data.live && <span className="text-brand">● hoy</span>}
         </div>
         <p className={`text-xs mono font-semibold leading-tight mt-1 truncate ${tone}`} aria-hidden="true">{signedMoney(data.pnl, currency)}</p>
         <p className={`text-xs mono leading-tight opacity-80 ${tone}`} aria-hidden="true">{pctText}</p>
@@ -89,8 +92,13 @@ export function PnlCalendar() {
   const data = range ? monthData : undefined
   const currency = data?.currency ?? requested
 
-  const byDate = useMemo(() => new Map((data?.days ?? []).map(d => [d.date, d])), [data])
-  const complete = useMemo(() => (data?.days ?? []).filter(d => d.complete), [data])
+  // Hoy con los precios en vivo (#213): sustituye al valor de la última consulta.
+  const live = useLiveDayPnl(data?.today, currency)
+  const days = useMemo(() => (data?.days ?? []).map(d =>
+    d.live && live && data?.today?.date === d.date ? { ...d, pnl: Math.round(live.pnl * 100) / 100, pct: live.pct } : d,
+  ), [data, live])
+  const byDate = useMemo(() => new Map(days.map(d => [d.date, d])), [days])
+  const complete = useMemo(() => days.filter(d => d.complete), [days])
   const summary = monthSummary(complete)
   const maxAbs = complete.reduce((m, d) => Math.max(m, Math.abs(d.pnl)), 0)
   const weeks = monthGrid(ym)
@@ -103,7 +111,11 @@ export function PnlCalendar() {
     <div className={cardClasses('none', 'px-5 py-5')}>
       <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
         <div className="flex items-center gap-2">
-          <h3 className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest mr-1">P&L diario</h3>
+          <h3 className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest">P&L diario</h3>
+          <InfoTooltip label="Qué mide el P&L diario">
+            <p>Ganancia o pérdida de cada día natural, de 00:00 a 24:00 (hora de Madrid), sin contar depósitos ni retiradas.</p>
+            <p className="mt-1.5"><span className="text-brand">● hoy</span> se actualiza en vivo desde las 00:00. El chip «24h» de la tarjeta Valor mide en cambio las últimas 24 horas móviles, por eso las cifras no coinciden.</p>
+          </InfoTooltip>
           <button type="button" onClick={() => setYm(addMonths(ym, -1))} disabled={!canPrev} aria-label="Mes anterior"
             className={iconButtonClasses('sm', false, 'disabled:hover:bg-transparent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60')}>
             <ChevronLeft size={16} />

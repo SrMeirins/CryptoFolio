@@ -24,6 +24,22 @@ export interface PnlResponse {
   dietzPct: number;  // Dietz modificado del rango
   peakCapitalPct: number; // P&L sobre el máximo capital neto aportado, sin margen (periodo completo)
   days: DayPnl[];
+  today: LiveDayBase | null; // base del día en curso si está en el rango (#213)
+}
+
+/**
+ * Base para recalcular el P&L de hoy en el cliente con los precios en vivo
+ * (#213): el cliente aplica la misma fórmula que computeDailyPnl con cada
+ * tick del WebSocket, en lugar de esperar a la siguiente consulta.
+ * Cantidades por activo de precio (alias resueltos; 'EUR' son euros) y
+ * precios en EUR que usó el servidor, como respaldo de los que falten.
+ */
+export interface LiveDayBase {
+  date: string;
+  previousValue: number;            // valor al cierre de ayer, en la moneda de la respuesta
+  holdings: Record<string, number>; // tenencias en este instante
+  flows: Array<{ asset: string; quantity: number }>; // flujos de capital de hoy (+ entrada, − salida)
+  pricesEur: Record<string, number>;
 }
 
 function previousDay(day: string): string {
@@ -44,7 +60,7 @@ export async function getDailyPnl(
   const to = query.to ?? today;
   const firstActivity = events.length > 0 ? madridDateOf(events.reduce((min, e) => Math.min(min, e.at), Infinity)) : to;
   const from = !query.from || query.from < firstActivity ? (firstActivity <= to ? firstActivity : to) : query.from;
-  const empty: PnlResponse = { currency, from, to, timezone: 'Europe/Madrid', refreshing: false, totalPnl: 0, twrPct: 0, dietzPct: 0, peakCapitalPct: 0, days: [] };
+  const empty: PnlResponse = { currency, from, to, timezone: 'Europe/Madrid', refreshing: false, totalPnl: 0, twrPct: 0, dietzPct: 0, peakCapitalPct: 0, days: [], today: null };
   if (events.length === 0 || from > to) return empty;
 
   // Día anterior (base) + días pedidos. El día de hoy se valora en este instante.
@@ -106,9 +122,12 @@ export async function getDailyPnl(
   const inflow = new Array<number>(allDays.length).fill(0);
   const outflow = new Array<number>(allDays.length).fill(0);
   const netCapitalFlow = new Array<number>(allDays.length).fill(0);
+  const todayIdx = allDays[allDays.length - 1] === today ? allDays.length - 1 : -1;
+  const todayFlows: LiveDayBase['flows'] = [];
   for (const f of flows) {
     const i = dayIndexFor(f.at, instants);
     if (i <= 0) continue; // anterior al rango o del propio día base
+    if (i === todayIdx) todayFlows.push({ asset: f.asset === 'EUR' ? 'EUR' : priceAsset(f.asset), quantity: f.quantity });
     const price = f.asset === 'EUR' ? fxAt(i) : priceOf(f.asset, i);
     if (f.asset !== 'EUR' && allDays[i] !== today && cache.get(priceAsset(f.asset))?.get(allDays[i]) === undefined) {
       markPending(priceAsset(f.asset), allDays[i]);
@@ -133,7 +152,30 @@ export async function getDailyPnl(
 
   const refreshing = pending.size > 0;
   if (refreshing) schedulePrefetch(pending);
-  return { currency, from, to, timezone: 'Europe/Madrid', refreshing, totalPnl, twrPct, dietzPct, peakCapitalPct, days };
+  const liveDay = todayIdx > 0 ? liveDayBase(today, valueAt(todayIdx - 1), holdings[todayIdx], todayFlows, priceTable, todayIdx) : null;
+  return { currency, from, to, timezone: 'Europe/Madrid', refreshing, totalPnl, twrPct, dietzPct, peakCapitalPct, days, today: liveDay };
+}
+
+function liveDayBase(
+  date: string,
+  previousValue: number,
+  held: ReadonlyMap<string, number>,
+  flows: LiveDayBase['flows'],
+  priceTable: ReadonlyMap<string, Array<number | null>>,
+  index: number,
+): LiveDayBase {
+  const holdings: Record<string, number> = {};
+  for (const [asset, qty] of held) {
+    if (qty === 0) continue;
+    const key = asset === 'EUR' ? 'EUR' : priceAsset(asset);
+    holdings[key] = (holdings[key] ?? 0) + qty;
+  }
+  const pricesEur: Record<string, number> = {};
+  for (const asset of new Set([...Object.keys(holdings), ...flows.map(f => f.asset), 'USDT'])) {
+    const price = priceTable.get(asset)?.[index];
+    if (asset !== 'EUR' && price && price > 0) pricesEur[asset] = price;
+  }
+  return { date, previousValue: Math.round(previousValue * 100) / 100, holdings, flows, pricesEur };
 }
 
 function heldOn(h: ReadonlyMap<string, number>, asset: string): boolean {

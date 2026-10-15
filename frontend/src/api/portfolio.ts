@@ -46,6 +46,16 @@ export interface DailyPnlResponse {
   dietzPct: number
   peakCapitalPct: number
   days: DailyPnlDay[]
+  // Base del día en curso para recalcularlo con los precios en vivo (#213); null si hoy no está en el rango.
+  today: LiveDayBase | null
+}
+
+export interface LiveDayBase {
+  date: string
+  previousValue: number              // cierre de ayer, en la moneda de la respuesta
+  holdings: Record<string, number>   // tenencias actuales por activo de precio ('EUR' = euros)
+  flows: Array<{ asset: string; quantity: number }>  // flujos de capital de hoy (+ entrada, − salida)
+  pricesEur: Record<string, number>  // precios que usó el servidor, de respaldo
 }
 
 export interface FifoLot {
