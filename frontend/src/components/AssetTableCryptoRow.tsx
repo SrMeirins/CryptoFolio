@@ -7,7 +7,7 @@ import { useCurrency } from '../hooks/useDisplayCurrency'
 import { type CryptoRow, walletShortName } from '../utils/assetTable'
 import { CryptoIcon } from './CryptoIcon'
 import { T, alpha, ink } from '../utils/colors'
-import { iconButtonClasses } from './ui'
+import { iconButtonClasses, tableRowClasses } from './ui'
 
 export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate, lockedAmounts = [] }: {
   row: CryptoRow
@@ -43,7 +43,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
   return (
     <>
       <tr
-        className={`transition-colors ${canExpand ? 'cursor-pointer hover:bg-background-tertiary/60' : 'hover:bg-background-tertiary/30'} ${expanded ? 'bg-background-tertiary/40' : ''}`}
+        className={tableRowClasses(canExpand, expanded)}
         onClick={() => canExpand && setExpanded(e => !e)}
       >
         {/* Activo */}

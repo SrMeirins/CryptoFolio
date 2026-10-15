@@ -38,7 +38,9 @@
   --cf-info: #4b8cf7;
   /* Translúcidos: bg-overlay/5 aclara en oscuro y oscurece en claro */
   --cf-overlay: #ffffff;
-  --cf-ink-shade: 0%;
+  /* Colores de categoría como texto: luminosidad OKLCH acotada para leerse sobre fondo oscuro */
+  --cf-ink-lmin: 0.75;
+  --cf-ink-lmax: 1;
   --cf-tooltip-bg: #030712;
   --cf-accent-blue: #3b82f6;
   --cf-accent-green: #10b981;
@@ -86,8 +88,9 @@
   --cf-warning: #ae5009;
   --cf-info: #1d4ed8;
   --cf-overlay: #000000;
-  /* Colores de categoría como texto: se oscurecen para leerse sobre blanco */
-  --cf-ink-shade: 45%;
+  /* Colores de categoría como texto: luminosidad OKLCH acotada para leerse sobre blanco */
+  --cf-ink-lmin: 0;
+  --cf-ink-lmax: 0.46;
   --cf-tooltip-bg: #ffffff;
   --cf-accent-blue: #1d4ed8;
   --cf-accent-green: #047857;

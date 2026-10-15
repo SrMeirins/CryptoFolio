@@ -2,6 +2,7 @@ import { formatEur, pnlColor } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { PNL_THRESHOLD } from './constants'
 import type { FiscalEvent } from './types'
+import { tableRowClasses } from '../../components/ui'
 
 const FEE_TYPES  = ['FEE_EXCHANGE', 'FEE_NETWORK', 'FEE']
 const LOST_TYPES = ['LOST', 'GIFT_SENT']
@@ -19,7 +20,7 @@ export function FiscalEventRow({ e }: { e: FiscalEvent }) {
   const isLost = LOST_TYPES.includes(e.tipo)
 
   return (
-    <tr className="hover:bg-background-tertiary/40 transition-colors">
+    <tr className={tableRowClasses()}>
       <td className="px-4 py-2.5 mono text-fg-muted text-xs">{e.fecha}</td>
       <td className="px-4 py-2.5">
         {isFee ? (

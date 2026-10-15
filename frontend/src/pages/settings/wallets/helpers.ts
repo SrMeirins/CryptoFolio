@@ -1,5 +1,6 @@
 import { Shield, Smartphone, Building2, Landmark } from 'lucide-react'
 import type { Network } from '../../../api/portfolio'
+import { fieldClasses } from '../../../components/ui/classes'
 
 export const OTHER_NETWORK = '__other__'
 
@@ -46,4 +47,4 @@ export function getAddressPlaceholder(network: Network | undefined): string {
 
 // Compartido por AddAddressForm y AddWalletForm — antes declarado por
 // duplicado e idéntico en ambos.
-export const inputClass = "w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm placeholder-fg-subtle focus:outline-hidden focus:border-brand"
+export const inputClass = fieldClasses()

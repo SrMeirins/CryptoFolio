@@ -17,7 +17,8 @@ describe('colores en estilos en línea (#198)', () => {
     expect(alpha('#000000', -5)).toContain(' 0%')
   })
 
-  it('ink oscurece según el tema mediante --cf-ink-shade', () => {
-    expect(ink('#f59e0b')).toBe('color-mix(in srgb, #f59e0b, black var(--cf-ink-shade))')
+  it('ink acota la luminosidad OKLCH al rango del tema, conservando tono y croma', () => {
+    expect(ink('#f59e0b')).toBe('oklch(from #f59e0b clamp(var(--cf-ink-lmin), l, var(--cf-ink-lmax)) c h)')
+    expect(ink(T.muted)).toContain('from var(--cf-fg-subtle)')
   })
 })

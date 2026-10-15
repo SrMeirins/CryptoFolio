@@ -2,8 +2,9 @@ import { Zap } from 'lucide-react'
 import { type FieldDefinition } from '../api/portfolio'
 import { WalletPicker } from './WalletPicker'
 import { useWalletsQuery } from '../hooks/useWallets'
+import { fieldClasses } from './ui'
 
-const baseInput = 'w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-hidden focus:border-brand transition-colors'
+const baseInput = fieldClasses()
 
 /** Renderiza el input adecuado (número, texto, fecha, wallet, select...) según `field.type`. */
 export function DynamicField({ field, value, onChange }: {

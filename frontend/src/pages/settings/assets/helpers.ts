@@ -1,3 +1,4 @@
+import { fieldClasses } from '../../../components/ui/classes'
 export const SOURCE_META: Record<string, { label: string; color: string }> = {
   eur_direct: { label: 'EUR directo', color: '#00c896' },
   usdt_proxy: { label: 'Vía USDT',    color: '#6366f1' },
@@ -20,4 +21,4 @@ export type SortDir = 'asc' | 'desc'
 
 // Compartido por AssetEditPanel y AddAssetDialog — antes declarado por
 // duplicado e idéntico en ambos.
-export const inputClass = "w-full bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm mono placeholder-fg-subtle focus:outline-hidden focus:border-brand"
+export const inputClass = fieldClasses('md', false, 'mono')

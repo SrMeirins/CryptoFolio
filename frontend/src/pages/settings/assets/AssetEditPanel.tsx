@@ -6,7 +6,7 @@ import { Toggle } from '../../../components/Toggle'
 import { PairInputsGrid } from './PairInputsGrid'
 import { CoinGeckoIdEditor } from './CoinGeckoIdEditor'
 import { T } from '../../../utils/colors'
-import { buttonClasses } from '../../../components/ui'
+import { buttonClasses, fieldClasses } from '../../../components/ui'
 
 export function AssetEditPanel({ asset, onSaved, onCancel }: {
   asset: AssetMetadata; onSaved: () => void; onCancel: () => void
@@ -86,7 +86,7 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
           <input value={testPairVal} onChange={e => setTestPairVal(e.target.value.toUpperCase())}
             onKeyDown={e => e.key === 'Enter' && handleTest()}
             placeholder={`${asset.symbol}EUR, ${asset.symbol}USDT...`}
-            className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm mono placeholder-fg-subtle focus:outline-hidden focus:border-brand" />
+            className={fieldClasses('md', false, 'flex-1 mono')} />
           <button type="button" onClick={handleTest} disabled={testLoading || !testPairVal}
             className="px-3 py-2 bg-background-tertiary hover:bg-border disabled:opacity-50 rounded-lg text-sm transition-colors">
             {testLoading ? <RefreshCw size={13} className="animate-spin" /> : <Search size={13} />}

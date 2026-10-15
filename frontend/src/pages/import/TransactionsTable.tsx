@@ -4,7 +4,7 @@ import { AccountChip } from './AccountChip'
 import { ACCOUNT_COLORS } from './types'
 import type { PreviewTransaction } from './types'
 import { T } from '../../utils/colors'
-import { cardClasses } from '../../components/ui'
+import { cardClasses, tableHeadRowClasses, tableRowClasses } from '../../components/ui'
 
 export function TransactionsTable({ newCount, newTxs, showTxTable, setShowTxTable, txPage, setTxPage, txPageSize }: {
   newCount: number
@@ -37,7 +37,7 @@ export function TransactionsTable({ newCount, newTxs, showTxTable, setShowTxTabl
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-fg-subtle uppercase tracking-wider border-b border-border">
+                <tr className={tableHeadRowClasses()}>
                   <th className="text-left px-4 py-2.5">Fecha</th>
                   <th className="text-left px-4 py-2.5">Cuenta</th>
                   <th className="text-left px-4 py-2.5">Tipo</th>
@@ -50,7 +50,7 @@ export function TransactionsTable({ newCount, newTxs, showTxTable, setShowTxTabl
                 {paginated.map((tx, i) => {
                   const meta = OP_META[tx.operationType] ?? { label: tx.operationType, color: T.muted }
                   return (
-                    <tr key={i} className="hover:bg-background-tertiary/50">
+                    <tr key={i} className={tableRowClasses()}>
                       <td className="px-4 py-2.5 text-fg-muted mono">
                         {new Date(tx.timestamp).toLocaleDateString('es-ES')}
                       </td>

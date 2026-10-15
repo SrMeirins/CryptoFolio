@@ -6,12 +6,11 @@ import { useTramos } from '../hooks/useTramos'
 import { calcularTramos, type TramoDesglose } from '../utils/tramosIrpf'
 import { portfolioApi } from '../api/portfolio'
 import { useDebounce } from '../hooks/useDebounce'
-import { useModalA11y } from '../hooks/useModalA11y'
 import { StepButton } from './StepButton'
 import { calcStep } from '../utils/calcStep'
 import { SaleSimulatorResults } from './SaleSimulatorResults'
 import { EurOnlyBadge } from './EurOnlyBadge'
-import { iconButtonClasses } from './ui'
+import { iconButtonClasses, Modal } from './ui'
 
 interface Props {
   asset:        string
@@ -35,7 +34,6 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
   const [price, setPrice] = useState(currentPrice > 0 ? currentPrice.toFixed(4) : '')
 
   const titleId = useId()
-  const dialogRef = useModalA11y<HTMLDivElement>(onClose)
 
   const debouncedQty   = useDebounce(qty,   400)
   const debouncedPrice = useDebounce(price, 400)
@@ -94,20 +92,10 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
   const tramosDesglose: TramoDesglose[] = net > 0.005 ? calcularTramos(net, tramosConfig) : []
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/70 backdrop-blur-xs"
-      onClick={e => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="w-full sm:max-w-lg bg-background-primary border border-overlay/10 rounded-t-xl sm:rounded-xl shadow-2xl flex flex-col max-h-[92vh]"
-      >
+    <Modal onClose={onClose} labelledBy={titleId} size="md">
 
         {/* Header */}
-        <div className="relative px-5 pt-5 pb-4 border-b border-overlay/8 shrink-0 overflow-hidden">
+        <div className="relative px-5 pt-5 pb-4 border-b border-border shrink-0 overflow-hidden">
           <div className="absolute inset-0 bg-linear-to-br from-brand/10 via-transparent to-transparent pointer-events-none" />
           <div className="relative flex items-start justify-between gap-3">
             <div>
@@ -204,7 +192,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-overlay/8 shrink-0">
+        <div className="px-5 py-3 border-t border-border shrink-0">
           <button
             type="button"
             onClick={onClose}
@@ -213,7 +201,6 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
             Cerrar
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

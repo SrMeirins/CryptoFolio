@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { FileText, Info, AlertTriangle } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { FileText, Info } from 'lucide-react'
 import { portfolioApi } from '../api/portfolio'
 import { FISCAL_STALE_TIME } from './fiscal/constants'
 import { baseTramosCompensada } from '../utils/tramosIrpf'
@@ -13,10 +13,11 @@ import { ExportPanel } from './fiscal/ExportPanel'
 import { YearTabs } from './fiscal/YearTabs'
 import { FiscalSummaryCards, FiscalSummaryCardsSkeleton } from './fiscal/FiscalSummaryCards'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
-import { cardClasses } from '../components/ui'
+import { cardClasses, EmptyState, ErrorState, Skeleton } from '../components/ui'
 
 export function Fiscal() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
+  const queryClient = useQueryClient()
   const currentYear = new Date().getFullYear()
 
   const { data: years = [] } = useQuery({
@@ -84,20 +85,20 @@ export function Fiscal() {
 
   if (hasError && activeYear) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center h-64 gap-3">
-        <AlertTriangle size={32} className="text-negative" />
-        <p className="text-fg text-sm font-medium">Error al cargar los datos fiscales de {activeYear}</p>
-        <p className="text-fg-subtle text-xs">Inténtalo de nuevo en unos segundos.</p>
+      <div className="p-6">
+        <ErrorState
+          title={`Error al cargar los datos fiscales de ${activeYear}`}
+          description="Inténtalo de nuevo en unos segundos."
+          onRetry={() => queryClient.refetchQueries({ predicate: q => String(q.queryKey[0]).startsWith('fiscal-') })}
+        />
       </div>
     )
   }
 
   if (!activeYear) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center h-64 gap-3">
-        <FileText size={32} className="text-fg-subtle" />
-        <p className="text-fg-subtle text-sm">No hay datos fiscales disponibles.</p>
-        <p className="text-fg-subtle text-xs">Importa transacciones y ejecuta el motor FIFO primero.</p>
+      <div className="p-6">
+        <EmptyState icon={<FileText size={32} />} title="No hay datos fiscales disponibles." description="Importa transacciones y ejecuta el motor FIFO primero." />
       </div>
     )
   }
@@ -152,17 +153,13 @@ export function Fiscal() {
           {carryforward && <CompensacionPerdidas data={carryforward} />}
 
           {modelo721Loading ? (
-            <div className={cardClasses('md', 'animate-pulse')}>
-              <div className="h-4 bg-background-tertiary rounded-lg w-48" />
-            </div>
+            <div className={cardClasses('md')}><Skeleton className="h-4 w-48" /></div>
           ) : modelo721 && (
             <Modelo721Card data={modelo721} activeYear={activeYear} />
           )}
 
           {eventsLoading ? (
-            <div className={cardClasses('md', 'animate-pulse')}>
-              <div className="h-4 bg-background-tertiary rounded-lg w-64" />
-            </div>
+            <div className={cardClasses('md')}><Skeleton className="h-4 w-64" /></div>
           ) : events && (
             <>
               <TablaEventos events={events.fiscalEvents} summary={summary} />

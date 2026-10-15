@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { badgeClasses, buttonClasses, cardClasses, iconButtonClasses, segmentClasses, tabClasses, tabId, tabPanelId } from './classes'
+import {
+  badgeClasses, buttonClasses, cardClasses, fieldClasses, iconButtonClasses, modalOverlayClasses, modalPanelClasses, segmentClasses,
+  skeletonClasses, stateClasses, tabClasses, tabId, tabPanelId, tableFootRowClasses, tableHeadRowClasses, tableRowClasses,
+} from './classes'
 
 // Variantes de los componentes base (#199): solo fichas del tema, foco visible
 // y estados deshabilitados coherentes.
@@ -97,5 +100,68 @@ describe('iconButtonClasses — tonos (#199)', () => {
   })
   it('las clases de posición extra se conservan', () => {
     expect(iconButtonClasses('sm', false, 'absolute right-2')).toContain('absolute right-2')
+  })
+})
+
+describe('fieldClasses (#199)', () => {
+  it('foco visible con la marca y estado deshabilitado', () => {
+    const c = fieldClasses()
+    expect(c).toContain('focus:border-brand')
+    expect(c).toContain('focus-visible:ring-2')
+    expect(c).toContain('disabled:opacity-50')
+    expect(c).not.toMatch(THEME_ONLY)
+  })
+  it('estado de error en rojo, sin el borde normal', () => {
+    const c = fieldClasses('md', true)
+    expect(c).toContain('border-negative/60')
+    expect(c).not.toMatch(/(^|\s)border-border(\s|$)/)
+  })
+  it('tamaños y clases extra (p. ej. hueco para un icono)', () => {
+    expect(fieldClasses('sm')).toContain('text-xs')
+    const c = fieldClasses('sm', false, 'pl-7 flex-1')
+    expect(c).toContain('pl-7')
+    expect(c).toContain('flex-1')
+  })
+})
+
+describe('modal', () => {
+  it('hoja inferior en móvil y centrado desde sm, con fichas del tema', () => {
+    expect(modalOverlayClasses()).toContain('items-end sm:items-center')
+    const c = modalPanelClasses('md')
+    expect(c).toContain('bg-background-card')
+    expect(c).toContain('rounded-t-xl sm:rounded-xl')
+    expect(c).not.toMatch(THEME_ONLY)
+  })
+  it('cada tamaño fija su ancho máximo y las clases extra lo sustituyen', () => {
+    expect(modalPanelClasses('sm')).toContain('sm:max-w-sm')
+    expect(modalPanelClasses('lg')).toContain('sm:max-w-2xl')
+    expect(modalPanelClasses('xl')).toContain('sm:max-w-4xl')
+    const c = modalPanelClasses('md', 'bg-background-primary')
+    expect(c).toContain('bg-background-primary')
+    expect(c).not.toContain('bg-background-card')
+  })
+})
+
+describe('tablas', () => {
+  it('cabecera, fila y pie comparten fichas del tema', () => {
+    for (const c of [tableHeadRowClasses(), tableRowClasses(), tableFootRowClasses()]) expect(c).not.toMatch(THEME_ONLY)
+    expect(tableHeadRowClasses()).toContain('uppercase')
+  })
+  it('fila interactiva con cursor y fila expandida resaltada', () => {
+    expect(tableRowClasses()).not.toContain('cursor-pointer')
+    expect(tableRowClasses(true)).toContain('cursor-pointer')
+    expect(tableRowClasses(false, true)).toContain('bg-background-tertiary/40')
+  })
+})
+
+describe('estados', () => {
+  it('skeleton sin animación cuando el usuario reduce movimiento', () => {
+    expect(skeletonClasses()).toContain('motion-reduce:animate-none')
+    expect(skeletonClasses('h-4 w-48 rounded-full')).toContain('rounded-full')
+    expect(skeletonClasses('rounded-full')).not.toContain('rounded-lg')
+  })
+  it('versión compacta con menos aire vertical', () => {
+    expect(stateClasses()).toContain('py-16')
+    expect(stateClasses(true)).toContain('py-8')
   })
 })

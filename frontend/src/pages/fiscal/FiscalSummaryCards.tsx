@@ -2,15 +2,15 @@ import { Calendar } from 'lucide-react'
 import { formatEur, pnlColor } from '../../utils/format'
 import { pnlBg } from './constants'
 import type { FiscalSummary } from './types'
-import { cardClasses } from '../../components/ui'
+import { cardClasses, Skeleton } from '../../components/ui'
 
 export function FiscalSummaryCardsSkeleton() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {[...Array(4)].map((_, i) => (
-        <div key={i} className={cardClasses('md', 'animate-pulse')}>
-          <div className="h-3 bg-background-tertiary rounded-lg w-3/4 mb-3" />
-          <div className="h-7 bg-background-tertiary rounded-lg w-1/2" />
+        <div key={i} className={cardClasses('md')}>
+          <Skeleton className="h-3 w-3/4 mb-3" />
+          <Skeleton className="h-7 w-1/2" />
         </div>
       ))}
     </div>

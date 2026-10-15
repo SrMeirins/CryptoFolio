@@ -4,7 +4,7 @@ import { formatEur } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { TableExpandToggle } from './TableExpandToggle'
 import type { RendimientoEvent } from './types'
-import { cardClasses, buttonClasses, badgeClasses } from '../../components/ui'
+import { cardClasses, buttonClasses, badgeClasses, fieldClasses, tableFootRowClasses, tableHeadRowClasses, tableRowClasses } from '../../components/ui'
 
 export function TablaRendimientos({ rendimientos, year }: { rendimientos: RendimientoEvent[]; year: number }) {
   const [expanded, setExpanded]         = useState(true)
@@ -54,7 +54,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
               <select
                 value={filterActivo}
                 onChange={e => setFilterActivo(e.target.value)}
-                className="px-2 py-1 bg-background-tertiary border border-border rounded-lg text-xs text-fg appearance-none cursor-pointer hover:border-fg-subtle transition-colors"
+                className={fieldClasses('sm', false, 'w-auto px-2 py-1 appearance-none cursor-pointer')}
               >
                 <option value="">Todos los activos</option>
                 {activos.map(a => <option key={a} value={a}>{a}</option>)}
@@ -63,7 +63,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
               <select
                 value={filterTipo}
                 onChange={e => setFilterTipo(e.target.value)}
-                className="px-2 py-1 bg-background-tertiary border border-border rounded-lg text-xs text-fg appearance-none cursor-pointer hover:border-fg-subtle transition-colors"
+                className={fieldClasses('sm', false, 'w-auto px-2 py-1 appearance-none cursor-pointer')}
               >
                 <option value="">Todos los tipos</option>
                 {tipos.map(t => <option key={t} value={t}>{t}</option>)}
@@ -87,7 +87,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-fg-subtle text-[11px] uppercase tracking-wider border-b border-border bg-background-tertiary/30">
+              <tr className={tableHeadRowClasses()}>
                 <th className="text-left px-4 py-2.5">Fecha</th>
                 <th className="text-left px-4 py-2.5">Tipo</th>
                 <th className="text-left px-4 py-2.5">Activo</th>
@@ -102,7 +102,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
                   <td colSpan={6} className="px-4 py-6 text-center text-fg-subtle text-xs">Sin rendimientos con los filtros actuales</td>
                 </tr>
               ) : filtered.map((r, i) => (
-                <tr key={`${r.fecha}-${r.tipo}-${r.activo}-${i}`} className="hover:bg-background-tertiary/40 transition-colors">
+                <tr key={`${r.fecha}-${r.tipo}-${r.activo}-${i}`} className={tableRowClasses()}>
                   <td className="px-4 py-2.5 mono text-fg-muted text-xs">{r.fecha}</td>
                   <td className="px-4 py-2.5">
                     <span className="text-xs bg-warning/10 text-warning px-1.5 py-0.5 rounded-lg">{r.tipo}</span>
@@ -120,7 +120,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-border bg-background-tertiary/20">
+              <tr className={tableFootRowClasses()}>
                 <td className="px-4 py-2.5 text-xs text-fg-subtle font-medium" colSpan={4}>
                   {filtered.length < rendimientos.length
                     ? `${filtered.length} de ${rendimientos.length} operaciones`

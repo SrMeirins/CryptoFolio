@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { portfolioApi } from '../../../api/portfolio'
 import { NETWORKS_REQUIRING_KEY } from './helpers'
-import { buttonClasses } from '../../../components/ui'
+import { buttonClasses, fieldClasses } from '../../../components/ui'
 
 export function NetworkApiKeyField({ networkId, networkName }: { networkId: string; networkName: string }) {
   const [status, setStatus] = useState<{ has_key: boolean } | null>(null)
@@ -43,7 +43,7 @@ export function NetworkApiKeyField({ networkId, networkName }: { networkId: stri
       <div className="flex gap-1.5">
         <input type="password" value={value} onChange={e => setValue(e.target.value)}
           placeholder={status?.has_key ? 'Ya configurada — pega una nueva para reemplazarla' : 'Sin esta clave, esta red no se puede verificar automáticamente'}
-          className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-xs placeholder-fg-subtle focus:outline-hidden focus:border-brand" />
+          className={fieldClasses('md', false, 'flex-1 text-xs')} />
         <button type="button" onClick={handleSave} disabled={!value || saving}
           className={buttonClasses('primary', 'sm')}>
           Guardar

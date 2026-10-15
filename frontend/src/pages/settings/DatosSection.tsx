@@ -5,7 +5,7 @@ import { RefreshCw, Trash2, Zap, Download } from 'lucide-react'
 import { useToast } from '../../hooks/useToast'
 import { useRunFifo } from '../../hooks/useRunFifo'
 import { T } from '../../utils/colors'
-import { cardClasses, buttonClasses } from '../../components/ui'
+import { cardClasses, buttonClasses, fieldClasses } from '../../components/ui'
 
 const CONFIRM_WORD = 'CONFIRMAR'
 
@@ -188,7 +188,7 @@ export function DatosSection() {
               </label>
               <input value={resetInput} onChange={e => setResetInput(e.target.value)}
                 placeholder={CONFIRM_WORD}
-                className="w-full bg-background-tertiary border border-negative/30 focus:border-negative rounded-lg px-3 py-2.5 text-sm mono placeholder-fg-subtle focus:outline-hidden" />
+                className={fieldClasses('md', false, 'py-2.5 mono border-negative/30 focus:border-negative')} />
             </div>
             <div className="flex items-center gap-2 justify-end">
               <button type="button" onClick={() => { setShowResetConfirm(false); setResetInput('') }}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Search, RefreshCw, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { portfolioApi, type AssetMetadata } from '../../../api/portfolio'
+import { fieldClasses } from '../../../components/ui'
 
 export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; onSaved: () => void }) {
   const queryClient = useQueryClient()
@@ -58,7 +59,7 @@ export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; on
           onChange={e => { setGeckoId(e.target.value.toLowerCase().trim()); setTestResult(null); setError(null) }}
           onKeyDown={e => e.key === 'Enter' && handleTest()}
           placeholder="ej. bitcoin, ethereum, ethereumpow"
-          className="flex-1 bg-background-tertiary border border-border rounded-lg px-3 py-2 text-sm font-mono placeholder-fg-subtle focus:outline-hidden focus:border-brand"
+          className={fieldClasses('md', false, 'flex-1 font-mono')}
         />
         <button type="button" onClick={handleTest} disabled={testing || !geckoId.trim()}
           title="Verificar que este ID devuelve precio en CoinGecko"

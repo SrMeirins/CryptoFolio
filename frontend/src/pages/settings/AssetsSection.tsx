@@ -11,6 +11,7 @@ import { AssetItem } from './assets/AssetItem'
 import { AddAssetDialog } from './assets/AddAssetDialog'
 import { T } from '../../utils/colors'
 import { buttonClasses, iconButtonClasses } from '../../components/ui'
+import { fieldClasses } from '../../components/ui'
 
 export function AssetsSection() {
   const queryClient = useQueryClient()
@@ -96,7 +97,7 @@ export function AssetsSection() {
     )
   }
 
-  const inputSearch = "w-full bg-background-tertiary border border-border rounded-lg pl-9 pr-3 py-2 text-sm placeholder-fg-subtle focus:outline-hidden focus:border-brand"
+  const inputSearch = fieldClasses('md', false, 'pl-9')
 
   return (
     <div className="h-full flex flex-col">

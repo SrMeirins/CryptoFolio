@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react'
 import type { PendingDeposit } from './PendingDepositsPanel'
-import { badgeClasses } from '../../components/ui'
+import { badgeClasses, fieldClasses } from '../../components/ui'
 
 export function PendingDepositRow({ dep, cost, isReviewed, onChangeCost, onUseHistorical, onToggleUnknown }: {
   dep: PendingDeposit
@@ -55,7 +55,7 @@ export function PendingDepositRow({ dep, cost, isReviewed, onChangeCost, onUseHi
               placeholder="Precio EUR/unidad al adquirir..."
               value={cost != null ? cost : ''}
               onChange={e => onChangeCost(e.target.value ? parseFloat(e.target.value) : null)}
-              className="flex-1 bg-background-primary border border-border rounded-lg px-3 py-1.5 text-sm text-fg placeholder-fg-subtle focus:outline-hidden focus:border-brand transition-colors mono"
+              className={fieldClasses('md', false, 'flex-1 bg-background-primary py-1.5 mono')}
             />
             {dep.historicalPrice != null && (
               <button
