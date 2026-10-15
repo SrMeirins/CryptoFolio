@@ -1,4 +1,4 @@
-name: Build de prueba (Windows)
+name: Build de prueba (Windows, Linux y macOS)
 
 # Disparo manual desde GitHub Actions → pestaña "Actions" → "Run workflow"
 on:
@@ -12,12 +12,24 @@ jobs:
     name: Lint & typecheck
     uses: ./.github/workflows/_lint.yml
 
-  build-win:
-    name: Build Windows (.exe)
+  # Mismos sistemas que release.yml, sin publicar: valida el empaquetado en
+  # los tres antes de una release (p. ej. al actualizar electron-builder, #205).
+  build:
+    name: Build ${{ matrix.platform }}
     needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: mac
     uses: ./.github/workflows/_build.yml
     with:
-      os: windows-latest
-      platform: win
+      os: ${{ matrix.os }}
+      platform: ${{ matrix.platform }}
       publish: false
     secrets: inherit
