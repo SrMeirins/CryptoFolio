@@ -1,7 +1,9 @@
 import { type ReactNode } from 'react'
 import { MetricCard, type Change24h } from './MetricCard'
 import { formatMoney, type Currency, formatPercent } from '../utils/format'
-import { costSecondary, flowSecondary, returnSecondary, todaySecondary } from '../utils/summaryCards'
+import { costSecondary, flowSecondary, returnSecondary } from '../utils/summaryCards'
+import { todayChip } from '../utils/windowChip'
+import { WindowChip } from './WindowChip'
 
 interface EurFlow {
   deposited:    number
@@ -45,6 +47,7 @@ export function PortfolioSummaryCards({
   // El flujo de EUR llega del backend con su propia moneda; se formatea con ella.
   const flowCurrency = eurFlow?.currency ?? currency
   const flowMoney = (v: number) => formatMoney(v, flowCurrency)
+  const today = todayChip(todayPnl, currency)
   return (
     // Ancho mínimo por tarjeta y paso a la fila siguiente según el espacio real
     // (descontando la barra lateral): antes las columnas dependían del ancho de
@@ -81,8 +84,8 @@ export function PortfolioSummaryCards({
         positive={hasPrices ? pnl >= 0 : undefined}
         loading={loading}
         tooltip={pnlTooltip}
-        secondary={todayPnl !== null && (
-          <span className={todayPnl > 0.005 ? 'text-positive' : todayPnl < -0.005 ? 'text-negative' : ''}>{todaySecondary(todayPnl, currency)}</span>
+        secondary={today && (
+          <WindowChip window="today" tone={today.tone} triggerLabel={today.aria}>{today.text}</WindowChip>
         )}
       />
 
