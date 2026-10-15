@@ -38,10 +38,11 @@ export function EvolutionTooltip({ active, payload, currency, intraday, primary 
           )
         })}
       </dl>
-      {Math.abs(p.flow) >= 0.01 && (
-        <p className={`mt-1.5 pt-1.5 border-t border-overlay/10 mono ${p.flow > 0 ? 'text-positive' : 'text-negative'}`}>
-          {p.flow > 0 ? 'Depósito ' : 'Retirada '}{signedMoney(p.flow, currency)}
-        </p>
+      {(p.deposit >= 0.01 || p.withdrawal >= 0.01) && (
+        <div className="mt-1.5 pt-1.5 border-t border-overlay/10 mono">
+          {p.deposit >= 0.01 && <p className="text-positive">Depósito +{formatMoney(p.deposit, currency)}</p>}
+          {p.withdrawal >= 0.01 && <p className="text-negative">Retirada −{formatMoney(p.withdrawal, currency)}</p>}
+        </div>
       )}
     </div>
   )

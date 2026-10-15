@@ -78,18 +78,58 @@ export function periodSummary(points: readonly EvolutionPoint[], intraday: boole
   }
 }
 
-/** Máximo de marcadores: en periodos largos, más saturarían la curva. */
-export const MAX_FLOW_MARKERS = 24
+export type FlowUnit = 'day' | 'week' | 'month'
+
+/** Grupo de depósitos y retiradas que se marca sobre la curva. */
+export interface FlowBucket {
+  unit: FlowUnit
+  start: number        // inicio del grupo (día, lunes o día 1 del mes, ms UTC)
+  anchor: EvolutionPoint  // punto de la curva donde se dibuja: el de mayor movimiento del grupo
+  deposits: number
+  withdrawals: number  // positivo
+  days: number         // días (o tramos) con algún movimiento
+}
+
+const DAY_MS = 86_400_000
+
+/** Granularidad de los marcadores según la duración: un marcador por día hasta ~6 meses; luego por semana o mes. */
+export function flowUnit(points: readonly EvolutionPoint[], intraday: boolean): FlowUnit {
+  if (intraday || points.length < 2) return 'day'
+  const spanDays = (points[points.length - 1].x - points[0].x) / DAY_MS
+  return spanDays <= 200 ? 'day' : spanDays <= 400 ? 'week' : 'month'
+}
+
+function bucketStart(x: number, unit: FlowUnit): number {
+  if (unit === 'day') return x
+  const d = new Date(x)
+  if (unit === 'month') return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)
+  const weekday = (d.getUTCDay() + 6) % 7
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - weekday)
+}
 
 /**
- * Puntos con depósitos o retiradas de capital propio, para marcarlos sobre la
- * curva. Si hay más de `max`, se quedan los de mayor importe (cada uno en su
- * día exacto), en orden cronológico.
+ * Depósitos y retiradas de capital propio agrupados para marcarlos sobre la
+ * curva. Nunca descarta movimientos: en periodos largos los agrupa por semana
+ * o mes (antes se mostraban solo los 24 mayores y la suma no cuadraba con la
+ * tarjeta «EUR neto»), y conserva entradas y salidas por separado.
  */
-export function flowMarkers(points: readonly EvolutionPoint[], max = MAX_FLOW_MARKERS): EvolutionPoint[] {
-  const flows = points.filter(p => Math.abs(p.flow) >= 0.01)
-  if (flows.length <= max) return flows
-  return [...flows].sort((a, b) => Math.abs(b.flow) - Math.abs(a.flow)).slice(0, max).sort((a, b) => a.x - b.x)
+export function flowBuckets(points: readonly EvolutionPoint[], intraday: boolean): FlowBucket[] {
+  const unit = flowUnit(points, intraday)
+  const buckets = new Map<number, FlowBucket>()
+  for (const p of points) {
+    if (p.deposit < 0.01 && p.withdrawal < 0.01) continue
+    const start = bucketStart(p.x, unit)
+    const b = buckets.get(start)
+    if (!b) {
+      buckets.set(start, { unit, start, anchor: p, deposits: p.deposit, withdrawals: p.withdrawal, days: 1 })
+      continue
+    }
+    if (p.deposit + p.withdrawal > b.anchor.deposit + b.anchor.withdrawal) b.anchor = p
+    b.deposits += p.deposit
+    b.withdrawals += p.withdrawal
+    b.days += 1
+  }
+  return [...buckets.values()].map(b => ({ ...b, deposits: round2(b.deposits), withdrawals: round2(b.withdrawals) }))
 }
 
 /**

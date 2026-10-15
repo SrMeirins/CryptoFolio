@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { EvolutionPoint } from './evolutionSeries'
-import { applyLiveToday, flowMarkers, maxDrawdown, periodSummary } from './evolutionSummary'
+import { applyLiveToday, flowBuckets, flowUnit, maxDrawdown, periodSummary } from './evolutionSummary'
 
 // Resumen del periodo del gráfico de evolución (#214).
 const D = 86_400_000
 const H = 3_600_000
 const pt = (i: number, stepPct: number | null, pnl: number, extra: Partial<EvolutionPoint> = {}): EvolutionPoint =>
-  ({ x: i * D, pct: 0, pnl, value: 100, stepPct, flow: 0, live: false, ...extra })
+  ({ x: i * D, pct: 0, pnl, value: 100, stepPct, deposit: 0, withdrawal: 0, live: false, ...extra })
 
 describe('periodSummary — mejor y peor día', () => {
   const points = [pt(0, 1, 1), pt(1, 4, 5), pt(2, -3, 2), pt(3, 0.5, 2.5, { pct: 2.4 })]
@@ -28,7 +28,7 @@ describe('periodSummary — 24H por horas', () => {
   it('encadena los tramos de 15 min de cada hora; el punto en punto cierra la hora anterior', () => {
     const base = Date.UTC(2026, 9, 15, 10)
     const q = (min: number, stepPct: number | null, pnl: number): EvolutionPoint =>
-      ({ x: base + min * 60_000, pct: 0, pnl, value: 100, stepPct, flow: 0, live: false })
+      ({ x: base + min * 60_000, pct: 0, pnl, value: 100, stepPct, deposit: 0, withdrawal: 0, live: false })
     const points = [q(0, null, 0), q(15, 1, 1), q(30, 1, 2), q(45, 1, 3), q(60, 1, 4), q(75, -5, -1)]
     const s = periodSummary(points, true)!
     expect(s.best?.x).toBe(base)                       // 10:00–11:00, cuatro tramos de +1 %
@@ -48,19 +48,50 @@ describe('maxDrawdown', () => {
     expect(dd?.toX).toBe(2 * D)
   })
   it('una retirada no es una caída: solo cuenta la rentabilidad', () => {
-    expect(maxDrawdown([pt(0, 0, 0, { value: 1000 }), pt(1, 0, 0, { value: 100, flow: -900 })])).toBeNull()
+    expect(maxDrawdown([pt(0, 0, 0, { value: 1000 }), pt(1, 0, 0, { value: 100, withdrawal: 900 })])).toBeNull()
   })
 })
 
-describe('flowMarkers', () => {
-  it('solo los puntos con depósitos o retiradas de capital', () => {
-    const points = [pt(0, 0, 0), pt(1, 0, 0, { flow: 500 }), pt(2, 0, 0, { flow: -0.001 }), pt(3, 0, 0, { flow: -200 })]
-    expect(flowMarkers(points).map(p => p.flow)).toEqual([500, -200])
+describe('flowBuckets', () => {
+  it('periodos cortos: un marcador por día con entradas y salidas por separado', () => {
+    const points = [pt(0, 0, 0), pt(1, 0, 0, { deposit: 500, withdrawal: 50 }), pt(2, 0, 0, { withdrawal: 0.001 }), pt(3, 0, 0, { withdrawal: 200 })]
+    const b = flowBuckets(points, false)
+    expect(b.map(x => [x.start, x.deposits, x.withdrawals])).toEqual([[1 * D, 500, 50], [3 * D, 0, 200]])
+    expect(b[0].unit).toBe('day')
   })
-  it('en periodos largos se quedan los de mayor importe, en orden cronológico', () => {
-    const many = Array.from({ length: 30 }, (_, i) => pt(i, 0, 0, { flow: i % 2 ? i : -i }))
-    const top = flowMarkers(many, 3)
-    expect(top.map(p => p.flow)).toEqual([27, -28, 29])
+
+  it('periodos largos: agrupa por mes sin descartar ningún movimiento; la suma cuadra', () => {
+    const start = Date.UTC(2022, 0, 3)
+    const points = Array.from({ length: 600 }, (_, i) => ({
+      ...pt(0, 0, 0), x: start + i * D,
+      deposit: i % 7 === 0 ? 100 : 0,
+      withdrawal: i % 50 === 0 ? 10 : 0,
+    }))
+    const b = flowBuckets(points, false)
+    expect(b[0].unit).toBe('month')
+    expect(b.reduce((s, x) => s + x.deposits, 0)).toBeCloseTo(points.reduce((s, p) => s + p.deposit, 0), 6)
+    expect(b.reduce((s, x) => s + x.withdrawals, 0)).toBeCloseTo(points.reduce((s, p) => s + p.withdrawal, 0), 6)
+    expect(b.every(x => new Date(x.start).getUTCDate() === 1)).toBe(true)
+  })
+
+  it('el marcador se ancla en el día de mayor movimiento del grupo', () => {
+    const start = Date.UTC(2025, 0, 6)   // lunes
+    const points = Array.from({ length: 300 }, (_, i) => ({ ...pt(0, 0, 0), x: start + i * D }))
+    points[1] = { ...points[1], deposit: 10 }
+    points[3] = { ...points[3], withdrawal: 400 }
+    const [b] = flowBuckets(points, false)
+    expect(b.unit).toBe('week')
+    expect(b.start).toBe(start)
+    expect(b.anchor.x).toBe(start + 3 * D)
+    expect(b.days).toBe(2)
+  })
+
+  it('granularidad según la duración; en 24H siempre por tramo', () => {
+    const span = (days: number) => [pt(0, 0, 0), { ...pt(0, 0, 0), x: days * D }]
+    expect(flowUnit(span(180), false)).toBe('day')
+    expect(flowUnit(span(365), false)).toBe('week')
+    expect(flowUnit(span(1700), false)).toBe('month')
+    expect(flowUnit(span(1700), true)).toBe('day')
   })
 })
 

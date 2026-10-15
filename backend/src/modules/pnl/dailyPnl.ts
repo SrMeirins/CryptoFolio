@@ -23,11 +23,17 @@ export interface DayValuation {
   inflow: number;    // entradas de capital del día, en EUR (≥ 0)
   outflow: number;   // salidas de capital del día, en EUR (≥ 0)
   netCapitalFlow: number; // entradas − salidas sin contar el margen, en EUR
+  // Entradas y salidas de capital propio por separado (sin margen), para que
+  // un depósito y una retirada del mismo día no se compensen en los marcadores.
+  capitalIn?: number;
+  capitalOut?: number;
   complete: boolean; // false si falta algún precio de cierre (aún descargándose)
   live: boolean;     // día en curso, con precios en vivo
 }
 
 export interface DayPnl extends DayValuation {
+  capitalIn: number;
+  capitalOut: number;
   pnl: number;
   pct: number | null;
   cumulativePct: number;       // TWR acumulado desde el inicio del rango
@@ -83,6 +89,8 @@ export function computeDailyPnl(
       cumulativeDietzPct: round4(dietz),
       cumulativePeakCapitalPct: round4(peakCapitalPct),
       netCapitalFlow: round2(day.netCapitalFlow),
+      capitalIn: round2(day.capitalIn ?? 0),
+      capitalOut: round2(day.capitalOut ?? 0),
     });
     prev = day.value;
   }

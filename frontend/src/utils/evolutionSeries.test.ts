@@ -29,21 +29,21 @@ describe('periodos', () => {
 describe('serie común de P&L y Valor', () => {
   const day = (date: string, value: number, pnl: number, pct: number, live = false): DailyPnlDay => ({
     date, value, pnl, pct, inflow: 0, outflow: 0, netCapitalFlow: 0, cumulativePct: pct, cumulativeDietzPct: pct,
-    cumulativePeakCapitalPct: pct / 2, complete: true, live,
+    cumulativePeakCapitalPct: pct / 2, capitalIn: 0, capitalOut: 0, complete: true, live,
   })
 
   it('diaria: fecha a medianoche UTC, valor del día y métrica del periodo', () => {
     const days = [day('2026-10-14', 100, 0, 0), day('2026-10-15', 110, 10, 10, true)]
     expect(fromDaily(days, '7D')).toEqual([
-      { x: Date.UTC(2026, 9, 14), pct: 0, pnl: 0, value: 100, stepPct: 0, flow: 0, live: false },
-      { x: Date.UTC(2026, 9, 15), pct: 10, pnl: 10, value: 110, stepPct: 10, flow: 0, live: true },
+      { x: Date.UTC(2026, 9, 14), pct: 0, pnl: 0, value: 100, stepPct: 0, deposit: 0, withdrawal: 0, live: false },
+      { x: Date.UTC(2026, 9, 15), pct: 10, pnl: 10, value: 110, stepPct: 10, deposit: 0, withdrawal: 0, live: true },
     ])
     expect(fromDaily(days, 'Todo')[1].pct).toBe(5)   // sobre capital aportado
   })
 
   it('intradía: instante exacto de cada punto', () => {
-    expect(fromIntraday([{ at: '2026-10-15T09:15:00.000Z', value: 5, pnl: 1, pct: 2, stepPct: 0.5, flow: 3, live: false }]))
-      .toEqual([{ x: Date.UTC(2026, 9, 15, 9, 15), pct: 2, pnl: 1, value: 5, stepPct: 0.5, flow: 3, live: false }])
+    expect(fromIntraday([{ at: '2026-10-15T09:15:00.000Z', value: 5, pnl: 1, pct: 2, stepPct: 0.5, capitalIn: 3, capitalOut: 1, live: false }]))
+      .toEqual([{ x: Date.UTC(2026, 9, 15, 9, 15), pct: 2, pnl: 1, value: 5, stepPct: 0.5, deposit: 3, withdrawal: 1, live: false }])
   })
 })
 

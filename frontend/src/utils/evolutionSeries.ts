@@ -12,11 +12,14 @@ export interface EvolutionPoint {
   pnl: number      // P&L acumulado en la moneda de la respuesta
   value: number    // valor de la cartera
   stepPct: number | null  // rentabilidad del día (o del tramo de 15 min en 24H)
-  flow: number     // flujo neto de capital propio del día o tramo (+ depósito, − retirada)
+  deposit: number     // depósitos de capital propio del día o tramo
+  withdrawal: number  // retiradas de capital propio del día o tramo (positivo)
   live: boolean
 }
 
-export interface IntradayPoint { at: string; value: number; pnl: number; pct: number; stepPct: number | null; flow: number; live: boolean }
+export interface IntradayPoint {
+  at: string; value: number; pnl: number; pct: number; stepPct: number | null; capitalIn: number; capitalOut: number; live: boolean
+}
 
 export type EvolutionQuery = { intraday: true } | { intraday: false; from?: string; to?: string }
 
@@ -34,13 +37,14 @@ export function fromDaily(days: readonly DailyPnlDay[], period: PnlPeriod): Evol
   const series = buildPnlSeries(days, period)
   return series.map((p, i) => ({
     x: dayMs(p.date), pct: p.pct, pnl: p.pnl, value: days[i].value,
-    stepPct: days[i].pct, flow: days[i].netCapitalFlow, live: p.live,
+    stepPct: days[i].pct, deposit: days[i].capitalIn ?? 0, withdrawal: days[i].capitalOut ?? 0, live: p.live,
   }))
 }
 
 export function fromIntraday(points: readonly IntradayPoint[]): EvolutionPoint[] {
   return points.map(p => ({
-    x: Date.parse(p.at), pct: p.pct, pnl: p.pnl, value: p.value, stepPct: p.stepPct, flow: p.flow, live: p.live,
+    x: Date.parse(p.at), pct: p.pct, pnl: p.pnl, value: p.value, stepPct: p.stepPct,
+    deposit: p.capitalIn, withdrawal: p.capitalOut, live: p.live,
   }))
 }
 
