@@ -1,6 +1,8 @@
 import { db } from '../../db/client';
 import { BASE_URL, enqueueCoinGeckoCall, fetchWithRetry } from '../prices/coingeckoClient';
 import { fetchWithTimeout } from '../prices/httpTimeout';
+import { PRICE_ALIASES } from '../prices/priceAliases';
+import { FIAT_ICON_SYMBOLS, FLAG_HOST, fiatFlagUrl } from './fiatFlags';
 
 // Logos de los activos servidos desde el propio origen (#201). Antes el
 // navegador los pedía a un servicio externo, lo que revelaba qué activos se
@@ -13,11 +15,13 @@ import { fetchWithTimeout } from '../prices/httpTimeout';
 // - Tamaño máximo y tipo comprobado por la firma real del fichero; solo PNG,
 //   JPEG o WebP (SVG no: puede contener scripts).
 // - Los activos sin logo quedan marcados y se reintentan pasados 7 días.
+// - Las monedas fiat usan su bandera y los alias (BETH → ETH) el logo de su
+//   activo de destino, sin descargarlo dos veces (#246).
 
 export type IconContentType = 'image/png' | 'image/jpeg' | 'image/webp';
 
 export const MAX_ICON_BYTES = 256 * 1024;
-const ALLOWED_HOSTS = new Set(['coin-images.coingecko.com', 'assets.coingecko.com']);
+const ALLOWED_HOSTS = new Set(['coin-images.coingecko.com', 'assets.coingecko.com', FLAG_HOST]);
 const MISSING_RETRY_DAYS = 7;
 const MARKETS_BATCH = 100;
 
@@ -29,7 +33,7 @@ export function sniffImageType(buf: Buffer): IconContentType | null {
   return null;
 }
 
-/** Solo URL HTTPS de los dominios de imágenes de CoinGecko. */
+/** Solo URL HTTPS de los dominios de imágenes de CoinGecko y de banderas. */
 export function isAllowedIconUrl(raw: string): boolean {
   let url: URL;
   try { url = new URL(raw); } catch { return false; }
@@ -79,15 +83,47 @@ export function syncAssetIcons({ force = false }: { force?: boolean } = {}): Pro
   return syncInFlight;
 }
 
+/** Activos y monedas que nunca tuvieron logo o llevan más de 7 días «sin logo». */
+async function needsIcon(symbols: readonly string[]): Promise<string[]> {
+  const rows = (await db.query(
+    `SELECT s.symbol FROM unnest($1::text[]) AS s(symbol)
+     LEFT JOIN asset_icons ai ON ai.symbol = s.symbol
+     WHERE ai.symbol IS NULL OR (ai.status = 'missing' AND ai.fetched_at < NOW() - make_interval(days => $2))
+     ORDER BY s.symbol`,
+    [symbols, MISSING_RETRY_DAYS],
+  )).rows as Array<{ symbol: string }>;
+  return rows.map(r => r.symbol);
+}
+
+/** Logos de CoinGecko y banderas por separado: el fallo de una fuente no frena a la otra. */
 async function runSync(): Promise<void> {
+  const results = await Promise.allSettled([syncCoinGeckoIcons(), syncFiatFlags()]);
+  for (const r of results) {
+    if (r.status === 'rejected') console.warn('[ICONS] Sincronización de logos fallida:', (r.reason as Error).message);
+  }
+}
+
+async function syncFiatFlags(): Promise<void> {
+  for (const symbol of await needsIcon(FIAT_ICON_SYMBOLS)) {
+    const url = fiatFlagUrl(symbol);
+    let icon: { type: IconContentType; data: Buffer } | null = null;
+    if (url) {
+      try { icon = await downloadIcon(url); } catch { icon = null; }
+    }
+    await saveIcon(symbol, icon);
+  }
+}
+
+async function syncCoinGeckoIcons(): Promise<void> {
   const pending = (await db.query(
     `SELECT am.symbol, am.coingecko_id
      FROM asset_metadata am
      LEFT JOIN asset_icons ai ON ai.symbol = am.symbol
      WHERE am.coingecko_id IS NOT NULL
+       AND am.symbol <> ALL($2::text[])
        AND (ai.symbol IS NULL OR (ai.status = 'missing' AND ai.fetched_at < NOW() - make_interval(days => $1)))
      ORDER BY am.symbol`,
-    [MISSING_RETRY_DAYS],
+    [MISSING_RETRY_DAYS, FIAT_ICON_SYMBOLS],
   )).rows as Array<{ symbol: string; coingecko_id: string }>;
   if (pending.length === 0) return;
 
@@ -111,17 +147,37 @@ async function runSync(): Promise<void> {
   }
 }
 
+/**
+ * Añade a la lista los alias sin logo propio con la versión del logo de su
+ * destino (BETH → ETH). Un logo propio del alias tiene prioridad.
+ */
+export function withAliasIcons(icons: Readonly<Record<string, number>>, aliases: Readonly<Record<string, string>> = PRICE_ALIASES): Record<string, number> {
+  const out = { ...icons };
+  for (const [alias, target] of Object.entries(aliases)) {
+    if (out[alias] === undefined && icons[target] !== undefined) out[alias] = icons[target];
+  }
+  return out;
+}
+
 /** Activos con logo y una versión (instante de descarga en ms) para invalidar la caché del navegador. */
 export async function listAssetIcons(): Promise<Record<string, number>> {
   const rows = (await db.query(
     `SELECT symbol, (EXTRACT(EPOCH FROM fetched_at) * 1000)::bigint AS version FROM asset_icons WHERE status = 'ok' ORDER BY symbol`,
   )).rows as Array<{ symbol: string; version: string }>;
-  return Object.fromEntries(rows.map(r => [r.symbol, Number(r.version)]));
+  return withAliasIcons(Object.fromEntries(rows.map(r => [r.symbol, Number(r.version)])));
 }
 
-export async function getAssetIcon(symbol: string): Promise<{ contentType: IconContentType; data: Buffer } | null> {
+async function storedIcon(symbol: string): Promise<{ contentType: IconContentType; data: Buffer } | null> {
   const row = (await db.query(
     `SELECT content_type, data FROM asset_icons WHERE symbol = $1 AND status = 'ok'`, [symbol],
   )).rows[0] as { content_type: IconContentType; data: Buffer } | undefined;
   return row ? { contentType: row.content_type, data: row.data } : null;
+}
+
+/** Logo del activo o, si es un alias sin logo propio, el de su destino. */
+export async function getAssetIcon(symbol: string): Promise<{ contentType: IconContentType; data: Buffer } | null> {
+  const own = await storedIcon(symbol);
+  if (own) return own;
+  const target = PRICE_ALIASES[symbol];
+  return target ? storedIcon(target) : null;
 }
