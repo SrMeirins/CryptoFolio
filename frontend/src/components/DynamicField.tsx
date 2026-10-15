@@ -2,7 +2,7 @@ import { Zap } from 'lucide-react'
 import { type FieldDefinition } from '../api/portfolio'
 import { WalletPicker } from './WalletPicker'
 import { useWalletsQuery } from '../hooks/useWallets'
-import { fieldClasses } from './ui'
+import { fieldClasses, Dropdown } from './ui'
 
 const baseInput = fieldClasses()
 
@@ -70,16 +70,8 @@ export function DynamicField({ field, value, onChange }: {
       )}
 
       {field.type === 'select' && field.options && (
-        <select
-          value={(value as string) ?? ''}
-          onChange={e => onChange(e.target.value)}
-          className={baseInput}
-        >
-          <option value="">Seleccionar...</option>
-          {field.options.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+        <Dropdown label={field.label} value={(value as string) ?? ''} onChange={onChange} className="w-full"
+          options={[{ value: '', label: 'Seleccionar...' }, ...field.options.map(opt => ({ value: opt.value, label: opt.label }))]} />
       )}
 
       {field.hint && <p className="text-xs text-fg-subtle leading-tight">{field.hint}</p>}

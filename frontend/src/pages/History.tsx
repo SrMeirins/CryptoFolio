@@ -21,7 +21,7 @@ import { fmtDateGroup, calcEurValue } from './history/helpers'
 import { TxRow } from './history/TxRow'
 import { StatsBar } from './history/StatsBar'
 import { AnalyticsPanel } from './history/AnalyticsPanel'
-import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses, tableHeadRowClasses, Button, EmptyState, LoadingState, PageHeader } from '../components/ui'
+import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses, tableHeadRowClasses, Button, EmptyState, LoadingState, PageHeader, Dropdown } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 
 type SortKey = 'fecha' | 'eur' | 'activo'
@@ -228,25 +228,16 @@ export function History() {
           </div>
 
           {/* Tipo */}
-          <select value={filters.type} onChange={e => setFilter('type', e.target.value)}
-            className={fieldClasses('sm', false, 'w-auto px-3 text-fg-muted cursor-pointer')}>
-            <option value="">Todos los tipos</option>
-            {Object.entries(OP_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
+          <Dropdown size="sm" label="Filtrar por tipo" value={filters.type} onChange={v => setFilter('type', v)}
+            options={[{ value: '', label: 'Todos los tipos' }, ...Object.entries(OP_META).map(([k, v]) => ({ value: k, label: v.label }))]} />
 
           {/* Wallet */}
-          <select value={filters.wallet_id} onChange={e => setFilter('wallet_id', e.target.value)}
-            className={fieldClasses('sm', false, 'w-auto px-3 text-fg-muted cursor-pointer')}>
-            <option value="">Todas las wallets</option>
-            {walletList.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-          </select>
+          <Dropdown size="sm" label="Filtrar por wallet" value={filters.wallet_id} onChange={v => setFilter('wallet_id', v)}
+            options={[{ value: '', label: 'Todas las wallets' }, ...walletList.map(w => ({ value: w.id, label: w.name }))]} />
 
           {/* Cuenta */}
-          <select value={filters.account} onChange={e => setFilter('account', e.target.value)}
-            className={fieldClasses('sm', false, 'w-auto px-3 text-fg-muted cursor-pointer')}>
-            <option value="">Todas las cuentas</option>
-            {KNOWN_ACCOUNTS.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
+          <Dropdown size="sm" label="Filtrar por cuenta" value={filters.account} onChange={v => setFilter('account', v)}
+            options={[{ value: '', label: 'Todas las cuentas' }, ...KNOWN_ACCOUNTS.map(a => ({ value: a, label: a }))]} />
 
           {/* Rango de fechas */}
           <DateRangePicker

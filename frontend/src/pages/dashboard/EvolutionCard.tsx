@@ -80,7 +80,7 @@ export function EvolutionCard() {
         extra={<Tabs label="Evolución del portfolio" idBase={baseId} value={tab} onChange={setTab}
           items={TABS.map(t => ({ value: t.id, label: t.label }))} />}
         actions={<>
-          <SegmentedControl label="Periodo del gráfico de evolución" value={period} onChange={p => { setPeriod(p); setRange(null) }}
+          <SegmentedControl label="Periodo del gráfico de evolución" variant="accent" value={period} onChange={p => { setPeriod(p); setRange(null) }}
             options={PNL_PERIODS.map(p => ({ value: p, label: p, title: PERIOD_TITLES[p] }))} />
           <DateRangePicker
             placeholder="Rango"
@@ -116,7 +116,7 @@ export function EvolutionCard() {
             <>
               {refreshing && <span className="text-xs text-fg-subtle">Descargando precios de cierre…</span>}
               {tab === 'pnl' && (
-                <SegmentedControl label="Unidad de la curva" value={unit} onChange={setUnit}
+                <SegmentedControl label="Unidad de la curva" variant="accent" value={unit} onChange={setUnit}
                   options={[{ value: 'pct', label: '%', title: 'Rentabilidad en %' }, { value: 'eur', label: currency === 'USD' ? '$' : '€', title: `P&L en ${currency}` }]} />
               )}
             </>

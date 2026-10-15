@@ -1,7 +1,7 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
 import { WEEKDAYS, type CalendarDay } from '../../../utils/pnlCalendar'
-import { colorAlpha, gridMove } from '../../../utils/calendarStats'
-import { T, alpha } from '../../../utils/colors'
+import { gridMove } from '../../../utils/calendarStats'
+import { heatBackground } from '../../../utils/topMovers'
 import type { Currency } from '../../../utils/format'
 import { longDate, signedMoney, signedPct, toneOf } from './format'
 
@@ -25,13 +25,13 @@ function useChangeDirection(value: number): 'up' | 'down' | null {
 function LiveFigure({ pnl, currency, tone }: { pnl: number; currency: Currency; tone: string }) {
   const dir = useChangeDirection(pnl)
   return (
-    <span key={pnl} className={`block rounded-sm ${dir === 'up' ? 'flash-up' : dir === 'down' ? 'flash-down' : ''} ${tone}`}>
+    <span key={pnl} className={`block ${dir ? 'live-tick' : ''} ${tone}`}>
       {signedMoney(pnl, currency)}
     </span>
   )
 }
 
-function DayCell({ date, data, today, maxAbs, currency, selected, focusable, onSelect, onKey, register }: {
+function DayCell({ date, data, today, maxAbs, currency, selected, focusable, highlighted, compact, onSelect, onKey, onHover, register }: {
   date: string
   data?: CalendarDay
   today: string
@@ -39,23 +39,27 @@ function DayCell({ date, data, today, maxAbs, currency, selected, focusable, onS
   currency: Currency
   selected: boolean
   focusable: boolean
+  /** Resaltado desde el gráfico del mes. */
+  highlighted: boolean
+  /** Semana enteramente futura: fila compacta. */
+  compact: boolean
   onSelect: (date: string) => void
   onKey: (e: KeyboardEvent<HTMLButtonElement>, date: string) => void
+  onHover: (date: string | null) => void
   register: (date: string, el: HTMLButtonElement | null) => void
 }) {
   const dayNumber = Number(date.slice(8))
   const future = date > today
   const hasData = !!data && data.complete && !future
-  const tone = hasData ? toneOf(data.pnl) : 'text-fg-subtle'
-  const alphaPct = hasData ? colorAlpha(data.pnl, maxAbs) : 0
   const label = future
     ? `${longDate(date)}: día futuro`
     : !data ? `${longDate(date)}: sin datos`
     : !data.complete ? `${longDate(date)}: calculando`
     : `${longDate(date)}${data.live ? ' (hoy desde las 00:00, en vivo)' : ''}: ${signedMoney(data.pnl, currency)}${data.pct === null ? '' : `, ${signedPct(data.pct)}`}`
+  const barWidth = hasData && maxAbs > 0 ? Math.min(100, (Math.abs(data.pnl) / maxAbs) * 100) : 0
 
   return (
-    <td role="gridcell" className="p-0.5 align-top" aria-selected={selected}>
+    <td role="gridcell" className="p-[3px] align-top" aria-selected={selected}>
       <button
         type="button"
         ref={el => register(date, el)}
@@ -64,29 +68,42 @@ function DayCell({ date, data, today, maxAbs, currency, selected, focusable, onS
         aria-disabled={!hasData || undefined}
         onClick={() => hasData && onSelect(date)}
         onKeyDown={e => onKey(e, date)}
-        style={alphaPct ? { backgroundColor: alpha(data!.pnl > 0 ? T.positive : T.negative, alphaPct) } : undefined}
-        className={`w-full h-16 rounded-lg border px-2 py-1.5 text-left transition-[transform,border-color] duration-150 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand
-          ${hasData ? 'cursor-pointer hover:-translate-y-px' : 'cursor-default'}
-          ${selected ? 'border-brand' : data?.live ? 'border-brand/60 calendar-live' : 'border-border/40'}`}
+        onMouseEnter={() => onHover(date)}
+        onMouseLeave={() => onHover(null)}
+        onFocus={() => onHover(date)}
+        onBlur={() => onHover(null)}
+        // Mosaico (#234): color con la escala del mapa de calor, sin borde, relieve suave.
+        style={hasData ? { background: heatBackground(data.pnl, maxAbs) } : undefined}
+        className={`group relative w-full ${compact ? 'h-8' : 'h-[68px]'} rounded-xl overflow-hidden text-left transition-[transform,box-shadow,opacity] duration-150
+          focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand motion-reduce:transition-none
+          ${hasData ? 'cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_1px_2px_rgba(0,0,0,0.2)] hover:-translate-y-px hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_6px_16px_rgba(0,0,0,0.3)]' : 'cursor-default'}
+          ${!hasData && !future ? 'bg-overlay/3' : ''} ${future ? 'opacity-35' : ''}
+          ${selected ? 'ring-2 ring-brand' : highlighted ? 'ring-2 ring-fg/40' : ''}
+          ${data?.live && !selected ? 'calendar-live' : ''}`}
       >
-        <span className="flex items-center justify-between text-xs mono text-fg-subtle" aria-hidden="true">
-          <span>{dayNumber}</span>
-          {data?.live && <span className="text-brand">● hoy</span>}
-        </span>
+        <span aria-hidden="true" className={`absolute top-1.5 left-2 text-[11px] mono ${hasData ? 'text-fg' : 'text-fg-subtle'}`}>{dayNumber}</span>
+        {data?.live && <span aria-hidden="true" className="absolute top-1.5 right-2 text-[10px] font-semibold text-brand">● hoy</span>}
         {hasData ? (
-          <span className="block mt-1 text-xs mono leading-tight" aria-hidden="true">
+          <span aria-hidden="true" className="absolute inset-x-2 bottom-2.5 flex flex-col">
             {data.live
-              ? <LiveFigure pnl={data.pnl} currency={currency} tone={`font-semibold truncate ${tone}`} />
-              : <span className={`block font-semibold truncate ${tone}`}>{signedMoney(data.pnl, currency)}</span>}
-            <span className={`block opacity-80 ${data.pct === null ? tone : toneOf(data.pct)}`}>{data.pct === null ? '—' : signedPct(data.pct)}</span>
+              ? <LiveFigure pnl={data.pnl} currency={currency} tone="text-[13px] font-semibold mono text-fg truncate" />
+              : <span className="text-[13px] font-semibold mono text-fg truncate">{signedMoney(data.pnl, currency)}</span>}
+            {/* El % aparece al pasar el cursor o al enfocar; siempre está en el detalle y en el nombre accesible. */}
+            <span className="text-[11px] mono text-fg h-0 opacity-0 group-hover:h-auto group-hover:opacity-100 group-focus-visible:h-auto group-focus-visible:opacity-100 transition-opacity">
+              {data.pct === null ? '—' : signedPct(data.pct)}
+            </span>
           </span>
-        ) : !future && <span className="block text-xs mono text-center mt-1 text-fg-subtle" aria-hidden="true">—</span>}
+        ) : !future && !compact && <span aria-hidden="true" className="absolute inset-x-0 bottom-3 text-center text-xs mono text-fg-subtle">—</span>}
+        {/* Barra proporcional a la magnitud del día */}
+        {hasData && (
+          <span aria-hidden="true" className={`absolute left-0 bottom-0 h-[3px] ${data.pnl >= 0 ? 'bg-positive' : 'bg-negative'}`} style={{ width: `${barWidth}%` }} />
+        )}
       </button>
     </td>
   )
 }
 
-export function CalendarMonthGrid({ weeks, byDate, totals, today, maxAbs, currency, selected, onSelect, caption }: {
+export function CalendarMonthGrid({ weeks, byDate, totals, today, maxAbs, currency, selected, onSelect, caption, hovered, onHover }: {
   weeks: (string | null)[][]
   byDate: ReadonlyMap<string, CalendarDay>
   totals: Array<number | null>
@@ -96,6 +113,9 @@ export function CalendarMonthGrid({ weeks, byDate, totals, today, maxAbs, curren
   selected: string | null
   onSelect: (date: string) => void
   caption: string
+  /** Día resaltado (desde la cuadrícula o el gráfico del mes). */
+  hovered: string | null
+  onHover: (date: string | null) => void
 }) {
   const refs = useRef<Record<string, HTMLButtonElement | null>>({})
   const days = weeks.flat().filter((d): d is string => !!d)
@@ -129,6 +149,7 @@ export function CalendarMonthGrid({ weeks, byDate, totals, today, maxAbs, curren
               {week.map((date, i) => date
                 ? <DayCell key={date} date={date} data={byDate.get(date)} today={today} maxAbs={maxAbs} currency={currency}
                     selected={selected === date} focusable={tabDate === date} onSelect={onSelect} onKey={onKey}
+                    highlighted={hovered === date} onHover={onHover} compact={week.every(d => !d || d > today)}
                     register={(d, el) => { refs.current[d] = el }} />
                 : <td key={`vacío-${i}`} className="p-0.5" aria-hidden="true" />)}
               <td className="p-0.5 align-middle text-right">

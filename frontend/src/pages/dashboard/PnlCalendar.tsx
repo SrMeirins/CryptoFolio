@@ -6,12 +6,13 @@ import { dailyPnlQuery } from '../../queries/currencyQueries'
 import { madridToday } from '../../utils/pnlChart'
 import { addMonths, compareYm, monthGrid, monthLabel, monthRange, monthSummary, ymOf, type YearMonth } from '../../utils/pnlCalendar'
 import { monthStats, weekTotals, yearMonths } from '../../utils/calendarStats'
-import { Button, SegmentedControl, Select, cardClasses, iconButtonClasses, PanelHeader, Skeleton } from '../../components/ui'
+import { Button, SegmentedControl, cardClasses, iconButtonClasses, PanelHeader, Skeleton, MonthPicker } from '../../components/ui'
 import { CalendarMonthGrid } from './calendar/CalendarMonthGrid'
 import { CalendarStats } from './calendar/CalendarStats'
 import { CalendarLegend } from './calendar/CalendarLegend'
 import { CalendarDayDetail } from './calendar/CalendarDayDetail'
 import { CalendarYearView } from './calendar/CalendarYearView'
+import { MonthTrend } from './calendar/MonthTrend'
 import { calendarSubtitle } from '../../utils/panelSubtitles'
 
 // Calendario de ganancias y pérdidas diarias (#167), sobre GET /api/v1/pnl/daily.
@@ -21,7 +22,6 @@ import { calendarSubtitle } from '../../utils/panelSubtitles'
 
 type View = 'month' | 'year'
 
-const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 const navButton = iconButtonClasses('sm', false, 'disabled:hover:bg-transparent')
 
 export function PnlCalendar() {
@@ -30,6 +30,7 @@ export function PnlCalendar() {
   const [view, setView] = useState<View>('month')
   const [ym, setYm] = useState<YearMonth>(current)
   const [selected, setSelected] = useState<string | null>(null)
+  const [hovered, setHovered] = useState<string | null>(null)
   const range = monthRange(ym, today)
 
   // Primer mes con actividad: se toma de la consulta de "Todo" que ya hace el gráfico (misma caché).
@@ -71,7 +72,6 @@ export function PnlCalendar() {
   const minYm = firstYm ?? current
   const canPrev = view === 'month' ? compareYm(ym, minYm) > 0 : ym.year > minYm.year
   const canNext = view === 'month' ? compareYm(ym, current) < 0 : ym.year < current.year
-  const years = Array.from({ length: current.year - minYm.year + 1 }, (_, i) => minYm.year + i)
 
   function go(next: YearMonth) {
     const clamped = compareYm(next, current) > 0 ? current : compareYm(next, minYm) < 0 ? minYm : next
@@ -92,25 +92,15 @@ export function PnlCalendar() {
           <p><span className="text-brand">● hoy</span> se actualiza en vivo desde las 00:00. El chip «24h» de la tarjeta Valor mide en cambio las últimas 24 horas móviles, por eso las cifras no coinciden.</p>
           <p>Pulsa un día para ver su detalle. Con el teclado, las flechas recorren los días.</p>
         </>}
-        extra={<SegmentedControl label="Vista del calendario" value={view} onChange={v => { setView(v); setSelected(null) }}
+        extra={<SegmentedControl label="Vista del calendario" variant="accent" value={view} onChange={v => { setView(v); setSelected(null) }}
           options={[{ value: 'month', label: 'Mes' }, { value: 'year', label: 'Año' }]} />}
         actions={<>
           <button type="button" onClick={() => step(-1)} disabled={!canPrev} aria-label={view === 'month' ? 'Mes anterior' : 'Año anterior'} className={navButton}>
             <ChevronLeft size={16} />
           </button>
-          {view === 'month' && (
-            <Select size="sm" aria-label="Mes" value={ym.month} className="w-auto"
-              onChange={e => go({ year: ym.year, month: Number(e.target.value) })}>
-              {MONTH_NAMES.map((name, i) => (
-                <option key={name} value={i + 1} disabled={compareYm({ year: ym.year, month: i + 1 }, current) > 0 || compareYm({ year: ym.year, month: i + 1 }, minYm) < 0}>
-                  {name}
-                </option>
-              ))}
-            </Select>
-          )}
-          <Select size="sm" aria-label="Año" value={ym.year} className="w-auto" onChange={e => go({ year: Number(e.target.value), month: ym.month })}>
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
-          </Select>
+          <MonthPicker mode={view} value={ym} min={minYm} max={current}
+            label={view === 'month' ? 'Elegir mes' : 'Elegir año'}
+            onChange={next => go(next)} />
           <button type="button" onClick={() => step(1)} disabled={!canNext} aria-label={view === 'month' ? 'Mes siguiente' : 'Año siguiente'} className={navButton}>
             <ChevronRight size={16} />
           </button>
@@ -127,6 +117,8 @@ export function PnlCalendar() {
       ) : (
         <>
           {complete.length > 0 && <CalendarStats stats={stats} total={monthSummary(complete)} currency={currency} />}
+          <MonthTrend days={days} currency={currency} hovered={hovered} onHover={setHovered}
+            lastDay={Number(weeks.flat().filter(Boolean).at(-1)?.slice(8) ?? 31)} />
           {data?.refreshing && <p className="text-xs text-fg-subtle mb-2">Descargando precios de cierre…</p>}
           {isError && <p className="text-xs text-fg-subtle py-6 text-center">No se pudo cargar el P&L del mes.</p>}
           {isLoading && (
@@ -137,7 +129,8 @@ export function PnlCalendar() {
           {!isError && (
             <div key={`${ym.year}-${ym.month}`} className="animate-page-in">
               <CalendarMonthGrid weeks={weeks} byDate={byDate} totals={totals} today={today} maxAbs={maxAbs} currency={currency}
-                selected={selected} onSelect={d => setSelected(s => (s === d ? null : d))} caption={`P&L diario de ${monthLabel(ym)}`} />
+                selected={selected} onSelect={d => setSelected(s => (s === d ? null : d))} caption={`P&L diario de ${monthLabel(ym)}`}
+                hovered={hovered} onHover={setHovered} />
             </div>
           )}
           <CalendarLegend maxAbs={maxAbs} currency={currency} />

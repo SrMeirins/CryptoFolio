@@ -33,6 +33,10 @@
   --cf-on-positive: #000000;
   --cf-on-negative: #000000;
   --cf-positive: #0ecb81;
+  /* Mapa de calor (#233): tonos intensos e intensidad máxima con texto legible (≥ 4,5:1) */
+  --cf-heat-up: #0e7c54;
+  --cf-heat-down: #b52b45;
+  --cf-heat-max: 100;
   --cf-negative: #f75369;
   --cf-warning: #f59e0b;
   --cf-info: #4b8cf7;
@@ -84,6 +88,9 @@
   --cf-on-positive: #ffffff;
   --cf-on-negative: #ffffff;
   --cf-positive: #027b51;
+  --cf-heat-up: #16a36f;
+  --cf-heat-down: #e0485f;
+  --cf-heat-max: 88;
   --cf-negative: #c92f48;
   --cf-warning: #ae5009;
   --cf-info: #1d4ed8;
@@ -328,3 +335,13 @@
   to   { opacity: 1; transform: none; }
 }
 .panel-in { animation: panelIn 0.38s ease-out both; }
+
+/* Mapa de calor (#233): destello de la celda cuando cambia su variación. */
+@keyframes heatFlashUp   { from { box-shadow: 0 0 0 2px color-mix(in srgb, var(--cf-positive) 70%, transparent), 0 0 18px color-mix(in srgb, var(--cf-positive) 55%, transparent); } }
+@keyframes heatFlashDown { from { box-shadow: 0 0 0 2px color-mix(in srgb, var(--cf-negative) 70%, transparent), 0 0 18px color-mix(in srgb, var(--cf-negative) 55%, transparent); } }
+.heat-flash-up   { animation: heatFlashUp 0.9s ease-out; }
+.heat-flash-down { animation: heatFlashDown 0.9s ease-out; }
+
+/* Día en vivo del calendario (#234): la cifra pulsa al cambiar, sin fondo. */
+@keyframes liveTick { from { opacity: 0.35; } to { opacity: 1; } }
+.live-tick { animation: liveTick 0.6s ease-out; }

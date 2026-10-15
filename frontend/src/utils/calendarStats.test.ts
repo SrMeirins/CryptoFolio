@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CalendarDay } from './pnlCalendar'
-import { colorAlpha, gridMove, monthStats, weekTotals, yearMonths } from './calendarStats'
+import { colorAlpha, gridMove, monthCumulative, monthStats, weekTotals, yearMonths } from './calendarStats'
 
 // Calendario de P&L (#216).
 const day = (date: string, pnl: number, pct: number | null = pnl, complete = true): CalendarDay => ({ date, pnl, pct, complete, live: false })
@@ -65,5 +65,16 @@ describe('gridMove', () => {
     expect(gridMove('2026-10-01', 'ArrowLeft')).toBeNull()
     expect(gridMove('2026-10-29', 'ArrowDown')).toBeNull()
     expect(gridMove('2026-10-15', 'Enter')).toBeNull()
+  })
+})
+
+describe('monthCumulative (#234)', () => {
+  it('acumula el P&L de los días completos, con su número de día', () => {
+    expect(monthCumulative([day('2026-10-01', 10), day('2026-10-02', -4.555), day('2026-10-03', 99, 1, false), day('2026-10-04', 1)])).toEqual([
+      { date: '2026-10-01', day: 1, pnl: 10, cum: 10 },
+      { date: '2026-10-02', day: 2, pnl: -4.555, cum: 5.45 },
+      { date: '2026-10-04', day: 4, pnl: 1, cum: 6.45 },
+    ])
+    expect(monthCumulative([])).toEqual([])
   })
 })

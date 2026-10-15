@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { portfolioApi } from '../api/portfolio'
 import { SaleSimulatorModal } from '../components/SaleSimulatorModal'
 import { usePricesStore } from '../store/pricesStore'
@@ -23,7 +24,9 @@ export function Portfolio() {
     queryFn: portfolioApi.getFiatBalances,
   })
 
-  const [search, setSearch] = useState('')
+  // ?activo=XRP llega desde el mapa de calor del Dashboard (#233).
+  const [params] = useSearchParams()
+  const [search, setSearch] = useState(() => params.get('activo') ?? '')
   const searchRef = useRef<HTMLInputElement>(null)
   const [simulator, setSimulator] = useState<{ asset: string; qty: number; price: number } | null>(null)
 

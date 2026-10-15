@@ -1,11 +1,10 @@
 import { useState, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react'
-import { useClickOutside } from '../hooks/useClickOutside'
 import {
   DAYS_ES, MONTHS_ES, today, startOfMonth, startOfYear,
   parseDate, fmtShort, getDaysInGrid, inDateRange,
 } from '../utils/date'
-import { iconButtonClasses } from './ui'
+import { Popover, iconButtonClasses } from './ui'
 
 interface Props {
   from:     string   // 'YYYY-MM-DD' o ''
@@ -90,8 +89,6 @@ export function DateRangePicker({ from, to, onChange, placeholder = 'Rango de fe
 
   const ref = useRef<HTMLDivElement>(null)
 
-  // Cerrar al clicar fuera
-  useClickOutside(ref, close, open)
 
   function openPicker() {
     setTmpFrom(from); setTmpTo(to); setPicking('from')
@@ -193,12 +190,10 @@ export function DateRangePicker({ from, to, onChange, placeholder = 'Rango de fe
         )}
       </div>
 
-      {/* Popover */}
-      {open && (
-        <div
-          className={`absolute top-full mt-2 z-50 ${align === 'right' ? 'right-0' : 'left-0'} bg-background-primary border border-overlay/12 rounded-xl shadow-2xl overflow-hidden animate-date-picker-in`}
-          style={{ minWidth: 280 }}
-        >
+      {/* Desplegable: Popover (#240) se coloca en la ventana y se abre hacia arriba si no cabe debajo */}
+      <Popover open={open} onClose={close} anchorRef={ref} align={align === 'right' ? 'end' : 'start'}
+        ariaProps={{ role: 'dialog', 'aria-label': 'Elegir rango de fechas' }}>
+        <div style={{ minWidth: 280 }}>
           {/* Atajos */}
           <div className="flex items-center gap-1 px-3 pt-3 pb-2">
             {SHORTCUTS.map(s => {
@@ -291,7 +286,7 @@ export function DateRangePicker({ from, to, onChange, placeholder = 'Rango de fe
             )}
           </div>
         </div>
-      )}
+      </Popover>
     </div>
   )
 }

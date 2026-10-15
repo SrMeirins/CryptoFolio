@@ -4,7 +4,7 @@ import { formatEur, formatNumber } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { TableExpandToggle } from './TableExpandToggle'
 import type { RendimientoEvent } from './types'
-import { cardClasses, buttonClasses, badgeClasses, fieldClasses, tableFootRowClasses, tableHeadRowClasses, tableRowClasses } from '../../components/ui'
+import { cardClasses, buttonClasses, badgeClasses, tableFootRowClasses, tableHeadRowClasses, tableRowClasses, Dropdown } from '../../components/ui'
 
 export function TablaRendimientos({ rendimientos, year }: { rendimientos: RendimientoEvent[]; year: number }) {
   const [expanded, setExpanded]         = useState(true)
@@ -51,23 +51,11 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
 
           {expanded && (
             <>
-              <select
-                value={filterActivo}
-                onChange={e => setFilterActivo(e.target.value)}
-                className={fieldClasses('sm', false, 'w-auto px-2 py-1 appearance-none cursor-pointer')}
-              >
-                <option value="">Todos los activos</option>
-                {activos.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
+              <Dropdown size="sm" label="Filtrar por activo" value={filterActivo} onChange={setFilterActivo} align="end"
+                options={[{ value: '', label: 'Todos los activos' }, ...activos.map(a => ({ value: a, label: a }))]} />
 
-              <select
-                value={filterTipo}
-                onChange={e => setFilterTipo(e.target.value)}
-                className={fieldClasses('sm', false, 'w-auto px-2 py-1 appearance-none cursor-pointer')}
-              >
-                <option value="">Todos los tipos</option>
-                {tipos.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <Dropdown size="sm" label="Filtrar por tipo" value={filterTipo} onChange={setFilterTipo} align="end"
+                options={[{ value: '', label: 'Todos los tipos' }, ...tipos.map(t => ({ value: t, label: t }))]} />
 
               <button
                 type="button"
