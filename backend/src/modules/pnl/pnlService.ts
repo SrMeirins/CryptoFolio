@@ -122,6 +122,8 @@ export async function getDailyPnl(
   const inflow = new Array<number>(allDays.length).fill(0);
   const outflow = new Array<number>(allDays.length).fill(0);
   const netCapitalFlow = new Array<number>(allDays.length).fill(0);
+  const capitalIn = new Array<number>(allDays.length).fill(0);
+  const capitalOut = new Array<number>(allDays.length).fill(0);
   const todayIdx = allDays[allDays.length - 1] === today ? allDays.length - 1 : -1;
   const todayFlows: LiveDayBase['flows'] = [];
   for (const f of flows) {
@@ -136,7 +138,10 @@ export async function getDailyPnl(
     if (price === null) { pendingDay[i] = true; continue; }
     const eur = Math.abs(f.quantity) * price;
     if (f.quantity > 0) inflow[i] += eur; else outflow[i] += eur;
-    if (f.kind === 'capital') netCapitalFlow[i] += f.quantity > 0 ? eur : -eur;
+    if (f.kind === 'capital') {
+      netCapitalFlow[i] += f.quantity > 0 ? eur : -eur;
+      if (f.quantity > 0) capitalIn[i] += eur; else capitalOut[i] += eur;
+    }
   }
 
   // ── Valoración y P&L ──
@@ -145,6 +150,7 @@ export async function getDailyPnl(
     const i = k + 1;
     return {
       date, value: valueAt(i), inflow: inflow[i], outflow: outflow[i], netCapitalFlow: netCapitalFlow[i],
+      capitalIn: capitalIn[i], capitalOut: capitalOut[i],
       complete: !pendingDay[i], live: date === today,
     };
   });

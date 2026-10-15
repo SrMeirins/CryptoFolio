@@ -26,6 +26,8 @@ export interface DailyPnlDay {
   inflow: number
   outflow: number
   netCapitalFlow: number
+  capitalIn: number    // depósitos de capital propio del día (sin margen)
+  capitalOut: number   // retiradas de capital propio del día (positivo)
   pnl: number
   pct: number | null
   cumulativePct: number
@@ -72,7 +74,7 @@ export interface IntradayPnlResponse {
   totalPnl: number
   twrPct: number
   approximate: string[]   // activos valorados con el precio en vivo en toda la ventana
-  points: Array<{ at: string; value: number; pnl: number; pct: number; stepPct: number | null; flow: number; live: boolean }>
+  points: Array<{ at: string; value: number; pnl: number; pct: number; stepPct: number | null; flow: number; capitalIn: number; capitalOut: number; live: boolean }>
 }
 
 export interface LiveDayBase {

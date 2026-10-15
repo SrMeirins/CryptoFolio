@@ -99,6 +99,10 @@ describe('getDailyPnl — flujos de capital y rendimiento', () => {
     expect(d['2026-01-13']).toMatchObject({ value: 700, outflow: 300, pnl: -50 });  // retirada EUR + XRP −10 %
     expect(d['2026-01-14']).toMatchObject({ value: 600, pnl: -100 });              // LOST resta del P&L
     expect(d['2026-01-15']).toMatchObject({ value: 550, outflow: 50, pnl: 0 });     // regalo: salida, no pérdida
+    // Entradas y salidas de capital propio por separado, sin el margen (#214).
+    expect(d['2026-01-10']).toMatchObject({ capitalIn: 1000, capitalOut: 0 });
+    expect(d['2026-01-13']).toMatchObject({ capitalIn: 0, capitalOut: 300 });
+    expect(d['2026-01-16']).toMatchObject({ capitalIn: 0, capitalOut: 0 });          // préstamo de margen
     expect(d['2026-01-16']).toMatchObject({ value: 640, inflow: 90, pnl: 0 });      // préstamo: no es ganancia
     expect(d['2026-01-17']).toMatchObject({ value: 550, outflow: 90, pnl: 0 });     // devolución: no es pérdida
     expect(r.totalPnl).toBe(-100);

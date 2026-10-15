@@ -66,6 +66,7 @@ describe('buildIntradaySeries', () => {
     expect(r.totalPnl).toBe(-1);
     // Rentabilidad de cada tramo y flujo de capital propio, para el tooltip y los marcadores (#214).
     expect(r.points.map(p => p.flow)).toEqual([0, 50, 0]);
+    expect(r.points.map(p => [p.capitalIn, p.capitalOut])).toEqual([[0, 0], [50, 0], [0, 0]]);
     expect(r.points[0].stepPct).toBeNull();
     expect(r.points[2].stepPct).toBeCloseTo(-6.875, 3);   // −11 sobre 160
   });

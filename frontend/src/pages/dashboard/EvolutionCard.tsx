@@ -9,7 +9,7 @@ import { useLiveDayPnl } from '../../hooks/useLiveDayPnl'
 import { dailyPnlQuery, intradayPnlQuery } from '../../queries/currencyQueries'
 import { METRIC_LABELS, PERIOD_TITLES, PNL_PERIODS, madridToday, metricFor, type PnlPeriod } from '../../utils/pnlChart'
 import { evolutionQuery, fromDaily, fromIntraday } from '../../utils/evolutionSeries'
-import { MAX_FLOW_MARKERS, applyLiveToday, periodSummary } from '../../utils/evolutionSummary'
+import { applyLiveToday, periodSummary } from '../../utils/evolutionSummary'
 
 // Bloque de evolución del Dashboard (#166): pestaña P&L (rentabilidad
 // acumulada, por defecto) y pestaña Valor (valor de la cartera). Desde #215
@@ -102,7 +102,7 @@ export function EvolutionCard() {
             <>
               <p>{labels.help}</p>
               {query.intraday && <p>Últimas 24 horas, un punto cada 15 minutos y el último con los precios en vivo.</p>}
-              <p>Los puntos verdes y rojos sobre la curva son depósitos y retiradas de capital (en periodos largos, los {MAX_FLOW_MARKERS} de mayor importe).</p>
+              <p>Los puntos verdes y rojos sobre la curva son depósitos y retiradas de capital propio, agrupados por semana o mes en periodos largos. Pasa el cursor o usa Tab para ver el importe.</p>
               <p>Máxima caída: mayor bajada de la rentabilidad desde un máximo del periodo, sin contar depósitos ni retiradas.</p>
               {approximate.length > 0 && (
                 <p>Sin precios de 15 min (valorados con el precio actual): <span className="mono">{approximate.join(', ')}</span></p>
