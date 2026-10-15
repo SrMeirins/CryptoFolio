@@ -22,6 +22,12 @@ export const dailyPnlQuery = (currency: Currency, from?: string, to?: string) =>
   staleTime: CURRENCY_STALE_MS,
 })
 
+export const dayDetailQuery = (currency: Currency, date: string) => queryOptions({
+  queryKey: ['pnl-day', currency, date],
+  queryFn: () => portfolioApi.getDayDetail(date, currency),
+  staleTime: CURRENCY_STALE_MS,
+})
+
 // La serie intradía (#215) cambia cada pocos minutos: fresca solo 1 minuto.
 export const intradayPnlQuery = (currency: Currency) => queryOptions({
   queryKey: ['intraday-pnl', currency],

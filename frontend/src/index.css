@@ -314,3 +314,10 @@
   transform-origin: center;
   animation: chartLivePulse 1.8s ease-out infinite;
 }
+
+/* Día en vivo del calendario de P&L (#216): borde que late suavemente. */
+@keyframes calendarLive {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--cf-brand) 0%, transparent); }
+  50%      { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cf-brand) 30%, transparent); }
+}
+.calendar-live { animation: calendarLive 2.4s ease-in-out infinite; }

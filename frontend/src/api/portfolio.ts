@@ -50,6 +50,20 @@ export interface DailyPnlResponse {
   today: LiveDayBase | null
 }
 
+export interface DayDetailResponse {
+  date: string
+  currency: Currency
+  live: boolean
+  complete: boolean
+  value: number
+  pnl: number
+  pct: number | null
+  inflow: number
+  outflow: number
+  contributions: Array<{ asset: string; pnl: number }>   // de mayor a menor aportación
+  other: number                                          // operaciones del día y otros
+}
+
 export interface IntradayPnlResponse {
   currency: Currency
   from: string
@@ -441,6 +455,8 @@ export const portfolioApi = {
     const query = params.toString()
     return api.get<DailyPnlResponse>(`/v1/pnl/daily${query ? `?${query}` : ''}`)
   },
+  // Detalle de un día del calendario de P&L (#216).
+  getDayDetail: (date: string, currency: Currency = 'EUR') => api.get<DayDetailResponse>(`/v1/pnl/day?${new URLSearchParams({ date, currency })}`),
   // Evolución de las últimas 24 h cada 15 min (#215).
   getIntradayPnl: (currency: Currency = 'EUR') => api.get<IntradayPnlResponse>(`/v1/pnl/intraday?${new URLSearchParams({ currency })}`),
   getPendingDeposits: () => api.get<Array<{

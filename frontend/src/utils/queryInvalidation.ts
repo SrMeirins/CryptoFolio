@@ -11,7 +11,7 @@ import type { QueryClient } from '@tanstack/react-query'
 // Las consultas por moneda (#177) se cachean 5 min: también se invalidan aquí
 // (el prefijo cubre las dos monedas).
 const TRANSACTION_AFFECTED_KEYS = [
-  'transactions', 'tx-stats', 'fifo-lots', 'fiscal-summary', 'eur-flow', 'daily-pnl', 'intraday-pnl',
+  'transactions', 'tx-stats', 'fifo-lots', 'fiscal-summary', 'eur-flow', 'daily-pnl', 'intraday-pnl', 'pnl-day',
 ] as const
 
 /**

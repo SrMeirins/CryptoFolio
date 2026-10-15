@@ -42,7 +42,7 @@ export interface LiveDayBase {
   pricesEur: Record<string, number>;
 }
 
-function previousDay(day: string): string {
+export function previousDay(day: string): string {
   const [y, m, d] = day.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
 }
