@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from 'react'
 import { PnlChart, type PnlUnit } from './PnlChart'
 import { ValueChart } from './ValueChart'
 import { EvolutionSummary } from './EvolutionSummary'
+import { CalendarDayDetail } from './calendar/CalendarDayDetail'
 import { DateRangePicker } from '../../components/DateRangePicker'
 import { SegmentedControl, Tabs, cardClasses, tabId, tabPanelId, PanelHeader } from '../../components/ui'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
@@ -30,6 +31,8 @@ export function EvolutionCard() {
   const [period, setPeriod] = useState<PnlPeriod>('Todo')
   const [range, setRange] = useState<{ from: string; to: string } | null>(null)
   const [unit, setUnit] = useState<PnlUnit>('pct')
+  // Día del mejor o peor resultado cuyo detalle se muestra bajo el resumen (#250).
+  const [openDay, setOpenDay] = useState<{ day: string; key: string } | null>(null)
   const baseId = useId()
   const today = madridToday()
   const query = evolutionQuery(period, today, range)
@@ -57,6 +60,10 @@ export function EvolutionCard() {
   const approximate = query.intraday ? intraday.data?.approximate ?? [] : []
   const refreshing = !query.intraday && !!daily.data?.refreshing
   const animationKey = `${period}-${range?.from ?? ''}-${range?.to ?? ''}-${tab}-${unit}`
+  // Al cambiar de periodo o de rango el detalle abierto deja de aplicar.
+  const periodKey = `${period}-${range?.from ?? ''}-${range?.to ?? ''}`
+  const detailDay = openDay?.key === periodKey ? openDay.day : null
+  const toggleDay = (day: string) => setOpenDay(o => (o?.day === day && o.key === periodKey ? null : { day, key: periodKey }))
 
   function pickRange(from: string, to: string) {
     if (!from && !to) {
@@ -100,13 +107,14 @@ export function EvolutionCard() {
           intraday={query.intraday}
           mode={tab}
           valueChange={valueChange}
+          openDay={detailDay}
+          onOpenDay={toggleDay}
           metricLabel={labels.short}
           metricHelp={
             <>
               <p>{labels.help}</p>
               {query.intraday && <p>Últimas 24 horas, un punto cada 15 minutos y el último con los precios en vivo.</p>}
               <p>Los puntos verdes y rojos sobre la curva son depósitos y retiradas de capital propio, agrupados por semana o mes en periodos largos. Pasa el cursor o usa Tab para ver el importe.</p>
-              <p>Máxima caída: mayor bajada de la rentabilidad desde un máximo del periodo, sin contar depósitos ni retiradas.</p>
               {approximate.length > 0 && (
                 <p>Sin precios de 15 min (valorados con el precio actual): <span className="mono">{approximate.join(', ')}</span></p>
               )}
@@ -122,6 +130,11 @@ export function EvolutionCard() {
             </>
           }
         />
+        {detailDay && (
+          <div className="-mt-1 mb-4">
+            <CalendarDayDetail date={detailDay} day={daily.data?.days.find(d => d.date === detailDay)} onClose={() => setOpenDay(null)} />
+          </div>
+        )}
         {tab === 'pnl' ? <PnlChart {...state} unit={unit} /> : <ValueChart {...state} />}
       </div>
     </div>
