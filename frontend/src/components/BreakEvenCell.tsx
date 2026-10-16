@@ -20,9 +20,9 @@ export function BreakEvenCell({ price, avgPrice, currency }: { price: number; av
       <span className="text-fg-muted">{formatPrice(avgPrice, currency)}</span>
       {d && (
         <>
-          <span className="relative block w-16 h-1 rounded-full bg-overlay/8" aria-hidden="true">
+          <span className="relative block w-16 h-1.5 rounded-full bg-overlay/8" aria-hidden="true">
             <span className="absolute left-1/2 -top-0.5 w-px h-2 bg-fg-subtle/70" />
-            <span className={`absolute top-0 h-1 rounded-full ${up ? 'bg-positive' : 'bg-negative'}`}
+            <span className={`absolute top-0 h-1.5 rounded-full ${up ? 'bg-positive' : 'bg-negative'}`}
               style={{ width: `${width}%`, left: up ? '50%' : `${50 - width}%` }} />
           </span>
           <span className={`text-[11px] leading-none ${up ? 'text-positive' : 'text-negative'}`}>

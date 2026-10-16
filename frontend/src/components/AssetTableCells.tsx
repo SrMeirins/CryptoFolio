@@ -14,7 +14,7 @@ export function WeightCell({ pct, tone = 'bg-brand/60' }: { pct: number | null; 
   return (
     <div className="flex flex-col items-end gap-1">
       <span className="text-xs mono text-fg-muted">{formatPercent(pct, 1)}</span>
-      <div className="w-16 h-1 bg-background-tertiary rounded-full overflow-hidden" aria-hidden="true">
+      <div className="w-16 h-1.5 bg-background-tertiary rounded-full overflow-hidden" aria-hidden="true">
         <div className={`h-full rounded-full ${tone} transition-[width] duration-500`} style={{ width: `${Math.min(pct, 100)}%` }} />
       </div>
     </div>

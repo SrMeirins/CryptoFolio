@@ -5,7 +5,7 @@ import { tableRowClasses } from './ui'
 import { CryptoIcon } from './CryptoIcon'
 import { WeightCell } from './AssetTableCells'
 
-export function FiatRowComponent({ row, totalPortfolioValue, compact = false }: { row: FiatRow; totalPortfolioValue: number; compact?: boolean }) {
+export function FiatRowComponent({ row, totalPortfolioValue, compact = false, rowKey }: { row: FiatRow; totalPortfolioValue: number; compact?: boolean; rowKey?: string }) {
   const currency = useCurrency()
   // Cantidad en la propia moneda del saldo (un saldo en EUR sigue siendo euros
   // aunque se muestre en USD); precio y valor, en la moneda de visualización.
@@ -15,7 +15,7 @@ export function FiatRowComponent({ row, totalPortfolioValue, compact = false }: 
 
   const pad = compact ? 'py-1.5' : 'py-3'
   return (
-    <tr className={tableRowClasses()}>
+    <tr data-row-key={rowKey} className={tableRowClasses()}>
       <td className={`px-5 ${pad}`}>
         <div className="flex items-center gap-2">
           <span className="w-4 shrink-0" />
@@ -31,6 +31,7 @@ export function FiatRowComponent({ row, totalPortfolioValue, compact = false }: 
       </td>
       <td className={`px-4 ${pad} text-right mono text-fg`}>{quantityLabel}</td>
       <td className={`px-4 ${pad} text-right mono text-fg-subtle`}>{formatPrice(row.price, currency)}</td>
+      <td className={`px-2 ${pad} text-right text-fg-subtle text-xs`}>—</td>
       <td className={`px-4 ${pad} text-right mono font-semibold text-fg`}>{formatMoney(row.value, currency)}</td>
       {/* Sin P&L ni break-even: es efectivo */}
       <td className={`px-4 ${pad} text-right mono text-fg-subtle`}>—</td>

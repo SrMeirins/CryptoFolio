@@ -12,6 +12,7 @@ import importsRouter from './routes/imports';
 import fifoRouter from './routes/fifo';
 import fifoLotsDetailRouter from './routes/fifo/fifoLotsDetail';
 import pricesRouter from './routes/prices';
+import pricesClosesRouter from './routes/pricesCloses';
 import pnlRouter from './routes/pnl';
 import assetIconsRouter from './routes/assetIcons';
 import catalogRouter from './routes/catalog';
@@ -43,6 +44,7 @@ app.use('/api/fiscal', fiscalRouter);
 app.use('/api/wallets', walletsRouter);
 app.use('/api/v1/pnl', pnlRouter);
 app.use('/api/v1/fifo', fifoLotsDetailRouter);
+app.use('/api/v1/prices', pricesClosesRouter);
 app.use('/api/assets', assetIconsRouter);
 
 // ── Frontend estático (solo en modo Electron) ──────────────────────────────
