@@ -8,8 +8,11 @@ import { type CryptoRow, walletShortName } from '../utils/assetTable'
 import { CryptoIcon } from './CryptoIcon'
 import { T, alpha, ink } from '../utils/colors'
 import { iconButtonClasses, tableRowClasses } from './ui'
+import { useFlashOnChange, type FlashDirection } from '../hooks/useFlashOnChange'
 
-export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate, lockedAmounts = [] }: {
+const flashClass = (f: FlashDirection) => (f === 'up' ? 'flash-up' : f === 'down' ? 'flash-down' : '')
+
+export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate, lockedAmounts = [], hideWalletChips = false }: {
   row: CryptoRow
   prices: Record<string, number>
   yesterdayPrices: Record<string, number>
@@ -17,6 +20,8 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
   compact?: boolean
   onSimulate?: (asset: string, qty: number) => void
   lockedAmounts?: LockedAmount[]
+  /** En la tabla de una sola wallet no se repite su chip en cada fila (#269). */
+  hideWalletChips?: boolean
 }) {
   const currency = useCurrency()
   const [expanded, setExpanded] = useState(false)
@@ -24,6 +29,9 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
   const pnl        = row.value - row.totalCostBasis
   const pnlPct     = row.totalCostBasis > 0 ? (pnl / row.totalCostBasis) * 100 : 0
   const hasPrice   = price > 0
+  // Destello al cambiar con los precios en vivo, como en el Dashboard (#269).
+  const priceFlash = useFlashOnChange(price)
+  const valueFlash = useFlashOnChange(row.value)
   const canExpand  = row.wallets.length > 1 || lockedAmounts.length > 0
 
   // 24h change
@@ -47,7 +55,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
         onClick={() => canExpand && setExpanded(e => !e)}
       >
         {/* Activo */}
-        <td className="px-5 py-3">
+        <td className={`px-5 ${compact ? 'py-1.5' : 'py-3'}`}>
           <div className="flex items-center gap-2">
             <div className="w-4 shrink-0 flex items-center justify-center">
               {canExpand
@@ -57,11 +65,11 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                 : <span className="w-3" />
               }
             </div>
-            <CryptoIcon symbol={row.asset} size={28} />
+            <CryptoIcon symbol={row.asset} size={compact ? 22 : 28} />
             <span className="font-medium">{row.asset}</span>
             {!expanded && (
               <div className="flex gap-1 ml-1 flex-wrap">
-                {row.wallets.map(w => (
+                {!hideWalletChips && row.wallets.map(w => (
                   <span key={w.wallet_id}
                     className="text-xs px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap"
                     style={{ backgroundColor: `${alpha(w.wallet_color, 9)}`, color: ink(w.wallet_color) }}>
@@ -85,8 +93,9 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                 onClick={e => { e.stopPropagation(); onSimulate(row.asset, row.totalQuantity) }}
                 className={iconButtonClasses('sm', false, 'ml-auto', 'brand')}
                 title="Simular venta"
+                aria-label={`Simular venta de ${row.asset}`}
               >
-                <Calculator size={13} />
+                <Calculator size={13} aria-hidden="true" />
               </button>
             )}
           </div>
@@ -99,14 +108,18 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
         <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono`}>
           {hasPrice ? (
             <div className="flex flex-col items-end gap-0.5">
-              <span>{formatPrice(price, currency)}</span>
+              <span className={`rounded px-0.5 ${flashClass(priceFlash)}`}>{formatPrice(price, currency)}</span>
               {change24h !== null && (
-                <span className={`text-xs font-semibold px-1.5 py-px rounded-full ${
+                // Mismo chip que la tarjeta Valor del Dashboard (#247): ventana visible.
+                <span title="Variación respecto al precio de hace 24 horas"
+                  className={`inline-flex items-center gap-1 text-[11px] leading-none font-semibold px-1.5 py-0.5 rounded-md border ${
                   change24h >= 0
-                    ? 'text-positive bg-positive/10'
-                    : 'text-negative bg-negative/10'
+                    ? 'text-positive bg-positive/8 border-positive/25'
+                    : 'text-negative bg-negative/8 border-negative/25'
                 }`}>
-                  {change24h >= 0 ? '▲' : '▼'} {formatPercent(Math.abs(change24h))}
+                  <span className="font-medium opacity-75">24 h</span>
+                  <span aria-hidden="true">{change24h >= 0 ? '▲' : '▼'}</span>
+                  {formatPercent(change24h, 2, true)}
                 </span>
               )}
             </div>
@@ -129,7 +142,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
 
         {/* Valor en la moneda de visualización */}
         <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono font-medium`}>
-          {hasPrice ? formatMoney(row.value, currency)
+          {hasPrice ? <span className={`rounded px-0.5 ${flashClass(valueFlash)}`}>{formatMoney(row.value, currency)}</span>
             : <span className="text-fg-subtle text-xs">—</span>}
         </td>
 
@@ -146,12 +159,18 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
         )}
 
         {/* P&L % */}
-        <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-sm ${hasPrice ? pnlColor(pnlPct) : 'text-fg-subtle'}`}>
-          {hasPrice ? formatPercent(pnlPct, 2, true) : '—'}
+        <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-sm`}>
+          {hasPrice ? (
+            // Pastilla con signo, no solo color (#269).
+            <span className={`inline-block px-1.5 py-0.5 rounded-md text-xs font-semibold ${
+              pnlPct > 0.005 ? 'bg-positive/10 text-positive' : pnlPct < -0.005 ? 'bg-negative/10 text-negative' : 'bg-overlay/6 text-fg-muted'}`}>
+              {formatPercent(pnlPct, 2, true)}
+            </span>
+          ) : <span className="text-fg-subtle">—</span>}
         </td>
 
         {/* % Cartera */}
-        <td className="px-4 py-3">
+        <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'}`}>
           {portfolioWeight !== null ? (
             <div className="flex flex-col items-end gap-1">
               <span className="text-xs mono text-fg-muted">{formatPercent(portfolioWeight, 1)}</span>
