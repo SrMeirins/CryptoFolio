@@ -2,12 +2,10 @@ import { type FiatRow } from '../utils/assetTable'
 import { formatAmount, formatMoney, formatPrice, formatPercent } from '../utils/format'
 import { useCurrency } from '../hooks/useDisplayCurrency'
 import { tableRowClasses } from './ui'
-
-const FIAT_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', CHF: '₣' }
+import { CryptoIcon } from './CryptoIcon'
 
 export function FiatRowComponent({ row, totalPortfolioValue, compact = false }: { row: FiatRow; totalPortfolioValue: number; compact?: boolean }) {
   const currency = useCurrency()
-  const symbol = FIAT_SYMBOLS[row.asset] ?? row.asset[0]
   // Cantidad en la propia moneda del saldo (un saldo en EUR sigue siendo euros
   // aunque se muestre en USD); precio y valor, en la moneda de visualización.
   const quantityLabel = row.asset === 'EUR' || row.asset === 'USD'
@@ -16,12 +14,11 @@ export function FiatRowComponent({ row, totalPortfolioValue, compact = false }: 
 
   return (
     <tr className={tableRowClasses()}>
-      <td className="px-5 py-3">
+      <td className={`px-5 ${compact ? 'py-1.5' : 'py-3'}`}>
         <div className="flex items-center gap-2">
           <span className="w-4 shrink-0" />
-          <div className="w-7 h-7 rounded-full bg-positive/10 flex items-center justify-center shrink-0 ring-1 ring-emerald-500/30 overflow-hidden">
-            <span className="text-sm font-bold text-positive">{symbol}</span>
-          </div>
+          {/* Bandera de la moneda (#246), como el resto de iconos de la app. */}
+          <CryptoIcon symbol={row.asset} size={compact ? 22 : 28} />
           <div className="flex items-center gap-2">
             <span className="font-medium">{row.asset}</span>
             <span className="text-[11px] font-semibold tracking-widest text-positive bg-positive/10 border border-positive/20 px-1.5 py-0.5 rounded-lg uppercase">

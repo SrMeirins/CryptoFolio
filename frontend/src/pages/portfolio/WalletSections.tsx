@@ -1,83 +1,53 @@
-import type { FifoLot, FiatBalance } from '../../api/portfolio'
 import { AssetTable } from '../../components/AssetTable'
+import { cardClasses, panelClasses, panelEnterStyle } from '../../components/ui'
+import { formatMoney, formatPercent } from '../../utils/format'
+import { useCurrency } from '../../hooks/useDisplayCurrency'
 import { ink } from '../../utils/colors'
+import type { WalletSection } from '../../utils/portfolioSections'
 
 const KIND_LABEL: Record<string, string> = {
   exchange: 'Exchange',
   hardware: 'Hardware',
+  software: 'Software',
   cold:     'Frío',
   hot:      'Caliente',
 }
 
-// Una sección por cada wallet real, en orden: frías primero, exchanges al final.
-export function WalletSections({ lots, fiatBalances, onSimulate }: {
-  lots: FifoLot[]
-  fiatBalances: FiatBalance[]
+// Una tarjeta por wallet con sus posiciones (#269): autocustodia primero,
+// exchanges después. Las wallets que solo tienen polvo no aparecen aquí (su
+// polvo va a la sección común) y el chip de la wallet no se repite en cada fila.
+export function WalletSections({ sections, total, compact, onSimulate }: {
+  sections: WalletSection[]
+  total: number
+  compact: boolean
   onSimulate: (asset: string, qty: number, price: number) => void
 }) {
-  const walletOrder: string[] = []
-  const seen = new Set<string>()
-
-  // 1. Wallets frías
-  for (const lot of lots) {
-    if (lot.wallet_kind !== 'exchange' && !seen.has(lot.wallet_id)) {
-      walletOrder.push(lot.wallet_id)
-      seen.add(lot.wallet_id)
-    }
-  }
-  // 2. Exchanges
-  for (const lot of lots) {
-    if (lot.wallet_kind === 'exchange' && !seen.has(lot.wallet_id)) {
-      walletOrder.push(lot.wallet_id)
-      seen.add(lot.wallet_id)
-    }
-  }
-  // 3. Wallets que solo tienen fiat (sin lotes cripto)
-  for (const b of fiatBalances) {
-    if (!seen.has(b.wallet_id)) {
-      walletOrder.push(b.wallet_id)
-      seen.add(b.wallet_id)
-    }
-  }
-
-  const groups = walletOrder.map(wid => {
-    const wLots = lots.filter(l => l.wallet_id === wid)
-    const wFiat = fiatBalances.filter(b => b.wallet_id === wid)
-    // walletOrder solo incluye IDs que aparecen en lots o fiatBalances, así
-    // que uno de los dos [0] siempre existe — el fallback a '' es defensivo,
-    // no se espera que se use en la práctica.
-    return {
-      key:   wid,
-      name:  wLots[0]?.wallet_name  ?? wFiat[0]?.wallet_name  ?? '',
-      color: wLots[0]?.wallet_color ?? wFiat[0]?.wallet_color ?? '',
-      kind:  wLots[0]?.wallet_kind  ?? wFiat[0]?.wallet_kind  ?? '',
-      lots:  wLots,
-      fiats: wFiat,
-      assetCount: new Set(wLots.map(l => l.asset)).size,
-    }
-  })
-
+  const currency = useCurrency()
   return (
-    <div className="space-y-6">
-      {groups.map(g => (
-        <div key={g.key} className="space-y-2">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
-            <h2 className="text-sm font-semibold tracking-wide" style={{ color: ink(g.color) }}>
-              {g.name}
-            </h2>
-            <span className="text-[11px] px-1.5 py-0.5 rounded-lg border font-medium uppercase tracking-wide text-fg-subtle border-border/60">
-              {KIND_LABEL[g.kind] ?? g.kind}
-            </span>
-            {g.assetCount > 0 && (
-              <span className="text-xs text-fg-subtle">
-                {g.assetCount} activo{g.assetCount !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-          <AssetTable lots={g.lots} fiatBalances={g.fiats} onSimulate={onSimulate} />
-        </div>
-      ))}
+    <div className="space-y-4">
+      {sections.map((s, i) => {
+        const value = s.rows.reduce((sum, r) => sum + r.value, 0)
+        return (
+          <section key={s.walletId} aria-label={`Wallet ${s.name}`}
+            className={panelClasses(cardClasses('none', 'overflow-hidden'))} style={panelEnterStyle(i + 1)}>
+            <AssetTable rows={s.rows} portfolioTotal={total} compact={compact} hideWalletChips onSimulate={onSimulate}
+              header={
+                <>
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} aria-hidden="true" />
+                  <h2 className="text-sm font-semibold truncate" style={{ color: ink(s.color) }}>{s.name}</h2>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md border border-border/60 font-medium uppercase tracking-wider text-fg-subtle">
+                    {KIND_LABEL[s.kind] ?? (s.kind || 'Fiat')}
+                  </span>
+                  <span className="text-xs text-fg-subtle">{s.assetCount} {s.assetCount === 1 ? 'posición' : 'posiciones'}</span>
+                  <span className="text-xs text-fg-subtle mono tabular-nums ml-1">
+                    · <span className="text-fg">{formatMoney(value, currency)}</span>
+                    {total > 0 && <> · {formatPercent((value / total) * 100, 1)}</>}
+                  </span>
+                </>
+              } />
+          </section>
+        )
+      })}
     </div>
   )
 }
