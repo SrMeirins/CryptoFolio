@@ -10,6 +10,8 @@ import { OP_META } from '../../constants/operations'
 import { formatAmount, formatMoney, formatPercent, formatPrice, pnlColor, type Currency } from '../../utils/format'
 import type { CryptoRow } from '../../utils/assetTable'
 import { breakEvenDistance } from '../../utils/portfolioView'
+import { recoveryText } from '../../utils/fxEffect'
+import { InfoTooltip } from '../../components/InfoTooltip'
 import { formatAge, lotSourceLabel, lotsView } from '../../utils/portfolioLots'
 import { ink } from '../../utils/colors'
 
@@ -95,7 +97,11 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
                 ? 'Sin precio actual para calcular el break-even.'
                 : distance.pct >= 0
                   ? <>En beneficio: el precio está un <span className="mono text-positive">{formatPercent(distance.pct, 1)}</span> por encima de tu precio medio.</>
-                  : <>Para recuperar lo invertido, el precio tiene que subir un <span className="mono text-negative">{formatPercent(distance.toRecover, 1)}</span>.</>}
+                  : <>Para recuperar lo invertido, el precio tiene que subir un <span className="mono text-negative">{formatPercent(distance.toRecover, 1)}</span>{' '}
+                      <InfoTooltip label="Por qué la subida es mayor que la caída">
+                        <p>{recoveryText(distance.pct)}</p>
+                        <p className="mt-1.5 text-fg-subtle">Ejemplo: tras caer un 50 %, hace falta subir un 100 % para volver al precio inicial.</p>
+                      </InfoTooltip>.</>}
             </div>
             <div className="shrink-0"><BreakEvenCell price={price} avgPrice={avg} currency={currency} /></div>
           </div>

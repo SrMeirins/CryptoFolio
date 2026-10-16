@@ -6,6 +6,7 @@ import { type Change24h } from '../components/MetricCard'
 import { PortfolioSummaryCards } from '../components/PortfolioSummaryCards'
 import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
 import { useDisplayMarket } from '../hooks/useDisplayMarket'
+import { FxEffectNote } from '../components/FxEffectNote'
 import { useCurrencyQuery } from '../hooks/useCurrencyQuery'
 import { dailyPnlQuery, eurFlowQuery } from '../queries/currencyQueries'
 import { computeChange24h } from '../utils/change24h'
@@ -151,6 +152,7 @@ export function Dashboard() {
               Valor actual − Coste de adquisición
             </p>
             <p className="text-fg-subtle">No tiene impacto fiscal hasta que se materialice con una venta.</p>
+            {currency === 'USD' && <FxEffectNote lots={lots} />}
           </>
         }
         pnlPctTooltip={
@@ -159,6 +161,7 @@ export function Dashboard() {
             <p className="mono text-xs bg-overlay/5 px-2.5 py-1.5 rounded-lg text-fg-muted">
               (Valor − Coste) ÷ Coste × 100
             </p>
+            {currency === 'USD' && <FxEffectNote lots={lots} />}
           </>
         }
         eurFlowTooltip={eurFlow && (
