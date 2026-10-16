@@ -115,6 +115,28 @@ export interface OpenLot {
   source_type: string
 }
 
+/** Venta o permuta de un activo, con sus consumos FIFO agrupados (#284). */
+export interface AssetSale {
+  soldAt: string
+  kind: 'venta' | 'permuta'
+  quantity: number
+  priceEur: number
+  proceedsEur: number
+  gainLossEur: number
+}
+
+export interface AssetSales {
+  asset: string
+  /** Ventas y permutas (una por operación). */
+  count: number
+  /** Realizado fiscal en EUR: coincide con Fiscal (incluye comisiones pagadas con el activo). */
+  realizedEur: number
+  /** Parte del realizado que no viene de ventas ni permutas (comisiones, margen…). */
+  otherRealizedEur: number
+  lastSaleAt: string | null
+  sales: AssetSale[]
+}
+
 export interface LockedAmount {
   wallet_id:    string
   wallet_name:  string
@@ -375,6 +397,7 @@ export const portfolioApi = {
   getLots: () => api.get<FifoLot[]>('/fifo/lots'),
   getLockedAmounts: () => api.get<LockedAmount[]>('/fifo/locked'),
   getOpenLots: (asset: string) => api.get<{ asset: string; lots: OpenLot[] }>(`/v1/fifo/lots/${encodeURIComponent(asset)}`),
+  getAssetSales: (asset: string) => api.get<AssetSales>(`/v1/fifo/sales/${encodeURIComponent(asset)}`),
   getFiatBalances: () => api.get<FiatBalance[]>('/fifo/fiat-balances'),
   getFiscalSummary: () => api.get<FiscalYear[]>('/fifo/summary'),
   runFifo: () => api.post<{ success: boolean } & FifoRunResult>('/fifo/run'),

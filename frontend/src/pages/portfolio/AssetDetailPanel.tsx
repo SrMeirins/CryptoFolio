@@ -8,6 +8,9 @@ import { PnlPill } from '../../components/AssetTableCells'
 import { Button, Drawer, Skeleton, iconButtonClasses } from '../../components/ui'
 import { OP_META } from '../../constants/operations'
 import { formatAmount, formatMoney, formatPercent, formatPrice, pnlColor, type Currency } from '../../utils/format'
+import { usePricesStore } from '../../store/pricesStore'
+import { totalReturn } from '../../utils/assetPriceChart'
+import { AssetPriceChart } from './AssetPriceChart'
 import type { CryptoRow } from '../../utils/assetTable'
 import { breakEvenDistance } from '../../utils/portfolioView'
 import { recoveryText } from '../../utils/fxEffect'
@@ -47,12 +50,21 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
     staleTime: 60_000,
   })
   const lots = useMemo(() => lotsView(data?.lots ?? [], price, currency, rate), [data, price, currency, rate])
+  const { data: sales } = useQuery({
+    queryKey: ['asset-sales', row.asset],
+    queryFn: () => portfolioApi.getAssetSales(row.asset),
+    staleTime: 60_000,
+  })
+  const livePriceEur = usePricesStore(s => s.prices[row.asset])
+  const firstOpenedAt = useMemo(() => lots.reduce<string | null>((min, l) => (min === null || l.openedAt < min ? l.openedAt : min), null), [lots])
 
   const hasPrice = price > 0
   const pnl = hasPrice ? row.value - row.totalCostBasis : null
   const pnlPct = pnl !== null && row.totalCostBasis > 0 ? (pnl / row.totalCostBasis) * 100 : null
   const avg = row.totalQuantity > 0 ? row.totalCostBasis / row.totalQuantity : null
   const distance = avg !== null ? breakEvenDistance(price, avg) : null
+  // Rentabilidad total (#284): el realizado es fiscal (EUR) y se convierte al cambio en vivo.
+  const total = sales && rate !== null ? totalReturn(sales.realizedEur, pnl, rate) : null
 
   return (
     <Drawer onClose={onClose} labelledBy={titleId} initialFocusRef={closeRef}>
@@ -76,6 +88,12 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+        {/* Evolución del precio (#284) */}
+        <section aria-label="Evolución del precio">
+          <AssetPriceChart asset={row.asset} currency={currency} rate={rate} livePriceEur={livePriceEur}
+            avgPrice={avg} buys={lots} sales={sales?.sales ?? []} firstOpenedAt={firstOpenedAt} />
+        </section>
+
         {/* Resumen y break-even */}
         <section aria-labelledby={`${titleId}-resumen`} className="space-y-3">
           <h3 id={`${titleId}-resumen`} className="text-[11px] font-semibold uppercase tracking-widest text-fg-subtle">Resumen</h3>
@@ -89,6 +107,34 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
             <Stat label="Rentabilidad">{pnlPct !== null ? <span className={pnlColor(pnlPct)}>{formatPercent(pnlPct, 2, true)}</span> : '—'}</Stat>
             <Stat label="Precio medio">{avg !== null ? formatPrice(avg, currency) : '—'}</Stat>
           </dl>
+          {total && sales && (sales.count > 0 || sales.realizedEur !== 0) && (
+            <div className="rounded-xl border border-border bg-overlay/2 px-3 py-2.5 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] uppercase tracking-wider text-fg-subtle">Rentabilidad total</span>
+                <InfoTooltip label="Cómo se calcula la rentabilidad total">
+                  <p>Realizado (ventas, permutas y comisiones pagadas con {row.asset}, como en Fiscal) más el no realizado de la posición actual.</p>
+                  {sales.otherRealizedEur !== 0 && (
+                    <p className="mt-1.5">Incluye {formatMoney(sales.otherRealizedEur * (rate ?? 1), currency)} de comisiones u otros consumos que no son ventas.</p>
+                  )}
+                  {currency !== 'EUR' && <p className="mt-1.5 text-fg-subtle">El realizado es un dato fiscal en EUR; aquí se muestra al cambio actual.</p>}
+                </InfoTooltip>
+              </div>
+              <dl className="grid grid-cols-3 gap-2 mono tabular-nums text-sm">
+                <div className="min-w-0"><dt className="text-[10px] font-sans text-fg-subtle">Realizado</dt>
+                  <dd className={`font-semibold break-words ${pnlColor(total.realized)}`}>{total.realized >= 0 ? '+' : ''}{formatMoney(total.realized, currency)}</dd></div>
+                <div className="min-w-0"><dt className="text-[10px] font-sans text-fg-subtle">No realizado</dt>
+                  <dd className={`font-semibold break-words ${total.unrealized !== null ? pnlColor(total.unrealized) : 'text-fg-subtle'}`}>
+                    {total.unrealized !== null ? `${total.unrealized >= 0 ? '+' : ''}${formatMoney(total.unrealized, currency)}` : '—'}</dd></div>
+                <div className="min-w-0"><dt className="text-[10px] font-sans text-fg-subtle">Total</dt>
+                  <dd className={`font-bold break-words ${total.total !== null ? pnlColor(total.total) : 'text-fg-subtle'}`}>
+                    {total.total !== null ? `${total.total >= 0 ? '+' : ''}${formatMoney(total.total, currency)}` : '—'}</dd></div>
+              </dl>
+              <p className="text-[11px] text-fg-subtle">
+                {sales.count === 0 ? 'Sin ventas ni permutas' : `${sales.count} ${sales.count === 1 ? 'venta' : 'ventas'}`}
+                {sales.lastSaleAt && <> · última el {formatLotDate(sales.lastSaleAt)}</>}
+              </p>
+            </div>
+          )}
           <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-overlay/2 px-3 py-2.5">
             <div className="text-xs text-fg-muted">
               {distance === null
