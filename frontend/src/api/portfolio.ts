@@ -257,8 +257,14 @@ export interface SimulationResult {
   irpf: { year: number; baseAntes: number; baseDespues: number; marginal: number; desglose: TramoMarginal[] }
   /** Compras reales del activo en los 2 meses anteriores (regla de recompra). */
   recompra: { aviso: boolean; comprasRecientes: string[] }
+  /** Importe neto de comisión menos el IRPF que genere (#280). */
+  netoEnMano:     number
+  /** Ganancia o pérdida tras comisión e IRPF (un ahorro de IRPF reduce la pérdida). */
+  resultadoNeto:  number
   lotsConsumed:   SimulatedLot[]
 }
+
+export interface SimulationCurvePoint { price: number; netGainLoss: number; irpf: number; netoEnMano: number; resultadoNeto: number }
 
 // Forma mínima común de wallet que necesita el wizard de operaciones
 // (constants/operations.ts la consume para el selector). La pantalla de
@@ -503,6 +509,11 @@ export const portfolioApi = {
     api.post<{ success: boolean; updated: number; fifo: unknown }>('/settings/bulk-set-costs', { updates }),
   simulateSale: (asset: string, quantity: number, priceEur: number, walletId?: string, feePct?: number) =>
     api.post<SimulationResult>('/fiscal/simulate-sale', { asset, quantity, priceEur, walletId, feePct }),
+  // Resultado neto por precio (#280) y cantidad para un neto en mano.
+  simulateSaleCurve: (asset: string, quantity: number, prices: number[], walletId?: string, feePct?: number) =>
+    api.post<{ quantity: number; points: SimulationCurvePoint[] }>('/fiscal/simulate-sale/curve', { asset, quantity, prices, walletId, feePct }),
+  simulateSaleQuantity: (asset: string, priceEur: number, targetNet: number, walletId?: string, feePct?: number) =>
+    api.post<{ quantity: number; netoEnMano: number; alcanzable: boolean }>('/fiscal/simulate-sale/quantity', { asset, priceEur, targetNet, walletId, feePct }),
   // Módulo fiscal detallado (pages/fiscal/Fiscal.tsx) — antes estas 8
   // llamadas usaban un fetchOk() local propio del fichero, sin pasar por
   // este cliente: sin el timeout de 30s del Nivel 2 ni el manejo de error
