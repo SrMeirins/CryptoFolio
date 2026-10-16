@@ -87,7 +87,7 @@ export function AssetTable({ rows, portfolioTotal, compact = false, hideWalletCh
               <SortTh {...sortProps} label="Precio" sk="price" />
               <SortTh {...sortProps} label="Valor" sk="value" title={`Valor en ${currency}`} />
               <SortTh {...sortProps} label="P&L" sk="pnl" title="P&L no realizado en importe y %" />
-              {!compact && <SortTh {...sortProps} label="Break-even" sk="breakeven" title="Precio medio de compra y distancia del precio actual" />}
+              {!compact && <SortTh {...sortProps} label="Break-even" sk="breakeven" title="Precio medio de compra y distancia del precio actual. La subida para recuperar es mayor que la caída: tras caer un 50 %, hace falta subir un 100 %." />}
               <SortTh {...sortProps} label="% cartera" sk="weight" />
             </tr>
           </thead>
