@@ -68,4 +68,16 @@ describe('routes/settings — assets piden resincronizar el feed en vivo', () =>
     expect(res.status).toBe(400);
     expect(requestLivePriceResyncMock).not.toHaveBeenCalled();
   });
+
+  it('vaciar un par en Ajustes lo desactiva para el relleno automático; rellenarlo lo reactiva (#277)', async () => {
+    await pool.query(
+      `INSERT INTO asset_metadata (symbol, name, binance_eur_pair, binance_usdt_pair, price_source) VALUES ('RSYNC', 'Resync', 'RSYNCEUR', 'RSYNCUSDT', 'eur_direct')`);
+    const disabled = async () => (await pool.query(`SELECT disabled_pairs FROM asset_metadata WHERE symbol = 'RSYNC'`)).rows[0].disabled_pairs;
+
+    await request(app).put('/api/settings/assets/RSYNC').send({ binanceEurPair: 'RSYNCEUR' });
+    expect(await disabled()).toEqual(['usdt']);
+
+    await request(app).put('/api/settings/assets/RSYNC').send({ binanceEurPair: 'RSYNCEUR', binanceUsdtPair: 'RSYNCUSDT' });
+    expect(await disabled()).toEqual([]);
+  });
 });

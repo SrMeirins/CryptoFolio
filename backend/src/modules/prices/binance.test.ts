@@ -296,11 +296,12 @@ describe('binance — handleTickerMessage (feed en vivo sin consultas por tick, 
     expect(queryMock).not.toHaveBeenCalled();
   });
 
-  it('un activo con varios pares toma el precio solo de su par preferido', () => {
-    bin.handleTickerMessage(tick('XRPEUR', '2'));
+  it('un activo con varios pares toma el precio del más líquido con datos (USDT) y no alterna entre fuentes (#277)', () => {
+    bin.handleTickerMessage(tick('EURUSDT', '1.25'));
     bin.handleTickerMessage(tick('XRPUSDT', '2.5'));
+    bin.handleTickerMessage(tick('XRPEUR', '2.03'));
     bin.handleTickerMessage(tick('XRPBTC', '0.00004'));
-    expect(bin.getLivePrice('XRP')).toBe(2);
+    expect(bin.getLivePrice('XRP')).toBeCloseTo(2, 10);   // 2,5 × 0,8: los ticks EUR y BTC no lo pisan
   });
 
   it('convierte los pares USDT con el último EURUSDT recibido', () => {

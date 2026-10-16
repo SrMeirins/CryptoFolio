@@ -3,7 +3,7 @@ import { WebSocket } from 'ws';
 import { getOrDetectPairInfo, loadPairCache, getPairInfo } from './pairDetector';
 import { getCurrentPricesEur, loadAssetMetadata as loadCoinGeckoIdMap } from './coingecko';
 import { fetchWithTimeout } from './httpTimeout';
-import { buildPairIndex, resolveTick, streamPairs, priceFromPairMap, EURUSDT_PAIR, type AssetPairsRow, type PairIndex } from './livePairIndex';
+import { buildPairIndex, resolveTick, streamPairs, priceFromPairMap, pickSource, EURUSDT_PAIR, type AssetPairsRow, type PairIndex, type PairKind } from './livePairIndex';
 import { createPriceBroadcaster, type PriceListener } from './priceBroadcaster';
 
 // Feed de precios en vivo: carga inicial por REST, WebSocket de Binance con
@@ -158,6 +158,8 @@ let reconnectDelayMs = RECONNECT_BASE_MS;
 let lastTickAt: number | null = null;
 let coinGeckoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let pairIndex: PairIndex = new Map();
+// Último tick de cada par de cada activo (#277): decide qué par da el precio.
+const sourceTicks = new Map<string, Partial<Record<PairKind, { at: number }>>>();
 
 // Los suscriptores reciben solo los precios que han cambiado (delta),
 // agrupados como mucho una vez por segundo. El snapshot completo se obtiene
@@ -225,12 +227,20 @@ export function handleTickerMessage(raw: string): void {
     if (open > 0) { eurUsdtOpenRate = 1 / open; setOpen24Price('USDT', eurUsdtOpenRate); }
   }
 
+  // Cada activo recibe ticks de todos sus pares (#277); solo cambia su precio
+  // el par elegido como fuente (el más líquido con datos recientes).
+  const now = Date.now();
   const updates = resolveTick(pairIndex, pair, price, {
     eurUsdtRate,
     btcEur: liveCache.get('BTC'),
     ethEur: liveCache.get('ETH'),
   });
-  for (const [asset, priceEur] of updates) setLivePrice(asset, priceEur);
+  for (const [asset, priceEur, kind] of updates) {
+    const ticks = sourceTicks.get(asset) ?? {};
+    ticks[kind] = { at: now };
+    sourceTicks.set(asset, ticks);
+    if (pickSource(ticks, now) === kind) setLivePrice(asset, priceEur);
+  }
 
   // Apertura de 24h: misma conversión, con las referencias también de hace 24h
   // (el `o` de EURUSDT, BTC y ETH), para que ambos precios sean de la misma ventana.
@@ -240,7 +250,10 @@ export function handleTickerMessage(raw: string): void {
       btcEur: open24Cache.get('BTC'),
       ethEur: open24Cache.get('ETH'),
     });
-    for (const [asset, openEur] of openUpdates) setOpen24Price(asset, openEur);
+    // La apertura de 24h, del mismo par que el precio: ambos de la misma fuente.
+    for (const [asset, openEur, kind] of openUpdates) {
+      if (pickSource(sourceTicks.get(asset) ?? {}, now) === kind) setOpen24Price(asset, openEur);
+    }
   }
 }
 
