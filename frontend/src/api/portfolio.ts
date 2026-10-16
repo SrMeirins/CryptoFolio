@@ -99,6 +99,22 @@ export interface FifoLot {
   avg_price_usd?: string | null
 }
 
+/** Lote FIFO abierto de un activo (#272), para el panel de detalle de Portfolio. */
+export interface OpenLot {
+  wallet_id: string
+  wallet_name: string
+  wallet_color: string
+  wallet_kind: string
+  opened_at: string
+  quantity_original: string
+  quantity_remaining: string
+  price_per_unit_eur: string
+  cost_basis_eur: string
+  /** Tipo USD por EUR de la fecha de apertura (#174); null si no lo hubo. */
+  usd_per_eur: string | null
+  source_type: string
+}
+
 export interface LockedAmount {
   wallet_id:    string
   wallet_name:  string
@@ -335,6 +351,7 @@ export interface Notification {
 export const portfolioApi = {
   getLots: () => api.get<FifoLot[]>('/fifo/lots'),
   getLockedAmounts: () => api.get<LockedAmount[]>('/fifo/locked'),
+  getOpenLots: (asset: string) => api.get<{ asset: string; lots: OpenLot[] }>(`/v1/fifo/lots/${encodeURIComponent(asset)}`),
   getFiatBalances: () => api.get<FiatBalance[]>('/fifo/fiat-balances'),
   getFiscalSummary: () => api.get<FiscalYear[]>('/fifo/summary'),
   runFifo: () => api.post<{ success: boolean } & FifoRunResult>('/fifo/run'),
