@@ -63,7 +63,7 @@ export function MetricCard({
     // Rejilla fija de tres filas (#210): etiqueta, valor y línea secundaria
     // ocupan la misma altura en todas las tarjetas, haya o no dato secundario,
     // así que quedan alineadas entre sí en cualquier ancho.
-    <div className={cardClasses('none', 'metric-card relative overflow-hidden px-5 py-5 grid grid-rows-[1.25rem_2rem_2.5rem] justify-items-center items-center text-center gap-y-2')}>
+    <div className={cardClasses('none', 'metric-card panel-glow relative overflow-hidden px-5 py-5 grid grid-rows-[1.25rem_2rem_2.5rem] justify-items-center items-center text-center gap-y-2')}>
       {sparkline && !loading && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 opacity-70">{sparkline}</div>
       )}

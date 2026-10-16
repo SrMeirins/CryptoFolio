@@ -187,10 +187,10 @@ describe('paneles (#232)', () => {
     expect(panelEnterStyle(99)).toEqual({ animationDelay: '720ms' })
     expect(panelEnterStyle(-2)).toEqual({ animationDelay: '0ms' })
   })
-  it('animación de entrada y sombra al pasar el cursor, con clases extra', () => {
+  it('animación de entrada y brillo de borde al pasar el cursor (#255), con clases extra', () => {
     const c = panelClasses('rounded-xl lg:col-span-2')
     expect(c).toContain('panel-in')
-    expect(c).toContain('hover:shadow-lg')
+    expect(c).toContain('panel-glow')
     expect(c).toContain('lg:col-span-2')
   })
 })

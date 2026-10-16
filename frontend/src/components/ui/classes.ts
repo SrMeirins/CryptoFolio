@@ -168,5 +168,5 @@ export function panelEnterStyle(index: number): { animationDelay: string } {
 }
 /** Panel con entrada animada y elevación suave al pasar el cursor. */
 export function panelClasses(extra = ''): string {
-  return twMerge('panel-in transition-shadow duration-200 hover:shadow-lg hover:shadow-black/10', extra)
+  return twMerge('panel-in panel-glow', extra)
 }

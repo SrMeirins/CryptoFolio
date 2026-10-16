@@ -9,6 +9,7 @@ import { formatTick, niceTicks, tickDecimals, timeAxis } from '../../utils/chart
 import { zeroSplit } from '../../utils/zeroSplit'
 import { useChartColors } from '../../hooks/useChartColors'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
+import { useTransientFlag } from '../../hooks/useTransientFlag'
 import { EvolutionTooltip } from './EvolutionTooltip'
 import { LiveDot } from './LiveDot'
 import { ChartFrame } from './ChartFrame'
@@ -33,6 +34,9 @@ export function PnlChart({ points, currency, intraday, unit, animationKey, loadi
 }) {
   const c = useChartColors()
   const reduceMotion = useReducedMotion()
+  // Al cambiar de periodo o unidad la curva se transforma en la nueva (#255) en
+  // vez de redibujarse desde cero; con los ticks en vivo no se anima.
+  const animating = useTransientFlag(animationKey, 900)
   const gradientId = useId().replace(/:/g, '')
   const key: 'pct' | 'pnl' = unit === 'pct' ? 'pct' : 'pnl'
 
@@ -56,7 +60,7 @@ export function PnlChart({ points, currency, intraday, unit, animationKey, loadi
   return (
     <ChartFrame loading={loading} error={error} empty={points.length === 0} errorText="No se pudo cargar la rentabilidad.">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart key={animationKey} data={points} margin={{ top: 8, right: 20, left: 0, bottom: 0 }}>
+        <AreaChart data={points} margin={{ top: 8, right: 20, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id={`${gradientId}-fill`} x1="0" y1="0" x2="0" y2="1">
               <stop offset={0} stopColor={c.up} stopOpacity={0.28} />
@@ -90,7 +94,7 @@ export function PnlChart({ points, currency, intraday, unit, animationKey, loadi
             type="monotone" dataKey={key} baseValue={0}
             stroke={split.stroke === null ? (split.solid === 'up' ? c.up : c.down) : `url(#${gradientId}-stroke)`} strokeWidth={2} fill={`url(#${gradientId}-fill)`}
             dot={false} activeDot={{ r: 4, fill: lastColor, strokeWidth: 0 }}
-            isAnimationActive={!reduceMotion} animationDuration={700} animationEasing="ease-out"
+            isAnimationActive={!reduceMotion && animating} animationDuration={600} animationEasing="ease-in-out"
           />
           <Customized component={
             <FlowMarkerLayer buckets={buckets} yKey={key} active={activeMarker} onActivate={setActiveMarker}

@@ -25,7 +25,7 @@ export function EvolutionTooltip({ active, payload, currency, intraday, primary 
   ]
   const order = primary === 'value' ? [3, 0, 1, 2] : primary === 'pnl' ? [2, 0, 1, 3] : [0, 1, 2, 3]
   return (
-    <div className="bg-tooltip/95 border border-overlay/10 rounded-xl px-3 py-2.5 shadow-xl text-xs min-w-48">
+    <div className="glass-tooltip rounded-xl px-3 py-2.5 text-xs min-w-48">
       <p className="text-fg-muted mb-1.5">{formatPointDate(p.x, intraday)}{p.live ? ' · en vivo' : ''}</p>
       <dl className="space-y-0.5">
         {order.map((i, k) => {
