@@ -11,6 +11,7 @@ import healthRouter from './routes/health';
 import importsRouter from './routes/imports';
 import fifoRouter from './routes/fifo';
 import fifoLotsDetailRouter from './routes/fifo/fifoLotsDetail';
+import fifoSalesDetailRouter from './routes/fifo/fifoSalesDetail';
 import pricesRouter from './routes/prices';
 import pricesClosesRouter from './routes/pricesCloses';
 import pnlRouter from './routes/pnl';
@@ -44,6 +45,7 @@ app.use('/api/fiscal', fiscalRouter);
 app.use('/api/wallets', walletsRouter);
 app.use('/api/v1/pnl', pnlRouter);
 app.use('/api/v1/fifo', fifoLotsDetailRouter);
+app.use('/api/v1/fifo', fifoSalesDetailRouter);
 app.use('/api/v1/prices', pricesClosesRouter);
 app.use('/api/assets', assetIconsRouter);
 
