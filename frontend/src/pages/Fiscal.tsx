@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Info } from 'lucide-react'
 import { portfolioApi } from '../api/portfolio'
 import { FISCAL_STALE_TIME } from './fiscal/constants'
+import { fiscalYearQueries, prefetchOrder } from './fiscal/fiscalYearQueries'
 import { baseTramosCompensada } from '../utils/tramosIrpf'
 import { ComparativaAnual, EvolucionMensual, DesglosePorActivo } from './fiscal/Charts'
 import { TramosIRPF, CompensacionPerdidas } from './fiscal/TaxCards'
@@ -40,47 +41,38 @@ export function Fiscal() {
 
   const activeYear = selectedYear ?? (years.length > 0 ? years[0] : null)
 
-  // activeYear! en las queryFn: no-null assertion segura — `enabled: !!activeYear`
-  // garantiza que React Query nunca las ejecuta con activeYear a null.
-  const { data: summary, isLoading: summaryLoading, isError: summaryError } = useQuery({
-    queryKey: ['fiscal-summary-detail', activeYear],
-    queryFn: () => portfolioApi.getFiscalSummaryDetail(activeYear!),
-    enabled: !!activeYear,
-    staleTime: FISCAL_STALE_TIME,
-    retry: false,
-  })
+  // Al cambiar de año se mantiene el anterior (atenuado) mientras llega el
+  // nuevo, en vez de vaciar la página (#295). Con year 0 la consulta está
+  // deshabilitada: solo sirve para tener claves válidas antes de saber el año.
+  const q = fiscalYearQueries(activeYear ?? 0)
+  const yearOpts = { enabled: !!activeYear, retry: false, placeholderData: keepPreviousData } as const
+  const { data: summary, isLoading: summaryLoading, isError: summaryError, isPlaceholderData: switching } = useQuery({ ...q.summary, ...yearOpts })
+  const { data: events, isLoading: eventsLoading, isError: eventsError } = useQuery({ ...q.events, ...yearOpts })
+  const { data: modelo721, isLoading: modelo721Loading, isError: modelo721Error } = useQuery({ ...q.modelo721, ...yearOpts })
+  const { data: breakdown = [], isError: breakdownError } = useQuery({ ...q.breakdown, ...yearOpts })
+  const { data: monthly, isError: monthlyError } = useQuery({ ...q.monthly, ...yearOpts })
 
-  const { data: events, isLoading: eventsLoading, isError: eventsError } = useQuery({
-    queryKey: ['fiscal-events', activeYear],
-    queryFn: () => portfolioApi.getFiscalEvents(activeYear!),
-    enabled: !!activeYear,
-    staleTime: FISCAL_STALE_TIME,
-    retry: false,
-  })
-
-  const { data: modelo721, isLoading: modelo721Loading, isError: modelo721Error } = useQuery({
-    queryKey: ['fiscal-721', activeYear],
-    queryFn: () => portfolioApi.getFiscalModelo721(activeYear!),
-    enabled: !!activeYear,
-    staleTime: FISCAL_STALE_TIME,
-    retry: false,
-  })
-
-  const { data: breakdown = [], isError: breakdownError } = useQuery({
-    queryKey: ['fiscal-breakdown', activeYear],
-    queryFn: () => portfolioApi.getFiscalBreakdown(activeYear!),
-    enabled: !!activeYear,
-    staleTime: FISCAL_STALE_TIME,
-    retry: false,
-  })
-
-  const { data: monthly, isError: monthlyError } = useQuery({
-    queryKey: ['fiscal-monthly', activeYear],
-    queryFn: () => portfolioApi.getFiscalMonthly(activeYear!),
-    enabled: !!activeYear,
-    staleTime: FISCAL_STALE_TIME,
-    retry: false,
-  })
+  // Precarga del resto de años cuando la página queda libre: cambiar de año pasa a ser instantáneo.
+  useEffect(() => {
+    if (!activeYear || summaryLoading) return
+    const run = () => {
+      for (const y of prefetchOrder(years, activeYear)) {
+        const p = fiscalYearQueries(y)
+        void queryClient.prefetchQuery(p.summary)
+        void queryClient.prefetchQuery(p.events)
+        void queryClient.prefetchQuery(p.modelo721)
+        void queryClient.prefetchQuery(p.breakdown)
+        void queryClient.prefetchQuery(p.monthly)
+      }
+    }
+    const idle = window.requestIdleCallback
+    if (idle) {
+      const id = idle(run, { timeout: 3000 })
+      return () => window.cancelIdleCallback(id)
+    }
+    const t = window.setTimeout(run, 800)
+    return () => window.clearTimeout(t)
+  }, [years, activeYear, summaryLoading, queryClient])
 
   const hasError = eventsError || breakdownError || monthlyError || summaryError || modelo721Error
 
@@ -119,10 +111,6 @@ export function Fiscal() {
         subtitle="Método FIFO · normativa española · importes en EUR"
         actions={
           <>
-            <div className="flex items-center gap-1 text-xs text-fg-subtle">
-              <Info size={11} />
-              Información orientativa
-            </div>
             <ExportPanel year={activeYear} />
           </>
         }
@@ -132,6 +120,7 @@ export function Fiscal() {
 
       {overview.length >= 2 && <ComparativaAnual data={overview} />}
 
+      <div aria-busy={switching} className={`space-y-5 transition-opacity duration-200 ${switching ? 'opacity-60' : ''}`}>
       {summaryLoading ? (
         <FiscalSummaryCardsSkeleton />
       ) : summary && (
@@ -168,6 +157,7 @@ export function Fiscal() {
           )}
         </>
       )}
+      </div>
 
       <div className="flex items-start gap-2 p-4 bg-background-tertiary/50 rounded-xl text-xs text-fg-subtle border border-border">
         <Info size={12} className="shrink-0 mt-0.5" />

@@ -161,9 +161,9 @@ export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summa
                     Val. Transmisión <SortIcon col="valorTransmisionEur" activeCol={sortKey} dir={sortDir} />
                   </button>
                 </th>
-                <th className="text-right px-4 py-2.5">Gtos.</th>
+                <th className="text-right px-4 py-2.5 whitespace-nowrap" title="Gastos de la transmisión (comisión de la venta)">Gastos venta</th>
                 <th className="text-right px-4 py-2.5">Val. Adquisición</th>
-                <th className="text-right px-4 py-2.5">Gtos.</th>
+                <th className="text-right px-4 py-2.5 whitespace-nowrap" title="Gastos de la adquisición (comisión de la compra)">Gastos compra</th>
                 <th className="text-right px-4 py-2.5">
                   <button type="button" onClick={() => toggleSort('gananciaPerdidaEur')} className="flex items-center gap-1 hover:text-fg ml-auto">
                     G/P € <SortIcon col="gananciaPerdidaEur" activeCol={sortKey} dir={sortDir} />

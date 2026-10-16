@@ -91,13 +91,13 @@ export async function cargarAniosFiscales(currentYear: number): Promise<AnioFisc
     const gpR = await db.query(`
       SELECT COALESCE(SUM(flc.gain_loss_eur), 0) AS neto
       FROM fifo_lot_consumptions flc
-      WHERE EXTRACT(YEAR FROM flc.consumed_at) = $1
+      WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE 'Europe/Madrid') = $1
         AND flc.fiscal_event_type != 'NONE'
     `, [y]);
     const rendR = await db.query(`
       SELECT COALESCE(SUM(t.amount_net * COALESCE(t.price_per_unit, 0)), 0) AS total
       FROM transactions t
-      WHERE EXTRACT(YEAR FROM t.timestamp) = $1
+      WHERE EXTRACT(YEAR FROM t.timestamp AT TIME ZONE 'Europe/Madrid') = $1
         AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
     `, [y]);
     rows.push({

@@ -16,7 +16,10 @@ export interface FiscalSummary {
 }
 
 export interface FiscalEvent {
+  /** Día en Madrid (AAAA-MM-DD, #295). */
   fecha: string
+  /** Instante exacto (ISO UTC) para el tooltip con la hora. */
+  fechaHora?: string
   tipo: string
   activoTransmitido: string
   activoRecibido: string | null
@@ -42,6 +45,7 @@ export interface FiscalEvent {
 
 export interface RendimientoEvent {
   fecha: string
+  fechaHora?: string
   tipo: string
   activo: string
   cantidad: number

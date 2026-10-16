@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { TrendingDown, Download } from 'lucide-react'
-import { formatEur, formatNumber } from '../../utils/format'
+import { formatEur } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { TableExpandToggle } from './TableExpandToggle'
 import type { RendimientoEvent } from './types'
+import { fiscalDateDetail, formatFiscalDate, formatFiscalQty } from '../../utils/fiscalTable'
 import { cardClasses, buttonClasses, badgeClasses, tableFootRowClasses, tableHeadRowClasses, tableRowClasses, Dropdown } from '../../components/ui'
 
 export function TablaRendimientos({ rendimientos, year }: { rendimientos: RendimientoEvent[]; year: number }) {
@@ -91,7 +92,9 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
                 </tr>
               ) : filtered.map((r, i) => (
                 <tr key={`${r.fecha}-${r.tipo}-${r.activo}-${i}`} className={tableRowClasses()}>
-                  <td className="px-4 py-2.5 mono text-fg-muted text-xs">{r.fecha}</td>
+                  <td className="px-4 py-2.5 text-fg-muted text-xs whitespace-nowrap">
+                    <time dateTime={r.fechaHora ?? r.fecha} title={fiscalDateDetail(r.fechaHora)}>{formatFiscalDate(r.fecha)}</time>
+                  </td>
                   <td className="px-4 py-2.5">
                     <span className="text-xs bg-warning/10 text-warning px-1.5 py-0.5 rounded-lg">{r.tipo}</span>
                   </td>
@@ -101,7 +104,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
                       <span className="font-bold mono">{r.activo}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-right mono text-fg-muted">{formatNumber(r.cantidad, 6, 6)}</td>
+                  <td className="px-4 py-2.5 text-right mono text-fg-muted">{formatFiscalQty(r.cantidad)}</td>
                   <td className="px-4 py-2.5 text-right mono font-medium text-warning">{formatEur(r.valorEur)}</td>
                   <td className="px-4 py-2.5 text-fg-subtle text-xs">{r.wallet}</td>
                 </tr>
