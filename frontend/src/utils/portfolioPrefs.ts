@@ -2,10 +2,22 @@
 // atajo de teclado del buscador. Si el almacenamiento no está disponible,
 // valen solo para la sesión.
 
+import type { PortfolioView } from './portfolioView'
+
 export type Density = 'comfortable' | 'compact'
 
 const DENSITY_KEY = 'cryptofolio.portfolio.density'
 const DUST_KEY = 'cryptofolio.portfolio.dustOpen'
+const VIEW_KEY = 'cryptofolio.portfolio.view'
+
+/** Vista de la tabla (#271): «Por activo» por defecto. */
+export function readView(): PortfolioView {
+  try { return localStorage.getItem(VIEW_KEY) === 'wallet' ? 'wallet' : 'asset' } catch { return 'asset' }
+}
+
+export function saveView(view: PortfolioView): void {
+  try { localStorage.setItem(VIEW_KEY, view) } catch { /* almacenamiento no disponible */ }
+}
 
 export function readDensity(): Density {
   try { return localStorage.getItem(DENSITY_KEY) === 'compact' ? 'compact' : 'comfortable' } catch { return 'comfortable' }

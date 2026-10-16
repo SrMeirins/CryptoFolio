@@ -9,12 +9,25 @@ import { InventoryStrip } from './portfolio/InventoryStrip'
 import { WalletCards } from './portfolio/WalletCards'
 import { WalletSections } from './portfolio/WalletSections'
 import { DustSection } from './portfolio/DustSection'
-import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState, PageHeader, SegmentedControl } from '../components/ui'
+import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState, PageHeader, SegmentedControl, Dropdown, cardClasses, panelClasses, panelEnterStyle } from '../components/ui'
+import { AssetTable } from '../components/AssetTable'
 import { navIcon } from '../constants/navigation'
 import { portfolioSubtitle } from '../utils/panelSubtitles'
 import { portfolioSections } from '../utils/portfolioSections'
 import { portfolioInventory } from '../utils/portfolioInventory'
-import { isSearchShortcut, readDensity, readDustOpen, saveDensity, saveDustOpen, type Density } from '../utils/portfolioPrefs'
+import { assetView, filterByPnl, type PnlFilter, type PortfolioView } from '../utils/portfolioView'
+import { isSearchShortcut, readDensity, readDustOpen, readView, saveDensity, saveDustOpen, saveView, type Density } from '../utils/portfolioPrefs'
+
+const VIEW_OPTIONS = [
+  { value: 'asset' as const, label: 'Por activo', title: 'Una fila por activo con todas sus wallets' },
+  { value: 'wallet' as const, label: 'Por wallet', title: 'Una tabla por wallet' },
+]
+
+const PNL_OPTIONS = [
+  { value: 'all' as const, label: 'Todos' },
+  { value: 'gain' as const, label: 'En ganancia' },
+  { value: 'loss' as const, label: 'En pérdida' },
+]
 
 const DENSITY_OPTIONS = [
   { value: 'comfortable' as const, label: <Rows3 size={14} aria-hidden="true" />, title: 'Cómodo' },
@@ -46,6 +59,9 @@ export function Portfolio() {
   const [dustOpen, setDustOpen] = useState(readDustOpen)
   // Wallet elegida en las tarjetas (#270): filtra la tabla; null = todas.
   const [walletFilter, setWalletFilter] = useState<string | null>(null)
+  // Vista de la tabla (recordada) y filtro de resultado (#271).
+  const [view, setView] = useState<PortfolioView>(readView)
+  const [pnlFilter, setPnlFilter] = useState<PnlFilter>('all')
   const compact = density === 'compact'
 
   // «/» enfoca el buscador desde cualquier punto de la página (#269).
@@ -78,6 +94,21 @@ export function Portfolio() {
       fiatBalances.filter(b => keep(b.asset, b.wallet_id)), fiatPrice, market.dustThreshold,
     )
   }, [q, walletFilter, all, displayLots, market.prices, fiatBalances, fiatPrice, market.dustThreshold])
+  // Vista «Por activo» (#271): una fila por activo con todas sus wallets.
+  const byAsset = useMemo(() => {
+    const keep = (asset: string, walletId: string) => asset.includes(q) && (!walletFilter || walletId === walletFilter)
+    return assetView(
+      displayLots.filter(l => keep(l.asset, l.wallet_id)), market.prices,
+      fiatBalances.filter(b => keep(b.asset, b.wallet_id)), fiatPrice, market.dustThreshold,
+    )
+  }, [q, walletFilter, displayLots, market.prices, fiatBalances, fiatPrice, market.dustThreshold])
+  const assetRows = useMemo(() => filterByPnl(byAsset.rows, pnlFilter, market.prices), [byAsset.rows, pnlFilter, market.prices])
+  const walletSections = useMemo(
+    () => filtered.sections
+      .map(s => ({ ...s, rows: filterByPnl(s.rows, pnlFilter, market.prices) }))
+      .filter(s => s.rows.length > 0),
+    [filtered.sections, pnlFilter, market.prices],
+  )
   // Inventario de toda la cartera: custodia, posiciones, bloqueado y wallets (#270).
   const inventory = useMemo(
     () => portfolioInventory(displayLots, market.prices, fiatBalances, fiatPrice, lockedAmounts),
@@ -87,7 +118,19 @@ export function Portfolio() {
   const hasPrices = Object.keys(market.prices).length > 0
   const walletCount = new Set(lots.map(l => l.wallet_id)).size
   const assetsTotal = new Set(lots.map(l => l.asset)).size
-  const nothingFound = filtered.sections.length === 0 && filtered.dust.length === 0
+  // El polvo no se filtra por resultado: sus importes son irrelevantes.
+  const dust = view === 'asset'
+    ? { rows: pnlFilter === 'all' ? byAsset.dust : [], value: byAsset.dustValue }
+    : { rows: pnlFilter === 'all' ? filtered.dust : [], value: filtered.dustValue }
+  const mainCount = view === 'asset' ? assetRows.length : walletSections.length
+  const nothingFound = mainCount === 0 && dust.rows.length === 0
+  const filtersActive = !!search || !!walletFilter || pnlFilter !== 'all'
+  const walletOptions = [{ value: '', label: 'Todas las wallets' }, ...inventory.wallets.map(w => ({ value: w.walletId, label: w.name }))]
+
+  function changeView(next: PortfolioView) {
+    setView(next)
+    saveView(next)
+  }
 
   function changeDensity(next: Density) {
     setDensity(next)
@@ -176,6 +219,20 @@ export function Portfolio() {
         </>
       )}
 
+      {/* Vista y filtros de la tabla (#271) */}
+      {!isLoading && (lots.length > 0 || fiatBalances.length > 0) && (
+        <div className="flex items-center gap-2 flex-wrap" role="toolbar" aria-label="Vista y filtros de la tabla">
+          <SegmentedControl label="Vista de la tabla" variant="accent" value={view} onChange={changeView} options={VIEW_OPTIONS} />
+          <SegmentedControl label="Filtrar por resultado" variant="accent" value={pnlFilter} onChange={setPnlFilter} options={PNL_OPTIONS} />
+          {view === 'asset' && (
+            <Dropdown size="sm" label="Filtrar por wallet" value={walletFilter ?? ''} onChange={v => setWalletFilter(v || null)} options={walletOptions} />
+          )}
+          {filtersActive && (
+            <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setWalletFilter(null); setPnlFilter('all') }}>Quitar filtros</Button>
+          )}
+        </div>
+      )}
+
       {isLoading ? (
         <LoadingState label="Cargando lotes FIFO…" />
       ) : lots.length === 0 && fiatBalances.length === 0 ? (
@@ -186,16 +243,27 @@ export function Portfolio() {
           icon={<Search size={22} />}
           title={search
             ? <>Sin resultados para <span className="mono text-fg">"{search}"</span></>
-            : 'Sin posiciones en esta wallet'}
-          action={<Button variant="ghost" size="sm" onClick={() => { setSearch(''); setWalletFilter(null) }}>Quitar filtros</Button>}
+            : 'Ninguna posición coincide con los filtros'}
+          action={<Button variant="ghost" size="sm" onClick={() => { setSearch(''); setWalletFilter(null); setPnlFilter('all') }}>Quitar filtros</Button>}
         />
       ) : (
         <>
-          <WalletSections sections={filtered.sections} total={all.total} compact={compact}
-            onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} />
-          <DustSection rows={filtered.dust} value={filtered.dustValue} total={all.total} threshold={market.dustThreshold}
-            compact={compact} open={dustOpen || (filtered.sections.length === 0 && filtered.dust.length > 0)} onToggle={toggleDust}
-            index={filtered.sections.length + 1} />
+          {view === 'asset' ? (
+            <section aria-label="Posiciones" className={panelClasses(cardClasses('none', 'overflow-clip'))} style={panelEnterStyle(1)}>
+              <AssetTable rows={assetRows} portfolioTotal={all.total} compact={compact}
+                onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })}
+                header={<>
+                  <h2 className="text-sm font-semibold text-fg">Posiciones</h2>
+                  <span className="text-xs text-fg-subtle">{assetRows.length} {assetRows.length === 1 ? 'activo' : 'activos'}</span>
+                </>} />
+            </section>
+          ) : (
+            <WalletSections sections={walletSections} total={all.total} compact={compact}
+              onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} />
+          )}
+          <DustSection rows={dust.rows} value={dust.value} total={all.total} threshold={market.dustThreshold}
+            compact={compact} open={dustOpen || (mainCount === 0 && dust.rows.length > 0)} onToggle={toggleDust}
+            index={mainCount + 1} />
         </>
       )}
     </div>

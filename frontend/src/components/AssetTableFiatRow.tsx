@@ -1,8 +1,9 @@
 import { type FiatRow } from '../utils/assetTable'
-import { formatAmount, formatMoney, formatPrice, formatPercent } from '../utils/format'
+import { formatAmount, formatMoney, formatPrice } from '../utils/format'
 import { useCurrency } from '../hooks/useDisplayCurrency'
 import { tableRowClasses } from './ui'
 import { CryptoIcon } from './CryptoIcon'
+import { WeightCell } from './AssetTableCells'
 
 export function FiatRowComponent({ row, totalPortfolioValue, compact = false }: { row: FiatRow; totalPortfolioValue: number; compact?: boolean }) {
   const currency = useCurrency()
@@ -12,9 +13,10 @@ export function FiatRowComponent({ row, totalPortfolioValue, compact = false }: 
     ? formatMoney(row.quantity, row.asset)
     : `${formatAmount(row.quantity, 2)} ${row.asset}`
 
+  const pad = compact ? 'py-1.5' : 'py-3'
   return (
     <tr className={tableRowClasses()}>
-      <td className={`px-5 ${compact ? 'py-1.5' : 'py-3'}`}>
+      <td className={`px-5 ${pad}`}>
         <div className="flex items-center gap-2">
           <span className="w-4 shrink-0" />
           {/* Bandera de la moneda (#246), como el resto de iconos de la app. */}
@@ -27,28 +29,14 @@ export function FiatRowComponent({ row, totalPortfolioValue, compact = false }: 
           </div>
         </div>
       </td>
-      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-fg`}>{quantityLabel}</td>
-      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-fg-subtle`}>{formatPrice(row.price, currency)}</td>
-      {!compact && <td className="px-4 py-3 text-right mono text-fg-subtle">—</td>}
-      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono font-medium text-fg`}>{formatMoney(row.value, currency)}</td>
-      {!compact && <td className="px-4 py-3 text-right mono text-fg-subtle">—</td>}
-      {!compact && <td className="px-4 py-3 text-right mono text-fg-subtle">—</td>}
-      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'} text-right mono text-fg-subtle`}>—</td>
-      {/* % cartera fiat */}
-      <td className={`px-4 ${compact ? 'py-1.5' : 'py-3'}`}>
-        {totalPortfolioValue > 0 ? (
-          <div className="flex flex-col items-end gap-1">
-            <span className="text-xs mono text-fg-muted">
-              {formatPercent((row.value / totalPortfolioValue) * 100, 1)}
-            </span>
-            <div className="w-16 h-1 bg-background-tertiary rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-positive/50 transition-all duration-500"
-                style={{ width: `${Math.min((row.value / totalPortfolioValue) * 100, 100)}%` }}
-              />
-            </div>
-          </div>
-        ) : <span className="text-fg-subtle text-xs">—</span>}
+      <td className={`px-4 ${pad} text-right mono text-fg`}>{quantityLabel}</td>
+      <td className={`px-4 ${pad} text-right mono text-fg-subtle`}>{formatPrice(row.price, currency)}</td>
+      <td className={`px-4 ${pad} text-right mono font-semibold text-fg`}>{formatMoney(row.value, currency)}</td>
+      {/* Sin P&L ni break-even: es efectivo */}
+      <td className={`px-4 ${pad} text-right mono text-fg-subtle`}>—</td>
+      {!compact && <td className={`px-4 ${pad} text-right mono text-fg-subtle`}>—</td>}
+      <td className={`px-4 ${pad}`}>
+        <WeightCell pct={totalPortfolioValue > 0 ? (row.value / totalPortfolioValue) * 100 : null} tone="bg-positive/50" />
       </td>
     </tr>
   )

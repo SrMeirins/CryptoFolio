@@ -29,7 +29,7 @@ export function WalletSections({ sections, total, compact, onSimulate }: {
         const value = s.rows.reduce((sum, r) => sum + r.value, 0)
         return (
           <section key={s.walletId} aria-label={`Wallet ${s.name}`}
-            className={panelClasses(cardClasses('none', 'overflow-hidden'))} style={panelEnterStyle(i + 1)}>
+            className={panelClasses(cardClasses('none', 'overflow-clip'))} style={panelEnterStyle(i + 1)}>
             <AssetTable rows={s.rows} portfolioTotal={total} compact={compact} hideWalletChips onSimulate={onSimulate}
               header={
                 <>

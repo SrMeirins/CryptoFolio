@@ -74,18 +74,18 @@ export function AssetTable({ rows, portfolioTotal, compact = false, hideWalletCh
           )}
         </div>
       )}
-      <div className="overflow-x-auto">
+      {/* Cabecera fija al desplazarse (#271): sin contenedor de scroll propio en
+          pantallas anchas; en estrechas, desplazamiento horizontal. */}
+      <div className="max-lg:overflow-x-auto">
         <table className="w-full text-sm tabular-nums">
-          <thead>
+          <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-background-card [&_th]:shadow-[inset_0_-1px_0_var(--cf-border)]">
             <tr className={tableHeadRowClasses()}>
               <SortTh {...sortProps} label="Activo" sk="asset" right={false} />
               <SortTh {...sortProps} label="Cantidad" sk="quantity" />
               <SortTh {...sortProps} label="Precio" sk="price" />
-              {!compact && <SortTh {...sortProps} label="P. medio" sk="breakeven" title="Precio medio de compra (break-even)" />}
               <SortTh {...sortProps} label="Valor" sk="value" title={`Valor en ${currency}`} />
-              {!compact && <SortTh {...sortProps} label="Coste base" sk="cost" />}
-              {!compact && <SortTh {...sortProps} label="P&L" sk="pnl" />}
-              <SortTh {...sortProps} label="P&L %" sk="pnlpct" />
+              <SortTh {...sortProps} label="P&L" sk="pnl" title="P&L no realizado en importe y %" />
+              {!compact && <SortTh {...sortProps} label="Break-even" sk="breakeven" title="Precio medio de compra y distancia del precio actual" />}
               <SortTh {...sortProps} label="% cartera" sk="weight" />
             </tr>
           </thead>

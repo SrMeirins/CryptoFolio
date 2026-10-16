@@ -152,8 +152,14 @@ export function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices:
       va = total > 0 ? (a.value / total) * 100 : 0
       vb = total > 0 ? (b.value / total) * 100 : 0
     } else if (key === 'breakeven') {
-      va = a.kind === 'crypto' && a.totalQuantity > 0 ? a.totalCostBasis / a.totalQuantity : 0
-      vb = b.kind === 'crypto' && b.totalQuantity > 0 ? b.totalCostBasis / b.totalQuantity : 0
+      // Distancia del precio al break-even (#271): comparable entre activos,
+      // a diferencia del precio medio en bruto. Sin dato, al final.
+      const dist = (r: UnifiedRow) => {
+        if (r.kind !== 'crypto' || r.totalQuantity <= 0 || r.totalCostBasis <= 0) return -Infinity
+        const price = prices[r.asset] ?? 0
+        return price > 0 ? (price / (r.totalCostBasis / r.totalQuantity) - 1) * 100 : -Infinity
+      }
+      va = dist(a); vb = dist(b)
     }
     return dir === 'asc' ? va - vb : vb - va
   })
