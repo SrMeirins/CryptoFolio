@@ -204,8 +204,9 @@ export async function importCsvFile(
         const valueClauses: string[] = [];
         for (const row of chunk) {
           const { id, tx, walletId, destinationWalletId, effectiveOpType, depositPriceOverride } = row;
-          const isWithdrawType = ['WITHDRAW', 'LOST', 'GIFT_SENT'].includes(effectiveOpType);
-          const destPending = isWithdrawType && !destinationWalletId;
+          // Solo una retirada sin destino queda pendiente de asignarlo; LOST y
+          // GIFT_SENT no tienen destino por definición (#257).
+          const destPending = effectiveOpType === 'WITHDRAW' && !destinationWalletId;
           const finalPricePerUnit = depositPriceOverride ?? tx.pricePerUnit ?? null;
           const finalCostAmount = depositPriceOverride
             ? tx.amount * depositPriceOverride
