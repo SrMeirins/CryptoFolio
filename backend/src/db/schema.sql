@@ -393,7 +393,10 @@ CREATE TABLE asset_metadata (
   binance_eth_pair   TEXT,
   price_source       TEXT DEFAULT 'unknown',
   auto_detected      BOOLEAN DEFAULT FALSE,
-  last_price_check   TIMESTAMPTZ
+  last_price_check   TIMESTAMPTZ,
+  -- Pares quitados a mano en Ajustes ('eur', 'usdt', 'btc', 'eth'): el
+  -- relleno automático de pares no los vuelve a añadir (#277).
+  disabled_pairs     TEXT[] NOT NULL DEFAULT '{}'
 );
 
 INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_eur_pair, price_source) VALUES

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPairIndex, priceFromPairMap, resolveTick, streamPairs, type AssetPairsRow } from './livePairIndex';
+import { buildPairIndex, pickSource, priceFromPairMap, resolveTick, streamPairs, PAIR_STALE_MS, type AssetPairsRow } from './livePairIndex';
 
 function row(symbol: string, pairs: Partial<Omit<AssetPairsRow, 'symbol'>> = {}): AssetPairsRow {
   return {
@@ -12,15 +12,15 @@ function row(symbol: string, pairs: Partial<Omit<AssetPairsRow, 'symbol'>> = {})
 const rates = { eurUsdtRate: 0.9, btcEur: 50_000, ethEur: 3_000 };
 
 describe('livePairIndex — buildPairIndex', () => {
-  it('cada activo se indexa solo por su par preferido (EUR > USDT > BTC > ETH)', () => {
+  it('cada activo se indexa por todos sus pares (#277): el selector elige la fuente', () => {
     const index = buildPairIndex([
       row('XRP', { binance_eur_pair: 'XRPEUR', binance_usdt_pair: 'XRPUSDT', binance_btc_pair: 'XRPBTC' }),
       row('HBAR', { binance_usdt_pair: 'HBARUSDT', binance_btc_pair: 'HBARBTC' }),
     ]);
 
     expect(index.get('XRPEUR')).toEqual([{ asset: 'XRP', kind: 'eur' }]);
-    expect(index.has('XRPUSDT')).toBe(false);
-    expect(index.has('XRPBTC')).toBe(false);
+    expect(index.get('XRPUSDT')).toEqual([{ asset: 'XRP', kind: 'usdt' }]);
+    expect(index.get('XRPBTC')).toEqual([{ asset: 'XRP', kind: 'btc' }]);
     expect(index.get('HBARUSDT')).toEqual([{ asset: 'HBAR', kind: 'usdt' }]);
   });
 
@@ -70,8 +70,8 @@ describe('livePairIndex — resolveTick', () => {
     row('BBB', { binance_eth_pair: 'BBBETH' }),
   ]);
 
-  it('par EUR: precio directo', () => {
-    expect(resolveTick(index, 'XRPEUR', 2, rates)).toEqual([['XRP', 2]]);
+  it('par EUR: precio directo, con el tipo de par', () => {
+    expect(resolveTick(index, 'XRPEUR', 2, rates)).toEqual([['XRP', 2, 'eur']]);
   });
 
   it('par USDT: convierte con EURUSDT', () => {
@@ -81,8 +81,8 @@ describe('livePairIndex — resolveTick', () => {
   });
 
   it('pares BTC/ETH: convierten con el precio en vivo de la referencia', () => {
-    expect(resolveTick(index, 'AAABTC', 0.0001, rates)).toEqual([['AAA', 5]]);
-    expect(resolveTick(index, 'BBBETH', 0.001, rates)).toEqual([['BBB', 3]]);
+    expect(resolveTick(index, 'AAABTC', 0.0001, rates)).toEqual([['AAA', 5, 'btc']]);
+    expect(resolveTick(index, 'BBBETH', 0.001, rates)).toEqual([['BBB', 3, 'eth']]);
   });
 
   it('sin precio de la referencia BTC todavía: no emite nada', () => {
@@ -99,13 +99,12 @@ describe('livePairIndex — resolveTick', () => {
 describe('livePairIndex — priceFromPairMap (precios REST, #147)', () => {
   const prices = new Map([['XRPEUR', 2], ['XRPUSDT', 2.5], ['HBARUSDT', 0.2], ['AAABTC', 0.0001]]);
 
-  it('respeta la cascada EUR > USDT > BTC > ETH', () => {
-    expect(priceFromPairMap(row('XRP', { binance_eur_pair: 'XRPEUR', binance_usdt_pair: 'XRPUSDT' }), prices, rates)).toBe(2);
+  it('respeta la cascada USDT > EUR > BTC > ETH, la misma que el WebSocket (#277)', () => {
+    expect(priceFromPairMap(row('XRP', { binance_eur_pair: 'XRPEUR', binance_usdt_pair: 'XRPUSDT' }), prices, rates)).toBeCloseTo(2.25, 10);
   });
 
-  it('cae al par USDT convertido si no hay precio del par EUR', () => {
-    const p = priceFromPairMap(row('HBAR', { binance_eur_pair: 'HBAREUR', binance_usdt_pair: 'HBARUSDT' }), prices, rates);
-    expect(p).toBeCloseTo(0.18, 10);
+  it('cae al par EUR si no hay precio del par USDT', () => {
+    expect(priceFromPairMap(row('XRP', { binance_eur_pair: 'XRPEUR', binance_usdt_pair: 'XRPXUSDT' }), prices, rates)).toBe(2);
   });
 
   it('convierte pares BTC con la referencia indicada y devuelve null si falta', () => {
@@ -118,3 +117,26 @@ describe('livePairIndex — priceFromPairMap (precios REST, #147)', () => {
   });
 });
 
+describe('livePairIndex — pickSource: el más rápido con respaldo (#277)', () => {
+  const now = 1_000_000;
+  const fresh = now - 1_000;
+  const stale = now - PAIR_STALE_MS - 1;
+
+  it('usa el par de mayor prioridad con datos recientes (USDT > EUR > BTC > ETH)', () => {
+    expect(pickSource({ eur: { at: fresh }, usdt: { at: fresh } }, now)).toBe('usdt');
+    expect(pickSource({ eur: { at: fresh }, btc: { at: fresh } }, now)).toBe('eur');
+  });
+
+  it('si el preferido lleva más de 15 s sin datos, usa otro par que sí los tenga', () => {
+    expect(pickSource({ usdt: { at: stale }, eur: { at: fresh } }, now)).toBe('eur');
+  });
+
+  it('sin ningún par reciente, el último que emitió: nunca se queda sin fuente', () => {
+    expect(pickSource({ usdt: { at: stale - 5_000 }, eur: { at: stale } }, now)).toBe('eur');
+    expect(pickSource({ btc: { at: stale } }, now)).toBe('btc');
+  });
+
+  it('sin ningún dato, null', () => {
+    expect(pickSource({}, now)).toBeNull();
+  });
+});

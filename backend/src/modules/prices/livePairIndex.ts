@@ -29,16 +29,40 @@ export interface LiveRates {
 // Par de referencia para convertir a EUR; siempre suscrito.
 export const EURUSDT_PAIR = 'EURUSDT';
 
-// Cada activo usa solo su par preferido (EUR > USDT > BTC > ETH), la misma
-// prioridad que la carga inicial por REST. Antes se suscribían todos sus pares
-// y cada tick sobrescribía el precio con la conversión de ese par, de modo que
-// un activo con varios pares alternaba entre fuentes.
-function preferredPair(row: AssetPairsRow): { pair: string; kind: PairKind } | null {
-  if (row.binance_eur_pair)  return { pair: row.binance_eur_pair.toUpperCase(),  kind: 'eur' };
-  if (row.binance_usdt_pair) return { pair: row.binance_usdt_pair.toUpperCase(), kind: 'usdt' };
-  if (row.binance_btc_pair)  return { pair: row.binance_btc_pair.toUpperCase(),  kind: 'btc' };
-  if (row.binance_eth_pair)  return { pair: row.binance_eth_pair.toUpperCase(),  kind: 'eth' };
-  return null;
+// Prioridad de los pares para el precio en vivo (#277): primero el más
+// líquido. Los pares en EUR se negocian poco y Binance solo emite cuando hay
+// operaciones, así que con EUR primero muchos precios parecían congelados.
+export const PAIR_PRIORITY: readonly PairKind[] = ['usdt', 'eur', 'btc', 'eth'];
+
+// Un par sin datos durante este tiempo cede el paso al siguiente que sí los tenga.
+export const PAIR_STALE_MS = 15_000;
+
+/** Pares de un activo con su tipo, en orden de prioridad. */
+function assetPairs(row: AssetPairsRow): Array<{ pair: string; kind: PairKind }> {
+  const byKind: Record<PairKind, string | null> = {
+    usdt: row.binance_usdt_pair, eur: row.binance_eur_pair, btc: row.binance_btc_pair, eth: row.binance_eth_pair,
+  };
+  return PAIR_PRIORITY.flatMap(kind => (byKind[kind] ? [{ pair: byKind[kind]!.toUpperCase(), kind }] : []));
+}
+
+/**
+ * Fuente del precio en vivo de un activo (#277): el par de mayor prioridad
+ * con datos en los últimos PAIR_STALE_MS; si ninguno es reciente, el que
+ * emitió por última vez. Así un activo nunca se queda sin precio y, mientras
+ * su par preferido emita, no alterna entre fuentes (cada tick de otro par se
+ * guarda, pero no cambia el precio).
+ */
+export function pickSource(ticks: Partial<Record<PairKind, { at: number }>>, now: number, staleMs = PAIR_STALE_MS): PairKind | null {
+  for (const kind of PAIR_PRIORITY) {
+    const t = ticks[kind];
+    if (t && now - t.at <= staleMs) return kind;
+  }
+  let latest: PairKind | null = null;
+  for (const kind of PAIR_PRIORITY) {
+    const t = ticks[kind];
+    if (t && (latest === null || t.at > ticks[latest]!.at)) latest = kind;
+  }
+  return latest;
 }
 
 export function buildPairIndex(rows: readonly AssetPairsRow[]): PairIndex {
@@ -54,12 +78,13 @@ export function buildPairIndex(rows: readonly AssetPairsRow[]): PairIndex {
     indexed.add(target.asset);
   };
 
+  // Todos los pares de cada activo (#277): el feed elige la fuente con pickSource.
   for (const row of rows) {
-    const preferred = preferredPair(row);
-    if (!preferred) continue;
-    add(preferred.pair, { asset: row.symbol, kind: preferred.kind });
-    if (preferred.kind === 'btc') needsBtc = true;
-    if (preferred.kind === 'eth') needsEth = true;
+    for (const { pair, kind } of assetPairs(row)) {
+      add(pair, { asset: row.symbol, kind });
+      if (kind === 'btc') needsBtc = true;
+      if (kind === 'eth') needsEth = true;
+    }
   }
 
   // Los activos cotizados contra BTC/ETH necesitan el precio en EUR de la
@@ -83,25 +108,25 @@ export function resolveTick(
   pair: string,
   price: number,
   rates: LiveRates,
-): Array<[asset: string, priceEur: number]> {
+): Array<[asset: string, priceEur: number, kind: PairKind]> {
   const targets = index.get(pair);
   if (!targets || !(price > 0)) return [];
 
-  const result: Array<[string, number]> = [];
+  const result: Array<[string, number, PairKind]> = [];
   for (const { asset, kind } of targets) {
     let priceEur: number | undefined;
     if (kind === 'eur') priceEur = price;
     else if (kind === 'usdt') priceEur = price * rates.eurUsdtRate;
     else if (kind === 'btc' && rates.btcEur) priceEur = price * rates.btcEur;
     else if (kind === 'eth' && rates.ethEur) priceEur = price * rates.ethEur;
-    if (priceEur !== undefined && priceEur > 0) result.push([asset, priceEur]);
+    if (priceEur !== undefined && priceEur > 0) result.push([asset, priceEur, kind]);
   }
   return result;
 }
 
 // Precio en EUR de un activo a partir de un mapa par → precio obtenido por
-// REST (carga inicial, activos nuevos), con la misma cascada de pares que el
-// WebSocket. Sirve igual para el último precio y para el de apertura de 24h.
+// REST (carga inicial, activos nuevos), con la misma prioridad que el
+// WebSocket (#277). Sirve igual para el último precio y para el de apertura de 24h.
 export function priceFromPairMap(
   row: AssetPairsRow,
   prices: ReadonlyMap<string, number>,
@@ -109,8 +134,8 @@ export function priceFromPairMap(
 ): number | null {
   const at = (pair: string | null) => (pair ? prices.get(pair.toUpperCase()) : undefined);
   const candidates: Array<number | undefined> = [
-    at(row.binance_eur_pair),
     mul(at(row.binance_usdt_pair), rates.eurUsdtRate),
+    at(row.binance_eur_pair),
     mul(at(row.binance_btc_pair), rates.btcEur),
     mul(at(row.binance_eth_pair), rates.ethEur),
   ];

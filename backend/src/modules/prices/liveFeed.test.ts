@@ -257,3 +257,59 @@ describe('liveFeed — vigilancia de inactividad (#194)', () => {
     expect(feed.getFeedStatus().lastTickAt).toBe(Date.parse('2026-10-14T10:00:00Z'));
   });
 });
+
+describe('liveFeed — el par más rápido con respaldo (#277)', () => {
+  let feed: typeof import('./liveFeed');
+  const tick = (pair: string, price: string, open = price) =>
+    sockets[0].handlers.message?.(Buffer.from(JSON.stringify({ data: { s: pair, c: price, o: open } })));
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    sockets.length = 0;
+    assetRows.current = [asset('XRP', { binance_eur_pair: 'XRPEUR', binance_usdt_pair: 'XRPUSDT' })];
+    queryMock.mockReset();
+    queryMock.mockImplementation(async (sql: string) =>
+      String(sql).includes('FROM asset_metadata') ? { rows: assetRows.current } : { rows: [] });
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [] })));
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    feed = await import('./liveFeed');
+    feed.startLivePrices();
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    tick('EURUSDT', '1.25');   // 1 USDT = 0,8 €
+  });
+
+  afterEach(() => {
+    feed.stopLivePrices();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('se suscribe a todos los pares del activo', () => {
+    expect(streamsOf(sockets[0])).toEqual(['eurusdt@miniTicker', 'xrpeur@miniTicker', 'xrpusdt@miniTicker']);
+  });
+
+  it('con el par USDT emitiendo, los ticks del par EUR no cambian el precio (sin saltos entre fuentes)', () => {
+    tick('XRPUSDT', '2.5');
+    expect(feed.getLivePrice('XRP')).toBeCloseTo(2, 10);       // 2,5 × 0,8
+    tick('XRPEUR', '2.03');
+    expect(feed.getLivePrice('XRP')).toBeCloseTo(2, 10);
+  });
+
+  it('si el par USDT lleva 15 s sin datos, el precio sigue con el par EUR; vuelve al USDT cuando emite', () => {
+    tick('XRPUSDT', '2.5');
+    vi.advanceTimersByTime(16_000);
+    tick('XRPEUR', '2.03');
+    expect(feed.getLivePrice('XRP')).toBe(2.03);
+    tick('XRPUSDT', '2.6');
+    expect(feed.getLivePrice('XRP')).toBeCloseTo(2.08, 10);
+  });
+
+  it('la apertura de 24 h sale del mismo par que el precio', () => {
+    tick('XRPUSDT', '2.5', '2.0');
+    tick('XRPEUR', '2.03', '1.0');
+    expect(feed.getAllOpen24Prices().get('XRP')).toBeCloseTo(1.6, 10);   // 2,0 × 0,8, no el 1,0 del par EUR
+  });
+});

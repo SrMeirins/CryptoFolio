@@ -5,6 +5,7 @@ import { runMigrations } from './db/run-migrations';
 import { setupPricesWebSocket } from './routes/prices';
 import { startLivePrices } from './modules/prices/binance';
 import { syncAssetIcons } from './modules/assets/assetIcons';
+import { startPairCompletion } from './modules/prices/pairCompletion';
 import { repairMissingCoinGeckoIds } from './modules/prices/coingecko';
 import { scheduleWalletSync } from './modules/walletSync/scheduler';
 
@@ -33,6 +34,8 @@ async function bootstrap() {
       startLivePrices();
       // Logos de los activos (#201): en segundo plano, sin retrasar el arranque.
       void syncAssetIcons({ force: true });
+      // Pares de Binance que falten (EUR, USDT, BTC, ETH) para el feed en vivo (#277).
+      startPairCompletion();
       // Reparar en background activos con price_source='coingecko' pero coingecko_id=NULL.
       // No bloquea el arranque; usa la cola con rate limit de CoinGecko.
       repairMissingCoinGeckoIds().catch(e =>

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { nextDisabledPairs } from '../../modules/prices/disabledPairs';
 import { z } from 'zod';
 import { db } from '../../db/client';
 import { autoDetectPair } from '../../modules/prices/pairDetector';
@@ -60,12 +61,22 @@ router.post('/assets', async (req: Request, res: Response) => {
   else if (binanceBtcPair) priceSource = 'btc_proxy';
   else if (coingecko_id) priceSource = 'coingecko';
 
+  // Pares vaciados a mano: el relleno automático no los vuelve a añadir (#277).
+  const prevPost = (await db.query(
+    'SELECT binance_eur_pair, binance_usdt_pair, binance_btc_pair, disabled_pairs FROM asset_metadata WHERE symbol = $1', [upperSymbol],
+  )).rows[0] as { binance_eur_pair: string | null; binance_usdt_pair: string | null; binance_btc_pair: string | null; disabled_pairs: string[] } | undefined;
+  const disabledPost = prevPost
+    ? nextDisabledPairs(prevPost.disabled_pairs,
+        { eur: prevPost.binance_eur_pair, usdt: prevPost.binance_usdt_pair, btc: prevPost.binance_btc_pair },
+        { eur: binanceEurPair || null, usdt: binanceUsdtPair || null, btc: binanceBtcPair || null })
+    : [];
+
   await db.query(
     `INSERT INTO asset_metadata (
       symbol, name, is_stablecoin,
       binance_eur_pair, binance_usdt_pair, binance_btc_pair,
-      coingecko_id, price_source, auto_detected, last_price_check
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, NOW())
+      coingecko_id, price_source, auto_detected, last_price_check, disabled_pairs
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, NOW(), $9)
     ON CONFLICT (symbol) DO UPDATE SET
       name              = EXCLUDED.name,
       is_stablecoin     = EXCLUDED.is_stablecoin,
@@ -74,10 +85,11 @@ router.post('/assets', async (req: Request, res: Response) => {
       binance_btc_pair  = EXCLUDED.binance_btc_pair,
       coingecko_id      = COALESCE(EXCLUDED.coingecko_id, asset_metadata.coingecko_id),
       price_source      = EXCLUDED.price_source,
-      last_price_check  = NOW()`,
+      last_price_check  = NOW(),
+      disabled_pairs    = EXCLUDED.disabled_pairs`,
     [upperSymbol, name || upperSymbol, isStablecoin || false,
      binanceEurPair || null, binanceUsdtPair || null, binanceBtcPair || null,
-     coingecko_id || null, priceSource]
+     coingecko_id || null, priceSource, disabledPost]
   );
 
   // Recargar el map en memoria si se proporcionó coingecko_id
@@ -106,6 +118,16 @@ router.put('/assets/:symbol', async (req: Request, res: Response) => {
   else if (binanceUsdtPair) priceSource = 'usdt_proxy';
   else if (binanceBtcPair) priceSource = 'btc_proxy';
 
+  // Pares vaciados a mano: el relleno automático no los vuelve a añadir (#277).
+  const prevPut = (await db.query(
+    'SELECT binance_eur_pair, binance_usdt_pair, binance_btc_pair, disabled_pairs FROM asset_metadata WHERE symbol = $1', [symbol.toUpperCase()],
+  )).rows[0] as { binance_eur_pair: string | null; binance_usdt_pair: string | null; binance_btc_pair: string | null; disabled_pairs: string[] } | undefined;
+  const disabledPut = prevPut
+    ? nextDisabledPairs(prevPut.disabled_pairs,
+        { eur: prevPut.binance_eur_pair, usdt: prevPut.binance_usdt_pair, btc: prevPut.binance_btc_pair },
+        { eur: binanceEurPair || null, usdt: binanceUsdtPair || null, btc: binanceBtcPair || null })
+    : [];
+
   await db.query(
     `UPDATE asset_metadata SET
       name              = COALESCE($1, name),
@@ -114,10 +136,11 @@ router.put('/assets/:symbol', async (req: Request, res: Response) => {
       binance_usdt_pair = $4,
       binance_btc_pair  = $5,
       price_source      = $6,
-      last_price_check  = NOW()
+      last_price_check  = NOW(),
+      disabled_pairs    = $8
      WHERE symbol = $7`,
     [name || null, isStablecoin || false, binanceEurPair || null,
-     binanceUsdtPair || null, binanceBtcPair || null, priceSource, symbol.toUpperCase()]
+     binanceUsdtPair || null, binanceBtcPair || null, priceSource, symbol.toUpperCase(), disabledPut]
   );
 
   requestLivePriceResync();
