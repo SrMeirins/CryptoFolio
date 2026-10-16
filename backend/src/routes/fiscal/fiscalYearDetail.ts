@@ -112,7 +112,7 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
   `, [year]);
 
   const dec31 = esAnioEnCurso ? new Date() : new Date(`${year}-12-31T23:59:59Z`);
-  const activos = await valorizarLotesEnFecha(dec31);
+  const { activos, preciosPendientes } = await valorizarLotesEnFecha(dec31);
   // Modelo 721: solo cuenta la custodia de terceros (exchanges); la
   // autocustodia (hardware/software) no se declara en este modelo.
   const valorTotal721 = sumaValorCustodiaExchange(activos);
@@ -128,9 +128,13 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
     numOperacionesPatrimoniales: parseInt(gpRes.rows[0].num_operaciones),
     totalRendimientos:           parseFloat(rendRes.rows[0].total_rendimientos),
     numRendimientos:             parseInt(rendRes.rows[0].num_rendimientos),
+    // Con precios pendientes el valor es un mínimo: si ya supera el umbral la
+    // obligación es segura; si no, el resultado es incompleto (#267).
     valorTotal31Dic:             valorTotal721,
     superaUmbral721:             valorTotal721 > umbral,
     umbral721:                   umbral,
+    preciosPendientes,
+    valorIncompleto:             preciosPendientes.length > 0,
   });
 });
 
@@ -152,7 +156,7 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
   const esAnioEnCurso = year === currentYear;
   const dec31 = esAnioEnCurso ? new Date() : new Date(`${year}-12-31T23:59:59Z`);
 
-  const activos = await valorizarLotesEnFecha(dec31);
+  const { activos, preciosPendientes } = await valorizarLotesEnFecha(dec31);
   const umbral = await getUmbral721();
 
   const totalValor = activos.reduce((sum, a) => sum + a.valorEur, 0);
@@ -168,6 +172,9 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
     totalValorCustodia,
     superaUmbral: totalValorCustodia > umbral,
     umbral,
+    // Activos sin precio: los totales son un mínimo (#267).
+    preciosPendientes,
+    incompleto: preciosPendientes.length > 0,
     aviso: 'El Modelo 721 aplica a criptoactivos cuya custodia está en manos de un tercero situado en el extranjero (exchanges). Se cuentan todos los exchanges registrados; confirma con tu asesor fiscal cuáles son entidades extranjeras. La autocustodia no computa.',
   });
 });

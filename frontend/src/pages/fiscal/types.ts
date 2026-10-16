@@ -10,6 +10,9 @@ export interface FiscalSummary {
   valorTotal31Dic: number
   superaUmbral721: boolean
   umbral721: number
+  /** Activos sin precio ahora: el valor es un mínimo (#267). */
+  preciosPendientes: string[]
+  valorIncompleto: boolean
 }
 
 export interface FiscalEvent {
@@ -56,6 +59,8 @@ export interface Modelo721Activo {
   costBasisEur: number
   precioEur: number
   valorEur: number
+  /** Sin precio a la fecha: valorEur = 0 (#267). */
+  sinPrecio: boolean
 }
 
 export interface Modelo721 {
@@ -67,6 +72,9 @@ export interface Modelo721 {
   totalValorCustodia: number
   superaUmbral: boolean
   umbral: number
+  /** Activos sin precio ahora: los totales son un mínimo (#267). */
+  preciosPendientes: string[]
+  incompleto: boolean
   aviso: string
 }
 

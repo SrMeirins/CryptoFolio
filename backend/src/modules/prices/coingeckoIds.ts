@@ -72,8 +72,18 @@ export async function searchCoinGeckoBySymbol(
   }
 }
 
-// Activos cuya búsqueda ya falló — evita reintentos infinitos en la misma sesión
+// Activos sin coincidencia en CoinGecko — evita reintentos infinitos en la misma sesión
 const failedSearches = new Set<string>();
+
+// Activos cuya última búsqueda falló por la red (timeout, HTTP de error, rate
+// limit…). No se recuerdan como definitivos (#267): se reintentan más tarde y
+// quien pide un precio sabe que el fallo puede ser temporal.
+const transientSearchFailures = new Set<string>();
+
+/** La última búsqueda del coingecko_id de `symbol` falló por un problema temporal de red. */
+export function coinGeckoSearchFailedTransiently(symbol: string): boolean {
+  return transientSearchFailures.has(symbol);
+}
 
 // In-flight dedup para búsquedas de ID: evita N búsquedas paralelas para el mismo símbolo
 const inFlightSearches = new Map<string, Promise<string | null>>();
@@ -123,10 +133,12 @@ async function _searchAndSaveCoinGeckoId(symbol: string): Promise<string | null>
     const geckoId = await verifyBestCandidateId(candidates) ?? candidates[0];
 
     await saveCoinGeckoId(symbol, geckoId);
+    transientSearchFailures.delete(symbol);
     return geckoId;
   } catch (e) {
+    // Error de red o HTTP: temporal, no se marca como búsqueda fallida (#267).
     console.error(`[PRICES] Error buscando coingecko_id para ${symbol}:`, (e as Error).message);
-    failedSearches.add(symbol);
+    transientSearchFailures.add(symbol);
     return null;
   }
 }

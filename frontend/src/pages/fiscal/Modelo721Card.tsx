@@ -5,6 +5,7 @@ import { CryptoIcon } from '../../components/CryptoIcon'
 import type { Modelo721 } from './types'
 import { T, alpha, ink } from '../../utils/colors'
 import { badgeClasses } from '../../components/ui'
+import { MODELO721_LABELS, modelo721Status, pendingPricesText } from '../../utils/modelo721Status'
 
 export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYear: number }) {
   const [expanded, setExpanded] = useState(true)
@@ -13,6 +14,10 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
   const vencido     = !data.esAnioEnCurso && activeYear < currentYear
   const pctUmbral   = Math.min((data.totalValorCustodia / data.umbral) * 100, 100)
   const autocustodia = data.totalValor - data.totalValorCustodia
+  // Con precios pendientes los totales son un mínimo (#267).
+  const status = modelo721Status(data)
+  const pending = pendingPricesText(data.preciosPendientes)
+  const min = data.incompleto ? '≥ ' : ''
 
   return (
     <div className={`bg-background-card border rounded-xl overflow-hidden ${
@@ -43,15 +48,20 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
             </p>
           </div>
 
-          {data.superaUmbral ? (
+          {status === 'obligatorio' ? (
             <div className="flex items-center gap-1.5 bg-negative/10 border border-negative/20 text-negative text-xs px-2.5 py-1 rounded-xl">
               <AlertTriangle size={11} />
               <span className="font-medium">Obligatorio declarar</span>
               {!data.esAnioEnCurso && <span className="opacity-70">· {deadline}</span>}
             </div>
+          ) : status === 'incompleto' ? (
+            <div className="flex items-center gap-1.5 bg-warning/10 border border-warning/20 text-warning text-xs px-2.5 py-1 rounded-xl">
+              <AlertTriangle size={11} />
+              <span className="font-medium">{MODELO721_LABELS.incompleto}</span>
+            </div>
           ) : (
             <div className="flex items-center gap-1.5 bg-positive/10 text-positive text-xs px-2.5 py-1 rounded-xl">
-              <span className="font-medium">Sin obligación</span>
+              <span className="font-medium">{MODELO721_LABELS['sin-obligacion']}</span>
             </div>
           )}
         </div>
@@ -59,7 +69,7 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
         <div className="flex items-center gap-5">
           <div className="text-right">
             <div className={`text-lg font-bold mono ${data.superaUmbral ? 'text-negative' : 'text-fg'}`}>
-              {formatEur(data.totalValorCustodia)}
+              {min}{formatEur(data.totalValorCustodia)}
             </div>
             <div className="text-xs text-fg-subtle">custodia de terceros · umbral {formatEur(data.umbral)}</div>
             {autocustodia > 0.01 && (
@@ -109,7 +119,7 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
                       </span>
                     </div>
                     <div className="text-xs text-fg-subtle mono mt-0.5">
-                      {formatNumber(a.quantity, 4, 4)} × {formatEur(a.precioEur)}
+                      {formatNumber(a.quantity, 4, 4)} × {a.sinPrecio ? <span className="text-warning">sin precio</span> : formatEur(a.precioEur)}
                     </div>
                     {a.costBasisEur > 0 && (
                       <div className="text-xs text-fg-subtle mono">
@@ -131,6 +141,12 @@ export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYea
           </div>
 
           <div className="px-5 pb-4 space-y-2">
+            {pending && (
+              <div role="status" className="flex items-start gap-2 p-3 bg-warning/5 border border-warning/20 rounded-xl text-xs text-warning">
+                <AlertTriangle size={11} className="shrink-0 mt-0.5" />
+                <span>{pending}: los totales son un mínimo. Se completarán cuando las fuentes de precios respondan.</span>
+              </div>
+            )}
             <div className="flex items-start gap-2 p-3 bg-background-tertiary rounded-xl text-xs text-fg-subtle">
               <Info size={11} className="shrink-0 mt-0.5" />
               Precios obtenidos de la API a fecha {data.fecha}. La columna de custodia indica dónde se encontraban los activos según el historial registrado.

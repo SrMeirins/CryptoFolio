@@ -1,5 +1,6 @@
 import { db } from '../../db/client';
 import { getHistoricalPriceEur } from '../prices/binance';
+import { PRICE_ALIASES } from '../prices/priceAliases';
 
 export interface LoteAFecha {
   asset: string;
@@ -69,6 +70,62 @@ export interface LoteValorizado {
   costBasisEur: number;
   precioEur: number;
   valorEur: number;
+  /** Sin precio a la fecha (fuente sin datos o no disponible a tiempo): valorEur = 0 (#267). */
+  sinPrecio: boolean;
+}
+
+export interface ValoracionAFecha {
+  activos: LoteValorizado[];
+  /**
+   * Activos cuyo precio no se pudo obtener ahora (fallo temporal o fuera de
+   * tiempo): el valor total es un mínimo (#267). No incluye los que ninguna
+   * fuente tiene (p. ej. deslistados), que valen 0 de forma definitiva.
+   */
+  preciosPendientes: string[];
+}
+
+/** Activos con el «sin precio» definitivo guardado en caché para esa fecha. */
+async function sinPrecioDefinitivo(assets: string[], fecha: Date): Promise<Set<string>> {
+  if (assets.length === 0) return new Set();
+  const lookup = assets.map(a => PRICE_ALIASES[a] ?? a);
+  const res = await db.query(
+    `SELECT asset FROM price_cache WHERE asset = ANY($1::text[]) AND price_date = $2 AND price_eur < 0`,
+    [lookup, fecha.toISOString().slice(0, 10)],
+  );
+  const definitivos = new Set((res.rows as Array<{ asset: string }>).map(r => r.asset));
+  return new Set(assets.filter(a => definitivos.has(PRICE_ALIASES[a] ?? a)));
+}
+
+// Tiempo máximo para obtener los precios de una valoración (#267). Si Binance
+// no responde (sin conexión, bloqueo por región…), CoinGecko va en cola y con
+// reintentos y la petición superaba los 30 s del navegador. Al agotarse se
+// responde con lo que haya; las descargas pendientes siguen en segundo plano
+// y la siguiente consulta usa su resultado (caché de precios).
+const DEFAULT_PRICE_BUDGET_MS = 8_000;
+
+export function priceBudgetMs(env: string | undefined = process.env.FISCAL_PRICE_BUDGET_MS): number {
+  const n = Number(env);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_PRICE_BUDGET_MS;
+}
+
+/**
+ * Precio de cada activo a una fecha, con un tiempo máximo compartido; null si
+ * no hay precio o no llega a tiempo. Una sola consulta por activo aunque esté
+ * en varias wallets.
+ */
+async function preciosConPresupuesto(assets: string[], fecha: Date, budgetMs: number): Promise<Map<string, number | null>> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<'timeout'>(resolve => { timer = setTimeout(() => resolve('timeout'), budgetMs); });
+  try {
+    const entries = await Promise.all(assets.map(async asset => {
+      const price = getHistoricalPriceEur(asset, fecha).catch(() => 0);
+      const result = await Promise.race([price, deadline]);
+      return [asset, result === 'timeout' || !(result > 0) ? null : result] as const;
+    }));
+    return new Map(entries);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // Valora todos los lotes abiertos a una fecha contra su precio histórico —
@@ -78,32 +135,29 @@ export interface LoteValorizado {
 // getLotesAFecha()+getHistoricalPriceEur() con el mismo filtro
 // wallet_kind==='exchange', con riesgo de divergencia si se tocaba uno sin
 // el otro.
-export async function valorizarLotesEnFecha(fecha: Date): Promise<LoteValorizado[]> {
+export async function valorizarLotesEnFecha(fecha: Date, budgetMs = priceBudgetMs()): Promise<ValoracionAFecha> {
   const lotes = await getLotesAFecha(fecha);
-  return Promise.all(
-    lotes.map(async (row): Promise<LoteValorizado> => {
-      const quantity = parseFloat(row.quantity);
-      let precioEur = 0;
-      let valorEur = 0;
-      try {
-        precioEur = await getHistoricalPriceEur(row.asset, fecha);
-        valorEur = quantity * precioEur;
-      } catch {
-        // precio no disponible — lote excluido del cálculo (valorEur = 0)
-      }
-      return {
-        asset:        row.asset,
-        wallet_id:    row.wallet_id,
-        wallet_name:  row.wallet_name,
-        wallet_kind:  row.wallet_kind,
-        wallet_color: row.wallet_color,
-        quantity,
-        costBasisEur: parseFloat(row.cost_basis),
-        precioEur,
-        valorEur,
-      };
-    })
-  );
+  const precios = await preciosConPresupuesto([...new Set(lotes.map(l => l.asset))], fecha, budgetMs);
+  const activos = lotes.map((row): LoteValorizado => {
+    const quantity = parseFloat(row.quantity);
+    const precio = precios.get(row.asset) ?? null;
+    return {
+      asset:        row.asset,
+      wallet_id:    row.wallet_id,
+      wallet_name:  row.wallet_name,
+      wallet_kind:  row.wallet_kind,
+      wallet_color: row.wallet_color,
+      quantity,
+      costBasisEur: parseFloat(row.cost_basis),
+      precioEur:    precio ?? 0,
+      valorEur:     precio === null ? 0 : quantity * precio,
+      sinPrecio:    precio === null,
+    };
+  });
+  const sinPrecio = [...new Set(activos.filter(a => a.sinPrecio).map(a => a.asset))];
+  const definitivos = await sinPrecioDefinitivo(sinPrecio, fecha);
+  const preciosPendientes = sinPrecio.filter(a => !definitivos.has(a)).sort();
+  return { activos, preciosPendientes };
 }
 
 // Solo la custodia de terceros (exchanges) computa para el umbral del
