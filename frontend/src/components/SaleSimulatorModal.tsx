@@ -1,16 +1,15 @@
-import { useState, useCallback, useId } from 'react'
+import { useState, useCallback, useId, useMemo } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { X, Calculator, AlertCircle } from 'lucide-react'
 import { formatAmount, formatPrice } from '../utils/format'
-import { useTramos } from '../hooks/useTramos'
-import { calcularTramos, type TramoDesglose } from '../utils/tramosIrpf'
 import { portfolioApi } from '../api/portfolio'
+import { parseFeePct, readFeePct, saveFeePct, walletQuantities } from '../utils/saleSimulator'
 import { useDebounce } from '../hooks/useDebounce'
 import { StepButton } from './StepButton'
 import { calcStep } from '../utils/calcStep'
 import { SaleSimulatorResults } from './SaleSimulatorResults'
 import { EurOnlyBadge } from './EurOnlyBadge'
-import { iconButtonClasses, Modal } from './ui'
+import { iconButtonClasses, Modal, Dropdown } from './ui'
 
 interface Props {
   asset:        string
@@ -30,22 +29,40 @@ const wrapCls = `
 `
 
 export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: Props) {
-  const [qty,   setQty]   = useState(totalQty.toString())
+  // Wallets con el activo (#279): el motor fiscal aplica FIFO por wallet, así
+  // que la venta se simula en una (por defecto, la de mayor cantidad).
+  const { data: openLots } = useQuery({
+    queryKey: ['open-lots', asset],
+    queryFn: () => portfolioApi.getOpenLots(asset),
+    staleTime: 60_000,
+  })
+  const wallets = useMemo(() => walletQuantities(openLots?.lots ?? []), [openLots])
+  const [walletChoice, setWalletChoice] = useState<string | null>(null)
+  const wallet = wallets.find(w => w.walletId === walletChoice) ?? wallets[0] ?? null
+  const walletQty = wallet?.quantity ?? totalQty
+
+  // Cantidad: null = el máximo de la wallet elegida (vuelve a él al cambiarla).
+  const [qtyInput, setQtyInput] = useState<string | null>(null)
+  const qty = qtyInput ?? String(+walletQty.toPrecision(12))
   const [price, setPrice] = useState(currentPrice > 0 ? currentPrice.toFixed(4) : '')
+  // Comisión de venta en % (#279), recordada en este navegador.
+  const [feeInput, setFeeInput] = useState(() => String(readFeePct()))
+  const feePct = parseFeePct(feeInput)
 
   const titleId = useId()
 
   const debouncedQty   = useDebounce(qty,   400)
   const debouncedPrice = useDebounce(price, 400)
+  const debouncedFee   = useDebounce(feePct, 400)
 
   // Simulación vía react-query: la clave incluye cantidad y precio, así que una
   // respuesta lenta de una consulta anterior nunca pisa a la más reciente.
   const qNum  = parseFloat(debouncedQty)
   const pNum  = parseFloat(debouncedPrice)
-  const valid = qNum > 0 && !isNaN(pNum) && pNum >= 0
+  const valid = qNum > 0 && !isNaN(pNum) && pNum >= 0 && wallet !== null
   const { data, isFetching: loading, error: queryError } = useQuery({
-    queryKey: ['simulate-sale', asset, qNum, pNum],
-    queryFn: () => portfolioApi.simulateSale(asset, qNum, pNum),
+    queryKey: ['simulate-sale', asset, wallet?.walletId, qNum, pNum, debouncedFee],
+    queryFn: () => portfolioApi.simulateSale(asset, qNum, pNum, wallet?.walletId, debouncedFee),
     enabled: valid,
     retry: false,
     // Mantiene el resultado anterior visible mientras se recalcula.
@@ -54,19 +71,16 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
   const result = valid && !queryError ? data ?? null : null
   const error  = valid && queryError ? queryError.message : null
 
-  // Handlers de paso para cantidad
-  const decQty = useCallback(() => {
-    setQty(v => {
-      const n = parseFloat(v) || 0
-      return String(Math.max(0, +(n - calcStep(n)).toPrecision(8)))
-    })
-  }, [])
-  const incQty = useCallback(() => {
-    setQty(v => {
-      const n = parseFloat(v) || 0
-      return String(Math.min(totalQty, +(n + calcStep(n)).toPrecision(8)))
-    })
-  }, [totalQty])
+  // Handlers de paso para cantidad: funciones normales (no memorizadas) para
+  // leer siempre la cantidad vigente, que depende de la wallet elegida.
+  const decQty = () => {
+    const n = parseFloat(qty) || 0
+    setQtyInput(String(Math.max(0, +(n - calcStep(n)).toPrecision(8))))
+  }
+  const incQty = () => {
+    const n = parseFloat(qty) || 0
+    setQtyInput(String(Math.min(walletQty, +(n + calcStep(n)).toPrecision(8))))
+  }
 
   // Handlers de paso para precio
   const decPrice = useCallback(() => {
@@ -82,14 +96,6 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
     })
   }, [])
 
-  const tramosConfig = useTramos()
-
-  const net = result?.netGainLoss ?? 0
-
-  // Desglose por tramos reutilizando la misma función que TaxCards.tsx
-  // (utils/tramosIrpf.ts) — antes este cálculo estaba reimplementado
-  // aquí, con riesgo de divergir si cambia la normativa de tramos.
-  const tramosDesglose: TramoDesglose[] = net > 0.005 ? calcularTramos(net, tramosConfig) : []
 
   return (
     <Modal onClose={onClose} labelledBy={titleId} size="md">
@@ -106,7 +112,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
               </div>
               <h2 id={titleId} className="text-xl font-bold tracking-tight">{asset}</h2>
               <p className="text-xs text-fg-subtle mt-0.5">
-                Disponible: <span className="text-fg mono">{formatAmount(totalQty)} {asset}</span>
+                Disponible{wallet ? <> en <span className="text-fg">{wallet.walletName}</span></> : ''}: <span className="text-fg mono">{formatAmount(walletQty)} {asset}</span>
               </p>
             </div>
             <button
@@ -122,6 +128,29 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
 
         <div className="overflow-y-auto flex-1 p-5 space-y-5">
 
+          {/* Wallet de venta y comisión (#279) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-fg-muted mb-1.5 block" id={`${titleId}-wallet`}>Wallet de venta</label>
+              {wallets.length > 0 ? (
+                <Dropdown label="Wallet de venta" value={wallet?.walletId ?? ''} className="w-full"
+                  onChange={v => { setWalletChoice(v); setQtyInput(null) }}
+                  options={wallets.map(w => ({ value: w.walletId, label: `${w.walletName} · ${formatAmount(w.quantity)}` }))} />
+              ) : <p className="text-xs text-fg-subtle py-2">Cargando wallets…</p>}
+              <p className="mt-1.5 text-[11px] text-fg-subtle">Se venden primero los lotes más antiguos de esta wallet (FIFO).</p>
+            </div>
+            <div>
+              <label htmlFor={`${titleId}-fee`} className="text-xs font-medium text-fg-muted mb-1.5 block">Comisión de venta (%)</label>
+              <div className={wrapCls}>
+                <input id={`${titleId}-fee`} type="text" inputMode="decimal" value={feeInput}
+                  onChange={e => setFeeInput(e.target.value)}
+                  onBlur={() => { setFeeInput(String(feePct)); saveFeePct(feePct) }}
+                  className={inputCls} />
+              </div>
+              <p className="mt-1.5 text-[11px] text-fg-subtle">Reduce el importe y la ganancia. Se recuerda.</p>
+            </div>
+          </div>
+
           {/* Inputs */}
           <div className="grid grid-cols-2 gap-3">
             {/* Cantidad */}
@@ -130,18 +159,18 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
               <div className={wrapCls}>
                 <StepButton label="−" onStep={decQty} />
                 <input
-                  type="number" step="any" min="0" max={totalQty}
-                  value={qty} onChange={e => setQty(e.target.value)}
+                  type="number" step="any" min="0" max={walletQty}
+                  value={qty} onChange={e => setQtyInput(e.target.value)}
                   className={inputCls}
                 />
                 <StepButton label="+" onStep={incQty} />
               </div>
               <button
                 type="button"
-                onClick={() => setQty(totalQty.toString())}
+                onClick={() => setQtyInput(null)}
                 className="mt-1.5 text-xs font-medium text-brand/80 hover:text-brand transition-colors"
               >
-                Usar máximo ({formatAmount(totalQty)})
+                Usar máximo ({formatAmount(walletQty)})
               </button>
             </div>
 
@@ -187,7 +216,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
 
           {/* Resultados: se mantienen visibles durante recalculo, fade suave */}
           {result && (
-            <SaleSimulatorResults result={result} loading={loading} net={net} tramosDesglose={tramosDesglose} />
+            <SaleSimulatorResults result={result} loading={loading} />
           )}
         </div>
 

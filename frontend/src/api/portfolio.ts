@@ -227,19 +227,36 @@ export interface SimulatedLot {
   costBasisConsumed: number
   pricePerUnit:      number
   proceedsEur:       number
+  /** Comisión de venta atribuida al lote (#279). */
+  feeEur:            number
+  /** El lote solo se vende en parte. */
+  partial:           boolean
   gainLossEur:       number
 }
+
+/** Tramo del IRPF que atraviesa la venta (#279); negativo si la venta reduce la base. */
+export interface TramoMarginal { tipo: number; desde: number; hasta: number; base: number; cuota: number }
 
 export interface SimulationResult {
   asset:          string
   quantity:       number
   priceEur:       number
-  totalProceeds:  number
+  feePct:         number
+  /** Wallet donde se simula la venta: FIFO de sus lotes (#279). */
+  walletId:       string
+  wallets:        Array<{ walletId: string; walletName: string; quantity: number }>
+  totalProceeds:  number   // bruto
+  totalFee:       number
+  netProceeds:    number   // bruto − comisión
   totalCostBasis: number
   totalGain:      number
   totalLoss:      number
   netGainLoss:    number
   irpfEstimate:   number
+  /** IRPF marginal sobre la base del ahorro del ejercicio (#279). */
+  irpf: { year: number; baseAntes: number; baseDespues: number; marginal: number; desglose: TramoMarginal[] }
+  /** Compras reales del activo en los 2 meses anteriores (regla de recompra). */
+  recompra: { aviso: boolean; comprasRecientes: string[] }
   lotsConsumed:   SimulatedLot[]
 }
 
@@ -484,8 +501,8 @@ export const portfolioApi = {
   }>>('/settings/pending-deposits'),
   bulkSetCosts: (updates: { id: string; pricePerUnit: number }[]) =>
     api.post<{ success: boolean; updated: number; fifo: unknown }>('/settings/bulk-set-costs', { updates }),
-  simulateSale: (asset: string, quantity: number, priceEur: number) =>
-    api.post<SimulationResult>('/fiscal/simulate-sale', { asset, quantity, priceEur }),
+  simulateSale: (asset: string, quantity: number, priceEur: number, walletId?: string, feePct?: number) =>
+    api.post<SimulationResult>('/fiscal/simulate-sale', { asset, quantity, priceEur, walletId, feePct }),
   // Módulo fiscal detallado (pages/fiscal/Fiscal.tsx) — antes estas 8
   // llamadas usaban un fetchOk() local propio del fichero, sin pasar por
   // este cliente: sin el timeout de 30s del Nivel 2 ni el manejo de error
