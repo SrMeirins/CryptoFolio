@@ -4,6 +4,7 @@ import {
   getHistoricalPriceEur as getCoinGeckoHistoricalPrice,
   searchAndSaveCoinGeckoId,
 } from './coingecko';
+import { coinGeckoSearchFailedTransiently } from './coingeckoIds';
 import { fetchWithTimeout } from './httpTimeout';
 import { dedupeByKey, priceKey } from './priceDedup';
 import { PRICE_ALIASES } from './priceAliases';
@@ -63,6 +64,22 @@ const inFlightPrices = new Map<string, Promise<number>>();
 // el motor FIFO y reimportaciones no relancen el mismo ciclo de reintentos + 429.
 const noPricePairs = new Set<string>();
 
+// Fallos temporales recientes (red caída, bloqueo por región HTTP 451, 5xx…):
+// no se persisten como «sin precio» (#267) —volverían 0 para siempre aunque
+// vuelva la conexión—, pero se espera un rato antes de reintentar para no
+// saturar las fuentes en cada consulta.
+const TRANSIENT_RETRY_MS = 5 * 60_000;
+const transientMisses = new Map<string, number>();
+
+/**
+ * El motivo de un fallo de Binance indica que no hay datos (definitivo), no un
+ * problema de red: activo sin par, vela vacía o símbolo inválido (HTTP 400).
+ */
+export function isDefinitiveNoData(reason: unknown): boolean {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  return msg === 'no pair' || msg.startsWith('Sin datos para') || msg.includes('HTTP 400');
+}
+
 export async function getHistoricalPriceEur(symbol: string, date: Date): Promise<number> {
   if (symbol === 'EUR') return 1;
 
@@ -94,6 +111,9 @@ async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<numbe
 
   // Cache en memoria: par ya conocido sin precio en esta sesión — evita DB + API
   if (noPricePairs.has(key)) return 0;
+  // Fallo temporal reciente: no se reintenta todavía (#267).
+  const missAt = transientMisses.get(key);
+  if (missAt !== undefined && Date.now() - missAt < TRANSIENT_RETRY_MS) return 0;
 
   // 1. Caché DB (incluye sentinela -1 = sin precio disponible en ninguna fuente)
   const cached = await db.query(
@@ -148,6 +168,10 @@ async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<numbe
     (btcR.status  === 'fulfilled' && btcR.value  > 0 ? btcR.value  : 0) ||
     (ethR.status  === 'fulfilled' && ethR.value  > 0 ? ethR.value  : 0);
 
+  // Algún par de Binance falló por la red (no por falta de datos): el precio
+  // puede existir y no debe darse por perdido (#267).
+  let transient = [eurR, usdtR, btcR, ethR].some(r => r.status === 'rejected' && !isDefinitiveNoData(r.reason));
+
   // 4. Fallback a CoinGecko si Binance no tiene datos históricos
   //    (activos delistados, tokens no nativos de Binance, etc.)
   if (!priceEur) {
@@ -155,7 +179,17 @@ async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<numbe
       // Asegurar que tenemos coingecko_id antes de llamar
       await searchAndSaveCoinGeckoId(symbol);
       priceEur = await getCoinGeckoHistoricalPrice(symbol, date);
-    } catch { /* sin precio disponible */ }
+      if (!priceEur && coinGeckoSearchFailedTransiently(symbol)) transient = true;
+    } catch {
+      // Error de red o rate limit de CoinGecko: temporal.
+      transient = true;
+    }
+  }
+
+  if (!priceEur && transient) {
+    console.warn(`[PRICES] Precio de ${symbol} @ ${dateStr} no disponible por un fallo temporal; se reintentará`);
+    transientMisses.set(key, Date.now());
+    return 0;
   }
 
   if (!priceEur) {
@@ -172,6 +206,7 @@ async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<numbe
     return 0;
   }
 
+  transientMisses.delete(key);
   await cachePrice(symbol, priceEur, dateStr);
   return priceEur;
 }

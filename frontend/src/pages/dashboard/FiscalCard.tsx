@@ -10,6 +10,7 @@ import { fiscalSubtitle } from '../../utils/panelSubtitles'
 import { baseTramosCompensada } from '../../utils/tramosIrpf'
 import { deadlineUrgency, estimatedTax, gainLossShares, nextFiscalDeadline } from '../../utils/fiscalPanel'
 import { madridToday } from '../../utils/pnlChart'
+import { MODELO721_LABELS, modelo721Status, pendingPricesText } from '../../utils/modelo721Status'
 import { useTramos } from '../../hooks/useTramos'
 import { FISCAL_STALE_TIME } from '../fiscal/constants'
 import { FiscalMonthly } from './FiscalMonthly'
@@ -128,14 +129,24 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
             </div>
             {modelo721 ? (
               <>
-                <span className={badgeClasses(modelo721.superaUmbral ? 'negative' : 'positive')}>
-                  {modelo721.superaUmbral ? 'Obligatorio' : 'Sin obligación'}
-                </span>
+                {(() => {
+                  // Con precios pendientes el valor es un mínimo (#267).
+                  const status = modelo721Status(modelo721)
+                  return (
+                    <span className={badgeClasses(status === 'obligatorio' ? 'negative' : status === 'incompleto' ? 'warning' : 'positive')}
+                      title={pendingPricesText(modelo721.preciosPendientes) ?? undefined}>
+                      {MODELO721_LABELS[status]}
+                    </span>
+                  )
+                })()}
                 <div className="h-1.5 rounded-full bg-overlay/6 overflow-hidden" role="img" aria-label={`${formatPercent(umbralPct ?? 0, 0)} del umbral`}>
                   <span className={`block h-full rounded-full ${modelo721.superaUmbral ? 'bg-negative' : (umbralPct ?? 0) > 75 ? 'bg-warning' : 'bg-positive'}`}
                     style={{ width: `${umbralPct}%` }} />
                 </div>
-                <p className="text-[11px] text-fg-subtle">{formatPercent(umbralPct ?? 0, 0)} del umbral de {formatEur(modelo721.umbral)}</p>
+                <p className="text-[11px] text-fg-subtle">{modelo721.incompleto ? 'Al menos ' : ''}{formatPercent(umbralPct ?? 0, 0)} del umbral de {formatEur(modelo721.umbral)}</p>
+                {modelo721.incompleto && (
+                  <p className="text-[11px] text-warning">{pendingPricesText(modelo721.preciosPendientes)}</p>
+                )}
               </>
             ) : <p className="text-xs text-fg-subtle">—</p>}
           </div>

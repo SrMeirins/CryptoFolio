@@ -1,6 +1,6 @@
 import { db } from '../../db/client';
 import { BASE_URL, enqueueCoinGeckoCall, fetchWithRetry, notifyStatus } from './coingeckoClient';
-import { getCoinGeckoId, searchAndSaveCoinGeckoId } from './coingeckoIds';
+import { coinGeckoSearchFailedTransiently, getCoinGeckoId, searchAndSaveCoinGeckoId } from './coingeckoIds';
 import { dedupeByKey, priceKey } from './priceDedup';
 
 // Evita que N llamadas concurrentes para el mismo par (symbol, date) generen
@@ -52,7 +52,8 @@ async function _getHistoricalPriceEur(
   const geckoId = getCoinGeckoId(symbol);
   if (!geckoId) {
     console.warn(`[PRICES] Sin coingecko_id para ${symbol}, usando fallback 0`);
-    noPricePairs.add(key);
+    // Si el id falta porque la búsqueda falló por la red, se reintentará (#267).
+    if (!coinGeckoSearchFailedTransiently(symbol)) noPricePairs.add(key);
     return 0;
   }
 
