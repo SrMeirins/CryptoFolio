@@ -21,6 +21,8 @@ interface AssetTableProps {
   /** Distingue filas del mismo activo en tablas que mezclan wallets (polvo). */
   keyByWallet?: boolean
   onSimulate?: (asset: string, qty: number, price: number) => void
+  /** Abre el panel de detalle de un activo (#272). */
+  onOpen?: (asset: string) => void
   /** Contenido de la barra superior, a la izquierda del botón de restablecer orden. */
   header?: ReactNode
 }
@@ -28,7 +30,7 @@ interface AssetTableProps {
 // Tabla de posiciones de Portfolio (#269): solo presentación y orden. Antes
 // calculaba sus propias filas, su polvo y su total, con lo que cada wallet
 // tenía su bloque de polvo y el «% cartera» era relativo a la propia tabla.
-export function AssetTable({ rows, portfolioTotal, compact = false, hideWalletChips = false, keyByWallet = false, onSimulate, header }: AssetTableProps) {
+export function AssetTable({ rows, portfolioTotal, compact = false, hideWalletChips = false, keyByWallet = false, onSimulate, onOpen, header }: AssetTableProps) {
   // Precios en vivo y de hace 24h (WebSocket, #147) en la moneda de visualización (#177).
   const { currency, prices, open24: yesterdayPrices } = useDisplayMarket()
   // El simulador de venta es fiscal y trabaja siempre en EUR: recibe el precio
@@ -93,7 +95,7 @@ export function AssetTable({ rows, portfolioTotal, compact = false, hideWalletCh
             {sorted.map(row => row.kind === 'fiat'
               ? <FiatRowComponent key={rowKey(row)} row={row} totalPortfolioValue={portfolioTotal} compact={compact} />
               : <CryptoRowComponent key={rowKey(row)} row={row} prices={prices} yesterdayPrices={yesterdayPrices}
-                  totalPortfolioValue={portfolioTotal} compact={compact} onSimulate={simulate} hideWalletChips={hideWalletChips}
+                  totalPortfolioValue={portfolioTotal} compact={compact} onSimulate={simulate} hideWalletChips={hideWalletChips} onOpen={onOpen}
                   lockedAmounts={lockedAmounts.filter(l => l.asset === row.asset && row.wallets.some(w => w.wallet_id === l.wallet_id))} />)}
           </tbody>
         </table>

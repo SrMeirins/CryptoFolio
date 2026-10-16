@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import { ChevronDown, ChevronRight, Settings, Calculator, Lock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { type LockedAmount } from '../api/portfolio'
@@ -14,7 +14,7 @@ import { PnlPill, WeightCell } from './AssetTableCells'
 
 const flashClass = (f: FlashDirection) => (f === 'up' ? 'flash-up' : f === 'down' ? 'flash-down' : '')
 
-export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate, lockedAmounts = [], hideWalletChips = false }: {
+export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate, lockedAmounts = [], hideWalletChips = false, onOpen }: {
   row: CryptoRow
   prices: Record<string, number>
   yesterdayPrices: Record<string, number>
@@ -24,9 +24,18 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
   lockedAmounts?: LockedAmount[]
   /** En la tabla de una sola wallet no se repite su chip en cada fila (#269). */
   hideWalletChips?: boolean
+  /** Abre el panel de detalle del activo (#272); sin él, la fila despliega sus wallets. */
+  onOpen?: (asset: string) => void
 }) {
   const currency = useCurrency()
   const [expanded, setExpanded] = useState(false)
+  // Al abrir el detalle con un clic en la fila, el foco pasa antes al nombre
+  // del activo para que vuelva ahí al cerrar el panel (#272).
+  const nameRef = useRef<HTMLButtonElement>(null)
+  function open() {
+    nameRef.current?.focus({ preventScroll: true })
+    onOpen?.(row.asset)
+  }
   const price      = prices[row.asset] ?? 0
   const pnl        = row.value - row.totalCostBasis
   const pnlPct     = row.totalCostBasis > 0 ? (pnl / row.totalCostBasis) * 100 : 0
@@ -54,22 +63,33 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
   return (
     <>
       <tr
-        className={tableRowClasses(canExpand, expanded)}
-        onClick={() => canExpand && setExpanded(e => !e)}
+        className={tableRowClasses(canExpand || !!onOpen, expanded)}
+        onClick={() => (onOpen ? open() : canExpand && setExpanded(e => !e))}
       >
         {/* Activo */}
         <td className={`px-5 ${pad}`}>
           <div className="flex items-center gap-2">
             <div className="w-4 shrink-0 flex items-center justify-center">
               {canExpand
-                ? expanded
-                  ? <ChevronDown size={12} className="text-fg-subtle" />
-                  : <ChevronRight size={12} className="text-fg-subtle" />
+                ? (
+                  <button type="button" aria-expanded={expanded} aria-label={`${expanded ? 'Ocultar' : 'Ver'} el reparto de ${row.asset} por wallet`}
+                    onClick={e => { e.stopPropagation(); setExpanded(x => !x) }}
+                    className="rounded p-0.5 text-fg-subtle hover:text-fg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60">
+                    {expanded ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
+                  </button>
+                )
                 : <span className="w-3" />
               }
             </div>
             <CryptoIcon symbol={row.asset} size={compact ? 22 : 28} />
-            <span className="font-medium">{row.asset}</span>
+            {onOpen
+              ? (
+                <button ref={nameRef} type="button" onClick={e => { e.stopPropagation(); open() }} aria-label={`Ver detalle de ${row.asset}`}
+                  className="font-medium rounded hover:text-brand focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60">
+                  {row.asset}
+                </button>
+              )
+              : <span className="font-medium">{row.asset}</span>}
             {!expanded && (
               <div className="flex gap-1 ml-1 flex-wrap">
                 {!hideWalletChips && row.wallets.map(w => (

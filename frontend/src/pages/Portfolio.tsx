@@ -6,6 +6,8 @@ import { SaleSimulatorModal } from '../components/SaleSimulatorModal'
 import { RefreshCw, Wallet, Search, X, Settings, Rows3, Rows4 } from 'lucide-react'
 import { useDisplayLots, useDisplayMarket } from '../hooks/useDisplayMarket'
 import { InventoryStrip } from './portfolio/InventoryStrip'
+import { AssetDetailPanel } from './portfolio/AssetDetailPanel'
+import { usePricesStore } from '../store/pricesStore'
 import { WalletCards } from './portfolio/WalletCards'
 import { WalletSections } from './portfolio/WalletSections'
 import { DustSection } from './portfolio/DustSection'
@@ -50,9 +52,11 @@ export function Portfolio() {
     staleTime: 60_000,
   })
 
-  // ?activo=XRP llega desde el mapa de calor del Dashboard (#233).
+  // ?activo=XRP llega desde el mapa de calor del Dashboard (#233): abre el
+  // panel de detalle de ese activo (#272).
   const [params] = useSearchParams()
-  const [search, setSearch] = useState(() => params.get('activo') ?? '')
+  const [search, setSearch] = useState('')
+  const [detailAsset, setDetailAsset] = useState<string | null>(() => params.get('activo')?.toUpperCase() ?? null)
   const searchRef = useRef<HTMLInputElement>(null)
   const [simulator, setSimulator] = useState<{ asset: string; qty: number; price: number } | null>(null)
   const [density, setDensity] = useState<Density>(readDensity)
@@ -109,6 +113,13 @@ export function Portfolio() {
       .filter(s => s.rows.length > 0),
     [filtered.sections, pnlFilter, market.prices],
   )
+  // Fila consolidada del activo del panel de detalle, sobre toda la cartera (#272).
+  const detailRow = useMemo(() => {
+    if (!detailAsset) return null
+    const v = assetView(displayLots, market.prices, [], fiatPrice, market.dustThreshold)
+    const row = [...v.rows, ...v.dust].find(r => r.asset === detailAsset)
+    return row && row.kind === 'crypto' ? row : null
+  }, [detailAsset, displayLots, market.prices, fiatPrice, market.dustThreshold])
   // Inventario de toda la cartera: custodia, posiciones, bloqueado y wallets (#270).
   const inventory = useMemo(
     () => portfolioInventory(displayLots, market.prices, fiatBalances, fiatPrice, lockedAmounts),
@@ -251,7 +262,7 @@ export function Portfolio() {
           {view === 'asset' ? (
             <section aria-label="Posiciones" className={panelClasses(cardClasses('none', 'overflow-clip'))} style={panelEnterStyle(1)}>
               <AssetTable rows={assetRows} portfolioTotal={all.total} compact={compact}
-                onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })}
+                onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} onOpen={setDetailAsset}
                 header={<>
                   <h2 className="text-sm font-semibold text-fg">Posiciones</h2>
                   <span className="text-xs text-fg-subtle">{assetRows.length} {assetRows.length === 1 ? 'activo' : 'activos'}</span>
@@ -267,6 +278,28 @@ export function Portfolio() {
         </>
       )}
     </div>
+
+    {detailRow && (() => {
+      const price = market.prices[detailRow.asset] ?? 0
+      const open = market.open24[detailRow.asset]
+      return (
+        <AssetDetailPanel
+          row={detailRow}
+          price={price}
+          change24h={price > 0 && open > 0 ? ((price - open) / open) * 100 : null}
+          currency={market.currency}
+          rate={market.rate}
+          locked={lockedAmounts.filter(l => l.asset === detailRow.asset)}
+          onClose={() => setDetailAsset(null)}
+          onSimulate={() => {
+            // El simulador es fiscal y trabaja en EUR; se cierra el panel para
+            // no apilar dos diálogos con el foco atrapado.
+            setDetailAsset(null)
+            setSimulator({ asset: detailRow.asset, qty: detailRow.totalQuantity, price: usePricesStore.getState().prices[detailRow.asset] ?? 0 })
+          }}
+        />
+      )
+    })()}
 
     {simulator && (
       <SaleSimulatorModal

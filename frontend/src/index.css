@@ -370,3 +370,7 @@
   backdrop-filter: blur(10px) saturate(1.4);
   -webkit-backdrop-filter: blur(10px) saturate(1.4);
 }
+
+/* ── Panel lateral (#272): entra desde la derecha ─────────────────────────── */
+@keyframes drawerIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.drawer-in { animation: drawerIn 0.22s ease-out both; }
