@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FifoLot, FiatBalance, LockedAmount } from '../api/portfolio'
-import { portfolioInventory } from './portfolioInventory'
+import { distinctHues, portfolioInventory, walletComposition } from './portfolioInventory'
 
 // Inventario de Portfolio (#270).
 const lot = (asset: string, wallet: string, kind: string, quantity: number): FifoLot => ({
@@ -47,5 +47,61 @@ describe('portfolioInventory', () => {
     expect(empty.custody.exchangePct).toBe(0)
     expect(empty.positions.top).toBeNull()
     expect(portfolioInventory([lot('NEW', 'cold', 'hardware', 5)], {}, [], 1, []).positions.top).toBeNull()
+  })
+})
+
+// Composición, P&L y antigüedad media por wallet (#283). Datos sintéticos.
+describe('walletComposition', () => {
+  const values = new Map([['A', 500], ['B', 300], ['C', 100], ['D', 50], ['E', 40], ['DUST', 0.5]])
+  const total = 990.5
+  it('4 principales y el resto (con el polvo) en «otros»; suma el valor de la wallet', () => {
+    const c = walletComposition(values, total, 1)
+    expect(c.top.map(p => p.asset)).toEqual(['A', 'B', 'C', 'D'])
+    expect(c.others.value).toBeCloseTo(40.5, 9)
+    expect(c.others.count).toBe(1)          // E; el polvo no cuenta
+    expect(c.assetCount).toBe(5)
+    expect(c.top.reduce((s, p) => s + p.value, 0) + c.others.value).toBeCloseTo(total, 9)
+    expect(c.top.reduce((s, p) => s + p.pct, 0) + c.others.pct).toBeCloseTo(100, 9)
+  })
+  it('una wallet con solo polvo lo muestra', () => {
+    const c = walletComposition(new Map([['X', 0.1], ['Y', 0.04]]), 0.14, 1)
+    expect(c.top.map(p => p.asset)).toEqual(['X', 'Y'])
+    expect(c.assetCount).toBe(2)
+    expect(c.others).toEqual({ value: 0, pct: 0, count: 0 })
+  })
+})
+
+describe('portfolioInventory: P&L y antigüedad media (#283)', () => {
+  const dated = (asset: string, wallet: string, quantity: number, cost: number, at: string | null): FifoLot =>
+    ({ ...lot(asset, wallet, 'hardware', quantity), cost_basis_eur: String(cost), avg_opened_at: at })
+  const inv = portfolioInventory(
+    [dated('XRP', 'cold', 1_000, 1_000, '2024-01-01T00:00:00Z'), dated('BTC', 'cold', 0.01, 3_000, '2024-01-31T00:00:00Z'), dated('NOPRICE', 'cold', 5, 50, null)],
+    prices, [], 1, [], 1,
+  )
+  const cold = inv.wallets[0]
+  it('P&L solo de las posiciones con precio', () => {
+    expect(cold.pnl).toBeCloseTo(2_000 + 500 - 4_000, 6)
+    expect(cold.pnlPct).toBeCloseTo(-37.5, 6)
+  })
+  it('fecha media ponderada por coste, en la wallet y en la cartera', () => {
+    expect(new Date(cold.avgOpenedAt!).toISOString()).toBe('2024-01-23T12:00:00.000Z')
+    expect(inv.avgOpenedAt).toBe(cold.avgOpenedAt)
+  })
+  it('sin coste ni fechas: null', () => {
+    const empty = portfolioInventory([lot('XRP', 'cold', 'hardware', 1)], prices, [], 1, [])
+    expect(empty.wallets[0].pnl).toBeNull()
+    expect(empty.avgOpenedAt).toBeNull()
+  })
+})
+
+describe('distinctHues (#283)', () => {
+  it('conserva los tonos separados y desplaza los que chocan', () => {
+    expect(distinctHues([10, 120, 240])).toEqual([10, 120, 240])
+    const h = distinctHues([80, 85, 90])
+    expect(h[0]).toBe(80)
+    for (let i = 0; i < h.length; i++) for (let j = i + 1; j < h.length; j++) {
+      const d = Math.abs(h[i] - h[j]) % 360
+      expect(Math.min(d, 360 - d)).toBeGreaterThanOrEqual(45)
+    }
   })
 })

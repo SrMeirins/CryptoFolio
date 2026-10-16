@@ -97,6 +97,8 @@ export interface FifoLot {
   // Coste y precio medio en USD con el tipo de apertura de cada lote (#174/#175).
   cost_basis_usd?: string | null
   avg_price_usd?: string | null
+  /** Fecha media de apertura de los lotes ponderada por coste (#283). */
+  avg_opened_at?: string | null
 }
 
 /** Lote FIFO abierto de un activo (#272), para el panel de detalle de Portfolio. */

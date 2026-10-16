@@ -51,6 +51,20 @@ describe('routes/fifo — endpoints de agregación', () => {
     const { runFifoEngine } = await import('../../modules/fifo/engine');
     await runFifoEngine();
 
+    // Dos lotes de ETH con coste distinto para la fecha media ponderada (#283).
+    // Se siembran tras el motor y sin coste en EUR en la transacción, para no
+    // alterar el flujo de EUR que comprueban otros tests.
+    for (const [at, price] of [['2024-01-01T00:00:00Z', 100], ['2024-01-31T00:00:00Z', 300]] as const) {
+      const tx = await pool.query(
+        `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id)
+         VALUES ('BUY', $1, 'ETH', 1, 1, $2) RETURNING id`, [at, walletId],
+      );
+      await pool.query(
+        `INSERT INTO fifo_lots (asset, quantity_original, quantity_remaining, cost_basis_eur, price_per_unit_eur, open_transaction_id, opened_at, wallet_id)
+         VALUES ('ETH', 1, 1, $1, $1, $2, $3, $4)`, [price, tx.rows[0].id, at, walletId],
+      );
+    }
+
     const { default: router } = await import('./fifoAggregations');
     app = express();
     app.use('/api/fifo', router);
@@ -98,6 +112,15 @@ describe('routes/fifo — endpoints de agregación', () => {
     const btc = res.body.find((r: { asset: string }) => r.asset === 'BTC');
     expect(btc).toBeTruthy();
     expect(Number(btc.quantity)).toBeCloseTo(0.6, 6);
+  });
+
+  it('GET /lots incluye la fecha media de apertura ponderada por coste (#283)', async () => {
+    const res = await request(app).get('/api/fifo/lots');
+    const eth = res.body.find((r: { asset: string }) => r.asset === 'ETH');
+    // 1 ene + 3/4 de 30 días (300 € frente a 100 €) = 23 ene 12:00 UTC
+    expect(new Date(eth.avg_opened_at).toISOString()).toBe('2024-01-23T12:00:00.000Z');
+    const btc = res.body.find((r: { asset: string }) => r.asset === 'BTC');
+    expect(new Date(btc.avg_opened_at).toISOString()).toBe('2024-01-01T00:00:00.000Z');
   });
 
   it('GET /locked devuelve vacío cuando no hay operaciones de staking/launchpool', async () => {

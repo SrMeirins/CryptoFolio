@@ -122,8 +122,8 @@ export function Portfolio() {
   }, [detailAsset, displayLots, market.prices, fiatPrice, market.dustThreshold])
   // Inventario de toda la cartera: custodia, posiciones, bloqueado y wallets (#270).
   const inventory = useMemo(
-    () => portfolioInventory(displayLots, market.prices, fiatBalances, fiatPrice, lockedAmounts),
-    [displayLots, market.prices, fiatBalances, fiatPrice, lockedAmounts],
+    () => portfolioInventory(displayLots, market.prices, fiatBalances, fiatPrice, lockedAmounts, market.dustThreshold),
+    [displayLots, market.prices, fiatBalances, fiatPrice, lockedAmounts, market.dustThreshold],
   )
 
   const hasPrices = Object.keys(market.prices).length > 0

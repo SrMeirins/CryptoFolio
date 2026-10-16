@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OpenLot } from '../api/portfolio'
-import { formatAge, formatLotDate, lotDateDetail, lotSourceLabel, lotsView } from './portfolioLots'
+import { daysSince, formatAge, formatLotDate, lotDateDetail, lotSourceLabel, lotsView } from './portfolioLots'
 
 // Lotes FIFO del panel de detalle (#272).
 const lot = (wallet: string, openedAt: string, original: number, remaining: number, unit: number, usdPerEur: string | null = null): OpenLot => ({
@@ -82,5 +82,14 @@ describe('lotSourceLabel', () => {
   it('el resto, con su etiqueta; sin etiqueta, el tipo tal cual', () => {
     expect(lotSourceLabel('BUY', labels)).toBe('Compra')
     expect(lotSourceLabel('NUEVO', labels)).toBe('NUEVO')
+  })
+})
+
+describe('daysSince (#283)', () => {
+  it('días completos, nunca negativos', () => {
+    const now = new Date('2026-01-31T10:00:00Z')
+    expect(daysSince(Date.parse('2026-01-01T10:00:00Z'), now)).toBe(30)
+    expect(daysSince(Date.parse('2026-02-01T10:00:00Z'), now)).toBe(0)
+    expect(daysSince(null, now)).toBeNull()
   })
 })
