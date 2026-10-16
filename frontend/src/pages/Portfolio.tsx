@@ -5,13 +5,15 @@ import { portfolioApi } from '../api/portfolio'
 import { SaleSimulatorModal } from '../components/SaleSimulatorModal'
 import { RefreshCw, Wallet, Search, X, Settings, Rows3, Rows4 } from 'lucide-react'
 import { useDisplayLots, useDisplayMarket } from '../hooks/useDisplayMarket'
-import { AllocationDonut } from './portfolio/AllocationDonut'
+import { InventoryStrip } from './portfolio/InventoryStrip'
+import { WalletCards } from './portfolio/WalletCards'
 import { WalletSections } from './portfolio/WalletSections'
 import { DustSection } from './portfolio/DustSection'
-import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState, PageHeader, SegmentedControl, panelEnterStyle } from '../components/ui'
+import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState, PageHeader, SegmentedControl } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 import { portfolioSubtitle } from '../utils/panelSubtitles'
 import { portfolioSections } from '../utils/portfolioSections'
+import { portfolioInventory } from '../utils/portfolioInventory'
 import { isSearchShortcut, readDensity, readDustOpen, saveDensity, saveDustOpen, type Density } from '../utils/portfolioPrefs'
 
 const DENSITY_OPTIONS = [
@@ -28,6 +30,12 @@ export function Portfolio() {
     queryKey: ['fiat-balances'],
     queryFn: portfolioApi.getFiatBalances,
   })
+  // Misma consulta (y caché) que la tabla de posiciones.
+  const { data: lockedAmounts = [] } = useQuery({
+    queryKey: ['locked-amounts'],
+    queryFn: portfolioApi.getLockedAmounts,
+    staleTime: 60_000,
+  })
 
   // ?activo=XRP llega desde el mapa de calor del Dashboard (#233).
   const [params] = useSearchParams()
@@ -36,6 +44,8 @@ export function Portfolio() {
   const [simulator, setSimulator] = useState<{ asset: string; qty: number; price: number } | null>(null)
   const [density, setDensity] = useState<Density>(readDensity)
   const [dustOpen, setDustOpen] = useState(readDustOpen)
+  // Wallet elegida en las tarjetas (#270): filtra la tabla; null = todas.
+  const [walletFilter, setWalletFilter] = useState<string | null>(null)
   const compact = density === 'compact'
 
   // «/» enfoca el buscador desde cualquier punto de la página (#269).
@@ -60,9 +70,19 @@ export function Portfolio() {
     () => portfolioSections(displayLots, market.prices, fiatBalances, fiatPrice, market.dustThreshold),
     [displayLots, market.prices, fiatBalances, fiatPrice, market.dustThreshold],
   )
-  const filtered = useMemo(() => (q
-    ? portfolioSections(displayLots.filter(l => l.asset.includes(q)), market.prices, fiatBalances.filter(b => b.asset.includes(q)), fiatPrice, market.dustThreshold)
-    : all), [q, all, displayLots, market.prices, fiatBalances, fiatPrice, market.dustThreshold])
+  const filtered = useMemo(() => {
+    if (!q && !walletFilter) return all
+    const keep = (asset: string, walletId: string) => asset.includes(q) && (!walletFilter || walletId === walletFilter)
+    return portfolioSections(
+      displayLots.filter(l => keep(l.asset, l.wallet_id)), market.prices,
+      fiatBalances.filter(b => keep(b.asset, b.wallet_id)), fiatPrice, market.dustThreshold,
+    )
+  }, [q, walletFilter, all, displayLots, market.prices, fiatBalances, fiatPrice, market.dustThreshold])
+  // Inventario de toda la cartera: custodia, posiciones, bloqueado y wallets (#270).
+  const inventory = useMemo(
+    () => portfolioInventory(displayLots, market.prices, fiatBalances, fiatPrice, lockedAmounts),
+    [displayLots, market.prices, fiatBalances, fiatPrice, lockedAmounts],
+  )
 
   const hasPrices = Object.keys(market.prices).length > 0
   const walletCount = new Set(lots.map(l => l.wallet_id)).size
@@ -147,11 +167,13 @@ export function Portfolio() {
         </div>
       )}
 
-      {/* Gráfico de distribución — solo con precios disponibles */}
-      {hasPrices && !isLoading && lots.length > 0 && (
-        <div className="panel-in" style={panelEnterStyle(0)}>
-          <AllocationDonut lots={lots} fiatBalances={fiatBalances} />
-        </div>
+      {/* Inventario y wallets (#270): sustituyen al anillo de distribución, que
+          duplicaba el panel del Dashboard. */}
+      {hasPrices && !isLoading && inventory.wallets.length > 0 && (
+        <>
+          <InventoryStrip inventory={inventory} />
+          <WalletCards wallets={inventory.wallets} selected={walletFilter} onSelect={setWalletFilter} />
+        </>
       )}
 
       {isLoading ? (
@@ -162,8 +184,10 @@ export function Portfolio() {
         <EmptyState
           compact
           icon={<Search size={22} />}
-          title={<>Sin resultados para <span className="mono text-fg">"{search}"</span></>}
-          action={<Button variant="ghost" size="sm" onClick={() => setSearch('')}>Limpiar búsqueda</Button>}
+          title={search
+            ? <>Sin resultados para <span className="mono text-fg">"{search}"</span></>
+            : 'Sin posiciones en esta wallet'}
+          action={<Button variant="ghost" size="sm" onClick={() => { setSearch(''); setWalletFilter(null) }}>Quitar filtros</Button>}
         />
       ) : (
         <>
