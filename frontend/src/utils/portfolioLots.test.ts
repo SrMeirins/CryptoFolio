@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OpenLot } from '../api/portfolio'
-import { formatAge, lotSourceLabel, lotsView } from './portfolioLots'
+import { formatAge, formatLotDate, lotDateDetail, lotSourceLabel, lotsView } from './portfolioLots'
 
 // Lotes FIFO del panel de detalle (#272).
 const lot = (wallet: string, openedAt: string, original: number, remaining: number, unit: number, usdPerEur: string | null = null): OpenLot => ({
@@ -42,11 +42,34 @@ describe('lotsView', () => {
 })
 
 describe('formatAge', () => {
-  it('días, meses y años', () => {
-    expect(formatAge(12)).toBe('12 d')
-    expect(formatAge(150)).toBe('4 m')
-    expect(formatAge(365)).toBe('1 a')
-    expect(formatAge(800)).toBe('2 a 2 m')
+  it('días con hoy y ayer', () => {
+    expect(formatAge(0)).toBe('Hoy')
+    expect(formatAge(1)).toBe('Ayer')
+    expect(formatAge(30)).toBe('Hace 30 días')
+  })
+  it('meses y años con singular y plural', () => {
+    expect(formatAge(31)).toBe('Hace 1 mes')
+    expect(formatAge(150)).toBe('Hace 4 meses')
+    expect(formatAge(364)).toBe('Hace 11 meses')
+    expect(formatAge(365)).toBe('Hace 1 año')
+    expect(formatAge(548)).toBe('Hace 1 año y 6 meses')
+    expect(formatAge(800)).toBe('Hace 2 años y 2 meses')
+    expect(formatAge(730)).toBe('Hace 2 años')
+    expect(formatAge(400)).toBe('Hace 1 año y 1 mes')
+  })
+})
+
+describe('fecha del lote', () => {
+  it('año completo y sin punto en el mes', () => {
+    expect(formatLotDate('2025-04-09T12:32:00Z')).toBe('9 abr 2025')
+    expect(formatLotDate('2025-09-09T12:00:00Z')).toBe('9 sept 2025')
+  })
+  it('tooltip con hora de Madrid y días', () => {
+    expect(lotDateDetail('2025-04-09T12:32:00Z', 554)).toBe('9 de abril de 2025, 14:32 · 554 días')
+    expect(lotDateDetail('2025-04-09T12:32:00Z', 1)).toBe('9 de abril de 2025, 14:32 · 1 día')
+  })
+  it('las 23:30 UTC ya son el día siguiente en Madrid', () => {
+    expect(formatLotDate('2025-12-31T23:30:00Z')).toBe('1 ene 2026')
   })
 })
 

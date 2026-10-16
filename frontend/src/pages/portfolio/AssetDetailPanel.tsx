@@ -12,14 +12,12 @@ import type { CryptoRow } from '../../utils/assetTable'
 import { breakEvenDistance } from '../../utils/portfolioView'
 import { recoveryText } from '../../utils/fxEffect'
 import { InfoTooltip } from '../../components/InfoTooltip'
-import { formatAge, lotSourceLabel, lotsView } from '../../utils/portfolioLots'
+import { formatAge, formatLotDate, lotDateDetail, lotSourceLabel, lotsView } from '../../utils/portfolioLots'
 import { ink } from '../../utils/colors'
 
 // Panel de detalle de un activo en Portfolio (#272): resumen con break-even
 // y simulador, reparto por wallet con lo bloqueado y los lotes FIFO abiertos,
 // con el próximo que se vendería en cada wallet destacado.
-
-const SHORT_DATE = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'Europe/Madrid' })
 
 function Stat({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -157,10 +155,13 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
             {lots.map((l, i) => (
               <li key={`${l.walletId}-${l.openedAt}-${i}`}
                 className={`rounded-xl border px-3 py-2.5 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 ${l.next ? 'border-brand/40 bg-brand/5' : 'border-border'}`}>
-                <div className="flex items-center gap-2 min-w-0 text-xs">
-                  <span className="mono text-fg">{SHORT_DATE.format(new Date(l.openedAt)).replace('.', '')}</span>
-                  <span className="text-fg-subtle">· {formatAge(l.ageDays)}</span>
-                  <span className="truncate" style={{ color: ink(l.walletColor) }}>{l.walletName}</span>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0 text-xs">
+                  {/* Antigüedad en palabras y fecha completa; detalle exacto en el tooltip (#289) */}
+                  <time dateTime={l.openedAt} title={lotDateDetail(l.openedAt, l.ageDays)} className="whitespace-nowrap">
+                    <span className="text-fg">{formatAge(l.ageDays)}</span>
+                    <span className="text-fg-subtle"> · {formatLotDate(l.openedAt)}</span>
+                  </time>
+                  <span className="truncate max-w-full" style={{ color: ink(l.walletColor) }}>{l.walletName}</span>
                   {l.next && (
                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-brand/12 text-brand shrink-0"
                       title="Es el primero que se vendería en esta wallet (FIFO)">Siguiente</span>

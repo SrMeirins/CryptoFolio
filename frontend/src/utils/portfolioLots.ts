@@ -64,14 +64,34 @@ export function lotsView(lots: readonly OpenLot[], price: number, currency: Curr
 }
 
 /** «12 d», «5 m», «2 a 3 m»: antigüedad compacta de un lote. */
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
+/** Antigüedad de un lote en palabras (#289): «Hoy», «Hace 5 días», «Hace 1 año y 6 meses». */
 export function formatAge(days: number): string {
-  if (days < 31) return `${days} d`
-  // Meses exactos del año (365 / 12 días); el margen evita que 365 días den 11 m por redondeo.
+  if (days <= 0) return 'Hoy'
+  if (days === 1) return 'Ayer'
+  if (days < 31) return `Hace ${days} días`
+  // Meses exactos del año (365 / 12 días); el margen evita que 365 días den 11 meses por redondeo.
   const months = Math.floor((days * 12) / 365 + 1e-9)
-  if (months < 12) return `${months} m`
+  if (months < 12) return `Hace ${plural(months, 'mes', 'meses')}`
   const years = Math.floor(months / 12)
   const rest = months % 12
-  return rest > 0 ? `${years} a ${rest} m` : `${years} a`
+  return `Hace ${plural(years, 'año', 'años')}${rest > 0 ? ` y ${plural(rest, 'mes', 'meses')}` : ''}`
+}
+
+const LOT_DATE = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Madrid' })
+const LOT_DAY_LONG = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: 'Europe/Madrid' })
+const LOT_TIME = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })
+
+/** Fecha de apertura con el año completo: «9 abr 2025». */
+export function formatLotDate(iso: string): string {
+  return LOT_DATE.format(new Date(iso)).replace('.', '')
+}
+
+/** Detalle del tooltip: «9 de abril de 2025, 14:32 · 554 días». */
+export function lotDateDetail(iso: string, days: number): string {
+  const d = new Date(iso)
+  return `${LOT_DAY_LONG.format(d)}, ${LOT_TIME.format(d)} · ${plural(days, 'día', 'días')}`
 }
 
 /**
