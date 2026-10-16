@@ -129,3 +129,13 @@ describe('buildRows — moneda de visualización (#177)', () => {
     expect(row).toMatchObject({ quantity: 50, price: 1, value: 50 })
   })
 })
+
+describe('sortRows — break-even por distancia (#271)', () => {
+  const row = (asset: string, qty: number, cost: number, value: number) =>
+    ({ kind: 'crypto' as const, asset, value, totalQuantity: qty, totalCostBasis: cost, avgPrice: cost / qty, wallets: [] })
+  it('ordena por distancia del precio al precio medio, no por el precio medio', () => {
+    const rows = [row('CARO', 1, 1_000, 900), row('BARATO', 100, 50, 100), row('SIN', 1, 1, 0)]
+    const prices = { CARO: 900, BARATO: 1 }   // CARO −10 %, BARATO +100 %, SIN sin precio
+    expect(sortRows(rows, 'breakeven', 'desc', prices, 1_000).map(r => r.asset)).toEqual(['BARATO', 'CARO', 'SIN'])
+  })
+})

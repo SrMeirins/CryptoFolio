@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isSearchShortcut, readDensity, readDustOpen, saveDensity, saveDustOpen } from './portfolioPrefs'
+import { isSearchShortcut, readDensity, readDustOpen, readView, saveDensity, saveDustOpen, saveView } from './portfolioPrefs'
 
 // Preferencias de Portfolio y atajo del buscador (#269).
 const key = (k: string, target: object | null = { tagName: 'BODY' }, mods: Partial<{ ctrlKey: boolean; metaKey: boolean; altKey: boolean }> = {}) =>
@@ -23,6 +23,7 @@ describe('preferencias sin almacenamiento disponible', () => {
   it('valores por defecto y guardar no falla', () => {
     expect(readDensity()).toBe('comfortable')
     expect(readDustOpen()).toBe(false)
-    expect(() => { saveDensity('compact'); saveDustOpen(true) }).not.toThrow()
+    expect(readView()).toBe('asset')
+    expect(() => { saveDensity('compact'); saveDustOpen(true); saveView('wallet') }).not.toThrow()
   })
 })
