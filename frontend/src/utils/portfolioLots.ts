@@ -79,6 +79,11 @@ export function formatAge(days: number): string {
   return `Hace ${plural(years, 'año', 'años')}${rest > 0 ? ` y ${plural(rest, 'mes', 'meses')}` : ''}`
 }
 
+/** Días completos transcurridos desde una fecha (ms); null si no la hay. */
+export function daysSince(ms: number | null, now: Date = new Date()): number | null {
+  return ms === null ? null : Math.max(0, Math.floor((now.getTime() - ms) / 86_400_000))
+}
+
 const LOT_DATE = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Madrid' })
 const LOT_DAY_LONG = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: 'Europe/Madrid' })
 const LOT_TIME = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })

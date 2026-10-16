@@ -124,7 +124,14 @@ router.get('/lots', async (_req, res) => {
             THEN SUM(fl.cost_basis_eur * fl.usd_per_eur) END AS cost_basis_usd,
        CASE WHEN bool_and(fl.usd_per_eur IS NOT NULL)
             THEN SUM(fl.quantity_remaining * fl.price_per_unit_eur * fl.usd_per_eur)
-                 / NULLIF(SUM(fl.quantity_remaining), 0) END AS avg_price_usd
+                 / NULLIF(SUM(fl.quantity_remaining), 0) END AS avg_price_usd,
+       -- Fecha media de apertura ponderada por el coste restante (#283); si
+       -- todo el grupo tiene coste 0 (airdrops), media por cantidad.
+       to_timestamp(COALESCE(
+         SUM(fl.quantity_remaining * fl.price_per_unit_eur * EXTRACT(EPOCH FROM fl.opened_at))
+           / NULLIF(SUM(fl.quantity_remaining * fl.price_per_unit_eur), 0),
+         SUM(fl.quantity_remaining * EXTRACT(EPOCH FROM fl.opened_at)) / NULLIF(SUM(fl.quantity_remaining), 0)
+       )::double precision) AS avg_opened_at
      FROM fifo_lots fl
      JOIN wallets w ON w.id = fl.wallet_id
      WHERE fl.is_closed = FALSE AND fl.quantity_remaining > 0
