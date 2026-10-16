@@ -1,96 +1,65 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { calcularIrpfAhorro, desgloseMarginal, parseTiposConfig } from '../../modules/fiscal/irpf';
-import { baseAhorro, cargarAniosFiscales, compensarPerdidas } from '../../modules/fiscal/carryforward';
-import { consumirFifo, type LoteAbierto } from '../../modules/fiscal/simularVenta';
 import { db } from '../../db/client';
 import { sendZodError } from './fiscalShared';
 import { validateSymbol } from '../settings/settingsShared';
+import { cantidadParaNeto, cargarContextoVenta, curvaVenta, evaluarVenta, type ContextoVenta } from '../../modules/fiscal/simulacionVenta';
 
 const router = Router();
 
-const simulateSaleSchema = z.object({
+// Campos comunes: activo, wallet donde se vende (#279: el motor fiscal aplica
+// FIFO por wallet; sin ella, la de mayor cantidad) y comisión de venta en %.
+const base = {
   asset:    z.string().min(1, 'asset es requerido'),
+  walletId: z.string().uuid('walletId inválido').optional(),
+  feePct:   z.number().min(0).max(10, 'feePct debe estar entre 0 y 10').optional(),
+};
+
+const simulateSaleSchema = z.object({
+  ...base,
   quantity: z.number().positive('quantity debe ser un número mayor que 0'),
   priceEur: z.number().nonnegative('priceEur debe ser un número mayor o igual que 0'),
-  // Wallet donde se vende (#279): el motor fiscal aplica FIFO por wallet. Sin
-  // ella, la de mayor cantidad del activo.
-  walletId: z.string().uuid('walletId inválido').optional(),
-  // Comisión de venta en % (#279): reduce el valor de transmisión.
-  feePct:   z.number().min(0).max(10, 'feePct debe estar entre 0 y 10').optional(),
 });
 
+const curveSchema = z.object({
+  ...base,
+  quantity: z.number().positive('quantity debe ser un número mayor que 0'),
+  prices:   z.array(z.number().nonnegative()).min(2).max(101, 'como máximo 101 precios'),
+});
+
+const quantitySchema = z.object({
+  ...base,
+  priceEur:  z.number().positive('priceEur debe ser mayor que 0'),
+  targetNet: z.number().positive('targetNet debe ser mayor que 0'),
+});
+
+/** Valida el símbolo y carga el contexto de la venta; responde el error si lo hay. */
+async function contexto(res: Response, rawAsset: string, walletId?: string): Promise<ContextoVenta | null> {
+  const asset = validateSymbol(rawAsset);
+  if (!asset) { res.status(400).json({ error: 'Símbolo inválido' }); return null; }
+  const ctx = await cargarContextoVenta(asset, walletId);
+  if ('error' in ctx) { res.status(ctx.status).json({ error: ctx.error }); return null; }
+  return ctx;
+}
+
 // ── POST /api/fiscal/simulate-sale ────────────────────────────────────────
-// Simulación pura: no escribe nada en DB. Devuelve el impacto fiscal de una
-// venta hipotética en una wallet, con el IRPF marginal sobre la base del
-// ejercicio y el aviso de la regla de recompra.
+// Simulación pura: no escribe nada en DB. Impacto fiscal de una venta
+// hipotética en una wallet, con IRPF marginal y aviso de recompra.
 router.post('/simulate-sale', async (req: Request, res: Response) => {
-  const validation = simulateSaleSchema.safeParse(req.body);
-  if (!validation.success) {
-    sendZodError(res, validation.error);
+  const v = simulateSaleSchema.safeParse(req.body);
+  if (!v.success) { sendZodError(res, v.error); return; }
+  const ctx = await contexto(res, v.data.asset, v.data.walletId);
+  if (!ctx) return;
+  const { quantity, priceEur, feePct = 0 } = v.data;
+  if (quantity > ctx.wallet.quantity + 0.0001) {
+    res.status(400).json({ error: `Solo hay ${ctx.wallet.quantity.toFixed(6)} ${ctx.asset} en ${ctx.wallet.walletName}` });
     return;
   }
-  const asset = validateSymbol(validation.data.asset);
-  if (!asset) { res.status(400).json({ error: 'Símbolo inválido' }); return; }
-  const { quantity, priceEur, feePct = 0 } = validation.data;
-
-  // Wallets con el activo, de mayor a menor cantidad.
-  const walletsRes = await db.query(
-    `SELECT fl.wallet_id, w.name AS wallet_name, SUM(fl.quantity_remaining)::float AS quantity
-     FROM fifo_lots fl JOIN wallets w ON w.id = fl.wallet_id
-     WHERE fl.asset = $1 AND fl.is_closed = FALSE AND fl.quantity_remaining > 0.0000001
-     GROUP BY fl.wallet_id, w.name
-     ORDER BY quantity DESC, w.name`,
-    [asset],
-  );
-  const wallets = (walletsRes.rows as Array<{ wallet_id: string; wallet_name: string; quantity: number }>)
-    .map(w => ({ walletId: w.wallet_id, walletName: w.wallet_name, quantity: w.quantity }));
-  if (wallets.length === 0) {
-    res.status(404).json({ error: `No hay lotes abiertos para ${asset}` });
-    return;
-  }
-  const wallet = validation.data.walletId ? wallets.find(w => w.walletId === validation.data.walletId) : wallets[0];
-  if (!wallet) {
-    res.status(404).json({ error: `No hay lotes abiertos de ${asset} en esa wallet` });
-    return;
-  }
-  if (quantity > wallet.quantity + 0.0001) {
-    res.status(400).json({ error: `Solo hay ${wallet.quantity.toFixed(6)} ${asset} en ${wallet.walletName}` });
-    return;
-  }
-
-  // Lotes de esa wallet en el orden del motor FIFO.
-  const lotsRes = await db.query(
-    `SELECT fl.id, fl.quantity_remaining::float AS quantity, fl.cost_basis_eur::float AS cost_basis,
-            fl.price_per_unit_eur::float AS price_per_unit, fl.opened_at, w.name AS wallet_name
-     FROM fifo_lots fl JOIN wallets w ON w.id = fl.wallet_id
-     WHERE fl.asset = $1 AND fl.wallet_id = $2 AND fl.is_closed = FALSE AND fl.quantity_remaining > 0.0000001
-     ORDER BY fl.opened_at ASC, fl.created_at ASC`,
-    [asset, wallet.walletId],
-  );
-  const lotes: LoteAbierto[] = (lotsRes.rows as Array<Record<string, unknown>>).map(r => ({
-    id: r.id as string,
-    walletName: r.wallet_name as string,
-    openedAt: new Date(r.opened_at as string).toISOString().slice(0, 10),
-    quantity: r.quantity as number,
-    costBasis: r.cost_basis as number,
-    pricePerUnit: r.price_per_unit as number,
-  }));
-  const consumo = consumirFifo(lotes, quantity, priceEur, feePct);
-
-  // IRPF marginal (#279): base del ahorro del ejercicio, con la misma regla de
-  // compensación de pérdidas que Fiscal, sin y con esta venta.
-  const year = new Date().getFullYear();
-  const anios = await cargarAniosFiscales(year);
-  const conVenta = anios.map(a => (a.year === year ? { ...a, netoGP: a.netoGP + consumo.netGainLoss } : a));
-  const baseAntes = baseAhorro(compensarPerdidas(anios).detalle.at(-1)!);
-  const baseDespues = baseAhorro(compensarPerdidas(conVenta).detalle.at(-1)!);
-  const tipos = parseTiposConfig((await db.query("SELECT value FROM app_config WHERE key = 'irpf_tramos_tipos'")).rows[0]?.value);
-  const irpfMarginal = Math.round((calcularIrpfAhorro(Math.max(0, baseDespues), tipos) - calcularIrpfAhorro(Math.max(0, baseAntes), tipos)) * 100) / 100;
+  const e = evaluarVenta(ctx, quantity, priceEur, feePct);
 
   // Regla de recompra (art. 33.5 LIRPF): compras reales del activo en los 2
   // meses anteriores. Solo se avisa (como en Fiscal), sin cambiar el cálculo.
-  const recompraRes = consumo.netGainLoss < 0
+  const recompraRes = e.netGainLoss < 0
     ? await db.query(
         `SELECT DISTINCT fl.opened_at::date AS fecha
          FROM fifo_lots fl JOIN transactions t ON t.id = fl.open_transaction_id
@@ -98,30 +67,45 @@ router.post('/simulate-sale', async (req: Request, res: Response) => {
            AND t.operation_type NOT IN ('TRANSFER_INTERNAL', 'WITHDRAW', 'DEPOSIT_CRYPTO', 'MARGIN_BORROW')
            AND fl.opened_at >= NOW() - INTERVAL '2 months'
          ORDER BY fecha DESC`,
-        [asset],
+        [ctx.asset],
       )
     : { rows: [] };
   const comprasRecientes = (recompraRes.rows as Array<{ fecha: string | Date }>)
     .map(r => (r.fecha instanceof Date ? r.fecha.toISOString() : String(r.fecha)).slice(0, 10));
 
   res.json({
-    asset,
+    asset: ctx.asset,
     quantity,
     priceEur,
     feePct,
-    walletId: wallet.walletId,
-    wallets,
-    ...consumo,
-    irpfEstimate: irpfMarginal,
-    irpf: {
-      year,
-      baseAntes,
-      baseDespues,
-      marginal: irpfMarginal,
-      desglose: desgloseMarginal(Math.max(0, baseAntes), Math.max(0, baseDespues), tipos),
-    },
+    walletId: ctx.wallet.walletId,
+    wallets: ctx.wallets,
+    ...e,
+    irpfEstimate: e.irpf.marginal,
     recompra: { aviso: comprasRecientes.length > 0, comprasRecientes },
   });
+});
+
+// ── POST /api/fiscal/simulate-sale/curve ──────────────────────────────────
+// Resultado neto (tras comisión e IRPF) de vender `quantity` a cada precio
+// (#280): alimenta el gráfico del simulador con la misma regla fiscal.
+router.post('/simulate-sale/curve', async (req: Request, res: Response) => {
+  const v = curveSchema.safeParse(req.body);
+  if (!v.success) { sendZodError(res, v.error); return; }
+  const ctx = await contexto(res, v.data.asset, v.data.walletId);
+  if (!ctx) return;
+  const quantity = Math.min(v.data.quantity, ctx.wallet.quantity);
+  res.json({ asset: ctx.asset, walletId: ctx.wallet.walletId, quantity, points: curvaVenta(ctx, quantity, v.data.feePct ?? 0, v.data.prices) });
+});
+
+// ── POST /api/fiscal/simulate-sale/quantity ───────────────────────────────
+// Cantidad a vender para recibir un neto en mano (#280).
+router.post('/simulate-sale/quantity', async (req: Request, res: Response) => {
+  const v = quantitySchema.safeParse(req.body);
+  if (!v.success) { sendZodError(res, v.error); return; }
+  const ctx = await contexto(res, v.data.asset, v.data.walletId);
+  if (!ctx) return;
+  res.json({ asset: ctx.asset, walletId: ctx.wallet.walletId, ...cantidadParaNeto(ctx, v.data.priceEur, v.data.feePct ?? 0, v.data.targetNet) });
 });
 
 export default router;

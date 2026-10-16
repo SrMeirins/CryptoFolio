@@ -96,4 +96,40 @@ describe('POST /api/fiscal/simulate-sale — wallet, IRPF marginal, recompra y c
     expect((await request(app).post('/api/fiscal/simulate-sale').send({ asset: 'ADA', quantity: 1, priceEur: 1, walletId: 'x' })).status).toBe(400);
     expect((await request(app).post('/api/fiscal/simulate-sale').send({ asset: 'ADA', quantity: 1, priceEur: 1, feePct: 50 })).status).toBe(400);
   });
+
+  it('curva (#280): resultado neto por precio, coherente con la simulación puntual', async () => {
+    const res = await request(app).post('/api/fiscal/simulate-sale/curve')
+      .send({ asset: 'ADA', quantity: 100, prices: [0, 0.5, 1, 2] });
+    expect(res.status).toBe(200);
+    expect(res.body.points).toHaveLength(4);
+    const prices = res.body.points.map((p: { price: number }) => p.price);
+    expect(prices).toEqual([0, 0.5, 1, 2]);
+    const results = res.body.points.map((p: { resultadoNeto: number }) => p.resultadoNeto);
+    expect(results[1]).toBeCloseTo(0, 6);                    // a 0,5 € (precio medio de esos 100) no se gana ni se pierde
+    expect(results[3]).toBeGreaterThan(results[2]);           // crece con el precio
+    const puntual = await request(app).post('/api/fiscal/simulate-sale').send({ asset: 'ADA', quantity: 100, priceEur: 2 });
+    expect(res.body.points[3].netoEnMano).toBeCloseTo(puntual.body.netoEnMano, 6);
+  });
+
+  it('cantidad para un neto en mano (#280): la simulación con esa cantidad da ese neto', async () => {
+    const res = await request(app).post('/api/fiscal/simulate-sale/quantity')
+      .send({ asset: 'ADA', priceEur: 1, targetNet: 80, feePct: 0.1 });
+    expect(res.status).toBe(200);
+    expect(res.body.alcanzable).toBe(true);
+    const check = await request(app).post('/api/fiscal/simulate-sale')
+      .send({ asset: 'ADA', quantity: res.body.quantity, priceEur: 1, feePct: 0.1 });
+    expect(check.body.netoEnMano).toBeCloseTo(80, 2);
+  });
+
+  it('neto inalcanzable con lo que hay en la wallet: cantidad máxima y aviso', async () => {
+    const res = await request(app).post('/api/fiscal/simulate-sale/quantity')
+      .send({ asset: 'ADA', priceEur: 1, targetNet: 1_000_000 });
+    expect(res.body.alcanzable).toBe(false);
+    expect(res.body.quantity).toBeCloseTo(210, 6);   // todo lo de Binance Spot (200 + el lote reciente de 10)
+  });
+
+  it('curva y cantidad validan sus datos', async () => {
+    expect((await request(app).post('/api/fiscal/simulate-sale/curve').send({ asset: 'ADA', quantity: 1, prices: [1] })).status).toBe(400);
+    expect((await request(app).post('/api/fiscal/simulate-sale/quantity').send({ asset: 'ADA', priceEur: 0, targetNet: 1 })).status).toBe(400);
+  });
 });
