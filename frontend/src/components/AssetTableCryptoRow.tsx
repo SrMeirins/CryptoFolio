@@ -1,12 +1,14 @@
 import { Fragment, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, Settings, Calculator, Lock } from 'lucide-react'
+import { ChevronDown, ChevronRight, Settings, Calculator, Lock, PanelRight, History } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { type LockedAmount } from '../api/portfolio'
 import { formatMoney, formatPrice, formatAmount, pnlColor, formatPercent } from '../utils/format'
 import { useCurrency } from '../hooks/useDisplayCurrency'
-import { type CryptoRow, walletShortName } from '../utils/assetTable'
+import { type CryptoRow } from '../utils/assetTable'
+import { assetHue } from '../utils/assetInitials'
+import { Sparkline } from './Sparkline'
 import { CryptoIcon } from './CryptoIcon'
-import { T, alpha, ink } from '../utils/colors'
+import { T, alpha } from '../utils/colors'
 import { iconButtonClasses, tableRowClasses } from './ui'
 import { useFlashOnChange, type FlashDirection } from '../hooks/useFlashOnChange'
 import { BreakEvenCell } from './BreakEvenCell'
@@ -14,7 +16,7 @@ import { PnlPill, WeightCell } from './AssetTableCells'
 
 const flashClass = (f: FlashDirection) => (f === 'up' ? 'flash-up' : f === 'down' ? 'flash-down' : '')
 
-export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate, lockedAmounts = [], hideWalletChips = false, onOpen }: {
+export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate, lockedAmounts = [], hideWalletChips = false, onOpen, spark, rowKey }: {
   row: CryptoRow
   prices: Record<string, number>
   yesterdayPrices: Record<string, number>
@@ -26,6 +28,10 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
   hideWalletChips?: boolean
   /** Abre el panel de detalle del activo (#272); sin él, la fila despliega sus wallets. */
   onOpen?: (asset: string) => void
+  /** Serie de 7 días para el mini-gráfico (#282); sin datos, «—». */
+  spark?: number[]
+  /** Clave de la fila para la reordenación animada (#282). */
+  rowKey?: string
 }) {
   const currency = useCurrency()
   const [expanded, setExpanded] = useState(false)
@@ -63,7 +69,10 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
   return (
     <>
       <tr
-        className={tableRowClasses(canExpand || !!onOpen, expanded)}
+        data-row-key={rowKey}
+        // Acento con el color del activo al pasar el cursor o con el foco dentro (#282).
+        style={{ ['--row-accent' as string]: `hsl(${assetHue(row.asset)} 70% 55%)` }}
+        className={tableRowClasses(canExpand || !!onOpen, expanded, 'group/row hover:shadow-[inset_3px_0_0_var(--row-accent)] focus-within:shadow-[inset_3px_0_0_var(--row-accent)]')}
         onClick={() => (onOpen ? open() : canExpand && setExpanded(e => !e))}
       >
         {/* Activo */}
@@ -84,21 +93,23 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
             <CryptoIcon symbol={row.asset} size={compact ? 22 : 28} />
             {onOpen
               ? (
-                <button ref={nameRef} type="button" onClick={e => { e.stopPropagation(); open() }} aria-label={`Ver detalle de ${row.asset}`}
+                // data-row-nav: destino de la navegación con ↑↓ (#282).
+                <button ref={nameRef} type="button" data-row-nav="" data-asset={row.asset}
+                  onClick={e => { e.stopPropagation(); open() }} aria-label={`Ver detalle de ${row.asset}`}
+                  aria-keyshortcuts="ArrowUp ArrowDown s"
                   className="font-medium rounded hover:text-brand focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60">
                   {row.asset}
                 </button>
               )
               : <span className="font-medium">{row.asset}</span>}
             {!expanded && (
-              <div className="flex gap-1 ml-1 flex-wrap">
-                {!hideWalletChips && row.wallets.map(w => (
-                  <span key={w.wallet_id}
-                    className="text-xs px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap"
-                    style={{ backgroundColor: `${alpha(w.wallet_color, 9)}`, color: ink(w.wallet_color) }}>
-                    {walletShortName(w.wallet_name, w.wallet_kind)}
-                  </span>
+              <div className="flex items-center gap-1 ml-1 flex-wrap">
+                {/* Un punto por wallet en lugar del chip de texto (#282) */}
+                {!hideWalletChips && row.wallets.length > 1 && row.wallets.map(w => (
+                  <span key={w.wallet_id} title={w.wallet_name}
+                    className="w-2 h-2 rounded-full shrink-0 ring-1 ring-overlay/20" style={{ backgroundColor: w.wallet_color }} />
                 ))}
+                {!hideWalletChips && row.wallets.length > 1 && <span className="sr-only">En {row.wallets.map(w => w.wallet_name).join(', ')}</span>}
                 {lockedAmounts.length > 0 && (() => {
                   const onlyLaunchpool = lockedAmounts.every(l => l.lock_kind === 'launchpool')
                   return (
@@ -110,17 +121,25 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                 })()}
               </div>
             )}
-            {onSimulate && (
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); onSimulate(row.asset, row.totalQuantity) }}
-                className={iconButtonClasses('sm', false, 'ml-auto', 'brand')}
-                title="Simular venta"
-                aria-label={`Simular venta de ${row.asset}`}
-              >
-                <Calculator size={13} aria-hidden="true" />
-              </button>
-            )}
+            {/* Acciones al pasar el cursor o con el foco (#282); siempre visibles en pantallas táctiles */}
+            <div className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100">
+              {onOpen && (
+                <button type="button" onClick={e => { e.stopPropagation(); open() }} title="Detalle"
+                  aria-label={`Detalle de ${row.asset}`} className={iconButtonClasses('sm')}>
+                  <PanelRight size={13} aria-hidden="true" />
+                </button>
+              )}
+              {onSimulate && (
+                <button type="button" onClick={e => { e.stopPropagation(); onSimulate(row.asset, row.totalQuantity) }}
+                  className={iconButtonClasses('sm', false, '', 'brand')} title="Simular venta (s)" aria-label={`Simular venta de ${row.asset}`}>
+                  <Calculator size={13} aria-hidden="true" />
+                </button>
+              )}
+              <Link to={`/history?buscar=${encodeURIComponent(row.asset)}`} onClick={e => e.stopPropagation()}
+                title="Historial" aria-label={`Historial de ${row.asset}`} className={iconButtonClasses('sm')}>
+                <History size={13} aria-hidden="true" />
+              </Link>
+            </div>
           </div>
         </td>
 
@@ -154,6 +173,13 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
               <Settings size={10} aria-hidden="true" />Sin precio
             </Link>
           )}
+        </td>
+
+        {/* Tendencia de 7 días (#282) */}
+        <td className={`px-2 ${pad}`}>
+          {spark && spark.length > 1
+            ? <Sparkline values={spark} days={7} className="w-20 h-7 ml-auto block" />
+            : <span className="block text-right text-fg-subtle text-xs">—</span>}
         </td>
 
         {/* Valor en la moneda de visualización */}
@@ -208,6 +234,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
               </td>
               <td className="px-4 py-2 text-right mono text-xs text-fg-muted">{formatAmount(w.quantity)}</td>
               <td className="px-4 py-2 text-right mono text-xs text-fg-subtle">—</td>
+              <td />
               <td className="px-4 py-2 text-right mono text-xs">
                 {hasPrice ? <span className="text-fg">{formatMoney(wValue, currency)}</span> : <span className="text-fg-subtle">—</span>}
               </td>
@@ -241,7 +268,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                   <td className={`px-4 py-1.5 text-right mono text-xs ${clr.amount}`}>
                     {formatAmount(parseFloat(l.locked_amount))}
                   </td>
-                  <td colSpan={compact ? 4 : 5} className={`px-4 py-1.5 text-xs ${clr.label} italic`}>
+                  <td colSpan={compact ? 5 : 6} className={`px-4 py-1.5 text-xs ${clr.label} italic`}>
                     {isLaunchpool ? 'bloqueado en launchpool' : 'bloqueado en staking'}
                   </td>
                 </tr>

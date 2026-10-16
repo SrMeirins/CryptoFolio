@@ -262,7 +262,7 @@ export function Portfolio() {
           {view === 'asset' ? (
             <section aria-label="Posiciones" className={panelClasses(cardClasses('none', 'overflow-clip'))} style={panelEnterStyle(1)}>
               <AssetTable rows={assetRows} portfolioTotal={all.total} compact={compact}
-                onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} onOpen={setDetailAsset}
+                onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} onOpen={setDetailAsset} exportName="posiciones"
                 header={<>
                   <h2 className="text-sm font-semibold text-fg">Posiciones</h2>
                   <span className="text-xs text-fg-subtle">{assetRows.length} {assetRows.length === 1 ? 'activo' : 'activos'}</span>
