@@ -37,3 +37,28 @@ export function calcularIrpfAhorro(base: number, tipos: readonly number[] = TIPO
   // respuesta JSON de /api/fiscal/simulate-sale.
   return Math.round(cuota * 100) / 100;
 }
+
+export interface TramoMarginal { tipo: number; desde: number; hasta: number; base: number; cuota: number }
+
+/**
+ * Tramos que atraviesa una base al pasar de `baseAntes` a `baseDespues` (#279):
+ * el impuesto marginal de una operación es la suma de sus cuotas. Si la base
+ * baja (venta con pérdida), los tramos se devuelven con base y cuota negativas.
+ */
+export function desgloseMarginal(baseAntes: number, baseDespues: number, tipos: readonly number[] = TIPOS_DEFECTO): TramoMarginal[] {
+  const lo = Math.max(0, Math.min(baseAntes, baseDespues));
+  const hi = Math.max(0, Math.max(baseAntes, baseDespues));
+  const sign = baseDespues >= baseAntes ? 1 : -1;
+  const out: TramoMarginal[] = [];
+  let anterior = 0;
+  for (let i = 0; i < TRAMOS_LIMITES.length; i++) {
+    const desde = Math.max(lo, anterior);
+    const hasta = Math.min(hi, TRAMOS_LIMITES[i]);
+    if (hasta > desde) {
+      const base = hasta - desde;
+      out.push({ tipo: tipos[i], desde, hasta, base: sign * base, cuota: sign * Math.round(base * tipos[i]) / 100 });
+    }
+    anterior = TRAMOS_LIMITES[i];
+  }
+  return out;
+}
