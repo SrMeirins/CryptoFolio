@@ -12,7 +12,9 @@ export function sendZodError(res: Response, error: ZodError): void {
 }
 
 export function parseYear(raw: string): number | null {
-  const y = parseInt(raw, 10);
-  if (isNaN(y) || y < 2009 || y > 2100) return null; // Bitcoin nació en 2009
+  // Exactamente 4 dígitos (#295): parseInt aceptaba «2024abc» o «2024.5».
+  if (!/^\d{4}$/.test(raw)) return null;
+  const y = Number(raw);
+  if (y < 2009 || y > 2100) return null; // Bitcoin nació en 2009
   return y;
 }

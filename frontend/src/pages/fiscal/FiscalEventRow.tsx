@@ -1,35 +1,32 @@
-import { formatEur, pnlColor, formatNumber } from '../../utils/format'
+import { formatEur, pnlColor } from '../../utils/format'
+import { fiscalDateDetail, fiscalTypeLabel, formatFiscalDate, formatFiscalQty, type FiscalTone } from '../../utils/fiscalTable'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { PNL_THRESHOLD } from './constants'
 import type { FiscalEvent } from './types'
 import { tableRowClasses } from '../../components/ui'
 
-const FEE_TYPES  = ['FEE_EXCHANGE', 'FEE_NETWORK', 'FEE']
-const LOST_TYPES = ['LOST', 'GIFT_SENT']
-
-function formatQtyTransmitida(qty: number): string {
-  if (qty < 0.01) return qty.toExponential(2)
-  if (qty >= 1000) return formatNumber(qty, 2)
-  if (qty >= 1) return formatNumber(qty, 4, 4)
-  return formatNumber(qty, 6, 6)
+// Color del tipo de operación (#295): el texto también lo dice, el color solo refuerza.
+const TONE_CLASS: Record<FiscalTone, string> = {
+  sale:   'bg-brand/10 text-brand',
+  swap:   'bg-accent-purple/10 text-accent-purple',
+  fee:    'bg-warning/10 text-warning',
+  loss:   'bg-negative/10 text-negative',
+  margin: 'bg-overlay/8 text-fg-muted',
+  other:  'bg-background-tertiary text-fg-muted',
 }
 
 export function FiscalEventRow({ e }: { e: FiscalEvent }) {
   const gp     = e.gananciaPerdidaEur ?? 0
-  const isFee  = FEE_TYPES.includes(e.tipo)
-  const isLost = LOST_TYPES.includes(e.tipo)
+  const type   = fiscalTypeLabel(e.tipo)
+  const isFee  = type.tone === 'fee'
 
   return (
     <tr className={tableRowClasses()}>
-      <td className="px-4 py-2.5 mono text-fg-muted text-xs">{e.fecha}</td>
+      <td className="px-4 py-2.5 text-fg-muted text-xs whitespace-nowrap">
+        <time dateTime={e.fechaHora ?? e.fecha} title={fiscalDateDetail(e.fechaHora)}>{formatFiscalDate(e.fecha)}</time>
+      </td>
       <td className="px-4 py-2.5">
-        {isFee ? (
-          <span className="text-xs bg-warning/10 text-warning px-1.5 py-0.5 rounded-lg">Fee</span>
-        ) : isLost ? (
-          <span className="text-xs bg-negative/10 text-negative px-1.5 py-0.5 rounded-lg">Pérdida</span>
-        ) : (
-          <span className="text-xs bg-background-tertiary text-fg-muted px-1.5 py-0.5 rounded-lg">{e.tipo}</span>
-        )}
+        <span className={`text-xs px-1.5 py-0.5 rounded-lg whitespace-nowrap ${TONE_CLASS[type.tone]}`}>{type.label}</span>
       </td>
       <td className="px-4 py-2.5 min-w-[140px]">
         <div className="flex items-center gap-1 whitespace-nowrap">
@@ -42,7 +39,7 @@ export function FiscalEventRow({ e }: { e: FiscalEvent }) {
               <span className="font-bold mono text-xs">{e.activoRecibido}</span>
             </>
           ) : isFee ? (
-            <span className="text-fg-subtle text-xs">→ fee</span>
+            <span className="text-fg-subtle text-xs">→ comisión</span>
           ) : null}
         </div>
         <div className="text-xs text-fg-subtle mt-0.5">{e.wallet}</div>
@@ -72,7 +69,7 @@ export function FiscalEventRow({ e }: { e: FiscalEvent }) {
         )}
       </td>
       <td className="px-4 py-2.5 text-right mono text-xs text-fg-subtle">
-        {formatQtyTransmitida(e.cantidadTransmitida)}
+        {formatFiscalQty(e.cantidadTransmitida)}
       </td>
       <td className="px-4 py-2.5">
         <span className="bg-background-tertiary px-1.5 py-0.5 rounded-lg text-fg mono text-xs">

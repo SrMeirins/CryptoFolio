@@ -1,4 +1,5 @@
 import { db } from '../../db/client';
+import { madridDate } from './madridTime';
 import { getContrapartidaClave } from './contrapartida';
 import { hayRecompra, type Adquisicion } from './antiRecompra';
 import { getHistoricalPriceEur } from '../prices/binance';
@@ -16,7 +17,10 @@ function getTipoRendimiento(operationType: string): string {
 }
 
 export interface EventoFiscal {
+  /** Día de la operación en Madrid (AAAA-MM-DD, #295). */
   fecha: string;
+  /** Instante exacto (ISO UTC), para mostrar la hora local. */
+  fechaHora: string;
   tipo: string;
   activoTransmitido: string;
   activoRecibido: string | null;
@@ -40,7 +44,9 @@ export interface EventoFiscal {
 }
 
 export interface Rendimiento {
+  /** Día en Madrid (AAAA-MM-DD, #295). */
   fecha: string;
+  fechaHora: string;
   tipo: string;
   activo: string;
   cantidad: number;
@@ -74,7 +80,7 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
     JOIN fifo_lots    fl ON fl.id = flc.lot_id
     JOIN transactions t  ON t.id  = flc.consuming_transaction_id
     JOIN wallets      w  ON w.id  = t.wallet_id
-    WHERE EXTRACT(YEAR FROM flc.consumed_at) = $1
+    WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE 'Europe/Madrid') = $1
       AND flc.fiscal_event_type != 'NONE'
     ORDER BY flc.consumed_at ASC
   `, [year]);
@@ -86,8 +92,8 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
     FROM fifo_lots fl
     JOIN transactions t ON t.id = fl.open_transaction_id
     WHERE t.operation_type NOT IN ('TRANSFER_INTERNAL', 'WITHDRAW', 'DEPOSIT_CRYPTO', 'MARGIN_BORROW')
-      AND fl.opened_at >= make_date($1, 1, 1) - INTERVAL '2 months'
-      AND fl.opened_at <  make_date($1 + 1, 1, 1) + INTERVAL '2 months'
+      AND fl.opened_at >= (make_date($1, 1, 1) - INTERVAL '2 months')::timestamp AT TIME ZONE 'Europe/Madrid'
+      AND fl.opened_at <  (make_date($1 + 1, 1, 1) + INTERVAL '2 months')::timestamp AT TIME ZONE 'Europe/Madrid'
   `, [year]);
   const adquisiciones: Adquisicion[] = adqRes.rows.map((r: Record<string, unknown>) => ({
     asset: r.asset as string, fecha: new Date(r.fecha as string), lotId: r.lot_id as string,
@@ -131,7 +137,8 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
       }
 
       return {
-        fecha:                    new Date(row.fecha as string).toISOString().slice(0, 10),
+        fecha:                    madridDate(new Date(row.fecha as string)),
+        fechaHora:                new Date(row.fecha as string).toISOString(),
         tipo:                     opType,
         activoTransmitido:        asset,
         activoRecibido:           activoRecibido,
@@ -169,13 +176,14 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
       w.name         AS wallet
     FROM transactions t
     JOIN wallets w ON w.id = t.wallet_id
-    WHERE EXTRACT(YEAR FROM t.timestamp) = $1
+    WHERE EXTRACT(YEAR FROM t.timestamp AT TIME ZONE 'Europe/Madrid') = $1
       AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
     ORDER BY t.timestamp ASC
   `, [year]);
 
   const rendimientos: Rendimiento[] = rendRows.rows.map((row: Record<string, unknown>) => ({
-    fecha:    new Date(row.fecha as string).toISOString().slice(0, 10),
+    fecha:    madridDate(new Date(row.fecha as string)),
+    fechaHora: new Date(row.fecha as string).toISOString(),
     tipo:     getTipoRendimiento(row.operation_type as string),
     activo:   row.activo as string,
     cantidad: parseFloat(row.cantidad as string),

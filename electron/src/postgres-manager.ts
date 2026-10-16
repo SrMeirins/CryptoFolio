@@ -171,6 +171,10 @@ export class PostgresManager {
       persistent:  true,
       // UTF-8 forzado — sin esto Windows usa WIN1252 según el locale regional
       initdbFlags: ['--encoding=UTF8', '--locale=C'],
+      // Zona UTC en cada arranque (#295), también en clústeres ya creados: sin
+      // esto initdb toma la del sistema y las fechas dependerían del equipo.
+      // El ejercicio fiscal se calcula siempre explícitamente en Europe/Madrid.
+      postgresFlags: ['-c', 'timezone=UTC'],
       onError: (msg) => {
         const str = String(msg ?? '');
         if (str) pgStderr.push(str);

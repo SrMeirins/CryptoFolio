@@ -3,6 +3,7 @@ import { db } from '../../db/client';
 import { getEventosAnio } from '../../modules/fiscal/eventosAnio';
 import { getUmbral721, sumaValorCustodiaExchange, valorizarLotesEnFecha } from '../../modules/fiscal/lotesValoracion';
 import { parseYear } from './fiscalShared';
+import { endOfYearMadrid, madridYearMonth } from '../../modules/fiscal/madridTime';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ router.get('/:year/breakdown', async (req: Request, res: Response) => {
       COUNT(*) AS operaciones
     FROM fifo_lot_consumptions flc
     JOIN fifo_lots fl ON fl.id = flc.lot_id
-    WHERE EXTRACT(YEAR FROM flc.consumed_at) = $1
+    WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE 'Europe/Madrid') = $1
       AND flc.fiscal_event_type != 'NONE'
     GROUP BY fl.asset
     ORDER BY ABS(SUM(flc.gain_loss_eur)) DESC
@@ -44,10 +45,10 @@ router.get('/:year/monthly', async (req: Request, res: Response) => {
 
   const result = await db.query(`
     SELECT
-      EXTRACT(MONTH FROM flc.consumed_at)::int AS mes,
+      EXTRACT(MONTH FROM flc.consumed_at AT TIME ZONE 'Europe/Madrid')::int AS mes,
       COALESCE(SUM(flc.gain_loss_eur), 0)      AS neto_mes
     FROM fifo_lot_consumptions flc
-    WHERE EXTRACT(YEAR FROM flc.consumed_at) = $1
+    WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE 'Europe/Madrid') = $1
       AND flc.fiscal_event_type != 'NONE'
     GROUP BY mes
     ORDER BY mes
@@ -58,8 +59,7 @@ router.get('/:year/monthly', async (req: Request, res: Response) => {
     parseFloat(r.neto_mes as string),
   ]));
 
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
+  const { year: currentYear, month: currentMonth } = madridYearMonth();
   const maxMonth = year < currentYear ? 12 : currentMonth;
 
   let acumulado = 0;
@@ -88,7 +88,7 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
   const year = parseYear(req.params.year);
   if (!year) return res.status(400).json({ error: 'Año inválido' });
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = madridYearMonth().year;
   const esAnioEnCurso = year === currentYear;
 
   const gpRes = await db.query(`
@@ -98,7 +98,7 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
       COALESCE(SUM(flc.gain_loss_eur), 0) AS neto,
       COUNT(*) AS num_operaciones
     FROM fifo_lot_consumptions flc
-    WHERE EXTRACT(YEAR FROM flc.consumed_at) = $1
+    WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE 'Europe/Madrid') = $1
       AND flc.fiscal_event_type != 'NONE'
   `, [year]);
 
@@ -107,11 +107,11 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
       COALESCE(SUM(t.amount_net * COALESCE(t.price_per_unit, 0)), 0) AS total_rendimientos,
       COUNT(*) AS num_rendimientos
     FROM transactions t
-    WHERE EXTRACT(YEAR FROM t.timestamp) = $1
+    WHERE EXTRACT(YEAR FROM t.timestamp AT TIME ZONE 'Europe/Madrid') = $1
       AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
   `, [year]);
 
-  const dec31 = esAnioEnCurso ? new Date() : new Date(`${year}-12-31T23:59:59Z`);
+  const dec31 = esAnioEnCurso ? new Date() : endOfYearMadrid(year);
   const { activos, preciosPendientes } = await valorizarLotesEnFecha(dec31);
   // Modelo 721: solo cuenta la custodia de terceros (exchanges); la
   // autocustodia (hardware/software) no se declara en este modelo.
@@ -152,9 +152,9 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
   const year = parseYear(req.params.year);
   if (!year) return res.status(400).json({ error: 'Año inválido' });
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = madridYearMonth().year;
   const esAnioEnCurso = year === currentYear;
-  const dec31 = esAnioEnCurso ? new Date() : new Date(`${year}-12-31T23:59:59Z`);
+  const dec31 = esAnioEnCurso ? new Date() : endOfYearMadrid(year);
 
   const { activos, preciosPendientes } = await valorizarLotesEnFecha(dec31);
   const umbral = await getUmbral721();
