@@ -2,6 +2,7 @@ import { formatEur, pnlColor } from '../../utils/format'
 import { fiscalDateDetail, fiscalTypeLabel, formatFiscalDate, formatFiscalQty, type FiscalTone } from '../../utils/fiscalTable'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { PNL_THRESHOLD } from './constants'
+import { EventWarnings } from './EventWarnings'
 import type { FiscalEvent } from './types'
 import { tableRowClasses } from '../../components/ui'
 
@@ -15,77 +16,96 @@ const TONE_CLASS: Record<FiscalTone, string> = {
   other:  'bg-background-tertiary text-fg-muted',
 }
 
-export function FiscalEventRow({ e }: { e: FiscalEvent }) {
-  const gp     = e.gananciaPerdidaEur ?? 0
-  const type   = fiscalTypeLabel(e.tipo)
-  const isFee  = type.tone === 'fee'
+function TypeBadge({ tipo }: { tipo: string }) {
+  const type = fiscalTypeLabel(tipo)
+  return <span className={`text-xs px-1.5 py-0.5 rounded-lg whitespace-nowrap ${TONE_CLASS[type.tone]}`}>{type.label}</span>
+}
 
+function FechaCell({ e }: { e: FiscalEvent }) {
+  return <time dateTime={e.fechaHora ?? e.fecha} title={fiscalDateDetail(e.fechaHora)}>{formatFiscalDate(e.fecha)}</time>
+}
+
+function Operacion({ e }: { e: FiscalEvent }) {
+  const isFee = fiscalTypeLabel(e.tipo).tone === 'fee'
+  return (
+    <div className="flex items-center gap-1 whitespace-nowrap min-w-0">
+      <CryptoIcon symbol={e.activoTransmitido} size={15} />
+      <span className="font-bold mono text-xs">{e.activoTransmitido}</span>
+      {e.activoRecibido ? (
+        <>
+          <span className="text-fg-subtle text-xs mx-0.5">→</span>
+          <CryptoIcon symbol={e.activoRecibido} size={15} />
+          <span className="font-bold mono text-xs">{e.activoRecibido}</span>
+        </>
+      ) : isFee ? (
+        <span className="text-fg-subtle text-xs">→ comisión</span>
+      ) : null}
+    </div>
+  )
+}
+
+function GananciaPerdida({ gp }: { gp: number }) {
+  return Math.abs(gp) < PNL_THRESHOLD
+    ? <span className="text-fg-subtle font-normal">0,00 €</span>
+    : <>{gp > 0 ? '+' : ''}{formatEur(gp)}</>
+}
+
+export function FiscalEventRow({ e }: { e: FiscalEvent }) {
+  const gp = e.gananciaPerdidaEur ?? 0
   return (
     <tr className={tableRowClasses()}>
-      <td className="px-4 py-2.5 text-fg-muted text-xs whitespace-nowrap">
-        <time dateTime={e.fechaHora ?? e.fecha} title={fiscalDateDetail(e.fechaHora)}>{formatFiscalDate(e.fecha)}</time>
-      </td>
-      <td className="px-4 py-2.5">
-        <span className={`text-xs px-1.5 py-0.5 rounded-lg whitespace-nowrap ${TONE_CLASS[type.tone]}`}>{type.label}</span>
-      </td>
+      <td className="px-4 py-2.5 text-fg-muted text-xs whitespace-nowrap"><FechaCell e={e} /></td>
+      <td className="px-4 py-2.5"><TypeBadge tipo={e.tipo} /></td>
       <td className="px-4 py-2.5 min-w-[140px]">
-        <div className="flex items-center gap-1 whitespace-nowrap">
-          <CryptoIcon symbol={e.activoTransmitido} size={15} />
-          <span className="font-bold mono text-xs">{e.activoTransmitido}</span>
-          {e.activoRecibido ? (
-            <>
-              <span className="text-fg-subtle text-xs mx-0.5">→</span>
-              <CryptoIcon symbol={e.activoRecibido} size={15} />
-              <span className="font-bold mono text-xs">{e.activoRecibido}</span>
-            </>
-          ) : isFee ? (
-            <span className="text-fg-subtle text-xs">→ comisión</span>
-          ) : null}
-        </div>
+        <Operacion e={e} />
         <div className="text-xs text-fg-subtle mt-0.5">{e.wallet}</div>
-        {e.permutaWrapStaking && (
-          <div
-            className="mt-0.5 inline-block text-xs bg-warning/10 text-warning px-1.5 py-0.5 rounded-lg"
-            title="El wrap/unwrap de ETH↔BETH (staking de ETH 2.0) se trata como permuta imponible: criterio conservador, sin doctrina de la DGT específica. Algunos asesores lo consideran no imponible al ser 1:1 sobre el mismo derecho. Valídalo con tu asesor."
-          >
-            ⚠ wrap de staking tratado como permuta imponible — criterio por validar
-          </div>
-        )}
-        {e.lostSinMotivo && (
-          <div
-            className="mt-0.5 inline-block text-xs bg-warning/10 text-warning px-1.5 py-0.5 rounded-lg"
-            title="Esta pérdida se computa como 100% deducible, pero su deducibilidad real depende del motivo (estafa, exchange insolvente, clave perdida...). Añade el motivo en las notas de la transacción y valídalo con tu asesor."
-          >
-            ⚠ pérdida sin motivo anotado — deducibilidad por validar
-          </div>
-        )}
-        {e.posiblePerdidaDiferida && (
-          <div
-            className="mt-0.5 inline-block text-xs bg-warning/10 text-warning px-1.5 py-0.5 rounded-lg"
-            title="Recompraste este activo en los 2 meses anteriores o posteriores a la venta con pérdida. Art. 33.5 LIRPF: la pérdida podría no ser computable ahora (aplicación a cripto no pacífica). Consúltalo con tu asesor."
-          >
-            ⚠ posible pérdida diferida (recompra ±2 meses)
-          </div>
-        )}
       </td>
-      <td className="px-4 py-2.5 text-right mono text-xs text-fg-subtle">
-        {formatFiscalQty(e.cantidadTransmitida)}
+      <td className="px-4 py-2.5 text-right mono text-xs text-fg-subtle">{formatFiscalQty(e.cantidadTransmitida)}</td>
+      {/* Clave AEAT compacta: la descripción va en el tooltip (#299) */}
+      <td className="px-3 py-2.5 text-center">
+        <abbr title={e.contrapartidaDescripcion} className="no-underline bg-background-tertiary px-1.5 py-0.5 rounded-lg text-fg mono text-xs cursor-help">{e.contrapartidaClave}</abbr>
       </td>
-      <td className="px-4 py-2.5">
-        <span className="bg-background-tertiary px-1.5 py-0.5 rounded-lg text-fg mono text-xs">
-          {e.contrapartidaClave}
+      {/* Valor con sus gastos debajo: 8 columnas en lugar de 10, el G/P siempre a la vista */}
+      <td className="px-4 py-2.5 text-right mono whitespace-nowrap">
+        {formatEur(e.valorTransmisionEur)}
+        <div className="text-[11px] text-fg-subtle">− {formatEur(e.gastosTransmisionEur)} gastos</div>
+      </td>
+      <td className="px-4 py-2.5 text-right mono whitespace-nowrap">
+        {formatEur(e.valorAdquisicionEur)}
+        <div className="text-[11px] text-fg-subtle">+ {formatEur(e.gastosAdquisicionEur)} gastos</div>
+      </td>
+      <td className={`px-4 py-2.5 text-right mono font-bold whitespace-nowrap ${pnlColor(gp)}`}>
+        {/* Avisos como iconos junto al resultado (#299) */}
+        <span className="inline-flex items-center justify-end gap-1">
+          <EventWarnings e={e} />
+          <GananciaPerdida gp={gp} />
         </span>
-        <span className="ml-1.5 text-fg-subtle text-xs">{e.contrapartidaDescripcion}</span>
-      </td>
-      <td className="px-4 py-2.5 text-right mono">{formatEur(e.valorTransmisionEur)}</td>
-      <td className="px-4 py-2.5 text-right mono text-fg-subtle">{formatEur(e.gastosTransmisionEur)}</td>
-      <td className="px-4 py-2.5 text-right mono">{formatEur(e.valorAdquisicionEur)}</td>
-      <td className="px-4 py-2.5 text-right mono text-fg-subtle">{formatEur(e.gastosAdquisicionEur)}</td>
-      <td className={`px-4 py-2.5 text-right mono font-bold ${pnlColor(gp)}`}>
-        {Math.abs(gp) < PNL_THRESHOLD
-          ? <span className="text-fg-subtle font-normal">0,00 €</span>
-          : <>{gp > 0 ? '+' : ''}{formatEur(gp)}</>}
       </td>
     </tr>
+  )
+}
+
+/** Tarjeta de una operación para pantallas estrechas (#299). */
+export function FiscalEventCard({ e }: { e: FiscalEvent }) {
+  const gp = e.gananciaPerdidaEur ?? 0
+  return (
+    <li className="px-4 py-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-xs text-fg-muted"><FechaCell e={e} /><TypeBadge tipo={e.tipo} /></span>
+        <span className={`inline-flex items-center gap-1 mono text-sm font-bold ${pnlColor(gp)}`}>
+          <EventWarnings e={e} />
+          <GananciaPerdida gp={gp} />
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <Operacion e={e} />
+        <span className="mono text-xs text-fg-subtle">{formatFiscalQty(e.cantidadTransmitida)}</span>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+        <div><dt className="text-fg-subtle">Transmisión</dt><dd className="mono text-fg">{formatEur(e.valorTransmisionEur)} <span className="text-fg-subtle">− {formatEur(e.gastosTransmisionEur)}</span></dd></div>
+        <div><dt className="text-fg-subtle">Adquisición</dt><dd className="mono text-fg">{formatEur(e.valorAdquisicionEur)} <span className="text-fg-subtle">+ {formatEur(e.gastosAdquisicionEur)}</span></dd></div>
+        <div className="col-span-2 text-fg-subtle truncate">{e.wallet} · <span className="mono">{e.contrapartidaClave}</span> {e.contrapartidaDescripcion}</div>
+      </dl>
+    </li>
   )
 }

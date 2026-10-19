@@ -5,12 +5,18 @@ import { CryptoIcon } from '../../components/CryptoIcon'
 import { TableExpandToggle } from './TableExpandToggle'
 import type { RendimientoEvent } from './types'
 import { fiscalDateDetail, formatFiscalDate, formatFiscalQty } from '../../utils/fiscalTable'
-import { cardClasses, buttonClasses, badgeClasses, tableFootRowClasses, tableHeadRowClasses, tableRowClasses, Dropdown } from '../../components/ui'
+import { cardClasses, buttonClasses, badgeClasses, tableFootRowClasses, tableHeadRowClasses, tableRowClasses, Dropdown, Pagination } from '../../components/ui'
+import { paginate, type PageSize } from '../../utils/pagination'
 
 export function TablaRendimientos({ rendimientos, year }: { rendimientos: RendimientoEvent[]; year: number }) {
   const [expanded, setExpanded]         = useState(true)
   const [filterActivo, setFilterActivo] = useState('')
   const [filterTipo, setFilterTipo]     = useState('')
+  // Misma paginación que las operaciones (#299); un filtro nuevo vuelve a la página 1.
+  const [size, setSize] = useState<PageSize>(25)
+  const viewKey = JSON.stringify([filterActivo, filterTipo, size, rendimientos.length])
+  const [pageState, setPageState] = useState({ key: viewKey, page: 1 })
+  const page = pageState.key === viewKey ? pageState.page : 1
 
   if (rendimientos.length === 0) return null
 
@@ -24,6 +30,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
   })
 
   const totalRend = filtered.reduce((s, r) => s + r.valorEur, 0)
+  const view = paginate(filtered, page, size)
 
   const porTipo = rendimientos.reduce<Record<string, number>>((acc, r) => {
     acc[r.tipo] = (acc[r.tipo] ?? 0) + r.valorEur
@@ -90,7 +97,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-center text-fg-subtle text-xs">Sin rendimientos con los filtros actuales</td>
                 </tr>
-              ) : filtered.map((r, i) => (
+              ) : view.items.map((r, i) => (
                 <tr key={`${r.fecha}-${r.tipo}-${r.activo}-${i}`} className={tableRowClasses()}>
                   <td className="px-4 py-2.5 text-fg-muted text-xs whitespace-nowrap">
                     <time dateTime={r.fechaHora ?? r.fecha} title={fiscalDateDetail(r.fechaHora)}>{formatFiscalDate(r.fecha)}</time>
@@ -122,6 +129,8 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
               </tr>
             </tfoot>
           </table>
+          <Pagination label="rendimientos" page={view.page} pages={view.pages} from={view.from} to={view.to} total={view.total}
+            size={size} onSize={setSize} onPage={p => setPageState({ key: viewKey, page: p })} />
         </div>
       )}
     </div>
