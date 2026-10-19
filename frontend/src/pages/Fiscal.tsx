@@ -21,12 +21,13 @@ import { TablaRendimientos } from './fiscal/TablaRendimientos'
 import { ExportPanel } from './fiscal/ExportPanel'
 import { YearTabs } from './fiscal/YearTabs'
 import { FiscalHero, FiscalHeroSkeleton } from './fiscal/FiscalHero'
+import { PlanificadorTab } from './fiscal/PlanificadorTab'
 import { useFiscalShortcuts } from './fiscal/useFiscalShortcuts'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
 import { cardClasses, EmptyState, ErrorState, Skeleton, PageHeader, Tabs, panelEnterStyle, tabId, tabPanelId } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 
-const VISTA_LABELS: Record<FiscalVista, string> = { resumen: 'Resumen', operaciones: 'Operaciones', modelo721: 'Modelo 721' }
+const VISTA_LABELS: Record<FiscalVista, string> = { resumen: 'Resumen', operaciones: 'Operaciones', modelo721: 'Modelo 721', planificar: 'Planificar' }
 const TAB_ITEMS = FISCAL_VISTAS.map((v, i) => ({ value: v, label: <span title={`Atajo: ${i + 1}`}>{VISTA_LABELS[v]}</span> }))
 const ID_BASE = 'fiscal-vista'
 
@@ -108,6 +109,15 @@ export function Fiscal() {
   }, [setSearchParams])
   const urlFilters = filtersFromUrl(searchParams)
 
+  // En pantallas estrechas la fila de pestañas se desplaza: la activa siempre a la vista.
+  useEffect(() => {
+    const el = document.getElementById(tabId(ID_BASE, vista))
+    const row = el?.parentElement
+    if (!el || !row || row.scrollWidth <= row.clientWidth) return
+    const a = el.getBoundingClientRect(), r = row.getBoundingClientRect()
+    row.scrollLeft += (a.left - r.left) - (r.width - a.width) / 2
+  }, [vista, activeYear])
+
   const onYearStep = useCallback((step: -1 | 1) => {
     if (!activeYear) return
     const next = adjacentYear(years, activeYear, step)
@@ -173,11 +183,20 @@ export function Fiscal() {
 
       <YearTabs years={years} activeYear={activeYear} overview={overview} onSelect={setSelectedYear} />
 
-      <Tabs items={TAB_ITEMS} value={vista} onChange={setVista} label="Secciones de Fiscal" idBase={ID_BASE} variant="underline" />
+      <Tabs items={TAB_ITEMS} value={vista} onChange={setVista} label="Secciones de Fiscal" idBase={ID_BASE} variant="underline"
+        className="overflow-x-auto [scrollbar-width:none] [&>button]:shrink-0 max-sm:[&>button]:px-3" />
 
       <div id={tabPanelId(ID_BASE)} role="tabpanel" aria-labelledby={tabId(ID_BASE, vista)} aria-busy={switching}
         className={`space-y-5 transition-opacity duration-200 ${switching ? 'opacity-60' : ''}`}>
-        {summaryLoading ? (
+        {/* Planificar trabaja siempre con el año en curso, sea cual sea el seleccionado (#307) */}
+        {vista === 'planificar' ? (
+          <Block i={0}>
+            {summary && !summary.esAnioEnCurso && (
+              <p className="text-xs text-fg-subtle mb-3">El planificador trabaja con el ejercicio en curso, no con {activeYear}.</p>
+            )}
+            <PlanificadorTab />
+          </Block>
+        ) : summaryLoading ? (
           <FiscalHeroSkeleton />
         ) : summary && vista === 'resumen' ? (
           <>
