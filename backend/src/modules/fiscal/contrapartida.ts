@@ -16,7 +16,7 @@ const FIAT_ASSETS = new Set(['EUR', 'USD', 'GBP', 'CHF', 'BRL', 'ARS']);
 // contrapartida. "I" nunca se devuelve — CryptoFolio no tiene dominio de
 // inmuebles, solo cripto; se documenta por completitud del catálogo AEAT.
 export function getContrapartidaClave(activoRecibido: string | null): { clave: string; descripcion: string } {
-  if (!activoRecibido)                 return { clave: 'O', descripcion: 'Sin contrapartida directa (comision/perdida)' };
+  if (!activoRecibido)                 return { clave: 'O', descripcion: 'Sin contrapartida directa (comisión/pérdida)' };
   if (FIAT_ASSETS.has(activoRecibido)) return { clave: 'D', descripcion: `Moneda de curso legal (${activoRecibido})` };
   return { clave: 'V', descripcion: `Otra moneda virtual (${activoRecibido})` };
 }

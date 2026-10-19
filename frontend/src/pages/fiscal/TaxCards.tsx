@@ -1,4 +1,6 @@
-import { Scale } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronDown, Scale } from 'lucide-react'
+import { tramosCompactos } from '../../utils/fiscalRendimientos'
 import { formatEur, formatPercent } from '../../utils/format'
 import { useTramos } from '../../hooks/useTramos'
 import { calcularTramos, tramoActivo } from '../../utils/tramosIrpf'
@@ -7,6 +9,8 @@ import { FiscalChartCard } from './FiscalChartCard'
 
 export function TramosIRPF({ base, label }: { base: number; label: string }) {
   const tramosConfig = useTramos()
+  // Con una base pequeña, una línea basta; la escala completa se despliega (#313).
+  const [abierto, setAbierto] = useState(false)
   const tramos = calcularTramos(base, tramosConfig)
   if (tramos.length === 0) return null
   const cuotaTotal   = tramos.reduce((s, t) => s + t.cuota, 0)
@@ -14,6 +18,21 @@ export function TramosIRPF({ base, label }: { base: number; label: string }) {
   const tipoMarginal = tramoActivo(base, tramosConfig)
   // Escala continua con la base marcada (#301); llega hasta el tramo siguiente.
   const scale = tramosScale(base, tramosConfig)
+  if (tramosCompactos(base) && !abierto) {
+    return (
+      <section aria-label={label} className="flex items-center gap-3 flex-wrap rounded-xl border border-border bg-background-card px-4 py-3 text-sm">
+        <Scale size={14} className="text-fg-subtle shrink-0" aria-hidden="true" />
+        <p className="flex-1 min-w-[14rem] text-fg-muted">
+          <span className="text-fg-subtle">{label}:</span> base <span className="mono text-fg">{formatEur(base)}</span> al <span className="mono text-fg">{tipoMarginal} %</span>
+          {' '}→ cuota <span className="mono font-semibold text-warning">{formatEur(cuotaTotal)}</span>
+        </p>
+        <button type="button" onClick={() => setAbierto(true)} aria-expanded={false}
+          className="inline-flex items-center gap-1 text-xs text-fg-subtle hover:text-fg rounded-md px-1 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60">
+          Ver tramos <ChevronDown size={13} aria-hidden="true" />
+        </button>
+      </section>
+    )
+  }
 
   return (
     <FiscalChartCard
