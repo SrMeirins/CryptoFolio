@@ -26,3 +26,9 @@ const DATE = new Intl.DateTimeFormat('en-CA', { timeZone: MADRID_TZ, year: 'nume
 export function madridDate(date: Date): string {
   return DATE.format(date);
 }
+
+/** Último día válido del mes (#297): el 29 de febrero en un año no bisiesto pasa a ser el 28. */
+export function clampDay(year: number, month: number, day: number): number {
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return Math.min(day, last);
+}

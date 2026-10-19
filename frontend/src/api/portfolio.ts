@@ -552,4 +552,7 @@ export const portfolioApi = {
   getFiscalModelo721: (year: number) => api.get<Modelo721>(`/fiscal/${year}/modelo721`),
   getFiscalBreakdown: (year: number) => api.get<BreakdownItem[]>(`/fiscal/${year}/breakdown`),
   getFiscalMonthly: (year: number) => api.get<MonthlyData>(`/fiscal/${year}/monthly`),
+  /** Neto del ejercicio hasta un día de Madrid (MM-DD), para comparar periodos (#297). */
+  getFiscalNetoHasta: (year: number, hasta: string) =>
+    api.get<{ year: number; hasta: string; neto: number; ganancias: number; perdidas: number; operaciones: number }>(`/fiscal/${year}/neto-hasta?hasta=${encodeURIComponent(hasta)}`),
 }
