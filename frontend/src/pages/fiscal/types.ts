@@ -104,9 +104,22 @@ export interface CarryforwardDetalle {
   netoDespues: number
 }
 
+/** Pérdida por año de origen (#305): original = compensado + pendiente + caducado. */
+export interface OrigenPerdida {
+  year: number
+  original: number
+  compensadoPatrim: number
+  compensadoRend: number
+  pendiente: number
+  caducado: number
+  /** Último ejercicio en que se puede compensar. */
+  caducaEn: number
+}
+
 export interface Carryforward {
   pendienteTotal: number
   detalle: CarryforwardDetalle[]
+  origenes?: OrigenPerdida[]
 }
 
 export interface BreakdownItem {

@@ -39,11 +39,13 @@ export function FiscalHeroSkeleton() {
   )
 }
 
-export function FiscalHero({ summary, cuota, tipoMedio, comparison }: {
+export function FiscalHero({ summary, cuota, tipoMedio, comparison, aviso }: {
   summary: FiscalSummary
   cuota: number
   tipoMedio: number
   comparison: YearComparison | null
+  /** Aviso destacado del año, p. ej. pérdidas que caducan (#305). */
+  aviso?: React.ReactNode
 }) {
   const neto = summary.netoPatrimonial
   const tint = neto > 0.005 ? 'from-positive/10' : neto < -0.005 ? 'from-negative/10' : 'from-overlay/5'
@@ -72,6 +74,7 @@ export function FiscalHero({ summary, cuota, tipoMedio, comparison }: {
           {comparison?.cuotaDelta != null && <Delta value={comparison.cuotaDelta} label={comparison.label} invert />}
         </div>
       </div>
+      {aviso}
       <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-border">
         <Mini label="Ganancias"><span className="text-positive">+{formatEur(summary.totalGanancias)}</span></Mini>
         <Mini label="Pérdidas"><span className="text-negative">{formatEur(summary.totalPerdidas)}</span></Mini>

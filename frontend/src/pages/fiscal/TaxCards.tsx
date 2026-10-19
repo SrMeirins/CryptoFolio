@@ -1,11 +1,9 @@
-import { Scale, Info } from 'lucide-react'
+import { Scale } from 'lucide-react'
 import { formatEur, formatPercent } from '../../utils/format'
 import { useTramos } from '../../hooks/useTramos'
 import { calcularTramos, tramoActivo } from '../../utils/tramosIrpf'
 import { tramosScale } from '../../utils/fiscalCharts'
 import { FiscalChartCard } from './FiscalChartCard'
-import type { Carryforward } from './types'
-import { badgeClasses } from '../../components/ui'
 
 export function TramosIRPF({ base, label }: { base: number; label: string }) {
   const tramosConfig = useTramos()
@@ -72,55 +70,6 @@ export function TramosIRPF({ base, label }: { base: number; label: string }) {
         <span className="mono font-bold text-warning">{formatEur(cuotaTotal)}</span>
       </div>
       <p className="text-xs text-fg-subtle mt-1">Estimación orientativa. Base del ahorro, sin considerar deducciones ni mínimo personal.</p>
-    </FiscalChartCard>
-  )
-}
-
-export function CompensacionPerdidas({ data }: { data: Carryforward }) {
-  if (data.pendienteTotal < 0.01 && data.detalle.every(d => d.perdida < 0.01)) return null
-
-  return (
-    <FiscalChartCard
-      icon={Scale}
-      title="Compensación de pérdidas (4 años)"
-      right={data.pendienteTotal > 0.01 && (
-        <span className={badgeClasses('info', 'sm', 'mono')}>
-          {formatEur(data.pendienteTotal)} pendiente
-        </span>
-      )}
-    >
-      <div className="space-y-1.5">
-        {data.detalle.map((d) => (
-          <div key={d.year} className="flex items-center gap-3 text-xs flex-wrap">
-            <span className="w-10 text-fg-subtle font-medium">{d.year}</span>
-            {d.perdida > 0.01 ? (
-              <>
-                <span className="text-negative mono">−{formatEur(d.perdida)}</span>
-                {d.compensadoPatrim > 0.01 && (
-                  <span className="text-positive mono">+{formatEur(d.compensadoPatrim)} vs patrimonio</span>
-                )}
-                {d.compensadoRend > 0.01 && (
-                  <span className="text-warning mono">+{formatEur(d.compensadoRend)} vs rendimientos</span>
-                )}
-              </>
-            ) : d.netoAntes > 0 ? (
-              <span className="text-fg-subtle mono">+{formatEur(d.netoAntes)} ganancias</span>
-            ) : (
-              <span className="text-fg-subtle">Sin operaciones</span>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {data.pendienteTotal > 0.01 && (
-        <div className="mt-3 pt-3 border-t border-border flex items-start gap-2 text-xs text-info">
-          <Info size={12} className="shrink-0 mt-0.5" />
-          <span>
-            Puedes compensar {formatEur(data.pendienteTotal)} de pérdidas pendientes con ganancias patrimoniales futuras
-            o hasta el 25% de rendimientos positivos (máx. 4 años desde su generación).
-          </span>
-        </div>
-      )}
     </FiscalChartCard>
   )
 }
