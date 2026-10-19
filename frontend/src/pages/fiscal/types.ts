@@ -80,6 +80,12 @@ export interface Modelo721 {
   preciosPendientes: string[]
   incompleto: boolean
   aviso: string
+  /** Último 721 presentado antes de este ejercicio (#311). */
+  ultimaPresentacion?: { ejercicio: number; valor: number } | null
+  /** Obligación con la regla del incremento de 20.000 € (#311). */
+  obligado?: boolean
+  /** Este ejercicio ya se presentó. */
+  presentado?: { declaradoEn: string; valor: number } | null
 }
 
 export interface YearOverview {

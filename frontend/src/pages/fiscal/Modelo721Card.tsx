@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { portfolioApi } from '../../api/portfolio'
+import { parseImporte, umbralSiguiente721 } from '../../utils/declaraciones'
 import { AlertTriangle, ChevronRight, Download, Landmark, ShieldCheck } from 'lucide-react'
 import { formatEur, formatPercent, formatPrice } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { InfoTooltip } from '../../components/InfoTooltip'
-import { buttonClasses, cardClasses } from '../../components/ui'
+import { buttonClasses, cardClasses, fieldClasses } from '../../components/ui'
 import { usePrivacyStore } from '../../store/privacyStore'
 import { ink } from '../../utils/colors'
 import { formatFiscalDate, formatFiscalQty } from '../../utils/fiscalTable'
@@ -66,6 +69,53 @@ function ExchangeRow({ g, total }: { g: ExchangeGroup; total: number }) {
         </div>
       )}
     </li>
+  )
+}
+
+/** Marca del 721 presentado con su valor (#311); ese valor fija la regla del incremento para los años siguientes. */
+function Presentado({ data, year }: { data: Modelo721; year: number }) {
+  const qc = useQueryClient()
+  const [valor, setValor] = useState('')
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ['fiscal-721'] })
+    void qc.invalidateQueries({ queryKey: ['fiscal-calendario'] })
+    void qc.invalidateQueries({ queryKey: ['fiscal-declaraciones'] })
+  }
+  const marcar = useMutation({
+    mutationFn: () => {
+      const v = parseImporte(valor)
+      return portfolioApi.marcar721(year, Number.isFinite(v) && v >= 0 ? v : undefined)
+    },
+    onSuccess: refresh,
+  })
+  const quitar = useMutation({ mutationFn: () => portfolioApi.quitarDeclaracion(year, 'modelo721'), onSuccess: refresh })
+  const busy = marcar.isPending || quitar.isPending
+  const error = marcar.error ?? quitar.error
+
+  if (data.presentado) {
+    return (
+      <div className="flex items-center gap-3 flex-wrap rounded-xl border border-positive/25 bg-positive/5 px-3 py-2.5 text-xs">
+        <ShieldCheck size={14} className="text-positive shrink-0" aria-hidden="true" />
+        <p className="flex-1 min-w-[12rem] text-fg-muted">
+          Presentado el {formatFiscalDate(data.presentado.declaradoEn.slice(0, 10))} con <span className="mono text-fg">{formatEur(data.presentado.valor)}</span>.
+        </p>
+        <button type="button" onClick={() => quitar.mutate()} disabled={busy} className={buttonClasses('ghost', 'sm')}>Quitar marca</button>
+        {error && <p role="alert" className="w-full text-negative">{error.message}</p>}
+      </div>
+    )
+  }
+  return (
+    <div className="flex items-center gap-2 flex-wrap rounded-xl border border-border px-3 py-2.5 text-xs">
+      <p className="flex-1 min-w-[12rem] text-fg-muted">¿Lo presentaste? Guarda el valor declarado para aplicar la regla del incremento los años siguientes.</p>
+      <label className="flex items-center gap-1.5">
+        <span className="sr-only">Valor declarado en euros</span>
+        <input type="text" inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)} maxLength={16}
+          placeholder={formatEur(data.totalValorCustodia)} className={fieldClasses('sm', false, 'w-32 mono text-right')}
+          title="Por defecto, el valor en exchanges a 31 de diciembre" />
+      </label>
+      <button type="button" onClick={() => marcar.mutate()} disabled={busy} className={buttonClasses('secondary', 'sm')}>Marcar como presentado</button>
+      {error && <p role="alert" className="w-full text-negative">{error.message}</p>}
+    </div>
   )
 }
 
@@ -165,19 +215,28 @@ export function Modelo721Card({ data: snapshot, activeYear }: { data: Modelo721;
           </p>
         )}
 
-        {/* Cuándo hay que presentarlo */}
+        {/* Cuándo hay que presentarlo (#311: regla del incremento de 20.000 €) */}
         <div className="flex items-start gap-2 p-3 rounded-xl border border-border text-xs text-fg-muted">
           <Landmark size={12} className="shrink-0 mt-0.5 text-fg-subtle" aria-hidden="true" />
           <div className="space-y-1">
             <p>
               Hay que presentarlo si el valor en exchanges extranjeros supera {formatEur(data.umbral)} a 31 de diciembre.
-              Una vez presentado, solo se repite si ese valor varía más de 20.000 € respecto a la última declaración.{' '}
+              Una vez presentado, solo se repite si ese valor aumenta más de 20.000 € respecto al último presentado, o si dejas de ser titular de lo declarado.{' '}
               <InfoTooltip label="Qué exchanges cuentan">
                 <p>{data.aviso}</p>
               </InfoTooltip>
             </p>
+            {data.ultimaPresentacion && (
+              <p>
+                Último presentado: <span className="mono text-fg">{data.ultimaPresentacion.ejercicio}</span> con <span className="mono text-fg">{formatEur(data.ultimaPresentacion.valor)}</span>;
+                este ejercicio obliga por encima de <span className="mono text-fg">{formatEur(umbralSiguiente721(data.umbral, data.ultimaPresentacion))}</span>.
+              </p>
+            )}
           </div>
         </div>
+
+        {/* Presentado (solo ejercicios cerrados) */}
+        {!data.esAnioEnCurso && <Presentado data={data} year={activeYear} />}
       </div>
     </section>
   )

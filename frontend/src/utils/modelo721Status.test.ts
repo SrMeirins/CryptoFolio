@@ -28,3 +28,11 @@ describe('pendingPricesText', () => {
     expect(pendingPricesText(undefined)).toBeNull()
   })
 })
+
+describe('modelo721Status con la regla del incremento (#311)', () => {
+  it('supera el umbral pero no aumentó más de 20.000 € desde el último presentado', () => {
+    expect(modelo721Status({ superaUmbral: true, obligado: false })).toBe('sin-obligacion')
+    expect(modelo721Status({ superaUmbral: true, obligado: true })).toBe('obligatorio')
+    expect(modelo721Status({ superaUmbral: false, obligado: false, incompleto: true })).toBe('incompleto')
+  })
+})
