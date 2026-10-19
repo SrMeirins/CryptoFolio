@@ -8,8 +8,7 @@ import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { PanelHeader, badgeClasses, cardClasses } from '../../components/ui'
 import { fiscalSubtitle } from '../../utils/panelSubtitles'
 import { baseTramosCompensada } from '../../utils/tramosIrpf'
-import { deadlineUrgency, estimatedTax, gainLossShares, nextFiscalDeadline } from '../../utils/fiscalPanel'
-import { madridToday } from '../../utils/pnlChart'
+import { deadlineFromHito, deadlineUrgency, estimatedTax, gainLossShares } from '../../utils/fiscalPanel'
 import { MODELO721_LABELS, modelo721Status, pendingPricesText } from '../../utils/modelo721Status'
 import { useTramos } from '../../hooks/useTramos'
 import { FISCAL_STALE_TIME } from '../fiscal/constants'
@@ -51,15 +50,8 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
     queryFn: () => portfolioApi.getFiscalModelo721(year!),
     enabled: !!year, staleTime: FISCAL_STALE_TIME,
   })
-  // De enero a marzo vence el 721 del año anterior (#249): hace falta saber si
-  // hubo obligación ese año.
-  const today = madridToday()
-  const todayYear = Number(today.slice(0, 4))
-  const { data: modelo721Prev } = useQuery({
-    queryKey: ['fiscal-721', todayYear - 1],
-    queryFn: () => portfolioApi.getFiscalModelo721(todayYear - 1),
-    enabled: today.slice(5) <= '03-31', staleTime: FISCAL_STALE_TIME,
-  })
+  // Próximo plazo: el mismo hito que Fiscal y la campana, calculado en el backend (#309).
+  const { data: calendario } = useQuery({ queryKey: ['fiscal-calendario'], queryFn: portfolioApi.getFiscalCalendar, staleTime: FISCAL_STALE_TIME })
 
   if (!current) return null
 
@@ -72,11 +64,8 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
   const base     = summary ? baseTramosCompensada(cfYear, summary.netoPatrimonial, summary.totalRendimientos) : null
   const tax      = base === null ? null : estimatedTax(base, tramos)
   const umbralPct = modelo721 ? Math.min(100, (modelo721.totalValorCustodia / modelo721.umbral) * 100) : null
-  const deadline = nextFiscalDeadline(today, {
-    previous: !!modelo721Prev?.superaUmbral,
-    current: year === todayYear && !!modelo721?.superaUmbral,
-  })
-  const urgency = deadlineUrgency(deadline)
+  const deadline = calendario ? deadlineFromHito(calendario.proximo) : null
+  const urgency = deadline ? deadlineUrgency(deadline) : 'calm'
 
   return (
     // Misma altura que Distribución: el gráfico mensual ocupa el espacio libre (#236).
@@ -151,8 +140,9 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
             ) : <p className="text-xs text-fg-subtle">—</p>}
           </div>
 
-          {/* Próximo plazo (#249): apertura, estado y progreso */}
-          <div className="rounded-xl border border-border bg-overlay/2 p-3 space-y-1.5"
+          {/* Próximo plazo (#249, #309): el mismo hito que Fiscal y la campana; lleva al calendario de Fiscal */}
+          {deadline && (
+          <Link to="/fiscal" className="block rounded-xl border border-border bg-overlay/2 p-3 space-y-1.5 hover:bg-overlay/4 transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60"
             title="Fechas habituales; consulta el calendario oficial de la AEAT">
             <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-fg-subtle"><CalendarClock size={12} aria-hidden="true" /> Próximo plazo</span>
             <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -175,7 +165,8 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
             <p className="text-[11px] text-fg-subtle">
               {deadline.opensApprox ? 'abre ~' + MONTH_YEAR.format(utc(deadline.opens)).replace('.', '') : 'abre ' + shortDate(deadline.opens)} · cierra {shortDate(deadline.date)}
             </p>
-          </div>
+          </Link>
+          )}
         </div>
       </div>
     </div>

@@ -10,6 +10,7 @@ export const NOTIFICATION_ROUTES: Record<string, string> = {
   'lots-no-price':       '/settings?tab=assets',
   'pending-withdrawals': '/history',
   'crypto-deposits':     '/import',
+  'fiscal-calendar':     '/fiscal',
 }
 
 // Metadata visual por tipo de aviso — antes TopBar.tsx y GeneralSection.tsx

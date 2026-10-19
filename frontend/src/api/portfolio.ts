@@ -139,6 +139,23 @@ export interface AssetSales {
   sales: AssetSale[]
 }
 
+/** Hito del calendario fiscal (#309). */
+export interface FiscalHito {
+  id: 'cierre' | 'modelo721' | 'renta'
+  ejercicio: number
+  titulo: string
+  desde: string
+  hasta: string
+  inicioAproximado: boolean
+  estado: 'pasado' | 'en-curso' | 'proximo'
+  diasRestantes: number
+  diasParaAbrir: number
+  progreso: number
+  obligado?: boolean | null
+}
+
+export interface FiscalCalendar { hoy: string; hitos: FiscalHito[]; proximo: FiscalHito }
+
 /** Planificador de fin de año (#307). */
 export interface FiscalPlanner {
   year: number
@@ -567,6 +584,8 @@ export const portfolioApi = {
   getFiscalModelo721: (year: number) => api.get<Modelo721>(`/fiscal/${year}/modelo721`),
   getFiscalBreakdown: (year: number) => api.get<BreakdownItem[]>(`/fiscal/${year}/breakdown`),
   getFiscalMonthly: (year: number) => api.get<MonthlyData>(`/fiscal/${year}/monthly`),
+  /** Calendario fiscal (#309): hitos del ciclo y el próximo, en hora de Madrid. */
+  getFiscalCalendar: () => api.get<FiscalCalendar>('/fiscal/calendario'),
   /** Planificador de fin de año (#307): contexto del ejercicio en curso y lotes abiertos en orden FIFO. */
   getFiscalPlanner: () => api.get<FiscalPlanner>('/fiscal/planificador'),
   /** Cuota del ejercicio en curso con cada ganancia (o pérdida) adicional (máx. 200). */
