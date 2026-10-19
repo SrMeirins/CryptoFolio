@@ -3,8 +3,8 @@ import { calcularTramos, type Tramo } from './tramosIrpf'
 // Cabecera y navegación de Fiscal (#297): cuota del ahorro, comparación con
 // el año anterior, pestaña de la URL, año contiguo y atajos. Funciones puras.
 
-export type FiscalVista = 'resumen' | 'operaciones' | 'modelo721'
-export const FISCAL_VISTAS: readonly FiscalVista[] = ['resumen', 'operaciones', 'modelo721']
+export type FiscalVista = 'resumen' | 'operaciones' | 'modelo721' | 'planificar'
+export const FISCAL_VISTAS: readonly FiscalVista[] = ['resumen', 'operaciones', 'modelo721', 'planificar']
 
 /** Pestaña a partir del parámetro `vista`; cualquier otro valor cae en Resumen. */
 export function parseVista(raw: string | null): FiscalVista {

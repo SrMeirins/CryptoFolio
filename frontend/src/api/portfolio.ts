@@ -139,6 +139,21 @@ export interface AssetSales {
   sales: AssetSale[]
 }
 
+/** Planificador de fin de año (#307). */
+export interface FiscalPlanner {
+  year: number
+  netoAnio: number
+  rendimientosAnio: number
+  cuotaActual: number
+  /** Ganancia realizable este año sin que suba la cuota. */
+  colchon: number
+  pendienteVigente: number
+  caducanEsteAnio: number
+  lotes: import('../utils/planificador').PlanLot[]
+  /** Activo → última adquisición de los últimos 2 meses (regla de recompra). */
+  comprasRecientes: Record<string, string>
+}
+
 export interface LockedAmount {
   wallet_id:    string
   wallet_name:  string
@@ -552,6 +567,10 @@ export const portfolioApi = {
   getFiscalModelo721: (year: number) => api.get<Modelo721>(`/fiscal/${year}/modelo721`),
   getFiscalBreakdown: (year: number) => api.get<BreakdownItem[]>(`/fiscal/${year}/breakdown`),
   getFiscalMonthly: (year: number) => api.get<MonthlyData>(`/fiscal/${year}/monthly`),
+  /** Planificador de fin de año (#307): contexto del ejercicio en curso y lotes abiertos en orden FIFO. */
+  getFiscalPlanner: () => api.get<FiscalPlanner>('/fiscal/planificador'),
+  /** Cuota del ejercicio en curso con cada ganancia (o pérdida) adicional (máx. 200). */
+  getFiscalCuotas: (ganancias: number[]) => api.post<{ cuotaBase: number; cuotas: number[] }>('/fiscal/planificador/cuotas', { ganancias }),
   /** Neto del ejercicio hasta un día de Madrid (MM-DD), para comparar periodos (#297). */
   getFiscalNetoHasta: (year: number, hasta: string) =>
     api.get<{ year: number; hasta: string; neto: number; ganancias: number; perdidas: number; operaciones: number }>(`/fiscal/${year}/neto-hasta?hasta=${encodeURIComponent(hasta)}`),

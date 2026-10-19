@@ -20,6 +20,10 @@ interface Props {
   totalQty:     number
   currentPrice: number
   onClose:      () => void
+  /** Wallet con la que se abre (p. ej. desde el planificador, #307). */
+  initialWalletId?: string
+  /** Cantidad con la que se abre; por defecto, todo lo de la wallet. */
+  initialQty?: number
 }
 
 type Mode = 'qty' | 'net'
@@ -45,7 +49,7 @@ const chipCls = (on: boolean) => `px-2 py-1 rounded-lg border text-[11px] font-m
 // Simulador de venta (#279, #280): FIFO de la wallet elegida, comisión e IRPF
 // marginal; en dos columnas, con atajos de cantidad y precio, modo «importe a
 // recibir» y gráfico del resultado según el precio.
-export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: Props) {
+export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose, initialWalletId, initialQty }: Props) {
   const titleId = useId()
   const livePrice = usePricesStore(s => s.prices[asset]) ?? currentPrice
 
@@ -56,14 +60,14 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose }: P
     staleTime: 60_000,
   })
   const wallets = useMemo(() => walletQuantities(openLots?.lots ?? []), [openLots])
-  const [walletChoice, setWalletChoice] = useState<string | null>(null)
+  const [walletChoice, setWalletChoice] = useState<string | null>(initialWalletId ?? null)
   const wallet = wallets.find(w => w.walletId === walletChoice) ?? wallets[0] ?? null
   const walletQty = wallet?.quantity ?? totalQty
   const breakEven = useMemo(() => walletBreakEven(openLots?.lots ?? [], wallet?.walletId), [openLots, wallet?.walletId])
 
   const [mode, setMode] = useState<Mode>('qty')
   // Cantidad: null = el máximo de la wallet elegida (vuelve a él al cambiarla).
-  const [qtyInput, setQtyInput] = useState<string | null>(null)
+  const [qtyInput, setQtyInput] = useState<string | null>(initialQty !== undefined && initialQty > 0 ? String(+initialQty.toPrecision(12)) : null)
   const qty = qtyInput ?? String(+walletQty.toPrecision(12))
   const [targetInput, setTargetInput] = useState('')
   const [price, setPrice] = useState(currentPrice > 0 ? currentPrice.toFixed(4) : '')

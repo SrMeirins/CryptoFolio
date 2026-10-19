@@ -6,6 +6,7 @@ describe('parseVista', () => {
   it('valores válidos y caída en Resumen', () => {
     expect(parseVista('operaciones')).toBe('operaciones')
     expect(parseVista('modelo721')).toBe('modelo721')
+    expect(parseVista('planificar')).toBe('planificar')
     expect(parseVista(null)).toBe('resumen')
     expect(parseVista('<script>')).toBe('resumen')
   })

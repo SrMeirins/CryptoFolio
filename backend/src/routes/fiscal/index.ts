@@ -4,6 +4,7 @@ import fiscalYearDetailRouter from './fiscalYearDetail';
 import fiscalExportRouter from './fiscalExport';
 import fiscalSimulateRouter from './fiscalSimulate';
 import fiscalPeriodRouter from './fiscalPeriod';
+import fiscalPlannerRouter from './fiscalPlanner';
 
 // Orquestador puro: monta los 4 sub-routers en /api/fiscal sin cambiar
 // ninguna ruta externa. Fragmentado desde el fichero más grande de todo el
@@ -19,5 +20,6 @@ router.use('/', fiscalYearDetailRouter);
 router.use('/', fiscalExportRouter);
 router.use('/', fiscalSimulateRouter);
 router.use('/', fiscalPeriodRouter);
+router.use('/', fiscalPlannerRouter);
 
 export default router;
