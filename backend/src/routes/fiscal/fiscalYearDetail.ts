@@ -74,13 +74,8 @@ router.get('/:year/monthly', async (req: Request, res: Response) => {
     });
   }
 
-  // Proyección lineal para año en curso
-  let proyeccionFinAnio: number | null = null;
-  if (year === currentYear && currentMonth > 0 && acumulado !== 0) {
-    proyeccionFinAnio = acumulado * (12 / currentMonth);
-  }
-
-  res.json({ meses, proyeccionFinAnio });
+  // Sin proyección lineal (#301): extrapolar el resultado de unos meses al año completo no era fiable.
+  res.json({ meses });
 });
 
 // ── GET /api/fiscal/:year/summary ──────────────────────────────────────────

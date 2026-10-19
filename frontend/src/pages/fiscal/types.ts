@@ -126,5 +126,4 @@ export interface MesData {
 
 export interface MonthlyData {
   meses: MesData[]
-  proyeccionFinAnio: number | null
 }

@@ -19,9 +19,14 @@ import {
 
 // Tabla de ganancias y pérdidas patrimoniales (#299): filtros, paginación,
 // resumen de recompras, avisos como iconos, tarjetas en móvil y CSV de lo filtrado.
-export function TablaEventos({ events, summary }: { events: FiscalEvent[]; summary: FiscalSummary }) {
+export function TablaEventos({ events, summary, initialFilters }: {
+  events: FiscalEvent[]
+  summary: FiscalSummary
+  /** Filtros con los que se abre la tabla, p. ej. desde un gráfico (#301). */
+  initialFilters?: Partial<EventFilters>
+}) {
   const [expanded, setExpanded] = useState(true)
-  const [filtersState, setFilters] = useState<EventFilters>(EMPTY_FILTERS)
+  const [filtersState, setFilters] = useState<EventFilters>(() => ({ ...EMPTY_FILTERS, ...initialFilters }))
   const [searchInput, setSearchInput] = useState('')
   const search = useDebounce(searchInput, 200)
   const [sortKey, setSortKey] = useState<SortKey>('fecha')
