@@ -23,12 +23,12 @@ export async function writeExcelExport(
     { header: 'Activo transmitido',        key: 'activo',    width: 15 },
     { header: 'Cantidad',                  key: 'cantidad',  width: 15 },
     { header: 'Clave contrapartida',       key: 'clave',     width: 10 },
-    { header: 'Descripcion contrapartida', key: 'desc',      width: 30 },
-    { header: 'Valor transmision EUR',     key: 'valorTx',   width: 20 },
-    { header: 'Gastos transmision EUR',    key: 'gastosTx',  width: 20 },
-    { header: 'Valor adquisicion EUR',     key: 'valorAdq',  width: 20 },
-    { header: 'Gastos adquisicion EUR',    key: 'gastosAdq', width: 20 },
-    { header: 'Ganancia/Perdida EUR',      key: 'gp',        width: 20 },
+    { header: 'Descripción contrapartida', key: 'desc',      width: 30 },
+    { header: 'Valor transmisión EUR',     key: 'valorTx',   width: 20 },
+    { header: 'Gastos transmisión EUR',    key: 'gastosTx',  width: 20 },
+    { header: 'Valor adquisición EUR',     key: 'valorAdq',  width: 20 },
+    { header: 'Gastos adquisición EUR',    key: 'gastosAdq', width: 20 },
+    { header: 'Ganancia/Pérdida EUR',      key: 'gp',        width: 20 },
   ];
   styleHeaderRow(sheet1.getRow(1));
 

@@ -1,5 +1,5 @@
 import { TrendingUp } from 'lucide-react'
-import { ComposedChart, Bar, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine, CartesianGrid, LabelList } from 'recharts'
+import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine, CartesianGrid, LabelList } from 'recharts'
 import { formatEur, formatMoneyCompact } from '../../../utils/format'
 import { comparativaSeries, type YearBar } from '../../../utils/fiscalCharts'
 import { useChartColors } from '../../../hooks/useChartColors'
@@ -58,7 +58,9 @@ export function ComparativaAnual({ data, activeYear, onSelectYear }: { data: Yea
             <Bar dataKey="perdidas" stackId="gp" maxBarSize={36} radius={[4, 4, 0, 0]} isAnimationActive={!reduceMotion} cursor="pointer">
               {series.map(s => <Cell key={s.year} fill={c.loss} fillOpacity={s.year === activeYear ? 0.95 : 0.45} />)}
             </Bar>
-            <Scatter dataKey="neto" fill={c.axis} shape="diamond" isAnimationActive={false} />
+            {/* Neto como línea fina (#313): el rombo se montaba sobre las barras */}
+            <Line dataKey="neto" type="linear" stroke={c.axis} strokeWidth={1.5} strokeDasharray="3 3"
+              dot={{ r: 2.5, strokeWidth: 0, fill: c.axis }} activeDot={false} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -66,7 +68,7 @@ export function ComparativaAnual({ data, activeYear, onSelectYear }: { data: Yea
       <p className="flex items-center gap-4 flex-wrap text-[11px] text-fg-subtle mt-2">
         <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-positive" aria-hidden="true" />Ganancias (arriba)</span>
         <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-negative" aria-hidden="true" />Pérdidas (abajo)</span>
-        <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rotate-45 bg-fg-muted" aria-hidden="true" />Neto</span>
+        <span className="inline-flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-fg-muted" aria-hidden="true" />Neto</span>
       </p>
     </FiscalChartCard>
   )

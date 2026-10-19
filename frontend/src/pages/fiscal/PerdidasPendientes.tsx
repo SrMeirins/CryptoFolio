@@ -1,6 +1,6 @@
 import { AlertTriangle, Hourglass } from 'lucide-react'
 import { formatEur } from '../../utils/format'
-import { caducanEsteAnio, origenesView, totalCaducado, type OrigenView } from '../../utils/perdidasPendientes'
+import { origenesView, totalCaducado, type OrigenView } from '../../utils/perdidasPendientes'
 import { badgeClasses } from '../../components/ui'
 import { FiscalChartCard } from './FiscalChartCard'
 import type { Carryforward } from './types'
@@ -67,13 +67,12 @@ export function PerdidasPendientes({ data }: { data: Carryforward }) {
   // El último ejercicio del cálculo es el año en curso (Madrid), según el backend.
   const currentYear = data.detalle.at(-1)?.year ?? new Date().getFullYear()
   const view = origenesView(origenes, currentYear)
-  const caducan = caducanEsteAnio(origenes, currentYear)
   const caducado = totalCaducado(origenes)
 
   return (
     <FiscalChartCard icon={Hourglass} title="Pérdidas pendientes de compensar"
       right={data.pendienteTotal > 0.01 && <span className={badgeClasses('info', 'sm', 'mono')}>{formatEur(data.pendienteTotal)} pendiente</span>}>
-      {caducan && <div className="mb-4"><AvisoCaducidad {...caducan} /></div>}
+      {/* El aviso de lo que caduca está en la cabecera del año; aquí basta con destacar su fila (#313). */}
       <ul className="space-y-4">{view.map(o => <Fila key={o.year} o={o} />)}</ul>
       <div className="mt-4 pt-3 border-t border-border space-y-1.5 text-[11px] text-fg-subtle">
         <p className="flex items-center gap-3 flex-wrap">

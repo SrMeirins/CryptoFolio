@@ -10,8 +10,8 @@ export function writeModelo100Csv(
   res.setHeader('Content-Disposition', `attachment; filename="fiscal_${year}_modelo100.csv"`);
 
   const lines: string[] = [];
-  lines.push('GANANCIAS Y PERDIDAS PATRIMONIALES - MODELO 100');
-  lines.push('Fecha;Denominacion activo transmitido;Clave contrapartida;Descripcion contrapartida;Valor transmision EUR;Gastos transmision EUR;Valor adquisicion EUR;Gastos adquisicion EUR;Ganancia/Perdida EUR');
+  lines.push('GANANCIAS Y PÉRDIDAS PATRIMONIALES - MODELO 100');
+  lines.push('Fecha;Denominación activo transmitido;Clave contrapartida;Descripción contrapartida;Valor transmisión EUR;Gastos transmisión EUR;Valor adquisición EUR;Gastos adquisición EUR;Ganancia/Pérdida EUR');
 
   // activoTransmitido y contrapartidaDescripcion (esta última incrusta un
   // símbolo de activo, ver contrapartida.ts) provienen en última instancia

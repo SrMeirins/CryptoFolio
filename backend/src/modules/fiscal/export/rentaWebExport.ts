@@ -3,6 +3,12 @@ import { sanitizeCsvField } from '../../csv/csvSafety';
 import { EventoFiscal } from '../eventosAnio';
 
 const eur = (n: number) => n.toFixed(2).replace('.', ',');
+/**
+ * El fichero Renta Web conserva su formato histórico en ASCII (#313): la
+ * descripción lleva tildes en pantalla, pero aquí se escribe sin ellas para
+ * no alterar lo que importa la herramienta de la AEAT.
+ */
+export const sinTildes = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const fmtDate = (iso: string) => {
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
@@ -28,7 +34,7 @@ export function writeRentaWebCsv(res: Response, year: number, fiscalEvents: Even
       fmtDate(e.fecha),
       sanitizeCsvField(e.activoTransmitido),
       e.contrapartidaClave,
-      sanitizeCsvField(e.contrapartidaDescripcion),
+      sanitizeCsvField(sinTildes(e.contrapartidaDescripcion)),
       eur(valorTxBruto),
       eur(e.gastosTransmisionEur),
       eur(e.valorAdquisicionEur),

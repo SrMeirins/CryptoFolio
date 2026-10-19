@@ -7,11 +7,14 @@ import type { RendimientoEvent } from './types'
 import { fiscalDateDetail, formatFiscalDate, formatFiscalQty } from '../../utils/fiscalTable'
 import { cardClasses, buttonClasses, badgeClasses, tableFootRowClasses, tableHeadRowClasses, tableRowClasses, Dropdown, Pagination } from '../../components/ui'
 import { paginate, type PageSize } from '../../utils/pagination'
+import { buildRendimientosCsv } from '../../utils/fiscalRendimientos'
+import { usePrivacyStore } from '../../store/privacyStore'
 
 export function TablaRendimientos({ rendimientos, year }: { rendimientos: RendimientoEvent[]; year: number }) {
   const [expanded, setExpanded]         = useState(true)
   const [filterActivo, setFilterActivo] = useState('')
   const [filterTipo, setFilterTipo]     = useState('')
+  const privacy = usePrivacyStore(s => s.hidden)
   // Misma paginación que las operaciones (#299); un filtro nuevo vuelve a la página 1.
   const [size, setSize] = useState<PageSize>(25)
   const viewKey = JSON.stringify([filterActivo, filterTipo, size, rendimientos.length])
@@ -31,6 +34,15 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
 
   const totalRend = filtered.reduce((s, r) => s + r.valorEur, 0)
   const view = paginate(filtered, page, size)
+
+  // CSV de la tabla filtrada (#313); antes descargaba la exportación completa del año.
+  function exportCsv() {
+    const blob = new Blob(['\uFEFF' + buildRendimientosCsv(filtered)], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `rendimientos_fiscal_${year}.csv`
+    a.click(); URL.revokeObjectURL(url)
+  }
 
   const porTipo = rendimientos.reduce<Record<string, number>>((acc, r) => {
     acc[r.tipo] = (acc[r.tipo] ?? 0) + r.valorEur
@@ -65,14 +77,11 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
               <Dropdown size="sm" label="Filtrar por tipo" value={filterTipo} onChange={setFilterTipo} align="end"
                 options={[{ value: '', label: 'Todos los tipos' }, ...tipos.map(t => ({ value: t, label: t }))]} />
 
-              <button
-                type="button"
-                onClick={() => window.open(`/api/fiscal/${year}/export?format=csv`, '_blank')}
-                title="Descarga el export fiscal completo del año (el backend no soporta filtrar solo esta sección)"
-                className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}
-              >
-                <Download size={11} />
-                CSV
+              <button type="button" onClick={exportCsv} disabled={privacy || filtered.length === 0}
+                title={privacy ? 'Desactiva el modo privacidad para exportar' : 'Exportar a CSV los rendimientos de la tabla'}
+                className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
+                <Download size={11} aria-hidden="true" />
+                {filtered.length < rendimientos.length ? 'CSV de lo filtrado' : 'CSV de rendimientos'}
               </button>
             </>
           )}
