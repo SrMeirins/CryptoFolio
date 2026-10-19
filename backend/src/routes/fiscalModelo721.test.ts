@@ -52,6 +52,8 @@ describe('GET /api/fiscal/:year/modelo721 — solo custodia de terceros', () => 
     expect(res.body.totalValor).toBeCloseTo(55_000, 2);
     expect(res.body.totalValorCustodia).toBeCloseTo(30_000, 2);
     expect(res.body.superaUmbral).toBe(false);
+    // Fecha de valoración: el 31 de diciembre de Madrid (#303).
+    expect(res.body.fecha).toBe('2024-12-31');
   });
 
   it('/summary también usa solo custodia de terceros para superaUmbral721', async () => {

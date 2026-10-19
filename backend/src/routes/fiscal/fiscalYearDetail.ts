@@ -3,7 +3,7 @@ import { db } from '../../db/client';
 import { getEventosAnio } from '../../modules/fiscal/eventosAnio';
 import { getUmbral721, sumaValorCustodiaExchange, valorizarLotesEnFecha } from '../../modules/fiscal/lotesValoracion';
 import { parseYear } from './fiscalShared';
-import { endOfYearMadrid, madridYearMonth } from '../../modules/fiscal/madridTime';
+import { endOfYearMadrid, madridDate, madridYearMonth } from '../../modules/fiscal/madridTime';
 
 const router = Router();
 
@@ -161,7 +161,8 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
   res.json({
     year,
     esAnioEnCurso,
-    fecha:        dec31.toISOString().slice(0, 10),
+    // Día de Madrid (#303): en el año en curso, recortar el ISO daba el día UTC.
+    fecha:        madridDate(dec31),
     activos,
     totalValor,
     totalValorCustodia,
