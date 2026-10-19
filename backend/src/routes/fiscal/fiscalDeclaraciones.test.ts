@@ -11,12 +11,15 @@ let app: import('express').Express;
 const Y = madridYearMonth().year;
 let walletId: string;
 
+// El lote se abre el mismo año de la venta: así no hay cartera que valorar a
+// 31 de diciembre de otros años y el test no depende de precios por red (en CI
+// la API de precios no responde y la valoración agotaría el tiempo).
 async function seedSale(year: number, gain: number) {
   const at = `${year}-06-15T10:00:00Z`;
   const tx = (await pool.query(`INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id) VALUES ('SELL', $1, 'BTC', 1, 1, $2) RETURNING id`, [at, walletId])).rows[0].id;
   const lot = (await pool.query(
     `INSERT INTO fifo_lots (asset, quantity_original, quantity_remaining, cost_basis_eur, price_per_unit_eur, open_transaction_id, opened_at, wallet_id, is_closed)
-     VALUES ('BTC', 1, 0, 0, 0, $1, '2015-01-01T00:00:00Z', $2, TRUE) RETURNING id`, [tx, walletId])).rows[0].id;
+     VALUES ('BTC', 1, 0, 0, 0, $1, $3, $2, TRUE) RETURNING id`, [tx, walletId, `${year}-01-01T00:00:00Z`])).rows[0].id;
   await pool.query(
     `INSERT INTO fifo_lot_consumptions (lot_id, consuming_transaction_id, quantity_consumed, cost_basis_consumed_eur, proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at)
      VALUES ($1, $2, 1, 0, $3, $4, $5, $6)`, [lot, tx, Math.max(gain, 0), gain, gain >= 0 ? 'GAIN' : 'LOSS', at]);
