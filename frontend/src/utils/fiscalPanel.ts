@@ -1,4 +1,5 @@
 import { calcularTramos, type Tramo } from './tramosIrpf'
+import type { FiscalHito } from '../api/portfolio'
 
 // Panel fiscal del Dashboard (#236). Funciones puras.
 
@@ -15,40 +16,20 @@ export interface Deadline {
   progress: number       // % del plazo transcurrido (0 si no ha abierto)
 }
 
-const DAY_MS = 86_400_000
-const daysUntil = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS)
-
-// Apertura estimada de la campaña de la renta: principios de abril (en la
-// campaña de 2026, el 8 de abril según la AEAT).
-const RENTA_OPENS_MD = '04-08'
-
 /**
- * Próximo plazo fiscal desde `today` (YYYY-MM-DD) con su apertura, estado y
- * progreso (#249): la renta del año anterior (abril–30 de junio) o, si hay
- * obligación, el Modelo 721 de un año (1 de enero–31 de marzo del siguiente).
- * Entre enero y marzo vence el 721 del año anterior, así que se necesita la
- * obligación de ambos años. Son las fechas habituales; el calendario oficial
- * lo publica la AEAT cada año.
+ * Próximo plazo para el panel del Dashboard a partir del hito del calendario
+ * fiscal del backend (#309): así Fiscal, Dashboard y campana muestran el mismo.
  */
-export function nextFiscalDeadline(today: string, obliged721: { previous: boolean; current: boolean }): Deadline {
-  const y = Number(today.slice(0, 4))
-  const renta = (year: number) => ({ label: `Renta ${year}`, opens: `${year + 1}-${RENTA_OPENS_MD}`, opensApprox: true, date: `${year + 1}-06-30` })
-  const modelo721 = (year: number) => ({ label: `Modelo 721 de ${year}`, opens: `${year + 1}-01-01`, opensApprox: false, date: `${year + 1}-03-31` })
-  const candidates = [
-    ...(obliged721.previous ? [modelo721(y - 1)] : []),
-    renta(y - 1),
-    ...(obliged721.current ? [modelo721(y)] : []),
-    renta(y),
-  ]
-  const next = candidates.filter(c => c.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0]
-  const open = today >= next.opens
-  const length = daysUntil(next.opens, next.date)
+export function deadlineFromHito(h: FiscalHito): Deadline {
   return {
-    ...next,
-    days: daysUntil(today, next.date),
-    status: open ? 'open' : 'pending',
-    daysToOpen: open ? 0 : daysUntil(today, next.opens),
-    progress: open && length > 0 ? Math.min(100, (daysUntil(next.opens, today) / length) * 100) : 0,
+    label: h.titulo,
+    opens: h.desde,
+    opensApprox: h.inicioAproximado,
+    date: h.hasta,
+    days: h.diasRestantes,
+    status: h.estado === 'en-curso' ? 'open' : 'pending',
+    daysToOpen: h.diasParaAbrir,
+    progress: h.progreso,
   }
 }
 

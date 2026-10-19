@@ -1,55 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { deadlineUrgency, estimatedTax, gainLossShares, nextFiscalDeadline } from './fiscalPanel'
+import { deadlineFromHito, deadlineUrgency, estimatedTax, gainLossShares } from './fiscalPanel'
+import type { FiscalHito } from '../api/portfolio'
 import { calcularTramos } from './tramosIrpf'
 
 // Panel fiscal del Dashboard (#236).
-const NO = { previous: false, current: false }
-const CUR = { previous: false, current: true }
-const PREV = { previous: true, current: false }
-describe('nextFiscalDeadline', () => {
-  it('antes del 30 de junio: el plazo de la renta del año anterior', () => {
-    expect(nextFiscalDeadline('2026-05-01', NO)).toMatchObject({ label: 'Renta 2025', date: '2026-06-30', days: 60 })
-  })
-  it('después: el 721 del año siguiente si hay obligación; si no, la renta del año en curso', () => {
-    expect(nextFiscalDeadline('2026-10-15', CUR)).toMatchObject({ label: 'Modelo 721 de 2026', date: '2027-03-31', days: 167 })
-    expect(nextFiscalDeadline('2026-10-15', NO)).toMatchObject({ label: 'Renta 2026', date: '2027-06-30', days: 258 })
-  })
-  it('el propio día del plazo cuenta como 0 días', () => {
-    expect(nextFiscalDeadline('2026-06-30', NO).days).toBe(0)
-  })
+const hito = (p: Partial<FiscalHito>): FiscalHito => ({
+  id: 'renta', ejercicio: 2025, titulo: 'Renta de 2025', desde: '2026-04-08', hasta: '2026-06-30', inicioAproximado: true,
+  estado: 'en-curso', diasRestantes: 60, diasParaAbrir: 0, progreso: 25, ...p,
+})
 
-  // #249: apertura, estado y progreso.
-  it('antes de la campaña: pendiente de abrir, con los días hasta la apertura estimada', () => {
-    const d = nextFiscalDeadline('2026-10-15', NO)
-    expect(d).toMatchObject({ status: 'pending', opens: '2027-04-08', opensApprox: true, daysToOpen: 175, progress: 0 })
-  })
-  it('el día de apertura ya está abierta, al 0 %', () => {
-    expect(nextFiscalDeadline('2026-04-08', NO)).toMatchObject({ status: 'open', daysToOpen: 0, progress: 0 })
-  })
-  it('con la campaña abierta, progreso entre apertura y cierre; el día del cierre, al 100 %', () => {
-    expect(nextFiscalDeadline('2026-05-19', NO).progress).toBeCloseTo((41 / 83) * 100, 6)
-    expect(nextFiscalDeadline('2026-06-30', NO)).toMatchObject({ status: 'open', progress: 100 })
-  })
-  it('el día siguiente al cierre pasa al plazo siguiente, pendiente', () => {
-    expect(nextFiscalDeadline('2026-07-01', NO)).toMatchObject({ label: 'Renta 2026', status: 'pending' })
-  })
-  it('Modelo 721: abre el 1 de enero (fecha fija)', () => {
-    expect(nextFiscalDeadline('2026-12-31', CUR)).toMatchObject({ label: 'Modelo 721 de 2026', status: 'pending', daysToOpen: 1 })
-    expect(nextFiscalDeadline('2027-01-01', PREV)).toMatchObject({ label: 'Modelo 721 de 2026', status: 'open', opensApprox: false, days: 89 })
-  })
-  it('entre enero y marzo vence el 721 del año anterior, si hubo obligación', () => {
-    expect(nextFiscalDeadline('2027-02-15', PREV).label).toBe('Modelo 721 de 2026')
-    expect(nextFiscalDeadline('2027-02-15', NO).label).toBe('Renta 2026')
-    expect(nextFiscalDeadline('2027-04-01', PREV).label).toBe('Renta 2026')   // el 721 ya cerró
+describe('deadlineFromHito', () => {
+  it('adapta el hito del calendario del backend', () => {
+    expect(deadlineFromHito(hito({}))).toEqual({ label: 'Renta de 2025', opens: '2026-04-08', opensApprox: true, date: '2026-06-30', days: 60, status: 'open', daysToOpen: 0, progress: 25 })
+    expect(deadlineFromHito(hito({ estado: 'proximo', diasParaAbrir: 7, progreso: 0 }))).toMatchObject({ status: 'pending', daysToOpen: 7 })
   })
 })
 
 describe('deadlineUrgency', () => {
-  it('tranquilo si falta más de un mes o no ha abierto; pronto hasta 30 días; urgente la última semana', () => {
-    expect(deadlineUrgency(nextFiscalDeadline('2026-05-01', NO))).toBe('calm')    // 60 días
-    expect(deadlineUrgency(nextFiscalDeadline('2026-06-10', NO))).toBe('soon')    // 20 días
-    expect(deadlineUrgency(nextFiscalDeadline('2026-06-25', NO))).toBe('urgent')  // 5 días
-    expect(deadlineUrgency(nextFiscalDeadline('2026-10-15', NO))).toBe('calm')    // pendiente
+  it('tranquilo, pronto y urgente según los días al cierre', () => {
+    expect(deadlineUrgency(deadlineFromHito(hito({ diasRestantes: 60 })))).toBe('calm')
+    expect(deadlineUrgency(deadlineFromHito(hito({ diasRestantes: 20 })))).toBe('soon')
+    expect(deadlineUrgency(deadlineFromHito(hito({ diasRestantes: 5 })))).toBe('urgent')
+    expect(deadlineUrgency(deadlineFromHito(hito({ estado: 'proximo', diasRestantes: 5 })))).toBe('calm')
   })
 })
 

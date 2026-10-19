@@ -22,6 +22,8 @@ import { ExportPanel } from './fiscal/ExportPanel'
 import { YearTabs } from './fiscal/YearTabs'
 import { FiscalHero, FiscalHeroSkeleton } from './fiscal/FiscalHero'
 import { PlanificadorTab } from './fiscal/PlanificadorTab'
+import { CalendarioFiscal } from './fiscal/CalendarioFiscal'
+import type { FiscalHito } from '../api/portfolio'
 import { useFiscalShortcuts } from './fiscal/useFiscalShortcuts'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
 import { cardClasses, EmptyState, ErrorState, Skeleton, PageHeader, Tabs, panelEnterStyle, tabId, tabPanelId } from '../components/ui'
@@ -46,6 +48,7 @@ export function Fiscal() {
   const { data: years = [] } = useQuery({ queryKey: ['fiscal-years'], queryFn: portfolioApi.getFiscalYears })
   const { data: overview = [] } = useQuery({ queryKey: ['fiscal-overview'], queryFn: portfolioApi.getFiscalOverview, staleTime: FISCAL_STALE_TIME })
   const { data: carryforward } = useQuery({ queryKey: ['fiscal-carryforward'], queryFn: portfolioApi.getFiscalCarryforward, staleTime: FISCAL_STALE_TIME })
+  const { data: calendario } = useQuery({ queryKey: ['fiscal-calendario'], queryFn: portfolioApi.getFiscalCalendar, staleTime: FISCAL_STALE_TIME })
 
   const activeYear = selectedYear ?? (years.length > 0 ? years[0] : null)
 
@@ -117,6 +120,13 @@ export function Fiscal() {
     const a = el.getBoundingClientRect(), r = row.getBoundingClientRect()
     row.scrollLeft += (a.left - r.left) - (r.width - a.width) / 2
   }, [vista, activeYear])
+
+  // Desde el calendario: cada hito lleva a donde se trabaja (#309).
+  const goHito = useCallback((h: FiscalHito) => {
+    if (h.id === 'cierre') { setVista('planificar'); return }
+    if (years.includes(h.ejercicio)) setSelectedYear(h.ejercicio)
+    setVista(h.id === 'modelo721' ? 'modelo721' : 'resumen')
+  }, [setVista, years])
 
   const onYearStep = useCallback((step: -1 | 1) => {
     if (!activeYear) return
@@ -201,6 +211,11 @@ export function Fiscal() {
         ) : summary && vista === 'resumen' ? (
           <>
             <FiscalHero summary={summary} cuota={cuota} tipoMedio={tipoMedio} comparison={comparison} aviso={caducan && <AvisoCaducidad {...caducan} compact />} />
+            {calendario && (
+              <Block i={1}>
+                <CalendarioFiscal data={calendario} netoPorAnio={new Map(overview.map(o => [o.year, o.netoPatrimonial]))} onGo={goHito} />
+              </Block>
+            )}
             {overview.length >= 2 && <Block i={1}><ComparativaAnual data={overview} activeYear={activeYear} onSelectYear={setSelectedYear} /></Block>}
             {monthly && monthly.meses.length > 0 && (
               <Block i={2}><EvolucionMensual data={monthly} onSelectMonth={m => openOperaciones(monthRange(activeYear, m))} /></Block>

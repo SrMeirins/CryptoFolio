@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../../db/client';
 import { runFifoEngine } from '../../modules/fifo/engine';
+import { avisoCalendario } from '../../modules/fiscal/calendarioFiscal';
+import { obligaciones721 } from '../../modules/fiscal/obligacion721';
 import { getHistoricalPriceEur } from '../../modules/prices/binance';
 import { requireConfirm, sendZodError } from './settingsShared';
 import { sendInternalError } from '../../middleware/errorHandler';
@@ -149,6 +151,14 @@ router.get('/notifications', async (_req: Request, res: Response) => {
       message: `Activos en cartera sin precio de mercado: ${assets}. El valor del portfolio puede estar incompleto.`,
       count: noLotPriceRes.rows.length,
     });
+  }
+
+  // Recordatorio del calendario fiscal (#309): a 30 días del próximo hito, información; a 7, aviso.
+  // Sin la obligación del 721 (p. ej. si falla la valoración) el aviso no se pierde: se asume desconocida.
+  const obligado = await obligaciones721().catch(() => () => null);
+  const avisoFiscal = avisoCalendario(new Date(), obligado);
+  if (avisoFiscal) {
+    notifications.push({ id: 'fiscal-calendar', type: avisoFiscal.type, category: 'Fiscal', message: avisoFiscal.message });
   }
 
   res.json(notifications);
