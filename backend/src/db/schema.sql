@@ -430,6 +430,17 @@ INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_e
   ('BETH', 'Binance ETH Staking', NULL, FALSE, 'BETHETH', 'eth_proxy');
 
 -- ============================================================
+-- TABLA: fiscal_declaraciones — Renta y Modelo 721 presentados (#311, migración 008)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS fiscal_declaraciones (
+  ejercicio     INTEGER     NOT NULL CHECK (ejercicio BETWEEN 2009 AND 2100),
+  tipo          TEXT        NOT NULL CHECK (tipo IN ('renta', 'modelo721')),
+  declarado_en  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  cifras        JSONB       NOT NULL CHECK (jsonb_typeof(cifras) = 'object'),
+  PRIMARY KEY (ejercicio, tipo)
+);
+
+-- ============================================================
 -- VISTAS
 -- ============================================================
 -- v_portfolio_current (portfolio actual agregado desde fifo_lots) existió

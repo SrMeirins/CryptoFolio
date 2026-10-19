@@ -3,6 +3,8 @@ import { db } from '../../db/client';
 import { getEventosAnio } from '../../modules/fiscal/eventosAnio';
 import { getUmbral721, sumaValorCustodiaExchange, valorizarLotesEnFecha } from '../../modules/fiscal/lotesValoracion';
 import { parseYear } from './fiscalShared';
+import { obligacion721 } from '../../modules/fiscal/declaraciones';
+import { listarDeclaraciones, ultimaPresentacion721 } from '../../modules/fiscal/declaracionesRepo';
 import { endOfYearMadrid, madridDate, madridYearMonth } from '../../modules/fiscal/madridTime';
 
 const router = Router();
@@ -155,6 +157,8 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
   const umbral = await getUmbral721();
 
   const totalValor = activos.reduce((sum, a) => sum + a.valorEur, 0);
+  const ultimaPresentacion = await ultimaPresentacion721(year);
+  const presentado = (await listarDeclaraciones()).find(d => d.ejercicio === year && d.tipo === 'modelo721') ?? null;
   // Solo la custodia de terceros computa para el umbral del 721.
   const totalValorCustodia = sumaValorCustodiaExchange(activos);
 
@@ -168,6 +172,10 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
     totalValorCustodia,
     superaUmbral: totalValorCustodia > umbral,
     umbral,
+    // Regla del incremento de 20.000 € respecto al último 721 presentado (#311).
+    ultimaPresentacion,
+    obligado: obligacion721(totalValorCustodia, umbral, ultimaPresentacion),
+    presentado: presentado ? { declaradoEn: presentado.declaradoEn, valor: presentado.cifras.valor } : null,
     // Activos sin precio: los totales son un mínimo (#267).
     preciosPendientes,
     incompleto: preciosPendientes.length > 0,

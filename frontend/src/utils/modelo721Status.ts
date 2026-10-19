@@ -4,8 +4,13 @@
 
 export type Modelo721Status = 'obligatorio' | 'incompleto' | 'sin-obligacion'
 
-export function modelo721Status({ superaUmbral, incompleto }: { superaUmbral: boolean; incompleto?: boolean }): Modelo721Status {
-  if (superaUmbral) return 'obligatorio'
+export function modelo721Status({ superaUmbral, incompleto, obligado }: { superaUmbral: boolean; incompleto?: boolean; obligado?: boolean }): Modelo721Status {
+  // Con un 721 presentado antes, superar el umbral no basta: el backend aplica
+  // la regla del incremento de 20.000 € y lo indica en `obligado` (#311).
+  const obliga = obligado ?? superaUmbral
+  if (obliga) return 'obligatorio'
+  // Si ya supera el umbral pero no obliga por la regla, el resultado es firme aunque falten precios.
+  if (superaUmbral) return 'sin-obligacion'
   return incompleto ? 'incompleto' : 'sin-obligacion'
 }
 

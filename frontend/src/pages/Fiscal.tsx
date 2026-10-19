@@ -23,6 +23,7 @@ import { YearTabs } from './fiscal/YearTabs'
 import { FiscalHero, FiscalHeroSkeleton } from './fiscal/FiscalHero'
 import { PlanificadorTab } from './fiscal/PlanificadorTab'
 import { CalendarioFiscal } from './fiscal/CalendarioFiscal'
+import { DeclaracionRenta } from './fiscal/DeclaracionRenta'
 import type { FiscalHito } from '../api/portfolio'
 import { useFiscalShortcuts } from './fiscal/useFiscalShortcuts'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
@@ -49,6 +50,8 @@ export function Fiscal() {
   const { data: overview = [] } = useQuery({ queryKey: ['fiscal-overview'], queryFn: portfolioApi.getFiscalOverview, staleTime: FISCAL_STALE_TIME })
   const { data: carryforward } = useQuery({ queryKey: ['fiscal-carryforward'], queryFn: portfolioApi.getFiscalCarryforward, staleTime: FISCAL_STALE_TIME })
   const { data: calendario } = useQuery({ queryKey: ['fiscal-calendario'], queryFn: portfolioApi.getFiscalCalendar, staleTime: FISCAL_STALE_TIME })
+  // Ejercicios declarados (#311): sin caché larga, para ver los cambios tras una importación.
+  const { data: declaraciones = [] } = useQuery({ queryKey: ['fiscal-declaraciones'], queryFn: portfolioApi.getDeclaraciones })
 
   const activeYear = selectedYear ?? (years.length > 0 ? years[0] : null)
 
@@ -176,6 +179,8 @@ export function Fiscal() {
     prevCuota,
   }) : null
 
+  const rentaDeclarada = declaraciones.find(d => d.ejercicio === activeYear && d.tipo === 'renta')
+
   // Pérdidas que caducan este año: solo se avisa en la cabecera del año en curso (#305).
   const caducan = summary?.esAnioEnCurso && carryforward?.origenes
     ? caducanEsteAnio(carryforward.origenes, activeYear)
@@ -210,7 +215,9 @@ export function Fiscal() {
           <FiscalHeroSkeleton />
         ) : summary && vista === 'resumen' ? (
           <>
-            <FiscalHero summary={summary} cuota={cuota} tipoMedio={tipoMedio} comparison={comparison} aviso={caducan && <AvisoCaducidad {...caducan} compact />} />
+            <FiscalHero summary={summary} cuota={cuota} tipoMedio={tipoMedio} comparison={comparison} aviso={caducan && <AvisoCaducidad {...caducan} compact />}
+              declarada={!!rentaDeclarada} />
+            {!summary.esAnioEnCurso && <Block i={1}><DeclaracionRenta year={activeYear} declaracion={rentaDeclarada} /></Block>}
             {calendario && (
               <Block i={1}>
                 <CalendarioFiscal data={calendario} netoPorAnio={new Map(overview.map(o => [o.year, o.netoPatrimonial]))} onGo={goHito} />

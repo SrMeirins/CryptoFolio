@@ -139,6 +139,16 @@ export interface AssetSales {
   sales: AssetSale[]
 }
 
+/** Ejercicio declarado (#311). */
+export interface Declaracion {
+  ejercicio: number
+  tipo: 'renta' | 'modelo721'
+  declaradoEn: string
+  cifras: Record<string, number>
+  /** Solo la Renta: cifras que han cambiado desde que se declaró. */
+  cambios?: { campo: string; declarado: number; actual: number }[]
+}
+
 /** Hito del calendario fiscal (#309). */
 export interface FiscalHito {
   id: 'cierre' | 'modelo721' | 'renta'
@@ -584,6 +594,11 @@ export const portfolioApi = {
   getFiscalModelo721: (year: number) => api.get<Modelo721>(`/fiscal/${year}/modelo721`),
   getFiscalBreakdown: (year: number) => api.get<BreakdownItem[]>(`/fiscal/${year}/breakdown`),
   getFiscalMonthly: (year: number) => api.get<MonthlyData>(`/fiscal/${year}/monthly`),
+  /** Ejercicios declarados (#311): Renta y Modelo 721 presentados, con los cambios de la Renta. */
+  getDeclaraciones: () => api.get<Declaracion[]>('/fiscal/declaraciones'),
+  marcarRenta: (year: number) => api.put<Declaracion>(`/fiscal/${year}/declaracion/renta`, {}),
+  marcar721: (year: number, valor?: number) => api.put<Declaracion>(`/fiscal/${year}/declaracion/modelo721`, valor === undefined ? {} : { valor }),
+  quitarDeclaracion: (year: number, tipo: Declaracion['tipo']) => api.delete<{ ok: true }>(`/fiscal/${year}/declaracion/${tipo}`),
   /** Calendario fiscal (#309): hitos del ciclo y el próximo, en hora de Madrid. */
   getFiscalCalendar: () => api.get<FiscalCalendar>('/fiscal/calendario'),
   /** Planificador de fin de año (#307): contexto del ejercicio en curso y lotes abiertos en orden FIFO. */
