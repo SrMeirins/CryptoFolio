@@ -12,7 +12,9 @@ import { ComparativaAnual } from './fiscal/charts/ComparativaAnual'
 import { EvolucionMensual } from './fiscal/charts/EvolucionMensual'
 import { DesglosePorActivo } from './fiscal/charts/DesglosePorActivo'
 import { filtersFromUrl, monthRange } from '../utils/fiscalCharts'
-import { TramosIRPF, CompensacionPerdidas } from './fiscal/TaxCards'
+import { TramosIRPF } from './fiscal/TaxCards'
+import { AvisoCaducidad, PerdidasPendientes } from './fiscal/PerdidasPendientes'
+import { caducanEsteAnio } from '../utils/perdidasPendientes'
 import { Modelo721Card } from './fiscal/Modelo721Card'
 import { TablaEventos } from './fiscal/TablaEventos'
 import { TablaRendimientos } from './fiscal/TablaRendimientos'
@@ -154,6 +156,11 @@ export function Fiscal() {
     prevCuota,
   }) : null
 
+  // Pérdidas que caducan este año: solo se avisa en la cabecera del año en curso (#305).
+  const caducan = summary?.esAnioEnCurso && carryforward?.origenes
+    ? caducanEsteAnio(carryforward.origenes, activeYear)
+    : null
+
   return (
     <div className="p-6 space-y-5 max-w-5xl mx-auto">
       <PageHeader
@@ -174,7 +181,7 @@ export function Fiscal() {
           <FiscalHeroSkeleton />
         ) : summary && vista === 'resumen' ? (
           <>
-            <FiscalHero summary={summary} cuota={cuota} tipoMedio={tipoMedio} comparison={comparison} />
+            <FiscalHero summary={summary} cuota={cuota} tipoMedio={tipoMedio} comparison={comparison} aviso={caducan && <AvisoCaducidad {...caducan} compact />} />
             {overview.length >= 2 && <Block i={1}><ComparativaAnual data={overview} activeYear={activeYear} onSelectYear={setSelectedYear} /></Block>}
             {monthly && monthly.meses.length > 0 && (
               <Block i={2}><EvolucionMensual data={monthly} onSelectMonth={m => openOperaciones(monthRange(activeYear, m))} /></Block>
@@ -185,7 +192,7 @@ export function Fiscal() {
                 <TramosIRPF base={baseCompensada} label={`Tramos IRPF — estimación ${activeYear}${huboCompensacion ? ' (tras compensar pérdidas)' : ''}`} />
               </Block>
             )}
-            {carryforward && <Block i={5}><CompensacionPerdidas data={carryforward} /></Block>}
+            {carryforward && <Block i={5}><PerdidasPendientes data={carryforward} /></Block>}
           </>
         ) : summary && vista === 'operaciones' ? (
           eventsLoading ? (
