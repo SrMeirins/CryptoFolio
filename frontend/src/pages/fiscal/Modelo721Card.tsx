@@ -1,163 +1,184 @@
-import { useState } from 'react'
-import { AlertTriangle, Info, ChevronDown, ChevronUp } from 'lucide-react'
-import { formatEur, pnlColor, formatPercent, formatNumber } from '../../utils/format'
+import { useMemo, useState } from 'react'
+import { AlertTriangle, ChevronRight, Download, Landmark, ShieldCheck } from 'lucide-react'
+import { formatEur, formatPercent, formatPrice } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import type { Modelo721 } from './types'
-import { T, alpha, ink } from '../../utils/colors'
-import { badgeClasses } from '../../components/ui'
+import { InfoTooltip } from '../../components/InfoTooltip'
+import { buttonClasses, cardClasses } from '../../components/ui'
+import { usePrivacyStore } from '../../store/privacyStore'
+import { ink } from '../../utils/colors'
+import { formatFiscalDate, formatFiscalQty } from '../../utils/fiscalTable'
 import { MODELO721_LABELS, modelo721Status, pendingPricesText } from '../../utils/modelo721Status'
+import { buildModelo721Csv, liveModelo721, margenUmbral, modelo721View, type ExchangeGroup } from '../../utils/modelo721View'
+import { usePricesStore } from '../../store/pricesStore'
+import type { Modelo721 } from './types'
 
-export function Modelo721Card({ data, activeYear }: { data: Modelo721; activeYear: number }) {
-  const [expanded, setExpanded] = useState(true)
-  const currentYear = new Date().getFullYear()
-  const deadline    = `31 mar ${activeYear + 1}`
-  const vencido     = !data.esAnioEnCurso && activeYear < currentYear
-  const pctUmbral   = Math.min((data.totalValorCustodia / data.umbral) * 100, 100)
-  const autocustodia = data.totalValor - data.totalValorCustodia
-  // Con precios pendientes los totales son un mínimo (#267).
+// Modelo 721 (#303): custodia de terceros frente al umbral, desglose por
+// exchange desplegable, autocustodia resumida (no computa) y exportación.
+
+const STATUS_CLASS = {
+  obligatorio: 'bg-negative/10 border-negative/25 text-negative',
+  incompleto: 'bg-warning/10 border-warning/25 text-warning',
+  'sin-obligacion': 'bg-positive/10 border-positive/25 text-positive',
+} as const
+
+function ExchangeRow({ g, total }: { g: ExchangeGroup; total: number }) {
+  const [open, setOpen] = useState(false)
+  const id = `m721-${g.walletId}`
+  const pct = total > 0 ? (g.valor / total) * 100 : 0
+  return (
+    <li className="rounded-xl border border-border overflow-hidden">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} aria-controls={id}
+        className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-overlay/3 transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60">
+        <ChevronRight size={14} className={`text-fg-subtle shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: g.color }} aria-hidden="true" />
+        <span className="text-sm font-medium truncate" style={{ color: ink(g.color) }}>{g.name}</span>
+        <span className="text-[11px] text-fg-subtle shrink-0">{g.activos.length} {g.activos.length === 1 ? 'activo' : 'activos'}</span>
+        {g.sinPrecio > 0 && <span className="text-[11px] text-warning shrink-0">{g.sinPrecio} sin precio</span>}
+        <span className="ml-auto text-right shrink-0">
+          <span className="block mono tabular-nums text-sm font-semibold text-fg">{formatEur(g.valor)}</span>
+          <span className="block mono text-[10px] text-fg-subtle">{formatPercent(pct, 1)}</span>
+        </span>
+      </button>
+      {open && (
+        <div id={id} className="border-t border-border overflow-x-auto">
+          <table className="w-full text-xs tabular-nums">
+            <thead>
+              <tr className="text-fg-subtle bg-overlay/3">
+                <th scope="col" className="text-left font-medium px-3 py-2">Activo</th>
+                <th scope="col" className="text-right font-medium px-3 py-2">Cantidad</th>
+                <th scope="col" className="text-right font-medium px-3 py-2">Precio</th>
+                <th scope="col" className="text-right font-medium px-3 py-2">Valor</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {g.activos.map(a => (
+                <tr key={a.asset}>
+                  <th scope="row" className="text-left font-normal px-3 py-2">
+                    <span className="inline-flex items-center gap-1.5"><CryptoIcon symbol={a.asset} size={14} /><span className="mono font-semibold text-fg">{a.asset}</span></span>
+                  </th>
+                  <td className="text-right mono px-3 py-2 text-fg-muted">{formatFiscalQty(a.quantity)}</td>
+                  <td className="text-right mono px-3 py-2 text-fg-muted">{a.sinPrecio ? <span className="text-warning">sin precio</span> : formatPrice(a.precioEur)}</td>
+                  <td className="text-right mono px-3 py-2 text-fg">{formatEur(a.valorEur)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </li>
+  )
+}
+
+export function Modelo721Card({ data: snapshot, activeYear }: { data: Modelo721; activeYear: number }) {
+  const privacy = usePrivacyStore(s => s.hidden)
+  // Año en curso: precios en vivo del feed (EUR) sobre la foto del backend (#303).
+  const livePrices = usePricesStore(s => s.prices)
+  const data = useMemo(() => liveModelo721(snapshot, livePrices), [snapshot, livePrices])
+  const view = modelo721View(data.activos)
   const status = modelo721Status(data)
   const pending = pendingPricesText(data.preciosPendientes)
   const min = data.incompleto ? '≥ ' : ''
+  const pctUmbral = Math.min((data.totalValorCustodia / data.umbral) * 100, 100)
+  const margen = margenUmbral(data)
+  const barColor = data.superaUmbral ? 'bg-negative' : pctUmbral > 75 ? 'bg-warning' : 'bg-positive'
+
+  function exportCsv() {
+    const blob = new Blob(['﻿' + buildModelo721Csv(data)], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `modelo721_${activeYear}.csv`
+    a.click(); URL.revokeObjectURL(url)
+  }
 
   return (
-    <div className={`bg-background-card border rounded-xl overflow-hidden ${
-      data.superaUmbral ? 'border-negative/40' : 'border-border'
-    }`}>
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        aria-expanded={expanded}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-overlay/2 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <div className="text-left">
-            <div className="flex items-center gap-2">
-              <h3 className="font-medium text-sm">Modelo 721</h3>
-              {data.esAnioEnCurso && (
-                <span className={badgeClasses('info', 'sm')}>estimación actual</span>
-              )}
-              {vencido && (
-                <span className="text-xs bg-background-tertiary text-fg-subtle px-2 py-0.5 rounded-full">cerrado</span>
-              )}
-            </div>
-            <p className="text-xs text-fg-subtle mt-0.5">
-              {data.esAnioEnCurso
-                ? `Valoración a ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}`
-                : `Valoración a 31 dic ${activeYear}`
-              }
-            </p>
+    <section aria-labelledby="m721-title" className={cardClasses('none', `overflow-hidden ${data.superaUmbral ? 'border-negative/40' : ''}`)}>
+      {/* Cabecera: título, estado, fecha de valoración y exportación */}
+      <div className="flex items-start justify-between gap-3 flex-wrap px-5 py-4 border-b border-border">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 id="m721-title" className="font-semibold text-sm text-fg">Modelo 721 · {activeYear}</h3>
+            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-lg border ${STATUS_CLASS[status]}`}>
+              {status !== 'sin-obligacion' && <AlertTriangle size={11} aria-hidden="true" />}
+              {status === 'obligatorio' ? 'Obligatorio declarar' : MODELO721_LABELS[status]}
+            </span>
           </div>
-
-          {status === 'obligatorio' ? (
-            <div className="flex items-center gap-1.5 bg-negative/10 border border-negative/20 text-negative text-xs px-2.5 py-1 rounded-xl">
-              <AlertTriangle size={11} />
-              <span className="font-medium">Obligatorio declarar</span>
-              {!data.esAnioEnCurso && <span className="opacity-70">· {deadline}</span>}
-            </div>
-          ) : status === 'incompleto' ? (
-            <div className="flex items-center gap-1.5 bg-warning/10 border border-warning/20 text-warning text-xs px-2.5 py-1 rounded-xl">
-              <AlertTriangle size={11} />
-              <span className="font-medium">{MODELO721_LABELS.incompleto}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 bg-positive/10 text-positive text-xs px-2.5 py-1 rounded-xl">
-              <span className="font-medium">{MODELO721_LABELS['sin-obligacion']}</span>
-            </div>
-          )}
+          <p className="text-xs text-fg-subtle mt-1">
+            {data.esAnioEnCurso
+              ? <>Valor en vivo, {formatFiscalDate(data.fecha)} · cuenta el del 31 de diciembre</>
+              : <>Valoración a {formatFiscalDate(data.fecha)} · plazo del 1 de enero al 31 de marzo de {activeYear + 1}</>}
+          </p>
         </div>
-
-        <div className="flex items-center gap-5">
-          <div className="text-right">
-            <div className={`text-lg font-bold mono ${data.superaUmbral ? 'text-negative' : 'text-fg'}`}>
-              {min}{formatEur(data.totalValorCustodia)}
-            </div>
-            <div className="text-xs text-fg-subtle">custodia de terceros · umbral {formatEur(data.umbral)}</div>
-            {autocustodia > 0.01 && (
-              <div className="text-xs text-fg-subtle">+ {formatEur(autocustodia)} en autocustodia (no computa)</div>
-            )}
-          </div>
-          {expanded ? <ChevronUp size={14} className="text-fg-subtle" /> : <ChevronDown size={14} className="text-fg-subtle" />}
-        </div>
-      </button>
-
-      <div className="px-5 pb-1">
-        <div className="h-1 bg-background-tertiary rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all"
-            style={{
-              width: `${pctUmbral}%`,
-              backgroundColor: data.superaUmbral ? T.negative : pctUmbral > 75 ? T.warning : T.positive,
-            }}
-          />
-        </div>
-        <div className="flex justify-between text-xs text-fg-subtle mt-0.5">
-          <span>0 €</span>
-          <span>{formatPercent(pctUmbral, 0)} del umbral</span>
-          <span>{formatEur(data.umbral)}</span>
-        </div>
+        <button type="button" onClick={exportCsv} disabled={privacy || view.exchanges.length === 0}
+          className={buttonClasses('secondary', 'sm', 'flex gap-1')}
+          title={privacy ? 'Desactiva el modo privacidad para exportar' : 'Posiciones en exchanges por activo, para preparar el modelo'}>
+          <Download size={11} aria-hidden="true" /> CSV del 721
+        </button>
       </div>
 
-      {expanded && (
-        <div className="border-t border-border">
-          <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-2">
-            {data.activos.map((a) => {
-              const pnl = a.valorEur - a.costBasisEur
-              return (
-                <div key={`${a.asset}-${a.wallet_id}`} className="flex items-center gap-3 bg-background-tertiary/50 rounded-xl px-3 py-2.5">
-                  <CryptoIcon symbol={a.asset} size={28} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm mono">{a.asset}</span>
-                      <span
-                        className="text-xs px-1.5 py-0.5 rounded-lg font-medium shrink-0"
-                        style={{
-                          backgroundColor: a.wallet_kind === 'exchange' ? alpha(T.warning, 12) : `${alpha(a.wallet_color, 9)}`,
-                          color: a.wallet_kind === 'exchange' ? T.warning : ink(a.wallet_color),
-                        }}
-                      >
-                        {a.wallet_name}
-                      </span>
-                    </div>
-                    <div className="text-xs text-fg-subtle mono mt-0.5">
-                      {formatNumber(a.quantity, 4, 4)} × {a.sinPrecio ? <span className="text-warning">sin precio</span> : formatEur(a.precioEur)}
-                    </div>
-                    {a.costBasisEur > 0 && (
-                      <div className="text-xs text-fg-subtle mono">
-                        Coste adq.: {formatEur(a.costBasisEur)}
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-bold mono text-sm">{formatEur(a.valorEur)}</div>
-                    {a.costBasisEur > 0 && (
-                      <div className={`text-xs mono ${pnlColor(pnl)}`}>
-                        {pnl >= 0 ? '+' : ''}{formatEur(pnl)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+      <div className="px-5 py-4 space-y-4">
+        {/* Custodia de terceros frente al umbral */}
+        <div>
+          <div className="flex items-end justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-[11px] uppercase tracking-widest text-fg-subtle">En custodia de terceros</p>
+              <p className={`text-2xl font-bold mono tabular-nums mt-1 ${data.superaUmbral ? 'text-negative' : 'text-fg'}`}>{min}{formatEur(data.totalValorCustodia)}</p>
+            </div>
+            <p className="text-xs text-fg-subtle text-right">
+              {margen >= 0
+                ? <>Margen hasta el umbral: <span className="mono text-fg-muted">{formatEur(margen)}</span></>
+                : <>Supera el umbral en <span className="mono text-negative">{formatEur(-margen)}</span></>}
+            </p>
           </div>
-
-          <div className="px-5 pb-4 space-y-2">
-            {pending && (
-              <div role="status" className="flex items-start gap-2 p-3 bg-warning/5 border border-warning/20 rounded-xl text-xs text-warning">
-                <AlertTriangle size={11} className="shrink-0 mt-0.5" />
-                <span>{pending}: los totales son un mínimo. Se completarán cuando las fuentes de precios respondan.</span>
-              </div>
-            )}
-            <div className="flex items-start gap-2 p-3 bg-background-tertiary rounded-xl text-xs text-fg-subtle">
-              <Info size={11} className="shrink-0 mt-0.5" />
-              Precios obtenidos de la API a fecha {data.fecha}. La columna de custodia indica dónde se encontraban los activos según el historial registrado.
-            </div>
-            <div className="flex items-start gap-2 p-3 bg-warning/5 border border-warning/20 rounded-xl text-xs text-warning">
-              <AlertTriangle size={11} className="shrink-0 mt-0.5" />
-              {data.aviso}
-            </div>
+          <div className="mt-2 h-2 bg-background-tertiary rounded-full overflow-hidden" role="img"
+            aria-label={`${formatPercent(pctUmbral, 0)} del umbral de ${formatEur(data.umbral)}`}>
+            <div className={`h-full rounded-full transition-[width] duration-500 ${barColor}`} style={{ width: `${Math.max(pctUmbral, data.totalValorCustodia > 0 ? 1 : 0)}%` }} />
+          </div>
+          <div className="flex justify-between text-[11px] text-fg-subtle mt-1 mono">
+            <span>0 €</span><span>{formatPercent(pctUmbral, 0)} del umbral</span><span>{formatEur(data.umbral)}</span>
           </div>
         </div>
-      )}
-    </div>
+
+        {/* Desglose por exchange */}
+        {view.exchanges.length > 0 ? (
+          <ul className="space-y-2" aria-label="Valor por exchange">
+            {view.exchanges.map(g => <ExchangeRow key={g.walletId} g={g} total={view.totalExchanges} />)}
+          </ul>
+        ) : (
+          <p className="text-xs text-fg-subtle">No hay activos en exchanges a esta fecha.</p>
+        )}
+
+        {/* Autocustodia: no computa */}
+        {view.autocustodia.activos > 0 && (
+          <p className="flex items-start gap-2 text-xs text-fg-subtle px-3 py-2 rounded-xl bg-overlay/3">
+            <ShieldCheck size={13} className="text-brand shrink-0 mt-px" aria-hidden="true" />
+            <span>
+              Autocustodia: <span className="mono text-fg-muted">{formatEur(view.autocustodia.valor)}</span>{' '}
+              en {view.autocustodia.wallets} {view.autocustodia.wallets === 1 ? 'wallet' : 'wallets'} · no computa
+            </span>
+          </p>
+        )}
+
+        {pending && (
+          <p role="status" className="flex items-start gap-2 p-3 bg-warning/5 border border-warning/20 rounded-xl text-xs text-warning">
+            <AlertTriangle size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
+            {pending}: los totales son un mínimo. Se completarán cuando las fuentes de precios respondan.
+          </p>
+        )}
+
+        {/* Cuándo hay que presentarlo */}
+        <div className="flex items-start gap-2 p-3 rounded-xl border border-border text-xs text-fg-muted">
+          <Landmark size={12} className="shrink-0 mt-0.5 text-fg-subtle" aria-hidden="true" />
+          <div className="space-y-1">
+            <p>
+              Hay que presentarlo si el valor en exchanges extranjeros supera {formatEur(data.umbral)} a 31 de diciembre.
+              Una vez presentado, solo se repite si ese valor varía más de 20.000 € respecto a la última declaración.{' '}
+              <InfoTooltip label="Qué exchanges cuentan">
+                <p>{data.aviso}</p>
+              </InfoTooltip>
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
