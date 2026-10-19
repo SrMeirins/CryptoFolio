@@ -8,7 +8,10 @@ import { fiscalYearQueries, prefetchOrder } from './fiscal/fiscalYearQueries'
 import { baseTramosCompensada } from '../utils/tramosIrpf'
 import { adjacentYear, cuotaAhorro, FISCAL_VISTAS, madridMonthDay, parseVista, yearComparison, type FiscalVista } from '../utils/fiscalHeader'
 import { useTramos } from '../hooks/useTramos'
-import { ComparativaAnual, EvolucionMensual, DesglosePorActivo } from './fiscal/Charts'
+import { ComparativaAnual } from './fiscal/charts/ComparativaAnual'
+import { EvolucionMensual } from './fiscal/charts/EvolucionMensual'
+import { DesglosePorActivo } from './fiscal/charts/DesglosePorActivo'
+import { filtersFromUrl, monthRange } from '../utils/fiscalCharts'
 import { TramosIRPF, CompensacionPerdidas } from './fiscal/TaxCards'
 import { Modelo721Card } from './fiscal/Modelo721Card'
 import { TablaEventos } from './fiscal/TablaEventos'
@@ -87,14 +90,21 @@ export function Fiscal() {
   }, [years, activeYear, summaryLoading, queryClient])
 
   // La pestaña vive en la URL: sobrevive a recargar y responde al botón atrás.
+  // Cambiar de pestaña a mano descarta los filtros que trajo un gráfico.
   const setVista = useCallback((v: FiscalVista) => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev)
+      for (const k of ['desde', 'hasta', 'activo']) next.delete(k)
       if (v === 'resumen') next.delete('vista')
       else next.set('vista', v)
       return next
     })
   }, [setSearchParams])
+  // Desde un gráfico: abre Operaciones ya filtrada (#301).
+  const openOperaciones = useCallback((filters: Record<string, string>) => {
+    setSearchParams({ vista: 'operaciones', ...filters })
+  }, [setSearchParams])
+  const urlFilters = filtersFromUrl(searchParams)
 
   const onYearStep = useCallback((step: -1 | 1) => {
     if (!activeYear) return
@@ -165,11 +175,11 @@ export function Fiscal() {
         ) : summary && vista === 'resumen' ? (
           <>
             <FiscalHero summary={summary} cuota={cuota} tipoMedio={tipoMedio} comparison={comparison} />
-            {overview.length >= 2 && <Block i={1}><ComparativaAnual data={overview} /></Block>}
-            {monthly && monthly.meses.length > 1 && (
-              <Block i={2}><EvolucionMensual data={monthly} esAnioEnCurso={summary.esAnioEnCurso} /></Block>
+            {overview.length >= 2 && <Block i={1}><ComparativaAnual data={overview} activeYear={activeYear} onSelectYear={setSelectedYear} /></Block>}
+            {monthly && monthly.meses.length > 0 && (
+              <Block i={2}><EvolucionMensual data={monthly} onSelectMonth={m => openOperaciones(monthRange(activeYear, m))} /></Block>
             )}
-            {breakdown.length > 0 && <Block i={3}><DesglosePorActivo data={breakdown} /></Block>}
+            {breakdown.length > 0 && <Block i={3}><DesglosePorActivo data={breakdown} onSelectAsset={a => openOperaciones({ activo: a })} /></Block>}
             {baseCompensada > 0 && (
               <Block i={4}>
                 <TramosIRPF base={baseCompensada} label={`Tramos IRPF — estimación ${activeYear}${huboCompensacion ? ' (tras compensar pérdidas)' : ''}`} />
@@ -182,7 +192,8 @@ export function Fiscal() {
             <div className={cardClasses('md')}><Skeleton className="h-4 w-64" /></div>
           ) : events && (
             <>
-              <Block i={0}><TablaEventos events={events.fiscalEvents} summary={summary} /></Block>
+              {/* La clave remonta la tabla cuando un gráfico trae filtros nuevos */}
+              <Block i={0}><TablaEventos key={JSON.stringify(urlFilters)} events={events.fiscalEvents} summary={summary} initialFilters={urlFilters} /></Block>
               <Block i={1}><TablaRendimientos rendimientos={events.rendimientos} year={activeYear} /></Block>
             </>
           )

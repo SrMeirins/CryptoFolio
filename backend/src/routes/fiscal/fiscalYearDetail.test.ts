@@ -81,6 +81,6 @@ describe('routes/fiscal — breakdown y monthly', () => {
     expect(marzo.netoMes).toBeCloseTo(-20, 2);
     expect(marzo.acumulado).toBeCloseTo(30, 2);
     // Año pasado (no en curso): no hay proyección
-    expect(res.body.proyeccionFinAnio).toBeNull();
+    expect(res.body).not.toHaveProperty('proyeccionFinAnio'); // retirada en #301
   });
 });
