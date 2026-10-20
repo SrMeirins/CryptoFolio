@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { edgeEnabled, filterOptions, nextEnabled, typeAhead } from './dropdownNav'
+import { edgeEnabled, filterOptions, nextEnabled, typeAhead, groupStarts } from './dropdownNav'
 
 // Teclado del Dropdown (#240).
 const opts = [{ label: 'Enero' }, { label: 'Febrero', disabled: true }, { label: 'Marzo' }, { label: 'Mayo' }, { label: 'Ávila' }]
@@ -28,5 +28,12 @@ describe('navegación del Dropdown', () => {
     expect(filterOptions(opts, 'AYO').map(o => o.label)).toEqual(['Mayo'])
     expect(filterOptions(opts, 'avi').map(o => o.label)).toEqual(['Ávila'])
     expect(filterOptions(opts, '  ')).toHaveLength(5)
+  })
+})
+
+describe('groupStarts (#321)', () => {
+  it('marca el inicio de cada grupo consecutivo y omite las opciones sin grupo', () => {
+    expect([...groupStarts([{ group: 'A' }, { group: 'A' }, { group: 'B' }, {}, { group: 'B' }])]).toEqual([0, 2, 4])
+    expect(groupStarts([{}, {}]).size).toBe(0)
   })
 })

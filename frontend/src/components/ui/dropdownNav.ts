@@ -36,3 +36,10 @@ export function filterOptions<T extends NavOption>(options: readonly T[], query:
   const q = norm(query.trim())
   return q ? options.filter(o => norm(o.label).includes(q)) : [...options]
 }
+
+/** Índices donde empieza un grupo nuevo (#321): ahí se pinta su cabecera. */
+export function groupStarts(options: readonly { group?: string }[]): Set<number> {
+  const out = new Set<number>()
+  options.forEach((o, i) => { if (o.group && o.group !== options[i - 1]?.group) out.add(i) })
+  return out
+}

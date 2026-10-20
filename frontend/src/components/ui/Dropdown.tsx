@@ -1,8 +1,8 @@
-import { useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { Fragment, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Check, ChevronDown, Search } from 'lucide-react'
 import { Popover } from './Popover'
 import { fieldClasses, type FieldSize } from './classes'
-import { edgeEnabled, filterOptions, nextEnabled, typeAhead } from './dropdownNav'
+import { edgeEnabled, filterOptions, groupStarts, nextEnabled, typeAhead } from './dropdownNav'
 
 // Desplegable de la app (#240), sustituto de <select>: lista con el estilo de
 // la interfaz sobre Popover (no se corta), marca de la opción elegida,
@@ -15,6 +15,10 @@ export interface DropdownOption<T extends string | number> {
   disabled?: boolean
   /** Contenido visual opcional (icono, color…) antes de la etiqueta. */
   prefix?: ReactNode
+  /** Texto secundario bajo la etiqueta (#321). */
+  description?: string
+  /** Grupo de la opción: las consecutivas del mismo grupo van bajo una cabecera (#321). */
+  group?: string
 }
 
 export interface DropdownProps<T extends string | number> {
@@ -30,12 +34,14 @@ export interface DropdownProps<T extends string | number> {
   align?: 'start' | 'end'
   disabled?: boolean
   id?: string
+  /** Texto del disparador cuando el valor no corresponde a ninguna opción. */
+  placeholder?: string
 }
 
 const SEARCH_FROM = 10
 
 export function Dropdown<T extends string | number>({
-  label, value, options, onChange, size = 'md', className = '', searchable, align = 'start', disabled = false, id,
+  label, value, options, onChange, size = 'md', className = '', searchable, align = 'start', disabled = false, id, placeholder = '—',
 }: DropdownProps<T>) {
   const autoId = useId()
   const baseId = id ?? autoId
@@ -49,6 +55,7 @@ export function Dropdown<T extends string | number>({
   const withSearch = searchable ?? options.length > SEARCH_FROM
   const visible = useMemo(() => filterOptions(options, query), [options, query])
   const selected = options.find(o => o.value === value)
+  const starts = useMemo(() => groupStarts(visible), [visible])
 
   function openList() {
     if (disabled) return
@@ -114,7 +121,7 @@ export function Dropdown<T extends string | number>({
       >
         <span className="flex items-center gap-2 min-w-0 truncate">
           {selected?.prefix}
-          <span className="truncate">{selected?.label ?? '—'}</span>
+          <span className={`truncate ${selected ? '' : 'text-fg-subtle'}`}>{selected?.label ?? placeholder}</span>
         </span>
         <ChevronDown size={size === 'sm' ? 13 : 15} aria-hidden="true"
           className={`shrink-0 text-fg-subtle transition-transform duration-200 motion-reduce:transition-none ${open ? 'rotate-180' : ''}`} />
@@ -144,8 +151,11 @@ export function Dropdown<T extends string | number>({
           {visible.map((o, i) => {
             const isSelected = o.value === value
             return (
+              <Fragment key={String(o.value)}>
+              {starts.has(i) && (
+                <div role="presentation" className="px-2.5 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-fg-subtle">{o.group}</div>
+              )}
               <div
-                key={String(o.value)}
                 id={`${baseId}-opt-${i}`}
                 role="option"
                 aria-selected={isSelected}
@@ -158,9 +168,13 @@ export function Dropdown<T extends string | number>({
                   ${i === active && !o.disabled ? 'bg-brand/12' : ''} ${isSelected ? 'font-medium text-brand' : ''}`}
               >
                 {o.prefix}
-                <span className="flex-1 truncate">{o.label}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="block truncate">{o.label}</span>
+                  {o.description && <span className="block text-[11px] font-normal text-fg-subtle whitespace-normal">{o.description}</span>}
+                </span>
                 {isSelected && <Check size={14} aria-hidden="true" className="text-brand shrink-0" />}
               </div>
+              </Fragment>
             )
           })}
         </div>

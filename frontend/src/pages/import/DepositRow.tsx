@@ -1,16 +1,26 @@
 import { useState } from 'react'
 import type { DepositReview } from './types'
 import { HistoricalPriceButton } from './HistoricalPriceButton'
-import { formatNumber } from '../../utils/format'
+import { formatEur, formatNumber } from '../../utils/format'
+import { idDeposito } from './revisionHelpers'
 
 // Fila de depósito individual
-export function DepositRow({ dep, cost, reviewed, onSetCost }: {
+export function DepositRow({ dep, cost, reviewed, onSetCost, resaltado }: {
   dep: DepositReview
+  resaltado: string | null
   cost: number | null | undefined
   reviewed: boolean
   onSetCost: (txKey: string, v: number | null) => void
 }) {
   const [inputVal, setInputVal] = useState(cost != null ? String(cost) : '')
+  // Un relleno masivo cambia el coste desde fuera: el campo lo refleja (#321).
+  // (Ajuste de estado durante el render, el patrón recomendado frente a un efecto.)
+  const [costPrevio, setCostPrevio] = useState(cost)
+  if (cost !== costPrevio) {
+    setCostPrevio(cost)
+    if (cost != null && parseFloat(inputVal.replace(',', '.')) !== cost) setInputVal(String(cost))
+  }
+  const id = idDeposito(dep.txKey)
   const date = new Date(dep.timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
 
   function handleInput(val: string) {
@@ -29,7 +39,7 @@ export function DepositRow({ dep, cost, reviewed, onSetCost }: {
     : 'desconocido'
 
   return (
-    <div className="px-4 py-3">
+    <div id={id} tabIndex={-1} className={`px-4 py-3 focus:outline-hidden transition-shadow ${resaltado === id ? 'ring-2 ring-inset ring-brand/60' : ''}`}>
       <div className="flex items-center gap-2 mb-2">
         <span className="text-xs text-fg-muted mono">{date}</span>
         <span className="text-xs text-fg-subtle">·</span>
@@ -44,7 +54,13 @@ export function DepositRow({ dep, cost, reviewed, onSetCost }: {
         {!reviewed && <span className="ml-auto text-xs text-warning">● pendiente</span>}
       </div>
 
-      <div className="flex items-center gap-2">
+      {dep.historicalPrice != null && dep.historicalPrice > 0 && (
+        <p className="text-[11px] text-fg-subtle mb-2">
+          Mercado ese día: <span className="mono text-fg-muted">{formatNumber(dep.historicalPrice, 6)} €/ud.</span> · valor <span className="mono text-fg-muted">{formatEur(dep.historicalPrice * dep.amount)}</span>
+        </p>
+      )}
+
+      <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex items-center flex-1 max-w-48">
           <input
             type="text"
@@ -52,6 +68,7 @@ export function DepositRow({ dep, cost, reviewed, onSetCost }: {
             placeholder="0,000000"
             value={inputVal}
             onChange={e => handleInput(e.target.value)}
+            aria-label={`Coste por unidad de ${dep.asset} del ${date}`}
             className={`w-full bg-background-primary border rounded-lg pl-3 pr-12 py-1.5 text-xs text-fg placeholder-fg-subtle focus:outline-hidden mono transition-colors ${
               reviewed && cost != null ? 'border-positive/40 focus:border-positive' : 'border-border focus:border-brand'
             }`}
@@ -59,11 +76,19 @@ export function DepositRow({ dep, cost, reviewed, onSetCost }: {
           <span className="absolute right-3 text-xs text-fg-subtle pointer-events-none">€/ud.</span>
         </div>
 
-        <HistoricalPriceButton
-          asset={dep.asset}
-          timestamp={dep.timestamp}
-          onPrice={p => { setInputVal(String(p)); onSetCost(dep.txKey, p) }}
-        />
+        {dep.historicalPrice != null && dep.historicalPrice > 0 ? (
+          <button type="button" onClick={() => { setInputVal(String(dep.historicalPrice)); onSetCost(dep.txKey, dep.historicalPrice as number) }}
+            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+              reviewed && cost === dep.historicalPrice ? 'border-positive/40 bg-positive/10 text-positive' : 'border-border text-fg-subtle hover:text-fg hover:border-fg-subtle bg-background-card'}`}>
+            Usar mercado
+          </button>
+        ) : (
+          <HistoricalPriceButton
+            asset={dep.asset}
+            timestamp={dep.timestamp}
+            onPrice={p => { setInputVal(String(p)); onSetCost(dep.txKey, p) }}
+          />
+        )}
 
         <button
           type="button"

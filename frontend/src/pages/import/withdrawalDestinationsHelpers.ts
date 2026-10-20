@@ -24,11 +24,3 @@ export function fmtAmt(n: number): string {
   if (Math.abs(n) >= 1)    return formatNumber(n, 6, 6)
   return formatNumber(n, 8, 8)
 }
-
-export function destLabel(dest: string, coldWallets: { id: string; name: string; color: string }[]) {
-  if (dest === '__lost__')     return { text: '💀 Pérdida',  cls: 'text-negative'   }
-  if (dest === '__gift__')     return { text: '🎁 Regalo',   cls: 'text-brand'  }
-  if (dest === '__external__') return { text: '📱 Externa',  cls: 'text-fg-muted'     }
-  const w = coldWallets.find(w => w.id === dest)
-  return w ? { text: w.name, cls: 'text-positive' } : { text: 'pendiente', cls: 'text-fg-subtle italic' }
-}
