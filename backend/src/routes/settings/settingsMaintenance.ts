@@ -8,6 +8,8 @@ import { getHistoricalPriceEur } from '../../modules/prices/binance';
 import { requireConfirm, sendZodError } from './settingsShared';
 import { sendInternalError } from '../../middleware/errorHandler';
 
+import { coberturaActual } from '../../modules/csv/coberturaDb';
+import { avisosCobertura } from '../../modules/csv/coberturaAvisos';
 const router = Router();
 
 const bulkSetCostsSchema = z.object({
@@ -160,6 +162,10 @@ router.get('/notifications', async (_req: Request, res: Response) => {
   if (avisoFiscal) {
     notifications.push({ id: 'fiscal-calendar', type: avisoFiscal.type, category: 'Fiscal', message: avisoFiscal.message });
   }
+
+  // Cobertura de importaciones (#328): exchanges sin importar hace más de 60 días y huecos sin revisar.
+  const { despues: coberturas } = await coberturaActual();
+  notifications.push(...avisosCobertura(coberturas));
 
   res.json(notifications);
 });

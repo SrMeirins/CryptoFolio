@@ -1,3 +1,4 @@
+import type { CambioEncaje, CoberturaExchange } from '../../api/portfolio'
 import type { WizardResult } from '../../components/OperationWizard'
 
 export interface ValidationResult {
@@ -83,7 +84,9 @@ export interface PreviewResult {
   exchange?: 'binance' | 'bitvavo'
   deteccion?: { exchange: 'binance' | 'bitvavo' | null; idioma: string; reconocido: boolean; esperadas: Record<'binance' | 'bitvavo', string> }
   /** Historial de retiradas de Binance aportado (#320). */
-  retiradas?: { filas: number; emparejadas: number; retiros: number } | null  /** Archivos del lote y filas repetidas entre ellos (#326). */
+  retiradas?: { filas: number; emparejadas: number; retiros: number } | null  /** Encaje del lote en la cobertura de cada exchange (#328). */
+  encaje?: { cobertura: CoberturaExchange[]; cambios: CambioEncaje[] }
+  /** Archivos del lote y filas repetidas entre ellos (#326). */
   archivos?: ArchivoLote[]
   repetidasEnLote?: number
 }
@@ -131,3 +134,6 @@ export const ACCOUNT_COLORS: Record<string, string> = {
 }
 
 export { type WizardResult }
+
+// Cobertura temporal por exchange (#328): tipos de la API.
+export type { TramoCobertura, HuecoCobertura, CoberturaExchange, TipoEncaje, CambioEncaje } from '../../api/portfolio'

@@ -10,6 +10,7 @@ import { EXCHANGE_LABEL, textoPendiente } from './wizard'
 import { ExchangeBadge } from './ExchangeBadge'
 import { RetiradasCard } from './RetiradasCard'
 import { LoteCard } from './LoteCard'
+import { EncajeCard } from './EncajeCard'
 
 export function PreviewStage({
   preview, showTxTable, setShowTxTable, txPage, setTxPage, txPageSize,
@@ -227,6 +228,8 @@ export function PreviewStage({
           txPageSize={txPageSize}
         />
       )}
+
+      {preview.encaje && <EncajeCard cobertura={preview.encaje.cobertura} cambios={preview.encaje.cambios} />}
 
       {loteCard}
 

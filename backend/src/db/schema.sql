@@ -201,6 +201,17 @@ CREATE TABLE csv_imports (
   notes         TEXT
 );
 
+-- Revisiones de cobertura (#328): huecos o tramo pendiente marcados como «no operé».
+CREATE TABLE cobertura_revisiones (
+  id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  exchange     TEXT        NOT NULL CHECK (exchange IN ('binance', 'bitvavo')),
+  tipo         TEXT        NOT NULL CHECK (tipo IN ('hueco', 'pendiente')),
+  desde        DATE        NOT NULL,
+  hasta        DATE        NOT NULL CHECK (hasta >= desde),
+  revisado_en  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_cobertura_revisiones_exchange ON cobertura_revisiones(exchange);
+
 -- ============================================================
 -- TABLA: raw_transactions
 -- ============================================================

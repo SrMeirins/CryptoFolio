@@ -76,7 +76,10 @@ export function combinarVistasPrevias(vistas: readonly VistaArchivo[]): PreviewL
       indice, nombre: v.nombre, exchange: v.exchange, reconocido: v.deteccion.reconocido, estado,
       motivo: !reconocido
         ? (v.deteccion.reconocido ? `No se puede leer como ${v.exchange === 'binance' ? 'Binance' : 'Bitvavo'}` : 'Formato no reconocido')
-        : nuevas === 0 ? (repetidas > 0 ? 'Todo está en otro archivo del lote o ya importado' : 'Ya importado, nada nuevo') : null,
+        : nuevas === 0
+          ? (r.transactions.length === 0 ? 'No contiene transacciones que importar'
+            : repetidas > 0 ? 'Todo está en otro archivo del lote o ya importado' : 'Ya importado, nada nuevo')
+          : null,
       nuevas, duplicadas: r.duplicateCount, repetidasEnLote: repetidas, rango: r.validation.dateRange,
     });
 
