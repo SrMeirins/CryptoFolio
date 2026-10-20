@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nadaQueImportar, newTransactions, newWithdrawals } from './reviewSelection'
+import { nadaQueImportar, newTransactions, newWithdrawals, loteIlegible } from './reviewSelection'
 import type { PreviewResult, PreviewTransaction } from './types'
 
 // Revisión solo de lo nuevo (#316). Datos sintéticos.
@@ -28,5 +28,15 @@ describe('revisión solo de lo nuevo', () => {
     expect(nadaQueImportar(preview([tx({ isNew: false })]))).toBe(true)
     expect(nadaQueImportar(p)).toBe(false)
     expect(nadaQueImportar(preview([tx({ isNew: false })], [{ txKey: 'u', timestamp: '', asset: 'BTC', amount: 1, historicalPrice: null, existingInDb: true }]))).toBe(false)
+  })
+})
+
+describe('loteIlegible (#326)', () => {
+  const a = (estado: 'listo' | 'no_reconocido') => ({ indice: 0, nombre: 'x.csv', exchange: 'binance' as const, reconocido: false, estado, motivo: null, nuevas: 0, duplicadas: 0, repetidasEnLote: 0, rango: null })
+  const base = { validation: { valid: false, errors: [], warnings: [], info: [], detectedLanguage: 'unknown', unknownOperations: [], rowCount: 0, dateRange: null }, transactions: [], duplicateCount: 0, newCount: 0, errors: [], unknownOperationSamples: {}, depositReviews: [] }
+  it('solo cuando todos los archivos de un lote son ilegibles', () => {
+    expect(loteIlegible({ ...base, archivos: [a('no_reconocido'), a('no_reconocido')] })).toBe(true)
+    expect(loteIlegible({ ...base, archivos: [a('no_reconocido'), a('listo')] })).toBe(false)
+    expect(loteIlegible({ ...base, archivos: [a('no_reconocido')] })).toBe(false)
   })
 })

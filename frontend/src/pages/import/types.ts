@@ -29,7 +29,23 @@ export interface PreviewTransaction {
   /** Fila nueva (no estaba importada); la marca el backend (#316). */
   isNew?: boolean
   /** Destino on-chain de un retiro, si el CSV lo trae (#320). */
-  destino?: DestinoRetiro
+  destino?: DestinoRetiro  /** Índice del archivo del lote del que viene (#326). */
+  archivo?: number
+}
+
+export type EstadoArchivo = 'listo' | 'no_reconocido' | 'sin_novedades'
+
+export interface ArchivoLote {
+  indice: number
+  nombre: string
+  exchange: 'binance' | 'bitvavo'
+  reconocido: boolean
+  estado: EstadoArchivo
+  motivo: string | null
+  nuevas: number
+  duplicadas: number
+  repetidasEnLote: number
+  rango: { from: string; to: string } | null
 }
 
 export interface DestinoRetiro {
@@ -67,7 +83,9 @@ export interface PreviewResult {
   exchange?: 'binance' | 'bitvavo'
   deteccion?: { exchange: 'binance' | 'bitvavo' | null; idioma: string; reconocido: boolean; esperadas: Record<'binance' | 'bitvavo', string> }
   /** Historial de retiradas de Binance aportado (#320). */
-  retiradas?: { filas: number; emparejadas: number; retiros: number } | null
+  retiradas?: { filas: number; emparejadas: number; retiros: number } | null  /** Archivos del lote y filas repetidas entre ellos (#326). */
+  archivos?: ArchivoLote[]
+  repetidasEnLote?: number
 }
 
 export interface ProgressEvent {
@@ -87,6 +105,8 @@ export interface ProgressEvent {
 
 export interface ResumenImportacion {
   importId: string
+  /** Desglose del lote (#326): una importación por archivo. */
+  archivos?: { importId: string; archivo: string; exchange: string; nuevas: number; duplicadas: number }[]
   archivo: string
   nuevas: number
   duplicadas: number

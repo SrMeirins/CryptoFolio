@@ -32,7 +32,7 @@ export async function importCsvFile(
   onProgress?: (done: number, total: number, asset?: string, operation?: string) => void,
   onStatus?: (message: string, progress?: number, total?: number) => void,
   exchange: Exchange = 'binance',
-  retiradasBuffer?: Buffer,
+  retiradasBuffers: readonly Buffer[] = [],
 ): Promise<ImportResult> {
   const validation = validateExchangeCsv(exchange, fileBuffer);
   if (!validation.valid) {
@@ -74,7 +74,7 @@ export async function importCsvFile(
   const transferDestByHash = buildTransferDestinationMap(parseResult.rawRows);
 
   // Dirección, red y hash on-chain de los retiros (#320), para guardarlos con cada transacción.
-  const { destinos } = await destinosDeRetiros(exchange, parseResult, retiradasBuffer);
+  const { destinos } = await destinosDeRetiros(exchange, parseResult, retiradasBuffers);
 
   onStatus?.('Iniciando transacción en base de datos...');
   const result = await db.transaction(async (client) => {

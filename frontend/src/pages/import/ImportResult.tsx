@@ -7,6 +7,7 @@ import { buttonClasses, cardClasses } from '../../components/ui'
 import { formatEur, pnlColor } from '../../utils/format'
 import { formatFiscalDate } from '../../utils/fiscalTable'
 import { formatoDuracion } from './progreso'
+import { ExchangeBadge } from './ExchangeBadge'
 
 const signed = (v: number) => `${v >= 0 ? '+' : ''}${formatEur(v)}`
 const fmt = new Intl.NumberFormat('es-ES')
@@ -26,6 +27,8 @@ export function ImportResult({ resumen, duracion, log, onGoToDashboard, onReset,
   const avisos = resumen?.avisos ?? []
   const sinPrecio = resumen?.precios.sinPrecio ?? []
   const faltanPrecios = resumen ? resumen.precios.necesarios - resumen.precios.obtenidos : 0
+  // Lote (#326): una importación por archivo, cada una con su enlace al Historial.
+  const porArchivo = resumen?.archivos && resumen.archivos.length > 1 ? resumen.archivos : null
 
   return (
     <div className="space-y-4">
@@ -35,7 +38,7 @@ export function ImportResult({ resumen, duracion, log, onGoToDashboard, onReset,
           <div>
             <h2 className="text-lg font-semibold text-fg" role="status">Importación completada</h2>
             <p className="text-xs text-fg-subtle">
-              {resumen ? <>{resumen.archivo} · </> : null}en {formatoDuracion(duracion)}
+              {porArchivo ? <>{porArchivo.length} archivos · </> : resumen ? <>{resumen.archivo} · </> : null}en {formatoDuracion(duracion)}
             </p>
           </div>
         </div>
@@ -59,6 +62,24 @@ export function ImportResult({ resumen, duracion, log, onGoToDashboard, onReset,
           </dl>
         ) : (
           <p className="text-sm text-fg-muted">La importación terminó, pero no llegó el resumen (se perdió la conexión). Revisa el Historial para ver lo importado.</p>
+        )}
+
+        {porArchivo && (
+          <section aria-labelledby="archivos-titulo" className="space-y-2">
+            <h3 id="archivos-titulo" className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">Por archivo</h3>
+            <ul className="space-y-1.5">
+              {porArchivo.map(a => (
+                <li key={a.importId} className="flex items-center gap-3 flex-wrap rounded-xl border border-border px-3 py-2 text-sm">
+                  <ExchangeBadge exchange={a.exchange} size={18} />
+                  <span className="min-w-0 flex-1 truncate text-fg">{a.archivo}</span>
+                  <span className="text-xs text-fg-subtle mono">{fmt.format(a.nuevas)} nueva{a.nuevas !== 1 ? 's' : ''} · {fmt.format(a.duplicadas)} ya estaba{a.duplicadas !== 1 ? 'n' : ''}</span>
+                  {a.nuevas > 0 && (
+                    <button type="button" onClick={() => onVerHistorial(a.importId)} className="text-xs text-brand hover:underline">Ver en Historial</button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {/* Impacto fiscal por ejercicio */}
@@ -87,7 +108,7 @@ export function ImportResult({ resumen, duracion, log, onGoToDashboard, onReset,
 
         {/* Acciones */}
         <div className="flex items-center gap-2 flex-wrap pt-1">
-          {resumen && resumen.nuevas > 0 && (
+          {resumen && resumen.nuevas > 0 && !porArchivo && (
             <button type="button" onClick={() => onVerHistorial(resumen.importId)} className={buttonClasses('primary', 'md', 'flex gap-1.5')}>
               <History size={14} aria-hidden="true" /> Ver estas transacciones en Historial
             </button>

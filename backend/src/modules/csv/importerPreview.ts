@@ -36,7 +36,7 @@ export interface PreviewResult {
   retiradas?: ResumenRetiradas | null;
 }
 
-export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'binance', retiradasBuffer?: Buffer): Promise<PreviewResult> {
+export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'binance', retiradasBuffers: readonly Buffer[] = []): Promise<PreviewResult> {
   const validation = validateExchangeCsv(exchange, fileBuffer);
 
   if (!validation.valid) {
@@ -205,7 +205,7 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
   }
 
   // Dirección, red y hash de cada retiro (#320): Bitvavo los trae; Binance, con su historial de retiradas.
-  const { destinos, resumen } = await destinosDeRetiros(exchange, parseResult, retiradasBuffer);
+  const { destinos, resumen } = await destinosDeRetiros(exchange, parseResult, retiradasBuffers);
 
   return {
     validation,

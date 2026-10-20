@@ -1,7 +1,7 @@
 import { db } from '../../../db/client';
 import type { ParsedTransaction, RawRowWithHash } from '../types';
 import type { Exchange } from '../exchanges';
-import { parseHistorialRetiradas } from './historialRetiradas';
+import { parseVariosHistoriales } from './historialRetiradas';
 import { resolverDestinos, type DestinoRetiro, type Red, type ResumenRetiradas } from './resolverDestinos';
 
 // Carga las redes de la BD y resuelve el destino on-chain de los retiros (#320).
@@ -21,11 +21,11 @@ async function cargarRedes(): Promise<Red[]> {
 export async function destinosDeRetiros(
   exchange: Exchange,
   parsed: { transactions: ParsedTransaction[]; rawRows: RawRowWithHash[] },
-  retiradasBuffer?: Buffer,
+  retiradasBuffers: readonly Buffer[] = [],
 ): Promise<{ destinos: Map<string, DestinoRetiro>; resumen: ResumenRetiradas | null }> {
   const hayRetiros = parsed.transactions.some(tx => tx.operationType === 'WITHDRAW');
   if (!hayRetiros) return { destinos: new Map(), resumen: null };
   // El historial de retiradas solo aplica a Binance; con Bitvavo se ignora.
-  const retiradas = exchange === 'binance' && retiradasBuffer ? parseHistorialRetiradas(retiradasBuffer) : null;
+  const retiradas = exchange === 'binance' && retiradasBuffers.length > 0 ? parseVariosHistoriales(retiradasBuffers) : null;
   return resolverDestinos(exchange, parsed.transactions, parsed.rawRows, await cargarRedes(), retiradas);
 }
