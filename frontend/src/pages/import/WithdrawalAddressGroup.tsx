@@ -7,13 +7,18 @@ import { ink } from '../../utils/colors'
 import { DireccionTag } from './DireccionTag'
 import { urlExplorador, type GrupoDireccion, type WalletReconocida } from './direcciones'
 import { WithdrawalSelector } from './WithdrawalSelector'
+import { Casilla } from './Casilla'
 import { fmtAmt, txKey } from './withdrawalDestinationsHelpers'
 
 const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })
 
 // Retiros a una misma dirección (#320): una sola decisión de destino para todos.
-export function WithdrawalAddressGroup({ grupo, red, destinations, coldWallets, reconocida, onAssign, onGuardar }: {
+export function WithdrawalAddressGroup({ id, grupo, red, destinations, coldWallets, reconocida, onAssign, onGuardar, selected, onToggle, resaltado }: {
+  id: string
   grupo: GrupoDireccion
+  selected: Set<string>
+  onToggle: () => void
+  resaltado: boolean
   red: Network | undefined
   destinations: Record<string, string>
   coldWallets: { id: string; name: string; color: string }[]
@@ -28,11 +33,14 @@ export function WithdrawalAddressGroup({ grupo, red, destinations, coldWallets, 
   const activos = [...new Set(grupo.txs.map(t => t.asset))]
   // Guardar solo tiene sentido si puede ser tuya: no para un regalo o una pérdida.
   const puedeGuardar = !reconocida && valor !== '__gift__' && valor !== '__lost__'
-  const detalleId = `retiros-${grupo.clave.slice(0, 24)}`
+  const detalleId = `${id}-detalle`
+  const enSel = grupo.txs.filter(t => selected.has(txKey(t))).length
 
   return (
-    <div className={`rounded-xl border transition-colors ${reconocida ? 'border-positive/30' : 'border-border'}`}>
+    <div id={id} tabIndex={-1} data-pendiente={asignados < grupo.txs.length || undefined}
+      className={`rounded-xl border transition-shadow focus:outline-hidden ${resaltado ? 'ring-2 ring-brand/60' : ''} ${reconocida ? 'border-positive/30' : 'border-border'}`}>
       <div className="flex items-center gap-3 px-4 py-3 flex-wrap bg-background-tertiary/60 rounded-t-xl">
+        <Casilla estado={enSel === 0 ? false : enSel === grupo.txs.length ? true : 'mixed'} onChange={onToggle} label="Seleccionar los retiros a esta dirección" />
         <span className={`w-2 h-2 rounded-full shrink-0 ${asignados === grupo.txs.length ? 'bg-positive' : asignados > 0 ? 'bg-warning' : 'bg-fg-subtle/50'}`} aria-hidden="true" />
         <div className="min-w-0 flex-1 space-y-0.5">
           <div className="flex items-center gap-2 flex-wrap">
@@ -46,7 +54,8 @@ export function WithdrawalAddressGroup({ grupo, red, destinations, coldWallets, 
             {dests.length > 1 && <span className="text-warning"> · destinos distintos</span>}
           </p>
         </div>
-        <WithdrawalSelector value={valor} coldWallets={coldWallets} onChange={onAssign} />
+        <WithdrawalSelector value={valor} coldWallets={coldWallets} onChange={onAssign} label="Destino de los retiros a esta dirección"
+          placeholder={dests.length > 1 ? 'Varios destinos' : undefined} />
         <button type="button" onClick={() => setAbierto(o => !o)} aria-expanded={abierto} aria-controls={detalleId}
           aria-label={abierto ? 'Ocultar los retiros' : 'Ver los retiros'}
           className="p-1 rounded-md text-fg-subtle hover:text-fg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60">
