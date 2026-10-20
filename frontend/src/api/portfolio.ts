@@ -381,6 +381,26 @@ export interface WalletFull {
   addresses: WalletAddress[]
 }
 
+// Cobertura temporal por exchange (#328)
+export interface TramoCobertura {
+  desde: string
+  hasta: string
+  transacciones: number
+  importaciones: { importId: string | null; archivo: string; nuevo: boolean; desde: string; hasta: string }[]
+}
+export interface HuecoCobertura { desde: string; hasta: string; dias: number; revisionId: string | null }
+export interface CoberturaExchange {
+  exchange: 'binance' | 'bitvavo'
+  desde: string
+  hasta: string
+  tramos: TramoCobertura[]
+  huecos: HuecoCobertura[]
+  pendiente: HuecoCobertura | null
+  meses: { mes: string; n: number }[]
+}
+export type TipoEncaje = 'rellena' | 'rellena_parte' | 'deja_hueco' | 'al_dia' | 'avanza'
+export interface CambioEncaje { tipo: TipoEncaje; exchange: 'binance' | 'bitvavo'; desde: string; hasta: string; dias: number }
+
 export interface Network {
   id: string
   name: string
@@ -566,6 +586,11 @@ export const portfolioApi = {
     netInvested: number
   }>(`/fifo/eur-flow?currency=${currency}`),
   getNotifications: () => api.get<Notification[]>('/settings/notifications'),
+  // Cobertura temporal de las importaciones y revisiones de huecos (#328).
+  getCobertura: () => api.get<CoberturaExchange[]>('/imports/cobertura'),
+  revisarCobertura: (data: { exchange: 'binance' | 'bitvavo'; tipo: 'hueco' | 'pendiente'; desde: string; hasta: string }) =>
+    api.post<{ id: string }>('/imports/cobertura/revisiones', data),
+  deshacerRevisionCobertura: (id: string) => api.delete<{ ok: boolean }>(`/imports/cobertura/revisiones/${encodeURIComponent(id)}`),
   // P&L diario por día local (Europe/Madrid), #165/#166. Sin `from`: desde la primera actividad.
   getDailyPnl: (from?: string, to?: string, currency: Currency = 'EUR') => {
     const params = new URLSearchParams({ currency })

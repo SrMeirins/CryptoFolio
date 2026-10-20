@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { firmaArchivo, pasoDeStage, puedeIrA, textoPendiente, ultimasPorExchange } from './wizard'
-import type { ImportRecord } from '../../api/portfolio'
+import { firmaArchivo, pasoDeStage, puedeIrA, textoPendiente } from './wizard'
 
 // Asistente de importación (#318). Datos sintéticos.
 describe('pasos', () => {
@@ -25,20 +24,6 @@ describe('firmaArchivo', () => {
   })
 })
 
-describe('ultimasPorExchange', () => {
-  const imp = (exchange: string, date_to: string | null): ImportRecord => ({
-    id: Math.random().toString(), filename: 'x.csv', imported_at: '', exchange, row_count: 0, skipped_count: 0,
-    transaction_count: '0', date_from: null, date_to, buy_count: '0', sell_count: '0', withdraw_count: '0', deposit_count: '0',
-  })
-  it('la fecha más reciente de cada exchange y los días transcurridos', () => {
-    const r = ultimasPorExchange([imp('binance', '2026-02-01T00:00:00Z'), imp('binance', '2026-06-16T10:00:00Z'), imp('bitvavo', '2026-09-03T00:00:00Z'), imp('binance', null)],
-      new Date('2026-10-16T10:00:00Z'))
-    expect(r).toEqual([
-      { exchange: 'binance', hasta: '2026-06-16T10:00:00Z', haceDias: 122 },
-      { exchange: 'bitvavo', hasta: '2026-09-03T00:00:00Z', haceDias: 43 },
-    ])
-  })
-})
 
 describe('textoPendiente', () => {
   it('lo que falta, con singular y plural', () => {

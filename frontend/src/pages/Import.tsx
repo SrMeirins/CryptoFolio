@@ -17,7 +17,7 @@ import { waitForImportCommit, readProgressStream } from './import/importStream'
 import { useWithdrawalDestinations, useDepositCosts, clearImportSessionStorage } from './import/useImportSessionState'
 import { cardClasses, buttonClasses, PageHeader } from '../components/ui'
 import { ImportStepper } from './import/ImportStepper'
-import { pasoDeStage, ultimasPorExchange, type Paso } from './import/wizard'
+import { pasoDeStage, type Paso } from './import/wizard'
 import { navIcon } from '../constants/navigation'
 import { anadirASeleccion, clasificarArchivo, firmaLote, indicesAConfirmar, type ArchivoSel } from './import/lote'
 import { useAvisoSalida } from './import/useAvisoSalida'
@@ -290,7 +290,6 @@ export function ImportPage() {
           fileRef={fileRef}
           onDragOver={setDragOver}
           onFiles={fs => { void handleFiles(fs) }}
-          ultimas={ultimasPorExchange(imports)}
           seleccion={seleccion}
           onQuitar={id => setSeleccion(prev => prev.filter(s => s.id !== id))}
           onAnalizar={() => { void analizar(seleccion) }}

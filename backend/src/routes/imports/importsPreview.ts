@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import { previewCsvFile } from '../../modules/csv/importer';
 import { CABECERAS_ESPERADAS, detectarExchange, Exchange } from '../../modules/csv/exchanges';
 import { combinarVistasPrevias, type VistaArchivo } from '../../modules/csv/lote';
+import { compararCobertura } from '../../modules/csv/cobertura';
+import { coberturaActual } from '../../modules/csv/coberturaDb';
 import { archivosDe, exchangesForzados, retiradasDe, uploadCsv } from './importsValidation';
 
 const router = Router();
@@ -32,8 +34,19 @@ router.post('/preview', uploadCsv, async (req: Request, res: Response) => {
     }
     const lote = combinarVistasPrevias(vistas);
     const primera = vistas[0];
+
+    // Encaje del lote en la cobertura de cada exchange (#328): solo los archivos con novedades.
+    const nuevos = lote.archivos.filter(a => a.estado === 'listo' && a.rango).map(a => ({
+      exchange: a.exchange,
+      rango: { importId: null, archivo: a.nombre, desde: a.rango!.from, hasta: a.rango!.to, transacciones: a.nuevas, nuevo: true },
+    }));
+    const { antes, despues } = await coberturaActual(nuevos);
+    const exchangesLote = new Set(nuevos.map(n => n.exchange));
+    const cobertura = despues.filter(c => exchangesLote.has(c.exchange));
+    const encaje = { cobertura, cambios: cobertura.flatMap(c => compararCobertura(antes.get(c.exchange) ?? null, c)) };
     res.json({
       ...lote,
+      encaje,
       exchange: primera.exchange,
       // Con un solo archivo se mantiene la detección de siempre (pantalla de formato no reconocido).
       ...(vistas.length === 1 ? { deteccion: { ...primera.deteccion, esperadas: CABECERAS_ESPERADAS } } : {}),

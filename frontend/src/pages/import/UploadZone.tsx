@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Upload, FileText, RefreshCw, AlertCircle, ChevronDown, CalendarClock, MapPin } from 'lucide-react'
+import { Upload, FileText, RefreshCw, AlertCircle, ChevronDown, MapPin } from 'lucide-react'
 import { cardClasses, SegmentedControl } from '../../components/ui'
-import { formatFiscalDate } from '../../utils/fiscalTable'
-import { EXCHANGE_LABEL, validateFile, type UltimaImportacion } from './wizard'
+import { validateFile } from './wizard'
+import { CoberturaPanel } from './CoberturaPanel'
 import { ArchivosSeleccion } from './ArchivosSeleccion'
 import { ExchangeBadge } from './ExchangeBadge'
 import type { ArchivoSel } from './lote'
@@ -40,11 +40,9 @@ const EXCHANGE_HELP: Record<ExchangeId, { steps: string[]; note: string; retirad
 
 
 
-const haceTexto = (dias: number) => (dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : dias < 60 ? `hace ${dias} días` : `hace ${Math.round(dias / 30)} meses`)
-
 // Paso Subir (#318): zona de arrastre con detección automática del exchange,
 // guía de exportación plegable y hasta dónde llega lo ya importado.
-export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFiles, ultimas, seleccion, onQuitar, onAnalizar }: {
+export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFiles, seleccion, onQuitar, onAnalizar }: {
   dragOver: boolean
   loading: boolean
   error: string | null
@@ -52,7 +50,6 @@ export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFi
   onDragOver: (v: boolean) => void
   /** Archivos soltados o elegidos: historiales de transacciones y de retiradas (#320, #326). */
   onFiles: (files: File[]) => void
-  ultimas: UltimaImportacion[]
   /** Archivos ya elegidos, a la espera de analizarlos (#326). */
   seleccion: ArchivoSel[]
   onQuitar: (id: string) => void
@@ -69,6 +66,12 @@ export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFi
     const err = files.map(validateFile).find(Boolean) ?? null
     setValidationError(err)
     if (!err) onFiles(files)
+  }
+  // «Ver guía» desde la cobertura: abre la guía en la pestaña de ese exchange.
+  function verGuia(ex: ExchangeId) {
+    setGuia(ex)
+    setGuiaAbierta(true)
+    requestAnimationFrame(() => document.getElementById('guia-exportar')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
   }
   function openPicker() {
     if (!loading) fileRef.current?.click()
@@ -129,18 +132,8 @@ export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFi
         </p>
       )}
 
-      {/* Hasta dónde llega lo importado: desde ahí conviene exportar */}
-      {ultimas.length > 0 && (
-        <ul className="flex flex-wrap gap-2" aria-label="Última importación por exchange">
-          {ultimas.map(u => (
-            <li key={u.exchange} className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs ${u.haceDias > 60 ? 'border-warning/30 bg-warning/5' : 'border-border'}`}>
-              <ExchangeBadge exchange={u.exchange} size={16} />
-              <span className="text-fg-muted">{EXCHANGE_LABEL[u.exchange] ?? u.exchange}: hasta el <span className="text-fg">{formatFiscalDate(u.hasta.slice(0, 10))}</span></span>
-              <span className={`inline-flex items-center gap-1 ${u.haceDias > 60 ? 'text-warning' : 'text-fg-subtle'}`}><CalendarClock size={11} aria-hidden="true" />{haceTexto(u.haceDias)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* Cobertura por exchange: tramos, huecos y lo pendiente hasta hoy (#328) */}
+      <CoberturaPanel onVerGuia={verGuia} />
 
       {/* Guía de exportación plegable */}
       <div className={cardClasses('none', 'overflow-hidden')}>

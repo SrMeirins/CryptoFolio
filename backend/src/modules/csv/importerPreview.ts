@@ -87,57 +87,8 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
     }
   }
 
-  // Detectar gaps y solapamientos con imports existentes DEL MISMO EXCHANGE
-  // (Binance y Bitvavo son historiales independientes — comparar fechas entre
-  // ambos generaría falsos "gap sin datos" sin sentido)
-  if (validation.dateRange) {
-    const newFrom = new Date(validation.dateRange.from);
-    const newTo = new Date(validation.dateRange.to);
-
-    const existingRanges = await db.query(
-      `SELECT
-         ci.filename,
-         MIN(t.timestamp)::date AS date_from,
-         MAX(t.timestamp)::date AS date_to
-       FROM csv_imports ci
-       JOIN transactions t ON t.import_id = ci.id
-       WHERE ci.exchange = $1
-       GROUP BY ci.id, ci.filename
-       ORDER BY MIN(t.timestamp)`,
-      [exchange]
-    );
-
-    for (const range of existingRanges.rows) {
-      const existFrom = new Date(range.date_from);
-      const existTo = new Date(range.date_to);
-
-      // Gap: nuevo CSV empieza después del fin del existente con hueco
-      const daysBetween = Math.floor(
-        (newFrom.getTime() - existTo.getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      if (daysBetween > 1) {
-        validation.warnings.push(
-          `Gap de ${daysBetween} dias sin datos: "${range.filename}" cubre hasta ${range.date_to} ` +
-          `y este CSV empieza el ${validation.dateRange.from}. ` +
-          `Considera exportar ese periodo desde ${exchange === 'binance' ? 'Binance' : 'Bitvavo'}.`
-        );
-      }
-
-      // Gap inverso: CSV existente empieza después del fin del nuevo
-      const daysBetweenInverse = Math.floor(
-        (existFrom.getTime() - newTo.getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      if (daysBetweenInverse > 1) {
-        validation.warnings.push(
-          `Gap de ${daysBetweenInverse} dias sin datos: este CSV cubre hasta ${validation.dateRange.to} ` +
-          `y "${range.filename}" empieza el ${range.date_from}. ` +
-          `Considera exportar ese periodo desde ${exchange === 'binance' ? 'Binance' : 'Bitvavo'}.`
-        );
-      }
-    }
-  }
+  // Los huecos de cobertura ya no se avisan aquí, archivo contra archivo: los calcula
+  // la ruta con todo el lote y lo ya importado (#328, modules/csv/cobertura.ts).
 
   // Contar duplicados — una sola query batch en lugar de N+1
   const allHashes = parseResult.transactions.flatMap(tx => tx.rawRowHashes);

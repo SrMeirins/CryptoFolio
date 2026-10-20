@@ -11,6 +11,10 @@ export const NOTIFICATION_ROUTES: Record<string, string> = {
   'pending-withdrawals': '/history',
   'crypto-deposits':     '/import',
   'fiscal-calendar':     '/fiscal',
+  // Cobertura de importaciones (#328)
+  'import-stale-binance': '/import',
+  'import-stale-bitvavo': '/import',
+  'import-huecos':        '/import',
 }
 
 // Metadata visual por tipo de aviso — antes TopBar.tsx y GeneralSection.tsx

@@ -56,6 +56,11 @@ describe('combinarVistasPrevias', () => {
     expect(l.validation.warnings).toEqual(['a.csv: Gap de 3 dias']);
   });
 
+  it('un archivo válido sin ninguna transacción importable no se da por «ya importado» (#328)', () => {
+    const l = combinarVistasPrevias([vista('vacio.csv', resultado({ transactions: [] }))]);
+    expect(l.archivos[0]).toMatchObject({ estado: 'sin_novedades', motivo: 'No contiene transacciones que importar' });
+  });
+
   it('un solo archivo: mismos mensajes sin prefijo', () => {
     const l = combinarVistasPrevias([vista('a.csv', resultado({ transactions: [tx('a')], validation: { ...resultado({}).validation, info: ['Info'] } }))]);
     expect(l.validation.info).toEqual(['Info']);

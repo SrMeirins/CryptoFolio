@@ -25,5 +25,7 @@ export function invalidateTransactionQueries(queryClient: QueryClient, { include
   }
   if (includeImports) {
     queryClient.invalidateQueries({ queryKey: ['imports'] })
+    // La cobertura temporal se deriva de las importaciones (#328).
+    queryClient.invalidateQueries({ queryKey: ['cobertura'] })
   }
 }
