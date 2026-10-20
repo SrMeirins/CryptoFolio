@@ -26,6 +26,8 @@ export interface PreviewTransaction {
   notes?: string
   subTradeCount: number
   rawRowHashes?: string[]
+  /** Fila nueva (no estaba importada); la marca el backend (#316). */
+  isNew?: boolean
 }
 
 export interface UnknownOperationSample {
@@ -62,8 +64,8 @@ export interface ProgressEvent {
 }
 
 export const LANG_LABELS: Record<string, string> = {
-  en: 'Ingles',
-  es: 'Espanol',
+  en: 'Inglés',
+  es: 'Español',
   unknown: 'Desconocido',
 }
 

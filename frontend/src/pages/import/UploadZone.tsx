@@ -6,7 +6,7 @@ import { formatNumber } from '../../utils/format'
 
 const EXCHANGE_HELP: Record<'binance' | 'bitvavo', { title: string; steps: string[]; note: string }> = {
   binance: {
-    title: 'Como exportar tu historial de Binance',
+    title: 'Cómo exportar tu historial de Binance',
     steps: [
       'Ve a Binance > Orders > Transaction History',
       'Pulsa el icono de exportar en la esquina superior derecha',
@@ -14,10 +14,10 @@ const EXCHANGE_HELP: Record<'binance' | 'bitvavo', { title: string; steps: strin
       'Elige el rango de fechas y formato CSV',
       'Espera a que se genere y descargalo',
     ],
-    note: 'Soportamos exportaciones en ingles y espanol.',
+    note: 'Admite exportaciones en inglés y español.',
   },
   bitvavo: {
-    title: 'Como exportar tu historial de Bitvavo',
+    title: 'Cómo exportar tu historial de Bitvavo',
     steps: [
       'Ve a Bitvavo > Account > Order History / Transaction History',
       'Pulsa el icono de exportar / descargar CSV',
@@ -109,8 +109,8 @@ export function UploadZone({ dragOver, loading, error, fileRef, exchange, onExch
         ) : (
           <>
             <Upload size={32} className="mx-auto text-fg-subtle mb-3" />
-            <p className="text-fg font-medium capitalize">Arrastra tu CSV de {exchange} aquí</p>
-            <p className="text-fg-subtle text-sm mt-1">o haz click para seleccionar</p>
+            <p className="text-fg font-medium">Arrastra tu CSV de {exchange === 'binance' ? 'Binance' : 'Bitvavo'} aquí</p>
+            <p className="text-fg-subtle text-sm mt-1">o haz clic para seleccionarlo</p>
             <div className="flex items-center justify-center gap-3 mt-3 text-xs text-fg-subtle">
               <span>Transaction History export</span>
               <span>·</span>

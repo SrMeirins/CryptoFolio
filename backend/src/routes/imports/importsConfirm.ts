@@ -5,7 +5,7 @@ import {
   applyExistingDepositCostUpdates, importTransactionsPhase,
   fetchMissingHistoricalPrices, runFifoPhase, ProgressEmitter,
 } from '../../modules/csv/confirmImport';
-import { hasBinaryMagic, upload, parseWithdrawalDestinations, parseDepositCosts } from './importsValidation';
+import { hasBinaryMagic, uploadCsv, parseWithdrawalDestinations, parseDepositCosts } from './importsValidation';
 
 const router = Router();
 
@@ -15,7 +15,7 @@ const router = Router();
 // La lógica de negocio de cada fase (gates de depósitos, import, precios
 // históricos, FIFO) vive en modules/csv/confirmImport.ts, fragmentada desde
 // este mismo fichero (antes ~335 líneas mezclando ambas cosas).
-router.post('/confirm', upload.single('file'), async (req: Request, res: Response) => {
+router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
   if (!req.file) { res.status(400).json({ error: 'No se recibió ningún archivo' }); return; }
   const exchange: Exchange = isExchange(req.body.exchange) ? req.body.exchange : 'binance';
 

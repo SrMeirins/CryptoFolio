@@ -122,10 +122,9 @@ describe('POST /api/imports/confirm', () => {
     const pngLike = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.from('resto del fichero')]);
     const res = await request(app).post('/api/imports/confirm').attach('file', pngLike, 'disfrazado.csv');
 
-    const events = parseSseEvents(res.text);
-    expect(events).toHaveLength(1);
-    expect(events[0].phase).toBe('error');
-    expect(events[0].message).toMatch(/no es un CSV válido/);
+    // Desde #316 se rechaza al recibir el archivo, antes de abrir el stream: 400 con el motivo.
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/no es un CSV de texto/);
   });
 
   it('withdrawalDestinations inválido (no es un objeto) se reporta como fase "error"', async () => {

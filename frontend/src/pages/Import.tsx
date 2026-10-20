@@ -90,12 +90,8 @@ export function ImportPage() {
   async function handleConfirm() {
     if (!fileBufferRef.current) return
 
-    const csvDeposits = (preview?.transactions ?? [])
-      .filter(tx => (tx.notes ?? '').includes('cripto externo'))
-    const unreviewedDeposits = csvDeposits.some(tx => {
-      const key = tx.rawRowHashes?.[0] ?? `${tx.timestamp}|${tx.asset}|${tx.amount}`
-      return !(key in depositCosts)
-    })
+    // Solo los depósitos que el backend pide revisar: nuevos del archivo y pendientes de la BD (#316).
+    const unreviewedDeposits = (preview?.depositReviews ?? []).some(d => !(d.txKey in depositCosts))
     if (unreviewedDeposits) {
       setStage('preview')
       setError('Asigna el coste de adquisición de todos los depósitos externos en el panel de revisión.')
@@ -202,7 +198,7 @@ export function ImportPage() {
       <PageHeader
         icon={navIcon('/import')}
         title="Importar"
-        subtitle="CSV de Binance y operaciones manuales"
+        subtitle="CSV de Binance y Bitvavo, y operaciones manuales"
         actions={<>
           <button
             type="button"
@@ -210,7 +206,7 @@ export function ImportPage() {
             className={buttonClasses('secondary', 'md', 'flex')}
           >
             <Plus size={14} />
-            Nueva transaccion
+            Nueva transacción
           </button>
           {stage !== 'upload' && (
             <button type="button" onClick={handleReset} className="text-xs text-fg-subtle hover:text-fg transition-colors">
@@ -259,6 +255,9 @@ export function ImportPage() {
           }
           onCatalog={(op) => { setCatalogingOp(op); setStage('catalog') }}
           onConfirm={handleConfirm}
+          error={error}
+          onReset={handleReset}
+          onVerHistorial={() => navigate('/history')}
         />
       )}
 

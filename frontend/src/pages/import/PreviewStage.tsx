@@ -1,15 +1,16 @@
-import { AlertTriangle, Play, Info } from 'lucide-react'
+import { AlertTriangle, Play, Info, CheckCircle2, Upload, History } from 'lucide-react'
 import { WithdrawalDestinations } from './WithdrawalDestinations'
 import { LANG_LABELS } from './types'
 import { UnknownOperationsCard } from './UnknownOperationsCard'
 import { TransactionsTable } from './TransactionsTable'
 import type { PreviewResult, DepositReview, WizardResult } from './types'
 import { cardClasses, buttonClasses } from '../../components/ui'
+import { nadaQueImportar, newTransactions, newWithdrawals, txKey } from './reviewSelection'
 
 export function PreviewStage({
   preview, showTxTable, setShowTxTable, txPage, setTxPage, txPageSize,
   resolvedOps, withdrawalDestinations, depositCosts,
-  onWithdrawalDestination, onDepositCost, onIgnoreOp, onCatalog, onConfirm,
+  onWithdrawalDestination, onDepositCost, onIgnoreOp, onCatalog, onConfirm, error, onReset, onVerHistorial,
 }: {
   preview: PreviewResult
   showTxTable: boolean
@@ -25,34 +26,53 @@ export function PreviewStage({
   onIgnoreOp: (op: string) => void
   onCatalog: (op: string) => void
   onConfirm: () => void
+  /** Error de la última acción (p. ej. depósitos sin coste al confirmar), visible en esta pantalla (#316). */
+  error: string | null
+  onReset: () => void
+  onVerHistorial: () => void
 }) {
   const hasUnresolved = preview.validation.unknownOperations.some(op => !resolvedOps[op] || resolvedOps[op].operationTypeId === '')
 
-  const withdrawals = [...preview.transactions.filter(tx => tx.operationType === 'WITHDRAW')]
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-  const withdrawalTxKeys = withdrawals.map(tx =>
-    tx.rawRowHashes?.[0] ?? `${tx.timestamp}|${tx.asset}|${tx.amount}`
-  )
+  // Solo lo nuevo (#316): las filas ya importadas no se vuelven a revisar.
+  const withdrawals = newWithdrawals(preview)
+  const withdrawalTxKeys = withdrawals.map(txKey)
   const hasUnassignedWithdrawals = withdrawalTxKeys.some(k => !withdrawalDestinations[k])
 
-  const depositsForPanel: DepositReview[] = preview.transactions
-    .filter(tx => (tx.notes ?? '').includes('cripto externo'))
-    .map(tx => ({
-      txKey:           tx.rawRowHashes?.[0] ?? `${tx.timestamp}|${tx.asset}|${tx.amount}`,
-      timestamp:       tx.timestamp,
-      asset:           tx.asset,
-      amount:          tx.amount,
-      historicalPrice: null,
-    }))
+  // Los depósitos a revisar los calcula el backend (nuevos y pendientes de la BD), con su precio histórico.
+  const depositsForPanel: DepositReview[] = preview.depositReviews
   const allDepositsReviewedInPanel = depositsForPanel.length === 0 ||
     depositsForPanel.every(d => d.txKey in depositCosts)
 
   const hasAnythingToDo = preview.newCount > 0 || depositsForPanel.length > 0
   const isBlocked = hasUnresolved || hasUnassignedWithdrawals || !allDepositsReviewedInPanel || !hasAnythingToDo
-  const newTxs    = preview.transactions.slice(0, preview.newCount)
+  const newTxs    = newTransactions(preview)
+
+  if (nadaQueImportar(preview)) {
+    const range = preview.validation.dateRange
+    return (
+      <div className={cardClasses('md', 'text-center space-y-4 py-10')} role="status">
+        <CheckCircle2 size={36} className="mx-auto text-positive" aria-hidden="true" />
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold text-fg">Ya está todo importado</h2>
+          <p className="text-sm text-fg-muted">
+            Las {preview.duplicateCount} transacciones de este archivo{range ? ` (${range.from} – ${range.to})` : ''} ya estaban en tu historial. No hay nada nuevo que importar.
+          </p>
+        </div>
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          <button type="button" onClick={onReset} className={buttonClasses('primary', 'sm', 'flex gap-1.5')}><Upload size={13} aria-hidden="true" /> Subir otro archivo</button>
+          <button type="button" onClick={onVerHistorial} className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}><History size={13} aria-hidden="true" /> Ver en Historial</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
+      {error && (
+        <p role="alert" className="flex items-start gap-2 rounded-xl border border-negative/30 bg-negative/5 px-4 py-3 text-sm text-negative">
+          <AlertTriangle size={15} className="shrink-0 mt-0.5" aria-hidden="true" /> {error}
+        </p>
+      )}
       <div className={cardClasses('md', 'space-y-4')}>
         <h2 className="font-medium text-sm">Resumen del archivo</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

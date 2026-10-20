@@ -13,11 +13,20 @@ export function ImportsList({ imports, onDelete }: {
   const totalTx = imports.reduce((s, i) => s + parseInt(i.transaction_count), 0)
   const confirmImport = imports.find(i => i.id === confirmId)
 
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // Si el borrado falla, se informa y se quita el indicador de carga (#316).
   async function handleConfirmDelete(id: string) {
     setDeletingId(id)
     setConfirmId(null)
-    await onDelete(id)
-    setDeletingId(null)
+    setDeleteError(null)
+    try {
+      await onDelete(id)
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'No se pudo borrar la importación')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   return (
@@ -28,6 +37,7 @@ export function ImportsList({ imports, onDelete }: {
           {imports.length} archivo{imports.length !== 1 ? 's' : ''} · {totalTx} transacciones totales
         </span>
       </div>
+      {deleteError && <p role="alert" className="px-1 text-xs text-negative">{deleteError}</p>}
 
       {imports.map(imp => {
         const txCount       = parseInt(imp.transaction_count)
