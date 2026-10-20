@@ -104,6 +104,7 @@ export async function importTransactionsPhase(
   newDepositCosts: Record<string, number>,
   exchange: Exchange,
   emit: ProgressEmitter,
+  retiradasBuffer?: Buffer,
 ): Promise<ImportResult> {
   const IMPORT_REPORT_EVERY = 5;
   let lastImportReport = 0;
@@ -123,7 +124,8 @@ export async function importTransactionsPhase(
     (message, progress, total) => {
       emit('importing', message, progress, total);
     },
-    exchange
+    exchange,
+    retiradasBuffer,
   );
 
   emit('importing', `✓ ${importResult.newTransactions} transacciones nuevas importadas (${importResult.duplicateRows} duplicadas ignoradas)`);

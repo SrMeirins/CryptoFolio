@@ -28,6 +28,15 @@ export interface PreviewTransaction {
   rawRowHashes?: string[]
   /** Fila nueva (no estaba importada); la marca el backend (#316). */
   isNew?: boolean
+  /** Destino on-chain de un retiro, si el CSV lo trae (#320). */
+  destino?: DestinoRetiro
+}
+
+export interface DestinoRetiro {
+  address: string | null
+  networkId: string | null
+  network: string | null
+  txHash: string | null
 }
 
 export interface UnknownOperationSample {
@@ -57,6 +66,8 @@ export interface PreviewResult {
   /** Exchange con el que se ha leído el archivo (detectado o elegido) (#318). */
   exchange?: 'binance' | 'bitvavo'
   deteccion?: { exchange: 'binance' | 'bitvavo' | null; idioma: string; reconocido: boolean; esperadas: Record<'binance' | 'bitvavo', string> }
+  /** Historial de retiradas de Binance aportado (#320). */
+  retiradas?: { filas: number; emparejadas: number; retiros: number } | null
 }
 
 export interface ProgressEvent {

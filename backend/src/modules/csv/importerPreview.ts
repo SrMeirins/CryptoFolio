@@ -5,6 +5,8 @@ import { ParsedTransaction } from './types';
 import { Exchange, parseExchangeCsv, validateExchangeCsv } from './exchanges';
 import { getHistoricalPriceEur } from '../prices/binance';
 import { normalizeBinanceYear } from './csvUtils';
+import { destinosDeRetiros } from './retiradas/destinosDb';
+import type { DestinoRetiro, ResumenRetiradas } from './retiradas/resolverDestinos';
 
 export interface UnknownOperationSample {
   timestamp: string;
@@ -24,15 +26,17 @@ export interface DepositReview {
 
 export interface PreviewResult {
   validation: ValidationResult;
-  transactions: Array<ParsedTransaction & { isNew?: boolean }>;
+  transactions: Array<ParsedTransaction & { isNew?: boolean; destino?: DestinoRetiro }>;
   duplicateCount: number;
   newCount: number;
   errors: string[];
   unknownOperationSamples: Record<string, UnknownOperationSample>;
   depositReviews: DepositReview[];  // depósitos externos que necesitan coste
+  /** Historial de retiradas de Binance aportado (#320): cuántas se han emparejado. */
+  retiradas?: ResumenRetiradas | null;
 }
 
-export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'binance'): Promise<PreviewResult> {
+export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'binance', retiradasBuffer?: Buffer): Promise<PreviewResult> {
   const validation = validateExchangeCsv(exchange, fileBuffer);
 
   if (!validation.valid) {
@@ -200,14 +204,21 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
     });
   }
 
+  // Dirección, red y hash de cada retiro (#320): Bitvavo los trae; Binance, con su historial de retiradas.
+  const { destinos, resumen } = await destinosDeRetiros(exchange, parseResult, retiradasBuffer);
+
   return {
     validation,
     // Marca explícita de las filas nuevas (#316): la revisión solo debe pedir las nuevas.
-    transactions: parseResult.transactions.map(tx => ({ ...tx, isNew: !tx.rawRowHashes.some(h => existingHashes.has(h)) })),
+    transactions: parseResult.transactions.map(tx => {
+      const destino = destinos.get(tx.rawRowHashes[0]);
+      return { ...tx, isNew: !tx.rawRowHashes.some(h => existingHashes.has(h)), ...(destino ? { destino } : {}) };
+    }),
     duplicateCount,
     newCount,
     errors: parseResult.errors.map((e) => e.message),
     unknownOperationSamples,
     depositReviews,
+    retiradas: resumen,
   };
 }

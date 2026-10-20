@@ -1,6 +1,7 @@
 import multer from 'multer';
 import { z } from 'zod';
 import type { Request, Response, NextFunction } from 'express';
+import { CABECERAS_RETIRADAS, esHistorialRetiradas } from '../../modules/csv/retiradas/historialRetiradas';
 
 // Magic bytes de CSV: texto plano — los primeros bytes no deben ser un ejecutable
 const BINARY_MAGIC = [
@@ -17,6 +18,12 @@ export function hasBinaryMagic(buf: Buffer): boolean {
 }
 
 export const MAX_CSV_MB = 10;
+
+/** Historial de retiradas opcional de la petición (#320), ya validado por uploadCsv. */
+export function retiradasDe(req: Request): Buffer | undefined {
+  const files = (req.files ?? {}) as Record<string, Express.Multer.File[] | undefined>;
+  return files.withdrawals?.[0]?.buffer;
+}
 
 /** Archivo rechazado por su tipo (#316): se responde 400 con el motivo, no 500. */
 class TipoArchivoError extends Error {}
@@ -40,7 +47,8 @@ export const upload = multer({
  * llegaban al manejador global como 500 «Internal server error».
  */
 export function uploadCsv(req: Request, res: Response, next: NextFunction): void {
-  upload.single('file')(req, res, (err: unknown) => {
+  // «withdrawals»: historial de retiradas de Binance, opcional (#320). Se normaliza a req.file.
+  upload.fields([{ name: 'file', maxCount: 1 }, { name: 'withdrawals', maxCount: 1 }])(req, res, (err: unknown) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
       res.status(413).json({ error: `El archivo supera el máximo de ${MAX_CSV_MB} MB` });
       return;
@@ -49,9 +57,20 @@ export function uploadCsv(req: Request, res: Response, next: NextFunction): void
       res.status(400).json({ error: err.message });
       return;
     }
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_UNEXPECTED_FILE') {
+      res.status(400).json({ error: 'Se esperaba un único CSV de transacciones y, opcionalmente, un historial de retiradas' });
+      return;
+    }
     if (err) { next(err); return; }
-    if (req.file && hasBinaryMagic(req.file.buffer)) {
+    const files = (req.files ?? {}) as Record<string, Express.Multer.File[] | undefined>;
+    req.file = files.file?.[0];
+    const retiradas = files.withdrawals?.[0];
+    if ([req.file, retiradas].some(f => f && hasBinaryMagic(f.buffer))) {
       res.status(400).json({ error: 'El archivo no es un CSV de texto (parece un ejecutable, imagen, ZIP o PDF)' });
+      return;
+    }
+    if (retiradas && !esHistorialRetiradas(retiradas.buffer)) {
+      res.status(400).json({ error: `El historial de retiradas no es válido: se esperan las columnas ${CABECERAS_RETIRADAS.join(', ')}` });
       return;
     }
     next();

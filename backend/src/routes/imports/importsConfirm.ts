@@ -5,7 +5,7 @@ import {
   applyExistingDepositCostUpdates, importTransactionsPhase,
   fetchMissingHistoricalPrices, runFifoPhase, ProgressEmitter,
 } from '../../modules/csv/confirmImport';
-import { hasBinaryMagic, uploadCsv, parseWithdrawalDestinations, parseDepositCosts } from './importsValidation';
+import { hasBinaryMagic, uploadCsv, parseWithdrawalDestinations, parseDepositCosts, retiradasDe } from './importsValidation';
 
 const router = Router();
 
@@ -74,7 +74,7 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
     await applyExistingDepositCostUpdates(existingDepositUpdates);
 
     await importTransactionsPhase(
-      req.file.buffer, req.file.originalname, withdrawalDestinations, newDepositCosts, exchange, send
+      req.file.buffer, req.file.originalname, withdrawalDestinations, newDepositCosts, exchange, send, retiradasDe(req)
     );
 
     // FASE 2: Precios históricos

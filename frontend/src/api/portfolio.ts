@@ -386,6 +386,7 @@ export interface Network {
   name: string
   native_asset: string
   explorer_url: string | null
+  explorer_tx_url?: string | null
   tokens: { id: string; asset: string }[]
 }
 
@@ -500,6 +501,13 @@ export const portfolioApi = {
   getWalletsFull: () => api.get<WalletFull[]>('/wallets'),
   getCatalog: () => api.get<CatalogData>('/catalog'),
   getNetworks: () => api.get<Network[]>('/wallets/networks'),
+  // Guarda la dirección de un retiro en una wallet propia, existente o nueva (#320).
+  linkWalletAddress: (data: {
+    walletId?: string
+    newWallet?: { name: string; type: 'hardware' | 'software'; color: string; notes?: string | null }
+    network_id: string | null
+    address: string
+  }) => api.post<{ wallet: { id: string; name: string; color: string }; addressId: string }>('/wallets/link-address', data),
   createWallet: (data: Record<string, unknown>) => api.post<{ id: string }>('/wallets', data),
   updateWallet: (id: string, data: Record<string, unknown>) => api.put<{ success: boolean }>(`/wallets/${id}`, data),
   deleteWallet: (id: string) => api.delete<{ success: boolean }>(`/wallets/${id}`),

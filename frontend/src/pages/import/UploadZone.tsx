@@ -1,13 +1,12 @@
 import { useState } from 'react'
-import { Upload, FileText, RefreshCw, AlertCircle, ChevronDown, CalendarClock } from 'lucide-react'
+import { Upload, FileText, RefreshCw, AlertCircle, ChevronDown, CalendarClock, MapPin, X } from 'lucide-react'
 import { cardClasses, SegmentedControl } from '../../components/ui'
-import { formatNumber } from '../../utils/format'
 import { formatFiscalDate } from '../../utils/fiscalTable'
-import { EXCHANGE_LABEL, type UltimaImportacion } from './wizard'
+import { EXCHANGE_LABEL, validateFile, type UltimaImportacion } from './wizard'
 
 type ExchangeId = 'binance' | 'bitvavo'
 
-const EXCHANGE_HELP: Record<ExchangeId, { steps: string[]; note: string }> = {
+const EXCHANGE_HELP: Record<ExchangeId, { steps: string[]; note: string; retiradas?: string[] }> = {
   binance: {
     steps: [
       'Ve a Binance > Orders > Transaction History',
@@ -17,6 +16,13 @@ const EXCHANGE_HELP: Record<ExchangeId, { steps: string[]; note: string }> = {
       'Espera a que se genere y descárgalo',
     ],
     note: 'Admite exportaciones en inglés y español.',
+    // Opcional (#320): aporta la dirección de cada retiro para reconocer tus wallets.
+    retiradas: [
+      'Ve a Binance > Orders > Assets History',
+      'Pulsa Export Withdrawal History',
+      'Elige Customize dates con el mismo rango',
+      'Formato CSV y descárgalo',
+    ],
   },
   bitvavo: {
     steps: [
@@ -44,37 +50,36 @@ export function ExchangeBadge({ exchange, size = 20 }: { exchange: string; size?
   )
 }
 
-// Mismos límites que el backend: feedback instantáneo antes de subir.
-const MAX_FILE_SIZE = 10 * 1024 * 1024
-
-function validateFile(file: File): string | null {
-  if (!file.name.toLowerCase().endsWith('.csv')) return 'Solo se aceptan archivos .csv'
-  if (file.size > MAX_FILE_SIZE) return `El archivo supera el máximo de 10 MB (${formatNumber(file.size / 1024 / 1024, 1, 1)} MB)`
-  return null
-}
 
 const haceTexto = (dias: number) => (dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : dias < 60 ? `hace ${dias} días` : `hace ${Math.round(dias / 30)} meses`)
 
 // Paso Subir (#318): zona de arrastre con detección automática del exchange,
 // guía de exportación plegable y hasta dónde llega lo ya importado.
-export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFile, ultimas }: {
+export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFiles, ultimas, retiradas, onQuitarRetiradas }: {
   dragOver: boolean
   loading: boolean
   error: string | null
   fileRef: React.RefObject<HTMLInputElement>
   onDragOver: (v: boolean) => void
-  onFile: (f: File) => void
+  /** Uno o dos archivos: el historial de transacciones y, opcionalmente, el de retiradas de Binance (#320). */
+  onFiles: (files: File[]) => void
   ultimas: UltimaImportacion[]
+  /** Nombre del historial de retiradas ya preparado, a la espera del de transacciones. */
+  retiradas: string | null
+  onQuitarRetiradas: () => void
 }) {
   const [validationError, setValidationError] = useState<string | null>(null)
   const [guiaAbierta, setGuiaAbierta] = useState(false)
   const [guia, setGuia] = useState<ExchangeId>('binance')
   const help = EXCHANGE_HELP[guia]
 
-  function handleFile(file: File) {
-    const err = validateFile(file)
+  function handleFiles(list: FileList | null | undefined) {
+    const files = [...(list ?? [])]
+    if (files.length === 0) return
+    if (files.length > 2) { setValidationError('Suelta como mucho dos archivos: el historial de transacciones y el de retiradas'); return }
+    const err = files.map(validateFile).find(Boolean) ?? null
     setValidationError(err)
-    if (!err) onFile(file)
+    if (!err) onFiles(files)
   }
   function openPicker() {
     if (!loading) fileRef.current?.click()
@@ -97,8 +102,7 @@ export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFi
         onDrop={e => {
           e.preventDefault()
           onDragOver(false)
-          const file = e.dataTransfer.files[0]
-          if (file) handleFile(file)
+          handleFiles(e.dataTransfer.files)
         }}
       >
         {loading ? (
@@ -113,6 +117,7 @@ export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFi
             </span>
             <p className="text-fg font-semibold text-base">{dragOver ? 'Suelta el archivo para analizarlo' : 'Arrastra tu CSV aquí'}</p>
             <p className="text-fg-subtle text-sm mt-1">o haz clic para seleccionarlo · reconocemos el exchange automáticamente</p>
+            <p className="text-fg-subtle text-xs mt-1">Binance: puedes añadir también el historial de retiradas para reconocer tus wallets</p>
             <div className="flex items-center justify-center gap-4 mt-5 text-xs text-fg-muted flex-wrap">
               <span className="inline-flex items-center gap-1.5"><ExchangeBadge exchange="binance" /> Binance</span>
               <span className="inline-flex items-center gap-1.5"><ExchangeBadge exchange="bitvavo" /> Bitvavo</span>
@@ -120,9 +125,18 @@ export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFi
             </div>
           </>
         )}
-        <input ref={fileRef} type="file" accept=".csv" className="hidden" tabIndex={-1}
-          onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+        <input ref={fileRef} type="file" accept=".csv" multiple className="hidden" tabIndex={-1}
+          onChange={e => handleFiles(e.target.files)} />
       </div>
+
+      {retiradas && (
+        <div className="flex items-center gap-2 rounded-xl border border-brand/30 bg-brand/5 px-4 py-2.5 text-xs text-fg-muted" role="status">
+          <MapPin size={13} className="text-brand shrink-0" aria-hidden="true" />
+          <span className="flex-1">Historial de retiradas listo (<span className="text-fg">{retiradas}</span>). Ahora suelta el historial de transacciones de Binance.</span>
+          <button type="button" onClick={onQuitarRetiradas} aria-label="Quitar el historial de retiradas"
+            className="p-1 rounded-md text-fg-subtle hover:text-fg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60"><X size={13} aria-hidden="true" /></button>
+        </div>
+      )}
 
       {(validationError || error) && (
         <p role="alert" className="flex items-start gap-2 p-4 bg-negative/10 border border-negative/20 rounded-xl text-sm text-negative">
@@ -159,6 +173,15 @@ export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFi
               {help.steps.map(step => <li key={step}>{step}</li>)}
             </ol>
             <p className="text-xs text-fg-subtle">{help.note}</p>
+            {help.retiradas && (
+              <div className="rounded-lg border border-border px-3 py-2.5 space-y-1.5">
+                <p className="text-xs font-medium text-fg flex items-center gap-1.5"><MapPin size={12} className="text-brand" aria-hidden="true" /> Opcional: historial de retiradas</p>
+                <p className="text-[11px] text-fg-subtle">Trae la dirección de cada retiro para reconocer tus wallets. Suéltalo junto al de transacciones.</p>
+                <ol className="text-xs text-fg-muted space-y-1 list-decimal list-inside">
+                  {help.retiradas.map(step => <li key={step}>{step}</li>)}
+                </ol>
+              </div>
+            )}
           </div>
         )}
       </div>
