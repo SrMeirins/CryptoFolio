@@ -54,6 +54,9 @@ export interface PreviewResult {
   errors: string[]
   unknownOperationSamples: Record<string, UnknownOperationSample>
   depositReviews: DepositReview[]
+  /** Exchange con el que se ha leído el archivo (detectado o elegido) (#318). */
+  exchange?: 'binance' | 'bitvavo'
+  deteccion?: { exchange: 'binance' | 'bitvavo' | null; idioma: string; reconocido: boolean; esperadas: Record<'binance' | 'bitvavo', string> }
 }
 
 export interface ProgressEvent {

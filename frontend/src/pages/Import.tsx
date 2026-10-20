@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, HardDrive, ArrowRight, X } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { OperationWizard } from '../components/OperationWizard'
 import { ManualTxModal } from '../components/ManualTxModal'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { UploadZone } from './import/UploadZone'
 import { PreviewStage } from './import/PreviewStage'
 import { ProgressStage } from './import/ProgressStage'
@@ -12,12 +12,16 @@ import { PendingDepositsPanel } from './import/PendingDepositsPanel'
 import { AdvancedSection } from './import/AdvancedSection'
 import type { PreviewResult, ProgressEvent, WizardResult } from './import/types'
 import { invalidateTransactionQueries } from '../utils/queryInvalidation'
-import { useSetupSeen } from '../hooks/useSetupSeen'
 import { portfolioApi } from '../api/portfolio'
 import { waitForImportCommit, readProgressStream } from './import/importStream'
 import { useWithdrawalDestinations, useDepositCosts, clearImportSessionStorage } from './import/useImportSessionState'
-import { cardClasses, buttonClasses, iconButtonClasses, PageHeader } from '../components/ui'
+import { cardClasses, buttonClasses, PageHeader } from '../components/ui'
+import { ImportStepper } from './import/ImportStepper'
+import { firmaArchivo, pasoDeStage, ultimasPorExchange, type Paso } from './import/wizard'
 import { navIcon } from '../constants/navigation'
+
+// Firma del archivo de la sesión: si se vuelve a subir el mismo, se conserva lo asignado (#318).
+const FIRMA_KEY = 'import_file_signature'
 
 export function ImportPage() {
   const queryClient = useQueryClient()
@@ -25,8 +29,8 @@ export function ImportPage() {
   const fileRef     = useRef<HTMLInputElement>(null)
   const fileBufferRef = useRef<File | null>(null)
 
-  const { setupSeen, markSetupSeen } = useSetupSeen()
   const [stage, setStage] = useState<'upload' | 'preview' | 'catalog' | 'progress' | 'done'>('upload')
+  // Exchange detectado por el backend en la vista previa (#318); «Cambiar» lo fuerza.
   const [exchange, setExchange] = useState<'binance' | 'bitvavo'>('binance')
   const [dragOver, setDragOver] = useState(false)
   const [loading, setLoading]   = useState(false)
@@ -53,15 +57,27 @@ export function ImportPage() {
   })
   const hasPendingDeposits = pendingDeposits.length > 0
 
-  async function handleFile(file: File) {
+  async function handleFile(file: File, forzado?: 'binance' | 'bitvavo') {
     setError(null)
     setLoading(true)
     fileBufferRef.current = file
 
+    // Otro archivo: las asignaciones de la sesión eran del anterior (#318). El mismo: se conservan.
+    const firma = firmaArchivo(file)
+    let anterior: string | null = null
+    try { anterior = sessionStorage.getItem(FIRMA_KEY) } catch { /* sin almacenamiento */ }
+    if (anterior !== firma) {
+      setWithdrawalDestinations({})
+      setDepositCosts({})
+      setResolvedOps({})
+      try { sessionStorage.setItem(FIRMA_KEY, firma) } catch { /* sin almacenamiento */ }
+    }
+
     try {
       const form = new FormData()
       form.append('file', file)
-      form.append('exchange', exchange)
+      // Sin exchange, el backend lo detecta por las cabeceras.
+      if (forzado) form.append('exchange', forzado)
       const res  = await fetch('/api/imports/preview', { method: 'POST', body: form })
       const body: unknown = await res.json()
 
@@ -73,6 +89,7 @@ export function ImportPage() {
 
       const data = body as PreviewResult
       setPreview(data)
+      setExchange(data.exchange ?? forzado ?? 'binance')
       setStage('preview')
     } catch {
       setError('Error al procesar el archivo')
@@ -150,6 +167,16 @@ export function ImportPage() {
     }
   }
 
+  // Volver a un paso anterior desde el indicador (#318): a Subir sin perder lo asignado.
+  function irAPaso(paso: Paso) {
+    if (paso !== 'subir') return
+    if (stage === 'done') { handleReset(); return }
+    setStage('upload')
+    setPreview(null)
+    setError(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
   function handleReset() {
     setStage('upload')
     setPreview(null)
@@ -161,6 +188,7 @@ export function ImportPage() {
     fileBufferRef.current = null
     if (fileRef.current) fileRef.current.value = ''
     clearImportSessionStorage()
+    try { sessionStorage.removeItem(FIRMA_KEY) } catch { /* sin almacenamiento */ }
   }
 
   async function handleDelete(id: string) {
@@ -170,31 +198,6 @@ export function ImportPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
-      {!setupSeen && (
-        <div className="flex items-center justify-between gap-4 px-4 py-3 bg-warning/10 border border-warning/30 rounded-lg text-sm">
-          <div className="flex items-center gap-3">
-            <HardDrive size={15} className="text-warning shrink-0" />
-            <span className="text-fg">
-              ¿Tienes wallets frías? Configúralas antes de importar para que los retiros se asignen correctamente.
-            </span>
-            <Link
-              to="/settings"
-              className="flex items-center gap-1 text-warning hover:text-warning/80 font-medium whitespace-nowrap transition-colors"
-            >
-              Ir a configuración <ArrowRight size={13} />
-            </Link>
-          </div>
-          <button
-            type="button"
-            onClick={markSetupSeen}
-            aria-label="Cerrar aviso"
-            className={iconButtonClasses('sm')}
-          >
-            <X size={15} />
-          </button>
-        </div>
-      )}
-
       <PageHeader
         icon={navIcon('/import')}
         title="Importar"
@@ -208,13 +211,15 @@ export function ImportPage() {
             <Plus size={14} />
             Nueva transacción
           </button>
-          {stage !== 'upload' && (
+          {stage !== 'upload' && stage !== 'progress' && (
             <button type="button" onClick={handleReset} className="text-xs text-fg-subtle hover:text-fg transition-colors">
-              Volver al inicio
+              Empezar de nuevo
             </button>
           )}
         </>}
       />
+
+      <ImportStepper actual={pasoDeStage(stage)} onIr={irAPaso} />
 
       {stage === 'upload' && hasPendingDeposits && (
         <PendingDepositsPanel deposits={pendingDeposits} />
@@ -226,10 +231,9 @@ export function ImportPage() {
           loading={loading}
           error={error}
           fileRef={fileRef}
-          exchange={exchange}
-          onExchangeChange={setExchange}
           onDragOver={setDragOver}
-          onFile={handleFile}
+          onFile={f => { void handleFile(f) }}
+          ultimas={ultimasPorExchange(imports)}
         />
       )}
 
@@ -258,6 +262,9 @@ export function ImportPage() {
           error={error}
           onReset={handleReset}
           onVerHistorial={() => navigate('/history')}
+          exchange={exchange}
+          onCambiarExchange={ex => { if (fileBufferRef.current) void handleFile(fileBufferRef.current, ex) }}
+          cambiando={loading}
         />
       )}
 

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { previewCsvFile } from '../../modules/csv/importer';
-import { Exchange, isExchange } from '../../modules/csv/exchanges';
+import { CABECERAS_ESPERADAS, detectarExchange, Exchange, isExchange } from '../../modules/csv/exchanges';
 import { uploadCsv } from './importsValidation';
 
 const router = Router();
@@ -16,10 +16,17 @@ const router = Router();
 // materializado en esta app mono-usuario.
 router.post('/preview', uploadCsv, async (req: Request, res: Response) => {
   if (!req.file) { res.status(400).json({ error: 'No se recibió ningún archivo' }); return; }
-  const exchange: Exchange = isExchange(req.body.exchange) ? req.body.exchange : 'binance';
+  // Sin exchange (o «auto») se detecta por las cabeceras (#318); uno explícito manda.
+  const elegido = isExchange(req.body.exchange) ? req.body.exchange : null;
+  const deteccion = detectarExchange(req.file.buffer);
+  const exchange: Exchange = elegido ?? deteccion.exchange ?? 'binance';
   try {
     const result = await previewCsvFile(req.file.buffer, exchange);
-    res.json(result);
+    res.json({
+      ...result,
+      exchange,
+      deteccion: { ...deteccion, reconocido: deteccion.exchange !== null, esperadas: CABECERAS_ESPERADAS },
+    });
   } catch (err) {
     res.status(422).json({ error: (err as Error).message });
   }

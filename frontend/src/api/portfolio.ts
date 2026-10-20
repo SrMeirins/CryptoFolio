@@ -203,6 +203,8 @@ export interface ImportRecord {
   id: string
   filename: string
   imported_at: string
+  /** Exchange del archivo (binance o bitvavo). */
+  exchange?: string | null
   row_count: number
   skipped_count: number
   transaction_count: string

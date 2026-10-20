@@ -6,11 +6,14 @@ import { TransactionsTable } from './TransactionsTable'
 import type { PreviewResult, DepositReview, WizardResult } from './types'
 import { cardClasses, buttonClasses } from '../../components/ui'
 import { nadaQueImportar, newTransactions, newWithdrawals, txKey } from './reviewSelection'
+import { EXCHANGE_LABEL, textoPendiente } from './wizard'
+import { ExchangeBadge } from './UploadZone'
 
 export function PreviewStage({
   preview, showTxTable, setShowTxTable, txPage, setTxPage, txPageSize,
   resolvedOps, withdrawalDestinations, depositCosts,
   onWithdrawalDestination, onDepositCost, onIgnoreOp, onCatalog, onConfirm, error, onReset, onVerHistorial,
+  exchange, onCambiarExchange, cambiando,
 }: {
   preview: PreviewResult
   showTxTable: boolean
@@ -30,6 +33,10 @@ export function PreviewStage({
   error: string | null
   onReset: () => void
   onVerHistorial: () => void
+  exchange: 'binance' | 'bitvavo'
+  /** Vuelve a leer el archivo con otro exchange (#318). */
+  onCambiarExchange: (ex: 'binance' | 'bitvavo') => void
+  cambiando: boolean
 }) {
   const hasUnresolved = preview.validation.unknownOperations.some(op => !resolvedOps[op] || resolvedOps[op].operationTypeId === '')
 
@@ -46,6 +53,50 @@ export function PreviewStage({
   const hasAnythingToDo = preview.newCount > 0 || depositsForPanel.length > 0
   const isBlocked = hasUnresolved || hasUnassignedWithdrawals || !allDepositsReviewedInPanel || !hasAnythingToDo
   const newTxs    = newTransactions(preview)
+  const otro = exchange === 'binance' ? 'bitvavo' : 'binance'
+  const deteccion = preview.deteccion
+  const chip = (
+    <div className="flex items-center gap-2 flex-wrap text-xs">
+      <span className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-fg-muted">
+        <ExchangeBadge exchange={exchange} size={16} />
+        {deteccion?.reconocido === false ? 'Leído como' : 'Detectado:'} <span className="text-fg font-medium">{EXCHANGE_LABEL[exchange]}</span>
+        {preview.validation.detectedLanguage !== 'unknown' && <> · {LANG_LABELS[preview.validation.detectedLanguage]?.toLowerCase() ?? preview.validation.detectedLanguage}</>}
+      </span>
+      <button type="button" onClick={() => onCambiarExchange(otro)} disabled={cambiando}
+        className="text-brand hover:underline disabled:opacity-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 rounded">
+        Cambiar a {EXCHANGE_LABEL[otro]}
+      </button>
+    </div>
+  )
+  const faltan = textoPendiente({
+    retiros: withdrawalTxKeys.filter(k => !withdrawalDestinations[k]).length,
+    depositos: depositsForPanel.filter(d => !(d.txKey in depositCosts)).length,
+    operaciones: preview.validation.unknownOperations.filter(op => !resolvedOps[op] || resolvedOps[op].operationTypeId === '').length,
+  })
+
+  // Archivo no reconocido: se explica qué cabeceras se esperaban y se ofrece elegir (#318).
+  if (deteccion && !deteccion.reconocido) {
+    return (
+      <div className={cardClasses('md', 'space-y-4')} role="alert">
+        <div className="flex items-start gap-3">
+          <AlertTriangle size={18} className="text-warning shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="space-y-1">
+            <h2 className="font-semibold text-fg">No reconocemos el formato de este archivo</h2>
+            <p className="text-sm text-fg-muted">Revisa que sea la exportación del historial de transacciones. Las cabeceras esperadas son:</p>
+            <ul className="text-xs text-fg-muted space-y-1 mt-2">
+              <li><span className="font-medium text-fg">Binance:</span> {deteccion.esperadas.binance}</li>
+              <li><span className="font-medium text-fg">Bitvavo:</span> {deteccion.esperadas.bitvavo}</li>
+            </ul>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button type="button" onClick={() => onCambiarExchange('binance')} disabled={cambiando} className={buttonClasses('secondary', 'sm')}>Leer como Binance</button>
+          <button type="button" onClick={() => onCambiarExchange('bitvavo')} disabled={cambiando} className={buttonClasses('secondary', 'sm')}>Leer como Bitvavo</button>
+          <button type="button" onClick={onReset} className={buttonClasses('ghost', 'sm')}>Subir otro archivo</button>
+        </div>
+      </div>
+    )
+  }
 
   if (nadaQueImportar(preview)) {
     const range = preview.validation.dateRange
@@ -53,6 +104,7 @@ export function PreviewStage({
       <div className={cardClasses('md', 'text-center space-y-4 py-10')} role="status">
         <CheckCircle2 size={36} className="mx-auto text-positive" aria-hidden="true" />
         <div className="space-y-1">
+          <div className="flex justify-center mb-2">{chip}</div>
           <h2 className="text-lg font-semibold text-fg">Ya está todo importado</h2>
           <p className="text-sm text-fg-muted">
             Las {preview.duplicateCount} transacciones de este archivo{range ? ` (${range.from} – ${range.to})` : ''} ya estaban en tu historial. No hay nada nuevo que importar.
@@ -74,7 +126,10 @@ export function PreviewStage({
         </p>
       )}
       <div className={cardClasses('md', 'space-y-4')}>
-        <h2 className="font-medium text-sm">Resumen del archivo</h2>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="font-medium text-sm">Resumen del archivo</h2>
+          {chip}
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-background-tertiary rounded-lg p-3 text-center">
             <div className="text-2xl font-bold mono text-positive">{preview.newCount}</div>
@@ -148,28 +203,18 @@ export function PreviewStage({
         />
       )}
 
-      <div className="flex items-center justify-between pt-2">
-        <div className="text-xs text-fg-subtle">
-          {hasUnresolved
-            ? '⚠ Resuelve todas las operaciones desconocidas antes de confirmar'
-            : hasUnassignedWithdrawals
-            ? '⚠ Asigna el destino de todos los retiros antes de confirmar'
-            : !allDepositsReviewedInPanel
-            ? '⚠ Asigna el coste de adquisición de todos los depósitos externos'
-            : !hasAnythingToDo
-            ? 'No hay transacciones nuevas ni depósitos que actualizar'
-            : preview.newCount === 0
-            ? 'Se actualizarán los costes de los depósitos y se recalculará el FIFO'
-            : `Se importarán ${preview.newCount} transacciones y se recalculará el FIFO automáticamente`
-          }
-        </div>
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={isBlocked}
-          className={buttonClasses('primary', 'lg', 'flex')}
-        >
-          <Play size={14} />
+      {/* Barra fija con lo que falta y la acción (#318) */}
+      <div className="sticky bottom-0 z-20 -mx-1 px-4 py-3 rounded-xl border border-border bg-background-card/95 backdrop-blur flex items-center justify-between gap-3 flex-wrap shadow-[0_-8px_24px_-16px_rgb(0_0_0/0.5)]">
+        <p className={`text-xs ${faltan ? 'text-warning' : 'text-fg-subtle'}`} aria-live="polite">
+          {faltan
+            ?? (!hasAnythingToDo
+              ? 'No hay transacciones nuevas ni depósitos que actualizar'
+              : preview.newCount === 0
+                ? 'Se actualizarán los costes de los depósitos y se recalculará el FIFO'
+                : `Se importarán ${preview.newCount} transacciones y se recalculará el FIFO`)}
+        </p>
+        <button type="button" onClick={onConfirm} disabled={isBlocked} className={buttonClasses('primary', 'md', 'flex')}>
+          <Play size={14} aria-hidden="true" />
           {preview.newCount === 0 && depositsForPanel.length > 0 ? 'Guardar costes y recalcular FIFO' : 'Confirmar e importar'}
         </button>
       </div>
