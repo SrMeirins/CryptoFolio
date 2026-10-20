@@ -3,7 +3,7 @@ import { WithdrawalDestinations } from './WithdrawalDestinations'
 import { LANG_LABELS } from './types'
 import { UnknownOperationsCard } from './UnknownOperationsCard'
 import { TransactionsTable } from './TransactionsTable'
-import type { PreviewResult, DepositReview, WizardResult } from './types'
+import type { PreviewResult, DepositReview, ResultadoExistentes, WizardResult } from './types'
 import { cardClasses, buttonClasses } from '../../components/ui'
 import { loteIlegible, nadaQueImportar, newTransactions, newWithdrawals, txKey } from './reviewSelection'
 import { EXCHANGE_LABEL, textoPendiente } from './wizard'
@@ -11,12 +11,13 @@ import { ExchangeBadge } from './ExchangeBadge'
 import { RetiradasCard } from './RetiradasCard'
 import { LoteCard } from './LoteCard'
 import { EncajeCard } from './EncajeCard'
+import { RetirosExistentes } from './RetirosExistentes'
 
 export function PreviewStage({
   preview, showTxTable, setShowTxTable, txPage, setTxPage, txPageSize,
   resolvedOps, withdrawalDestinations, depositCosts,
   onWithdrawalDestination, onDepositCost, onIgnoreOp, onCatalog, onConfirm, error, onReset, onVerHistorial,
-  exchange, onCambiarExchange, onLeerComo, onQuitarArchivo, cambiando, retiradasNombre, onRetiradas,
+  exchange, onCambiarExchange, onLeerComo, onQuitarArchivo, cambiando, retiradasNombre, onRetiradas, onGuardarExistentes,
 }: {
   preview: PreviewResult
   showTxTable: boolean
@@ -46,6 +47,8 @@ export function PreviewStage({
   /** Historial de retiradas de Binance aportado (#320). */
   retiradasNombre: string | null
   onRetiradas: (file: File | null) => void
+  /** Retiros ya importados (#330): guarda direcciones y destinos cambiados. */
+  onGuardarExistentes: (reasignaciones: Record<string, string>) => Promise<ResultadoExistentes>
 }) {
   const hasUnresolved = preview.validation.unknownOperations.some(op => !resolvedOps[op] || resolvedOps[op].operationTypeId === '')
 
@@ -128,6 +131,34 @@ export function PreviewStage({
           </div>
         </div>
         {loteCard}
+      </div>
+    )
+  }
+
+  const existentes = preview.existentes ?? []
+  const existentesCard = existentes.length > 0 && <RetirosExistentes existentes={existentes} onGuardar={onGuardarExistentes} />
+
+  // Nada nuevo, pero hay retiros ya importados que completar (#330): esa es la revisión.
+  if (nadaQueImportar(preview) && existentes.length > 0) {
+    return (
+      <div className="space-y-4">
+        {archivos.length > 0 && (
+          <p className="text-xs text-fg-muted" role="status">No hay transacciones nuevas que importar; sí puedes completar retiros que ya estaban importados.</p>
+        )}
+        {existentesCard}
+        {loteCard}
+      </div>
+    )
+  }
+
+  // Solo historiales de retiradas y ningún retiro que completar.
+  if (archivos.length === 0) {
+    return (
+      <div className={cardClasses('md', 'text-center space-y-3 py-10')} role="status">
+        <CheckCircle2 size={32} className="mx-auto text-positive" aria-hidden="true" />
+        <h2 className="text-lg font-semibold text-fg">No hay retiros que completar</h2>
+        <p className="text-sm text-fg-muted">Los retiros de Binance ya importados no coinciden con este historial de retiradas o ya tienen su dirección.</p>
+        <button type="button" onClick={onReset} className={buttonClasses('secondary', 'sm', 'mx-auto flex gap-1.5')}><Upload size={13} aria-hidden="true" /> Subir otro archivo</button>
       </div>
     )
   }
@@ -232,6 +263,8 @@ export function PreviewStage({
       {preview.encaje && <EncajeCard cobertura={preview.encaje.cobertura} cambios={preview.encaje.cambios} />}
 
       {loteCard}
+
+      {existentesCard}
 
       {hayBinance && withdrawals.length > 0 && (
         <RetiradasCard resumen={preview.retiradas} nombre={retiradasNombre} cargando={cambiando}

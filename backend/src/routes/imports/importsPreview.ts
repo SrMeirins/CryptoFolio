@@ -4,6 +4,7 @@ import { CABECERAS_ESPERADAS, detectarExchange, Exchange } from '../../modules/c
 import { combinarVistasPrevias, type VistaArchivo } from '../../modules/csv/lote';
 import { compararCobertura } from '../../modules/csv/cobertura';
 import { coberturaActual } from '../../modules/csv/coberturaDb';
+import { retirosExistentes } from '../../modules/csv/retiradas/existentes';
 import { archivosDe, exchangesForzados, retiradasDe, uploadCsv } from './importsValidation';
 
 const router = Router();
@@ -16,7 +17,8 @@ const router = Router();
 // Los mensajes reenviados al cliente son deliberadamente seguros y legibles.
 router.post('/preview', uploadCsv, async (req: Request, res: Response) => {
   const archivos = archivosDe(req);
-  if (archivos.length === 0) { res.status(400).json({ error: 'No se recibió ningún archivo' }); return; }
+  // Solo historiales de retiradas también vale (#330): completan los retiros ya importados.
+  if (archivos.length === 0 && retiradasDe(req).length === 0) { res.status(400).json({ error: 'No se recibió ningún archivo' }); return; }
   let forzados: (Exchange | null)[];
   try { forzados = exchangesForzados(req.body, archivos.length); } catch (e) { res.status(400).json({ error: (e as Error).message }); return; }
 
@@ -44,10 +46,13 @@ router.post('/preview', uploadCsv, async (req: Request, res: Response) => {
     const exchangesLote = new Set(nuevos.map(n => n.exchange));
     const cobertura = despues.filter(c => exchangesLote.has(c.exchange));
     const encaje = { cobertura, cambios: cobertura.flatMap(c => compararCobertura(antes.get(c.exchange) ?? null, c)) };
+    // Retiros ya importados que se pueden completar con estos archivos (#330).
+    const existentes = await retirosExistentes(vistas.map((v, i) => ({ exchange: v.exchange, buffer: archivos[i].buffer })), retiradas);
     res.json({
       ...lote,
       encaje,
-      exchange: primera.exchange,
+      existentes,
+      exchange: primera?.exchange ?? 'binance',
       // Con un solo archivo se mantiene la detección de siempre (pantalla de formato no reconocido).
       ...(vistas.length === 1 ? { deteccion: { ...primera.deteccion, esperadas: CABECERAS_ESPERADAS } } : {}),
     });

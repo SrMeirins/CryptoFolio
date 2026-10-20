@@ -47,8 +47,10 @@ export function ArchivosSeleccion({ seleccion, loading, onQuitar, onAnadir, onAn
         <button type="button" onClick={onAnadir} disabled={loading} className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
           <Plus size={13} aria-hidden="true" /> Añadir más
         </button>
-        <button type="button" onClick={onAnalizar} disabled={loading || tx === 0} className={buttonClasses('primary', 'sm', 'flex gap-1.5')}>
-          <Play size={13} aria-hidden="true" /> {loading ? 'Analizando…' : tx === 0 ? 'Falta un historial de transacciones' : `Analizar ${tx === 1 ? 'el archivo' : `${tx} archivos`}`}
+        <button type="button" onClick={onAnalizar} disabled={loading || seleccion.length === 0} className={buttonClasses('primary', 'sm', 'flex gap-1.5')}>
+          <Play size={13} aria-hidden="true" /> {loading ? 'Analizando…'
+            : tx === 0 ? 'Completar retiros ya importados'
+              : `Analizar ${tx === 1 ? 'el archivo' : `${tx} archivos`}`}
         </button>
       </div>
     </section>

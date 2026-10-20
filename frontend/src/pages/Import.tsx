@@ -10,7 +10,7 @@ import { ProgressStage } from './import/ProgressStage'
 import { ImportsList } from './import/ImportsList'
 import { PendingDepositsPanel } from './import/PendingDepositsPanel'
 import { AdvancedSection } from './import/AdvancedSection'
-import type { PreviewResult, ProgressEvent, WizardResult } from './import/types'
+import type { PreviewResult, ProgressEvent, ResultadoExistentes, WizardResult } from './import/types'
 import { invalidateTransactionQueries } from '../utils/queryInvalidation'
 import { portfolioApi } from '../api/portfolio'
 import { waitForImportCommit, readProgressStream } from './import/importStream'
@@ -69,7 +69,8 @@ export function ImportPage() {
   // Analiza la selección (uno o varios archivos, #326). Sin exchange forzado, el backend lo detecta.
   async function analizar(sel: ArchivoSel[]) {
     const tx = sel.filter(s => s.tipo === 'transacciones')
-    if (tx.length === 0) { setSeleccion(sel); setError('Añade al menos un historial de transacciones'); return }
+    // Solo historiales de retiradas también vale: completan los retiros ya importados (#330).
+    if (sel.length === 0) { setSeleccion(sel); setError('Añade al menos un archivo'); return }
     setError(null)
     setLoading(true)
     setSeleccion(sel)
@@ -116,7 +117,9 @@ export function ImportPage() {
     const nuevos = await Promise.all(files.map(clasificarArchivo))
     const { seleccion: sig, error: err } = anadirASeleccion(seleccion, nuevos)
     if (err) { setError(err); return }
-    if (seleccion.length === 0 && nuevos.filter(n => n.tipo === 'transacciones').length === 1) { await analizar(sig); return }
+    const soloUnoDeTx = nuevos.filter(n => n.tipo === 'transacciones').length === 1
+    const soloRetiradas = nuevos.every(n => n.tipo === 'retiradas')
+    if (seleccion.length === 0 && (soloUnoDeTx || soloRetiradas)) { await analizar(sig); return }
     setSeleccion(sig)
   }
 
@@ -147,6 +150,20 @@ export function ImportPage() {
       if (err) { setError(err); return }
       void analizar(sig)
     })
+  }
+
+  // Retiros ya importados (#330): guarda direcciones y los destinos cambiados, con los mismos archivos.
+  async function guardarExistentes(reasignaciones: Record<string, string>): Promise<ResultadoExistentes> {
+    const form = new FormData()
+    transacciones.forEach(f => form.append('files', f.file))
+    retiradasSel.forEach(f => form.append('withdrawals', f.file))
+    if (transacciones.length > 0) form.append('exchanges', JSON.stringify((preview?.archivos ?? []).map(a => a.exchange)))
+    form.append('reasignaciones', JSON.stringify(reasignaciones))
+    const res = await fetch('/api/imports/retiros-existentes', { method: 'POST', body: form })
+    const body = await res.json() as ResultadoExistentes & { error?: string }
+    if (!res.ok) throw new Error(body.error || 'No se pudieron guardar los retiros')
+    invalidateTransactionQueries(queryClient, { includeImports: true })
+    return body
   }
 
   function finishImportSuccess() {
@@ -328,6 +345,7 @@ export function ImportPage() {
           cambiando={loading}
           retiradasNombre={retiradasSel.length === 0 ? null : retiradasSel.length === 1 ? retiradasSel[0].file.name : `${retiradasSel.length} historiales`}
           onRetiradas={cambiarRetiradas}
+          onGuardarExistentes={guardarExistentes}
         />
       )}
 

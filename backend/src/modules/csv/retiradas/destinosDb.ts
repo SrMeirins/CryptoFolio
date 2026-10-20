@@ -6,7 +6,7 @@ import { resolverDestinos, type DestinoRetiro, type Red, type ResumenRetiradas }
 
 // Carga las redes de la BD y resuelve el destino on-chain de los retiros (#320).
 
-async function cargarRedes(): Promise<Red[]> {
+export async function cargarRedes(): Promise<Red[]> {
   const res = await db.query(
     `SELECT n.id, n.name, n.native_asset,
             COALESCE(array_agg(na.asset) FILTER (WHERE na.asset IS NOT NULL), '{}') AS tokens
