@@ -37,6 +37,15 @@ describe('POST /api/imports/preview (#316)', () => {
     expect(despues.validation.info.some((m: string) => m.includes('operaciones de rendimiento'))).toBe(false);
   });
 
+  it('detecta el exchange si no se indica (#318)', async () => {
+    const r = (await request(app).post('/api/imports/preview').attach('file', csv(ROWS), 'c.csv')).body;
+    expect(r.exchange).toBe('binance');
+    expect(r.deteccion).toMatchObject({ exchange: 'binance', idioma: 'en', reconocido: true });
+    const raro = (await request(app).post('/api/imports/preview').attach('file', Buffer.from('col1,col2\n1,2'), 'd.csv')).body;
+    expect(raro.deteccion.reconocido).toBe(false);
+    expect(raro.deteccion.esperadas.bitvavo).toMatch(/Timezone/);
+  });
+
   it('errores de subida claros también en la vista previa', async () => {
     expect((await request(app).post('/api/imports/preview').attach('file', Buffer.from('hola'), 'a.txt')).status).toBe(400);
     expect((await request(app).post('/api/imports/preview').attach('file', Buffer.from([0x50, 0x4b, 0x03, 0x04]), 'z.csv')).status).toBe(400);

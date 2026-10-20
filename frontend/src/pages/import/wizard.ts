@@ -1,0 +1,63 @@
+import type { ImportRecord } from '../../api/portfolio'
+
+// Asistente de importación (#318): pasos, firma del archivo para conservar el
+// trabajo al volver, última importación por exchange y texto de lo que falta.
+// Funciones puras.
+
+export type Stage = 'upload' | 'preview' | 'catalog' | 'progress' | 'done'
+export type Paso = 'subir' | 'revisar' | 'importar' | 'listo'
+
+export const PASOS: { id: Paso; label: string }[] = [
+  { id: 'subir', label: 'Subir' },
+  { id: 'revisar', label: 'Revisar' },
+  { id: 'importar', label: 'Importar' },
+  { id: 'listo', label: 'Listo' },
+]
+
+export function pasoDeStage(stage: Stage): Paso {
+  return stage === 'upload' ? 'subir' : stage === 'preview' || stage === 'catalog' ? 'revisar' : stage === 'progress' ? 'importar' : 'listo'
+}
+
+/** Se puede volver a un paso anterior mientras no se esté importando (y desde Listo, solo a Subir). */
+export function puedeIrA(destino: Paso, actual: Paso): boolean {
+  const i = PASOS.findIndex(p => p.id === destino), j = PASOS.findIndex(p => p.id === actual)
+  if (i >= j || actual === 'importar') return false
+  return actual === 'listo' ? destino === 'subir' : true
+}
+
+/** Identifica un archivo para saber si se vuelve a subir el mismo. */
+export function firmaArchivo(f: { name: string; size: number; lastModified: number }): string {
+  return `${f.name}|${f.size}|${f.lastModified}`
+}
+
+export const EXCHANGE_LABEL: Record<string, string> = { binance: 'Binance', bitvavo: 'Bitvavo' }
+
+export interface UltimaImportacion { exchange: string; hasta: string; haceDias: number }
+
+/** Hasta qué fecha llega lo importado de cada exchange, para saber desde cuándo exportar. */
+export function ultimasPorExchange(imports: readonly ImportRecord[], now: Date = new Date()): UltimaImportacion[] {
+  const max = new Map<string, string>()
+  for (const i of imports) {
+    if (!i.date_to) continue
+    const ex = i.exchange || 'binance'
+    if (!max.has(ex) || i.date_to > max.get(ex)!) max.set(ex, i.date_to)
+  }
+  return [...max].map(([exchange, hasta]) => ({
+    exchange, hasta, haceDias: Math.max(0, Math.floor((now.getTime() - Date.parse(hasta)) / 86_400_000)),
+  })).sort((a, b) => (EXCHANGE_LABEL[a.exchange] ?? a.exchange).localeCompare(EXCHANGE_LABEL[b.exchange] ?? b.exchange))
+}
+
+const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
+
+/** «Faltan 3 retiros por asignar y 1 depósito por valorar»; null si no falta nada. */
+export function textoPendiente(p: { retiros: number; depositos: number; operaciones: number }): string | null {
+  const partes = [
+    p.retiros > 0 && `${plural(p.retiros, 'retiro', 'retiros')} por asignar`,
+    p.depositos > 0 && `${plural(p.depositos, 'depósito', 'depósitos')} por valorar`,
+    p.operaciones > 0 && `${plural(p.operaciones, 'operación desconocida', 'operaciones desconocidas')} por catalogar`,
+  ].filter(Boolean) as string[]
+  if (partes.length === 0) return null
+  const total = p.retiros + p.depositos + p.operaciones
+  const lista = partes.length === 1 ? partes[0] : `${partes.slice(0, -1).join(', ')} y ${partes.at(-1)}`
+  return `${total === 1 ? 'Falta' : 'Faltan'} ${lista}`
+}
