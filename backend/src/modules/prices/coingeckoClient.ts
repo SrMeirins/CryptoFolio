@@ -11,12 +11,14 @@ const API_KEY = process.env.COINGECKO_API_KEY || '';
 const API_KEY_HEADER = BASE_URL.includes('pro-api.coingecko.com') ? 'x-cg-pro-api-key' : 'x-cg-demo-api-key';
 
 // Callback opcional para surfacear eventos de precios (rate limiting, etc.) al caller.
-let _statusCallback: ((msg: string) => void) | undefined;
-export function setCoinGeckoStatusCallback(cb: ((msg: string) => void) | undefined): void {
+// `info.esperaSeg` (#324): duración de una espera por rate limit, para la cuenta atrás del cliente.
+export interface InfoEstado { esperaSeg?: number }
+let _statusCallback: ((msg: string, info?: InfoEstado) => void) | undefined;
+export function setCoinGeckoStatusCallback(cb: ((msg: string, info?: InfoEstado) => void) | undefined): void {
   _statusCallback = cb;
 }
-export function notifyStatus(msg: string): void {
-  _statusCallback?.(msg);
+export function notifyStatus(msg: string, info?: InfoEstado): void {
+  _statusCallback?.(msg, info);
 }
 
 // ── Rate limiter simple ────────────────────────────────────────────────────
@@ -105,7 +107,7 @@ export async function fetchWithRetry(url: string, retries = 2): Promise<unknown>
         const waitSec = Math.round(waitMs / 1000);
         rateLimitedUntil = Date.now() + waitMs;
         console.warn(`[PRICES] Rate limit (429), esperando ${waitSec}s...`);
-        notifyStatus(`⏳ Rate limit CoinGecko 429 — esperando ${waitSec}s (intento ${attempt}/${retries})...`);
+        notifyStatus(`⏳ Rate limit CoinGecko 429 — esperando ${waitSec}s (intento ${attempt}/${retries})...`, { esperaSeg: waitSec });
         await sleep(waitMs);
         continue;
       }

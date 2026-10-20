@@ -40,8 +40,12 @@ function Block({ i, children }: { i: number; children: ReactNode }) {
 }
 
 export function Fiscal() {
-  const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
+  // ?anio=2025 llega desde el resultado de una importación (#324).
+  const [selectedYear, setSelectedYear] = useState<number | null>(() => {
+    const a = parseInt(searchParams.get('anio') ?? '', 10)
+    return a >= 2009 && a <= 2100 ? a : null
+  })
   const vista = parseVista(searchParams.get('vista'))
   const queryClient = useQueryClient()
   const tramos = useTramos()

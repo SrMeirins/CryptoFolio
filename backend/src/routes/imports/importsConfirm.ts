@@ -6,6 +6,9 @@ import {
   fetchMissingHistoricalPrices, runFifoPhase, ProgressEmitter,
 } from '../../modules/csv/confirmImport';
 import { hasBinaryMagic, uploadCsv, parseWithdrawalDestinations, parseDepositCosts, retiradasDe } from './importsValidation';
+import { cargarAniosFiscales } from '../../modules/fiscal/carryforward';
+import { madridYearMonth } from '../../modules/fiscal/madridTime';
+import { agruparAvisosFifo, impactoPorEjercicio } from '../../modules/csv/resumenImportacion';
 
 const router = Router();
 
@@ -30,8 +33,8 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
   // compresion/express pueden exponer flush() en la respuesta; se tipa una sola vez.
   const flushable = res as Response & { flush?: () => void };
 
-  const send: ProgressEmitter = (phase, message, progress, total) => {
-    const data = JSON.stringify({ phase, message, progress, total });
+  const send: ProgressEmitter = (phase, message, progress, total, extra) => {
+    const data = JSON.stringify({ phase, message, progress, total, ...extra });
     res.write(`data: ${data}\n\n`);
     flushable.flush?.();
   };
@@ -73,12 +76,12 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
     const { existingDepositUpdates, newDepositCosts } = splitDepositCosts(depositCostsRaw);
     await applyExistingDepositCostUpdates(existingDepositUpdates);
 
-    await importTransactionsPhase(
+    const importResult = await importTransactionsPhase(
       req.file.buffer, req.file.originalname, withdrawalDestinations, newDepositCosts, exchange, send, retiradasDe(req)
     );
 
     // FASE 2: Precios históricos
-    await fetchMissingHistoricalPrices(send);
+    const precios = await fetchMissingHistoricalPrices(send);
 
     // GATE: verificar que no haya depósitos externos sin coste antes de correr FIFO
     const gate1 = await checkPendingDepositGate();
@@ -92,10 +95,23 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
       return;
     }
 
-    // FASE 3: Motor FIFO
-    await runFifoPhase(send);
+    // FASE 3: Motor FIFO, con el G/P de cada ejercicio antes y después para el resumen (#324)
+    const anio = madridYearMonth().year;
+    const antes = await cargarAniosFiscales(anio);
+    const fifo = await runFifoPhase(send);
+    const despues = await cargarAniosFiscales(anio);
 
-    send('done', 'Proceso completado correctamente');
+    send('done', 'Proceso completado correctamente', undefined, undefined, {
+      resumen: {
+        importId: importResult.importId,
+        archivo: req.file.originalname,
+        nuevas: importResult.newTransactions,
+        duplicadas: importResult.duplicateRows,
+        precios,
+        avisos: agruparAvisosFifo(fifo.errors, fifo.warnings),
+        impacto: impactoPorEjercicio(antes, despues),
+      },
+    });
   } catch (err) {
     send('error', `Error: ${(err as Error).message}`);
   } finally {

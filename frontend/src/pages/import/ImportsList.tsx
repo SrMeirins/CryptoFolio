@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FileText, RefreshCw, Trash2, Calendar, Hash, ChevronRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import type { ImportRecord } from '../../api/portfolio'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { iconButtonClasses } from '../../components/ui'
@@ -92,6 +93,10 @@ export function ImportsList({ imports, onDelete }: {
                   </p>
                 </div>
               )}
+
+              <Link to={`/history?import=${encodeURIComponent(imp.id)}`} className="text-xs text-brand hover:underline shrink-0">
+                Ver transacciones
+              </Link>
 
               <button
                 type="button"

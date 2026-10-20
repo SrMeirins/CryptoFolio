@@ -79,12 +79,14 @@ router.get('/stats', async (req: Request, res: Response) => {
   });
 });
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // ── GET /api/transactions ──────────────────────────────────────────────────
 router.get('/', async (req: Request, res: Response) => {
   const currency = currencySchema.safeParse(req.query.currency);
   if (!currency.success) { res.status(400).json({ error: 'currency debe ser EUR o USD' }); return; }
   const {
-    asset, type, wallet_id, account, manually_added,
+    asset, type, wallet_id, account, manually_added, import_id,
     date_from, date_to, search,
     limit = '50', offset = '0',
   } = req.query;
@@ -93,6 +95,12 @@ router.get('/', async (req: Request, res: Response) => {
   const params: unknown[] = [];
   let paramIdx = 1;
 
+  // Transacciones de una importación concreta (#324), desde su resultado o la lista de importaciones.
+  if (import_id !== undefined) {
+    if (typeof import_id !== 'string' || !UUID_RE.test(import_id)) { res.status(400).json({ error: 'import_id debe ser un UUID válido' }); return; }
+    where += ` AND t.import_id = $${paramIdx++}`;
+    params.push(import_id);
+  }
   if (asset)          { where += ` AND t.asset = $${paramIdx++}`;           params.push((asset as string).toUpperCase()); }
   if (type)           { where += ` AND t.operation_type = $${paramIdx++}`;  params.push(type); }
   if (wallet_id)      { where += ` AND t.wallet_id = $${paramIdx++}`;       params.push(wallet_id); }

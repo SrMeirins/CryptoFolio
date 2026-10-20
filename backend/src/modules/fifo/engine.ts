@@ -15,7 +15,11 @@ export { getOpenLots } from './lotPrimitives';
 // transacción — no requiere unlock manual ni riesgo de dejarlo colgado.
 const FIFO_ENGINE_LOCK_KEY = `'cryptotracker:fifo_engine'`;
 
-export async function runFifoEngine(): Promise<FifoRunResult> {
+/**
+ * @param onProgress opcional (#324): operaciones procesadas sobre el total, para
+ *   mostrar el avance en la importación. No altera el cálculo.
+ */
+export async function runFifoEngine(onProgress?: (done: number, total: number) => void): Promise<FifoRunResult> {
   const result: FifoRunResult = {
     lotsCreated: 0,
     lotsConsumed: 0,
@@ -116,8 +120,11 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
     };
 
     const processedIds = new Set<string>();
+    // Unas 50 notificaciones como mucho, por grande que sea el historial.
+    const pasoAviso = Math.max(1, Math.floor(transactions.length / 50));
 
     for (let i = 0; i < transactions.length; i++) {
+      if (onProgress && i % pasoAviso === 0) onProgress(i, transactions.length);
       const tx = transactions[i];
       if (processedIds.has(tx.id)) continue;
 
@@ -161,6 +168,7 @@ export async function runFifoEngine(): Promise<FifoRunResult> {
         processedIds.add(tx.id);
       }
     }
+    onProgress?.(transactions.length, transactions.length);
 
     return result;
   });
