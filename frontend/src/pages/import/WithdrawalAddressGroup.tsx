@@ -13,8 +13,12 @@ import { fmtAmt, txKey } from './withdrawalDestinationsHelpers'
 const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })
 
 // Retiros a una misma dirección (#320): una sola decisión de destino para todos.
-export function WithdrawalAddressGroup({ id, grupo, red, destinations, coldWallets, reconocida, onAssign, onGuardar, selected, onToggle, resaltado }: {
+export function WithdrawalAddressGroup({ id, grupo, red, destinations, coldWallets, reconocida, onAssign, onGuardar, selected, onToggle, resaltado, seleccionable = true, nota }: {
   id: string
+  /** Sin casilla de selección (p. ej. retiros ya importados, #330). */
+  seleccionable?: boolean
+  /** Línea extra bajo la cabecera, p. ej. el destino actual. */
+  nota?: React.ReactNode
   grupo: GrupoDireccion
   selected: Set<string>
   onToggle: () => void
@@ -40,7 +44,7 @@ export function WithdrawalAddressGroup({ id, grupo, red, destinations, coldWalle
     <div id={id} tabIndex={-1} data-pendiente={asignados < grupo.txs.length || undefined}
       className={`rounded-xl border transition-shadow focus:outline-hidden ${resaltado ? 'ring-2 ring-brand/60' : ''} ${reconocida ? 'border-positive/30' : 'border-border'}`}>
       <div className="flex items-center gap-3 px-4 py-3 flex-wrap bg-background-tertiary/60 rounded-t-xl">
-        <Casilla estado={enSel === 0 ? false : enSel === grupo.txs.length ? true : 'mixed'} onChange={onToggle} label="Seleccionar los retiros a esta dirección" />
+        {seleccionable && <Casilla estado={enSel === 0 ? false : enSel === grupo.txs.length ? true : 'mixed'} onChange={onToggle} label="Seleccionar los retiros a esta dirección" />}
         <span className={`w-2 h-2 rounded-full shrink-0 ${asignados === grupo.txs.length ? 'bg-positive' : asignados > 0 ? 'bg-warning' : 'bg-fg-subtle/50'}`} aria-hidden="true" />
         <div className="min-w-0 flex-1 space-y-0.5">
           <div className="flex items-center gap-2 flex-wrap">
@@ -53,6 +57,7 @@ export function WithdrawalAddressGroup({ id, grupo, red, destinations, coldWalle
             {grupo.txs.length} retiro{grupo.txs.length !== 1 ? 's' : ''} · {activos.join(', ')} · desde {fecha(grupo.txs[0].timestamp)}
             {dests.length > 1 && <span className="text-warning"> · destinos distintos</span>}
           </p>
+          {nota}
         </div>
         <WithdrawalSelector value={valor} coldWallets={coldWallets} onChange={onAssign} label="Destino de los retiros a esta dirección"
           placeholder={dests.length > 1 ? 'Varios destinos' : undefined} />

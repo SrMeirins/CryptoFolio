@@ -3,6 +3,7 @@ import importsPreviewRouter from './importsPreview';
 import importsConfirmRouter from './importsConfirm';
 import importsCrudRouter from './importsCrud';
 import importsCoberturaRouter from './importsCobertura';
+import importsRetirosExistentesRouter from './importsRetirosExistentes';
 
 // Orquestador puro: monta los 3 sub-routers en /api/imports sin cambiar
 // ninguna ruta externa. Fragmentado desde un único fichero de 470 líneas
@@ -15,6 +16,7 @@ router.use('/', importsPreviewRouter);
 router.use('/', importsConfirmRouter);
 // Antes que el CRUD: /cobertura/revisiones/:id no debe caer en DELETE /:id (#328).
 router.use('/', importsCoberturaRouter);
+router.use('/', importsRetirosExistentesRouter);
 router.use('/', importsCrudRouter);
 
 export default router;

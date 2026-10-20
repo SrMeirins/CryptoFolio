@@ -84,7 +84,9 @@ export interface PreviewResult {
   exchange?: 'binance' | 'bitvavo'
   deteccion?: { exchange: 'binance' | 'bitvavo' | null; idioma: string; reconocido: boolean; esperadas: Record<'binance' | 'bitvavo', string> }
   /** Historial de retiradas de Binance aportado (#320). */
-  retiradas?: { filas: number; emparejadas: number; retiros: number } | null  /** Encaje del lote en la cobertura de cada exchange (#328). */
+  retiradas?: { filas: number; emparejadas: number; retiros: number } | null  /** Retiros ya importados sin dirección que estos archivos pueden completar (#330). */
+  existentes?: RetiroExistente[]
+  /** Encaje del lote en la cobertura de cada exchange (#328). */
   encaje?: { cobertura: CoberturaExchange[]; cambios: CambioEncaje[] }
   /** Archivos del lote y filas repetidas entre ellos (#326). */
   archivos?: ArchivoLote[]
@@ -137,3 +139,18 @@ export { type WizardResult }
 
 // Cobertura temporal por exchange (#328): tipos de la API.
 export type { TramoCobertura, HuecoCobertura, CoberturaExchange, TipoEncaje, CambioEncaje } from '../../api/portfolio'
+
+/** Retiro ya importado que se puede completar con dirección y reasignar (#330). */
+export interface RetiroExistente {
+  id: string
+  exchange: 'binance' | 'bitvavo'
+  timestamp: string
+  asset: string
+  amount: number
+  account: string
+  /** Wallet propia (id), '__external__', '__gift__', '__lost__' o '' si está pendiente. */
+  destinoActual: string
+  destino: DestinoRetiro
+}
+
+export interface ResultadoExistentes { direcciones: number; destinos: number; fifo: boolean }
