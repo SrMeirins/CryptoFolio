@@ -8,6 +8,7 @@ import { requestLivePriceResync } from '../prices/liveFeed';
 import { getOrDetectPairInfo } from '../prices/pairDetector';
 import { enrichIncomeTransactionsWithPrices } from './importerEnrichment';
 import { buildTransferDestinationMap, resolveWalletId, resolveDestinationWalletId } from './importerTransferDestinations';
+import { destinosDeRetiros } from './retiradas/destinosDb';
 
 export { previewCsvFile } from './importerPreview';
 export type { UnknownOperationSample, DepositReview, PreviewResult } from './importerPreview';
@@ -31,6 +32,7 @@ export async function importCsvFile(
   onProgress?: (done: number, total: number, asset?: string, operation?: string) => void,
   onStatus?: (message: string, progress?: number, total?: number) => void,
   exchange: Exchange = 'binance',
+  retiradasBuffer?: Buffer,
 ): Promise<ImportResult> {
   const validation = validateExchangeCsv(exchange, fileBuffer);
   if (!validation.valid) {
@@ -70,6 +72,9 @@ export async function importCsvFile(
   // es el único exchange con TRANSFER_INTERNAL (Bitvavo es cuenta única,
   // sin sub-wallets; su rawRows queda vacío y el mapa resultante también).
   const transferDestByHash = buildTransferDestinationMap(parseResult.rawRows);
+
+  // Dirección, red y hash on-chain de los retiros (#320), para guardarlos con cada transacción.
+  const { destinos } = await destinosDeRetiros(exchange, parseResult, retiradasBuffer);
 
   onStatus?.('Iniciando transacción en base de datos...');
   const result = await db.transaction(async (client) => {
@@ -134,6 +139,8 @@ export async function importCsvFile(
     // Registros existentes que deben actualizarse porque su clasificación cambió
     // (p.ej. WITHDRAW con destination_pending que ahora el parser clasifica como LOST)
     const upgradeRows: { transactionId: string; newOpType: string }[] = [];
+    // Retiros ya importados sin dirección que ahora la traen (p. ej. al añadir el historial de retiradas).
+    const destinoRows: { transactionId: string; key: string }[] = [];
 
     for (const tx of parseResult.transactions) {
       processed++;
@@ -143,6 +150,7 @@ export async function importCsvFile(
         const existingHash = tx.rawRowHashes.find(h => existingHashSet.has(h));
         if (existingHash) {
           const meta = existingHashMeta.get(existingHash);
+          if (meta && destinos.has(existingHash)) destinoRows.push({ transactionId: meta.transaction_id, key: existingHash });
           if (
             meta &&
             meta.destination_pending &&
@@ -211,6 +219,7 @@ export async function importCsvFile(
           const finalCostAmount = depositPriceOverride
             ? tx.amount * depositPriceOverride
             : (tx.costAmount ?? null);
+          const destino = destinos.get(tx.rawRowHashes[0]);
           const b = params.length;
           params.push(
             id, importId, effectiveOpType, tx.timestamp,
@@ -219,16 +228,18 @@ export async function importCsvFile(
             tx.feeAsset ?? null, tx.feeAmount ?? null,
             walletId, tx.account, tx.notes ?? null,
             destinationWalletId, destPending,
+            destino?.address ?? null, destino?.networkId ?? null, destino?.txHash ?? null,
           );
           valueClauses.push(
-            `($${b+1},$${b+2},$${b+3}::operation_type,$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},$${b+15},false,$${b+16},$${b+17},NULL)`
+            `($${b+1},$${b+2},$${b+3}::operation_type,$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},$${b+15},false,$${b+16},$${b+17},NULL,$${b+18},$${b+19},$${b+20})`
           );
         }
         await client.query(
           `INSERT INTO transactions
            (id,import_id,operation_type,timestamp,asset,amount,amount_net,
             cost_asset,cost_amount,price_per_unit,fee_asset,fee_amount,
-            wallet_id,account,notes,manually_added,destination_wallet_id,destination_pending,linked_tx_id)
+            wallet_id,account,notes,manually_added,destination_wallet_id,destination_pending,linked_tx_id,
+            counterparty_address,counterparty_network_id,tx_hash)
            VALUES ${valueClauses.join(',')}`,
           params
         );
@@ -289,6 +300,20 @@ export async function importCsvFile(
           [newOpType, transactionId]
         );
       }
+    }
+
+    // Completa la dirección de retiros ya importados sin ella (#320); nunca pisa una existente.
+    for (const { transactionId, key } of destinoRows) {
+      const d = destinos.get(key);
+      if (!d) continue;
+      await client.query(
+        `UPDATE transactions
+         SET counterparty_address = COALESCE(counterparty_address, $1),
+             counterparty_network_id = COALESCE(counterparty_network_id, $2),
+             tx_hash = COALESCE(tx_hash, $3)
+         WHERE id = $4`,
+        [d.address, d.networkId, d.txHash, transactionId]
+      );
     }
 
     // ── Paso C: batch INSERT de raw_transactions para todas ──────────────────

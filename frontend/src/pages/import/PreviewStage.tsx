@@ -8,12 +8,13 @@ import { cardClasses, buttonClasses } from '../../components/ui'
 import { nadaQueImportar, newTransactions, newWithdrawals, txKey } from './reviewSelection'
 import { EXCHANGE_LABEL, textoPendiente } from './wizard'
 import { ExchangeBadge } from './UploadZone'
+import { RetiradasCard } from './RetiradasCard'
 
 export function PreviewStage({
   preview, showTxTable, setShowTxTable, txPage, setTxPage, txPageSize,
   resolvedOps, withdrawalDestinations, depositCosts,
   onWithdrawalDestination, onDepositCost, onIgnoreOp, onCatalog, onConfirm, error, onReset, onVerHistorial,
-  exchange, onCambiarExchange, cambiando,
+  exchange, onCambiarExchange, cambiando, retiradasNombre, onRetiradas,
 }: {
   preview: PreviewResult
   showTxTable: boolean
@@ -37,6 +38,9 @@ export function PreviewStage({
   /** Vuelve a leer el archivo con otro exchange (#318). */
   onCambiarExchange: (ex: 'binance' | 'bitvavo') => void
   cambiando: boolean
+  /** Historial de retiradas de Binance aportado (#320). */
+  retiradasNombre: string | null
+  onRetiradas: (file: File | null) => void
 }) {
   const hasUnresolved = preview.validation.unknownOperations.some(op => !resolvedOps[op] || resolvedOps[op].operationTypeId === '')
 
@@ -190,6 +194,11 @@ export function PreviewStage({
           setTxPage={setTxPage}
           txPageSize={txPageSize}
         />
+      )}
+
+      {exchange === 'binance' && withdrawals.length > 0 && (
+        <RetiradasCard resumen={preview.retiradas} nombre={retiradasNombre} cargando={cambiando}
+          onAnadir={f => onRetiradas(f)} onQuitar={() => onRetiradas(null)} />
       )}
 
       {(withdrawals.length > 0 || depositsForPanel.length > 0) && (

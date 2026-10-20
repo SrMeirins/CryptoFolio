@@ -253,6 +253,10 @@ CREATE TABLE transactions (
   destination_wallet_id UUID REFERENCES wallets(id) ON DELETE RESTRICT,
   destination_pending   BOOLEAN NOT NULL DEFAULT FALSE,
   linked_tx_id          UUID REFERENCES transactions(id) ON DELETE SET NULL,
+  -- Destino on-chain de un retiro (#320): dirección, red y hash, si el CSV los trae.
+  counterparty_address    TEXT CHECK (char_length(counterparty_address) <= 128),
+  counterparty_network_id UUID REFERENCES networks(id) ON DELETE SET NULL,
+  tx_hash                 TEXT CHECK (char_length(tx_hash) <= 128),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

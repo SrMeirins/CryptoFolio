@@ -1,3 +1,4 @@
+import { formatNumber } from '../../utils/format'
 import type { ImportRecord } from '../../api/portfolio'
 
 // Asistente de importación (#318): pasos, firma del archivo para conservar el
@@ -60,4 +61,13 @@ export function textoPendiente(p: { retiros: number; depositos: number; operacio
   const total = p.retiros + p.depositos + p.operaciones
   const lista = partes.length === 1 ? partes[0] : `${partes.slice(0, -1).join(', ')} y ${partes.at(-1)}`
   return `${total === 1 ? 'Falta' : 'Faltan'} ${lista}`
+}
+
+// Mismos límites que el backend: feedback instantáneo antes de subir.
+const MAX_FILE_SIZE = 10 * 1024 * 1024
+
+export function validateFile(file: File): string | null {
+  if (!file.name.toLowerCase().endsWith('.csv')) return 'Solo se aceptan archivos .csv'
+  if (file.size > MAX_FILE_SIZE) return `El archivo supera el máximo de 10 MB (${formatNumber(file.size / 1024 / 1024, 1, 1)} MB)`
+  return null
 }

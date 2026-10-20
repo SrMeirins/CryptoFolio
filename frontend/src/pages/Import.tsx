@@ -19,6 +19,7 @@ import { cardClasses, buttonClasses, PageHeader } from '../components/ui'
 import { ImportStepper } from './import/ImportStepper'
 import { firmaArchivo, pasoDeStage, ultimasPorExchange, type Paso } from './import/wizard'
 import { navIcon } from '../constants/navigation'
+import { esArchivoRetiradas } from './import/direcciones'
 
 // Firma del archivo de la sesión: si se vuelve a subir el mismo, se conserva lo asignado (#318).
 const FIRMA_KEY = 'import_file_signature'
@@ -28,6 +29,9 @@ export function ImportPage() {
   const navigate    = useNavigate()
   const fileRef     = useRef<HTMLInputElement>(null)
   const fileBufferRef = useRef<File | null>(null)
+  // Historial de retiradas de Binance opcional (#320): se envía junto al de transacciones.
+  const retiradasRef = useRef<File | null>(null)
+  const [retiradasNombre, setRetiradasNombre] = useState<string | null>(null)
 
   const [stage, setStage] = useState<'upload' | 'preview' | 'catalog' | 'progress' | 'done'>('upload')
   // Exchange detectado por el backend en la vista previa (#318); «Cambiar» lo fuerza.
@@ -76,6 +80,7 @@ export function ImportPage() {
     try {
       const form = new FormData()
       form.append('file', file)
+      if (retiradasRef.current) form.append('withdrawals', retiradasRef.current)
       // Sin exchange, el backend lo detecta por las cabeceras.
       if (forzado) form.append('exchange', forzado)
       const res  = await fetch('/api/imports/preview', { method: 'POST', body: form })
@@ -96,6 +101,31 @@ export function ImportPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Uno o dos archivos (#320): se distingue el historial de retiradas por su cabecera.
+  async function handleFiles(files: File[]) {
+    setError(null)
+    const tipos = await Promise.all(files.map(esArchivoRetiradas))
+    const retiradas = files.filter((_, i) => tipos[i])
+    const transacciones = files.filter((_, i) => !tipos[i])
+    if (retiradas.length > 1 || transacciones.length > 1) {
+      setError('Suelta un único historial de transacciones y, opcionalmente, uno de retiradas')
+      return
+    }
+    if (retiradas[0]) setRetiradas(retiradas[0])
+    if (transacciones[0]) await handleFile(transacciones[0])
+  }
+
+  function setRetiradas(file: File | null) {
+    retiradasRef.current = file
+    setRetiradasNombre(file?.name ?? null)
+  }
+
+  // Añadir o quitar el historial de retiradas desde la revisión: se relee con el mismo exchange.
+  function cambiarRetiradas(file: File | null) {
+    setRetiradas(file)
+    if (fileBufferRef.current) void handleFile(fileBufferRef.current, exchange)
   }
 
   function finishImportSuccess() {
@@ -120,6 +150,7 @@ export function ImportPage() {
 
     const form = new FormData()
     form.append('file', fileBufferRef.current)
+    if (retiradasRef.current) form.append('withdrawals', retiradasRef.current)
     form.append('exchange', exchange)
     if (Object.keys(resolvedOps).length > 0)
       form.append('resolvedOperations', JSON.stringify(resolvedOps))
@@ -186,6 +217,7 @@ export function ImportPage() {
     setWithdrawalDestinations({})
     setDepositCosts({})
     fileBufferRef.current = null
+    setRetiradas(null)
     if (fileRef.current) fileRef.current.value = ''
     clearImportSessionStorage()
     try { sessionStorage.removeItem(FIRMA_KEY) } catch { /* sin almacenamiento */ }
@@ -232,8 +264,10 @@ export function ImportPage() {
           error={error}
           fileRef={fileRef}
           onDragOver={setDragOver}
-          onFile={f => { void handleFile(f) }}
+          onFiles={fs => { void handleFiles(fs) }}
           ultimas={ultimasPorExchange(imports)}
+          retiradas={retiradasNombre}
+          onQuitarRetiradas={() => setRetiradas(null)}
         />
       )}
 
@@ -265,6 +299,8 @@ export function ImportPage() {
           exchange={exchange}
           onCambiarExchange={ex => { if (fileBufferRef.current) void handleFile(fileBufferRef.current, ex) }}
           cambiando={loading}
+          retiradasNombre={retiradasNombre}
+          onRetiradas={cambiarRetiradas}
         />
       )}
 

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { previewCsvFile } from '../../modules/csv/importer';
 import { CABECERAS_ESPERADAS, detectarExchange, Exchange, isExchange } from '../../modules/csv/exchanges';
-import { uploadCsv } from './importsValidation';
+import { retiradasDe, uploadCsv } from './importsValidation';
 
 const router = Router();
 
@@ -21,7 +21,7 @@ router.post('/preview', uploadCsv, async (req: Request, res: Response) => {
   const deteccion = detectarExchange(req.file.buffer);
   const exchange: Exchange = elegido ?? deteccion.exchange ?? 'binance';
   try {
-    const result = await previewCsvFile(req.file.buffer, exchange);
+    const result = await previewCsvFile(req.file.buffer, exchange, retiradasDe(req));
     res.json({
       ...result,
       exchange,

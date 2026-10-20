@@ -1,6 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Eye, EyeOff } from 'lucide-react'
+import { AlertTriangle, Eye, EyeOff, MapPin } from 'lucide-react'
+import { portfolioApi } from '../../api/portfolio'
+import { WithdrawalAddressGroup } from './WithdrawalAddressGroup'
+import { GuardarDireccionModal } from './GuardarDireccionModal'
+import { agruparPorDireccion, walletsPorDireccion, type GrupoDireccion } from './direcciones'
 import { DepositSection } from './DepositSection'
 import { QuickApplyButtons } from './QuickApplyButtons'
 import { BulkSelectionBar } from './BulkSelectionBar'
@@ -21,18 +25,45 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
   const [expanded,       setExpanded]       = useState<Set<string>>(new Set())
   const [showOnlyPending, setShowOnlyPending] = useState(false)
 
-  const { data: wallets = [] } = useQuery({
-    queryKey: ['wallets'],
-    queryFn: () => fetch('/api/wallets').then(r => r.json()),
-  })
-  const allNonExchangeWallets = (wallets as { id: string; name: string; type: string; color: string }[])
-    .filter(w => w.type !== 'exchange')
+  const [guardando,      setGuardando]      = useState<GrupoDireccion | null>(null)
+  const [ultimaWallet,   setUltimaWallet]   = useState<string | null>(null)
+
+  const { data: wallets = [] } = useQuery({ queryKey: ['wallets'], queryFn: portfolioApi.getWalletsFull })
+  const { data: redes = [] } = useQuery({ queryKey: ['networks'], queryFn: portfolioApi.getNetworks, staleTime: 5 * 60_000 })
+  const allNonExchangeWallets = wallets.filter(w => w.type !== 'exchange')
   const coldWallets = allNonExchangeWallets.filter(w => w.name !== 'Wallets externas')
+
+  // Retiros con dirección: una decisión por dirección (#320); el resto, por activo como antes.
+  const { grupos, sinDireccion } = useMemo(() => agruparPorDireccion(withdrawals), [withdrawals])
+  const reconocidas = useMemo(() => walletsPorDireccion(coldWallets), [coldWallets])
+  const pendientesDeGuardar = grupos.filter(g => !reconocidas.has(g.clave))
+
+  // Dirección reconocida → se asigna sola a su wallet (editable). Solo lo que aún no tiene destino.
+  const firmaReconocidas = grupos.map(g => `${g.clave}:${reconocidas.get(g.clave)?.id ?? ''}`).join('|')
+  useEffect(() => {
+    for (const g of grupos) {
+      const w = reconocidas.get(g.clave)
+      if (!w) continue
+      for (const tx of g.txs) if (!destinations[txKey(tx)]) onAssign(txKey(tx), w.id)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaReconocidas])
+
+  function asignarGrupo(g: GrupoDireccion, dest: string) {
+    for (const tx of g.txs) onAssign(txKey(tx), dest)
+  }
+
+  function alGuardar(g: GrupoDireccion, wallet: { id: string }, siguiente: boolean) {
+    asignarGrupo(g, wallet.id)
+    setUltimaWallet(wallet.id)
+    const resto = pendientesDeGuardar.filter(p => p.clave !== g.clave && !['__gift__', '__lost__'].includes(destinations[txKey(p.txs[0])] ?? ''))
+    setGuardando(siguiente && resto.length > 0 ? resto[0] : null)
+  }
 
   // Pre-rellenar desde memoria en el primer render
   useEffect(() => {
     const mem = loadMemory()
-    for (const tx of withdrawals) {
+    for (const tx of sinDireccion) {
       const key = txKey(tx)
       if (destinations[key]) continue
       const stored = mem[`${tx.asset}|${tx.account}`]
@@ -41,7 +72,7 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const sortedWithdrawals = [...withdrawals].sort(
+  const sortedWithdrawals = [...sinDireccion].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   )
   const byAsset = sortedWithdrawals.reduce<Record<string, PreviewTransaction[]>>((acc, tx) => {
@@ -83,8 +114,8 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
     const tx = withdrawals.find(t => txKey(t) === key)
     if (!tx) return
     saveMemory(`${tx.asset}|${tx.account}`, dest)
-    // Auto-aplicar al resto de txs no asignadas del mismo activo
-    for (const sibling of withdrawals) {
+    // Auto-aplicar al resto de txs no asignadas del mismo activo (sin dirección: las otras van por grupo)
+    for (const sibling of sinDireccion) {
       const sibKey = txKey(sibling)
       if (sibKey === key) continue
       if (sibling.asset !== tx.asset) continue
@@ -229,7 +260,9 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
         {coldWallets.length === 0 && (
           <div className="flex items-center gap-2 text-xs text-warning bg-warning/10 rounded-xl px-4 py-2.5 border border-warning/20">
             <AlertTriangle size={12} className="shrink-0" />
-            Sin wallets frías configuradas — solo disponibles: Pérdida, Externa, Regalo.
+            {grupos.length > 0
+              ? 'Aún no tienes wallets propias: usa «¿Es tuya? Guardar en mi wallet» en una dirección para crear la primera.'
+              : 'Sin wallets frías configuradas — solo disponibles: Pérdida, Externa, Regalo.'}
           </div>
         )}
 
@@ -254,8 +287,26 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
           onSelectNone={selectNone}
         />
 
+        {/* ── Retiros por dirección de destino (#320) ────────────────────────── */}
+        {grupos.length > 0 && (
+          <section aria-labelledby="retiros-direccion" className="space-y-1.5">
+            <h3 id="retiros-direccion" className="flex items-center gap-1.5 px-1 pb-1 text-xs text-fg-subtle">
+              <MapPin size={12} aria-hidden="true" /> {grupos.length} {grupos.length === 1 ? 'dirección' : 'direcciones'} de destino
+              {reconocidas.size > 0 && <span className="text-positive">· {grupos.length - pendientesDeGuardar.length} reconocida{grupos.length - pendientesDeGuardar.length !== 1 ? 's' : ''}</span>}
+            </h3>
+            {grupos.map(g => (
+              <WithdrawalAddressGroup key={g.clave} grupo={g} red={redes.find(r => r.id === g.networkId)}
+                destinations={destinations} coldWallets={coldWallets} reconocida={reconocidas.get(g.clave)}
+                onAssign={dest => asignarGrupo(g, dest)} onGuardar={() => setGuardando(g)} />
+            ))}
+          </section>
+        )}
+
         {/* ── Lista de grupos por activo ─────────────────────────────────────── */}
         <div className="space-y-1.5">
+          {grupos.length > 0 && uniqueAssets.length > 0 && (
+            <h3 className="px-1 pt-2 text-xs text-fg-subtle">Sin dirección en el archivo</h3>
+          )}
           {/* Cabecera con filtro "solo pendientes" */}
           {uniqueAssets.length > 1 && (
             <div className="flex items-center justify-between px-1 pb-1">
@@ -329,6 +380,12 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
           />
         )}
       </div>
+
+      {guardando && (
+        <GuardarDireccionModal key={guardando.clave} grupo={guardando} wallets={coldWallets} redes={redes}
+          preseleccion={ultimaWallet} restantes={pendientesDeGuardar.filter(p => p.clave !== guardando.clave).length}
+          onGuardado={(w, siguiente) => alGuardar(guardando, w, siguiente)} onClose={() => setGuardando(null)} />
+      )}
     </div>
   )
 }
