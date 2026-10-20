@@ -24,7 +24,7 @@ export interface DepositReview {
 
 export interface PreviewResult {
   validation: ValidationResult;
-  transactions: ParsedTransaction[];
+  transactions: Array<ParsedTransaction & { isNew?: boolean }>;
   duplicateCount: number;
   newCount: number;
   errors: string[];
@@ -81,19 +81,6 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
         };
       }
     }
-  }
-
-  // Avisar si hay income ops que necesitarán precio histórico al importar.
-  // DEPOSIT_CRYPTO se excluye: ya aparece en el panel de revisión obligatoria — no duplicar aviso.
-  const INCOME_WARNING_OPS = new Set(['STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'LENDING_INTEREST_LOCKED', 'CASHBACK', 'AIRDROP']);
-  const incomeOpsCount = parseResult.transactions.filter(
-    tx => INCOME_WARNING_OPS.has(tx.operationType) && !tx.pricePerUnit
-  ).length;
-  if (incomeOpsCount > 0) {
-    validation.info.push(
-      `${incomeOpsCount} operaciones de rendimiento (staking, interés, airdrop) necesitan precio histórico. ` +
-      `Se consultará la API al confirmar — puede tardar unos segundos adicionales.`
-    );
   }
 
   // Detectar gaps y solapamientos con imports existentes DEL MISMO EXCHANGE
@@ -162,6 +149,20 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
     else newCount++;
   }
 
+  // Avisar si hay income ops que necesitarán precio histórico al importar.
+  // DEPOSIT_CRYPTO se excluye: ya aparece en el panel de revisión obligatoria — no duplicar aviso.
+  const INCOME_WARNING_OPS = new Set(['STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST', 'LENDING_INTEREST_LOCKED', 'CASHBACK', 'AIRDROP']);
+  // Solo las filas nuevas (#316): las ya importadas no vuelven a consultar precios.
+  const incomeOpsCount = parseResult.transactions.filter(
+    tx => INCOME_WARNING_OPS.has(tx.operationType) && !tx.pricePerUnit && !tx.rawRowHashes.some(h => existingHashes.has(h))
+  ).length;
+  if (incomeOpsCount > 0) {
+    validation.info.push(
+      `${incomeOpsCount} operaciones de rendimiento (staking, interés, airdrop) necesitan precio histórico. ` +
+      `Se consultará la API al confirmar — puede tardar unos segundos adicionales.`
+    );
+  }
+
   // Detectar depósitos externos que necesitan revisión de coste:
   // 1. Nuevos en este CSV
   // 2. Ya importados en DB pero sin price_per_unit
@@ -201,7 +202,8 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
 
   return {
     validation,
-    transactions: parseResult.transactions,
+    // Marca explícita de las filas nuevas (#316): la revisión solo debe pedir las nuevas.
+    transactions: parseResult.transactions.map(tx => ({ ...tx, isNew: !tx.rawRowHashes.some(h => existingHashes.has(h)) })),
     duplicateCount,
     newCount,
     errors: parseResult.errors.map((e) => e.message),

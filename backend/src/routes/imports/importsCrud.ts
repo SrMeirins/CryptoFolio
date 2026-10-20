@@ -3,14 +3,15 @@ import { importCsvFile } from '../../modules/csv/importer';
 import { Exchange, isExchange } from '../../modules/csv/exchanges';
 import { runFifoEngine } from '../../modules/fifo/engine';
 import { db } from '../../db/client';
-import { upload } from './importsValidation';
+import { uploadCsv } from './importsValidation';
 
 const router = Router();
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // POST /api/imports — import directo sin SSE (usado por integraciones/scripts,
 // no por la UI principal que usa /confirm). Mismo criterio de mensajes de
 // error intencionados que /preview — ver comentario en importsPreview.ts.
-router.post('/', upload.single('file'), async (req: Request, res: Response) => {
+router.post('/', uploadCsv, async (req: Request, res: Response) => {
   if (!req.file) { res.status(400).json({ error: 'No se recibió ningún archivo' }); return; }
   const exchange: Exchange = isExchange(req.body.exchange) ? req.body.exchange : 'binance';
   try {
@@ -51,6 +52,8 @@ router.get('/', async (_req: Request, res: Response) => {
 // DELETE /api/imports/:id
 router.delete('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
+  // Id validado (#316): uno mal formado hacía fallar la consulta con un 500.
+  if (!UUID_RE.test(id)) { res.status(400).json({ error: 'Id de importación inválido' }); return; }
 
   await db.transaction(async (client) => {
     const txRes = await client.query(
@@ -81,8 +84,11 @@ router.delete('/:id', async (req: Request, res: Response) => {
   // Recalcular FIFO y esperar resultado antes de responder. Si falla, no se traga el
   // error: express-async-errors lo propaga al handler global y el DELETE no responde
   // "success" sobre un recálculo que en realidad no se completó.
-  const remaining = await db.query('SELECT COUNT(*) FROM csv_imports');
-  if (parseInt(remaining.rows[0].count) > 0) {
+  // Se recalcula siempre que queden transacciones (#316): antes solo si quedaban
+  // importaciones, y con transacciones manuales sus lotes quedaban con cantidades
+  // consumidas por ventas ya borradas.
+  const remaining = await db.query('SELECT EXISTS (SELECT 1 FROM transactions) AS hay');
+  if (remaining.rows[0].hay) {
     await runFifoEngine();
   }
 
