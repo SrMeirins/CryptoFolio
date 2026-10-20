@@ -1,8 +1,11 @@
 import { useState } from 'react'
-import { Upload, FileText, RefreshCw, AlertCircle, ChevronDown, CalendarClock, MapPin, X } from 'lucide-react'
+import { Upload, FileText, RefreshCw, AlertCircle, ChevronDown, CalendarClock, MapPin } from 'lucide-react'
 import { cardClasses, SegmentedControl } from '../../components/ui'
 import { formatFiscalDate } from '../../utils/fiscalTable'
 import { EXCHANGE_LABEL, validateFile, type UltimaImportacion } from './wizard'
+import { ArchivosSeleccion } from './ArchivosSeleccion'
+import { ExchangeBadge } from './ExchangeBadge'
+import type { ArchivoSel } from './lote'
 
 type ExchangeId = 'binance' | 'bitvavo'
 
@@ -35,38 +38,25 @@ const EXCHANGE_HELP: Record<ExchangeId, { steps: string[]; note: string; retirad
   },
 }
 
-// Distintivo propio de cada exchange (#318): color e inicial, sin logotipos de marca.
-const DISTINTIVO: Record<ExchangeId, { color: string; texto: string; inicial: string }> = {
-  binance: { color: '#F0B90B', texto: '#1E2026', inicial: 'B' },   // texto oscuro: el blanco sobre amarillo no contrasta
-  bitvavo: { color: '#0051FF', texto: '#FFFFFF', inicial: 'b' },
-}
-
-export function ExchangeBadge({ exchange, size = 20 }: { exchange: string; size?: number }) {
-  const d = DISTINTIVO[exchange as ExchangeId]
-  if (!d) return null
-  return (
-    <span className="inline-grid place-items-center rounded-md font-bold shrink-0" aria-hidden="true"
-      style={{ width: size, height: size, backgroundColor: d.color, color: d.texto, fontSize: size * 0.55 }}>{d.inicial}</span>
-  )
-}
 
 
 const haceTexto = (dias: number) => (dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : dias < 60 ? `hace ${dias} días` : `hace ${Math.round(dias / 30)} meses`)
 
 // Paso Subir (#318): zona de arrastre con detección automática del exchange,
 // guía de exportación plegable y hasta dónde llega lo ya importado.
-export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFiles, ultimas, retiradas, onQuitarRetiradas }: {
+export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFiles, ultimas, seleccion, onQuitar, onAnalizar }: {
   dragOver: boolean
   loading: boolean
   error: string | null
   fileRef: React.RefObject<HTMLInputElement>
   onDragOver: (v: boolean) => void
-  /** Uno o dos archivos: el historial de transacciones y, opcionalmente, el de retiradas de Binance (#320). */
+  /** Archivos soltados o elegidos: historiales de transacciones y de retiradas (#320, #326). */
   onFiles: (files: File[]) => void
   ultimas: UltimaImportacion[]
-  /** Nombre del historial de retiradas ya preparado, a la espera del de transacciones. */
-  retiradas: string | null
-  onQuitarRetiradas: () => void
+  /** Archivos ya elegidos, a la espera de analizarlos (#326). */
+  seleccion: ArchivoSel[]
+  onQuitar: (id: string) => void
+  onAnalizar: () => void
 }) {
   const [validationError, setValidationError] = useState<string | null>(null)
   const [guiaAbierta, setGuiaAbierta] = useState(false)
@@ -76,7 +66,6 @@ export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFi
   function handleFiles(list: FileList | null | undefined) {
     const files = [...(list ?? [])]
     if (files.length === 0) return
-    if (files.length > 2) { setValidationError('Suelta como mucho dos archivos: el historial de transacciones y el de retiradas'); return }
     const err = files.map(validateFile).find(Boolean) ?? null
     setValidationError(err)
     if (!err) onFiles(files)
@@ -90,7 +79,7 @@ export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFi
       <div
         role="button"
         tabIndex={loading ? -1 : 0}
-        aria-label="Seleccionar o arrastrar un CSV de Binance o Bitvavo"
+        aria-label="Elegir o arrastrar uno o varios CSV de Binance o Bitvavo"
         aria-busy={loading}
         className={`relative overflow-hidden border-2 border-dashed rounded-2xl px-6 py-14 text-center transition-all cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60
           ${dragOver ? 'border-brand bg-brand/8 scale-[1.01] motion-reduce:scale-100' : 'border-border hover:border-fg-subtle hover:bg-overlay/2'}
@@ -108,15 +97,15 @@ export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFi
         {loading ? (
           <div className="flex flex-col items-center gap-3" role="status">
             <RefreshCw size={32} className="text-brand animate-spin motion-reduce:animate-none" aria-hidden="true" />
-            <p className="text-fg-muted text-sm">Analizando el CSV…</p>
+            <p className="text-fg-muted text-sm">Analizando…</p>
           </div>
         ) : (
           <>
             <span className={`mx-auto mb-4 grid place-items-center size-14 rounded-2xl transition-colors ${dragOver ? 'bg-brand text-white' : 'bg-brand/10 text-brand'}`} aria-hidden="true">
               <Upload size={26} />
             </span>
-            <p className="text-fg font-semibold text-base">{dragOver ? 'Suelta el archivo para analizarlo' : 'Arrastra tu CSV aquí'}</p>
-            <p className="text-fg-subtle text-sm mt-1">o haz clic para seleccionarlo · reconocemos el exchange automáticamente</p>
+            <p className="text-fg font-semibold text-base">{dragOver ? 'Suelta los archivos' : seleccion.length > 0 ? 'Arrastra más archivos aquí' : 'Arrastra tus CSV aquí'}</p>
+            <p className="text-fg-subtle text-sm mt-1">o haz clic para elegirlos · uno o varios, de Binance y Bitvavo · reconocemos el exchange de cada uno</p>
             <p className="text-fg-subtle text-xs mt-1">Binance: puedes añadir también el historial de retiradas para reconocer tus wallets</p>
             <div className="flex items-center justify-center gap-4 mt-5 text-xs text-fg-muted flex-wrap">
               <span className="inline-flex items-center gap-1.5"><ExchangeBadge exchange="binance" /> Binance</span>
@@ -129,13 +118,8 @@ export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFi
           onChange={e => handleFiles(e.target.files)} />
       </div>
 
-      {retiradas && (
-        <div className="flex items-center gap-2 rounded-xl border border-brand/30 bg-brand/5 px-4 py-2.5 text-xs text-fg-muted" role="status">
-          <MapPin size={13} className="text-brand shrink-0" aria-hidden="true" />
-          <span className="flex-1">Historial de retiradas listo (<span className="text-fg">{retiradas}</span>). Ahora suelta el historial de transacciones de Binance.</span>
-          <button type="button" onClick={onQuitarRetiradas} aria-label="Quitar el historial de retiradas"
-            className="p-1 rounded-md text-fg-subtle hover:text-fg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60"><X size={13} aria-hidden="true" /></button>
-        </div>
+      {seleccion.length > 0 && (
+        <ArchivosSeleccion seleccion={seleccion} loading={loading} onQuitar={onQuitar} onAnadir={openPicker} onAnalizar={onAnalizar} />
       )}
 
       {(validationError || error) && (

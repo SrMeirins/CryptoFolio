@@ -35,6 +35,24 @@ function fechaUtc(raw: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+/**
+ * Varios historiales de retiradas (#326), p. ej. por rangos de fechas: se unen
+ * sin repetir la misma retirada aunque aparezca en dos exportaciones solapadas.
+ */
+export function parseVariosHistoriales(buffers: readonly Buffer[]): RetiradaBinance[] {
+  const vistas = new Set<string>();
+  const out: RetiradaBinance[] = [];
+  for (const b of buffers) {
+    for (const r of parseHistorialRetiradas(b)) {
+      const clave = `${r.timestamp.getTime()}|${r.coin}|${r.bruto}|${r.txHash ?? ''}|${r.address ?? ''}`;
+      if (vistas.has(clave)) continue;
+      vistas.add(clave);
+      out.push(r);
+    }
+  }
+  return out;
+}
+
 /** Solo las retiradas completadas: una cancelada o fallida no sale del historial. */
 export function parseHistorialRetiradas(buffer: Buffer): RetiradaBinance[] {
   if (!esHistorialRetiradas(buffer)) {

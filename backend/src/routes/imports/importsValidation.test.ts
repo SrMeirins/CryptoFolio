@@ -65,3 +65,18 @@ describe('parseDepositCosts', () => {
     expect(() => parseDepositCosts('[1,2,3]')).toThrow('depositCosts inválido');
   });
 });
+
+describe('exchangesForzados (#326)', () => {
+  it('lee el exchange de cada archivo del lote o el único de siempre', async () => {
+    const { exchangesForzados } = await import('./importsValidation');
+    expect(exchangesForzados({ exchanges: '["bitvavo",null]' }, 3)).toEqual(['bitvavo', null, null]);
+    expect(exchangesForzados({ exchange: 'bitvavo' }, 2)).toEqual(['bitvavo', null]);
+    expect(exchangesForzados({}, 1)).toEqual([null]);
+  });
+  it('rechaza valores que no son exchanges, JSON roto o más posiciones que archivos', async () => {
+    const { exchangesForzados } = await import('./importsValidation');
+    expect(() => exchangesForzados({ exchanges: '["kraken"]' }, 1)).toThrow();
+    expect(() => exchangesForzados({ exchanges: '{' }, 1)).toThrow();
+    expect(() => exchangesForzados({ exchanges: '["binance","binance"]' }, 1)).toThrow();
+  });
+});

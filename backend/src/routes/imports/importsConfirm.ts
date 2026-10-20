@@ -1,14 +1,14 @@
 import { Router, Request, Response } from 'express';
-import { Exchange, isExchange } from '../../modules/csv/exchanges';
+import { Exchange } from '../../modules/csv/exchanges';
 import {
   checkPreImportDepositGate, checkPendingDepositGate, splitDepositCosts,
   applyExistingDepositCostUpdates, importTransactionsPhase,
   fetchMissingHistoricalPrices, runFifoPhase, ProgressEmitter,
 } from '../../modules/csv/confirmImport';
-import { hasBinaryMagic, uploadCsv, parseWithdrawalDestinations, parseDepositCosts, retiradasDe } from './importsValidation';
+import { archivosDe, exchangesForzados, uploadCsv, parseWithdrawalDestinations, parseDepositCosts, retiradasDe } from './importsValidation';
 import { cargarAniosFiscales } from '../../modules/fiscal/carryforward';
 import { madridYearMonth } from '../../modules/fiscal/madridTime';
-import { agruparAvisosFifo, impactoPorEjercicio } from '../../modules/csv/resumenImportacion';
+import { agruparAvisosFifo, impactoPorEjercicio, type ArchivoImportado } from '../../modules/csv/resumenImportacion';
 
 const router = Router();
 
@@ -18,9 +18,17 @@ const router = Router();
 // La lógica de negocio de cada fase (gates de depósitos, import, precios
 // históricos, FIFO) vive en modules/csv/confirmImport.ts, fragmentada desde
 // este mismo fichero (antes ~335 líneas mezclando ambas cosas).
+//
+// Lote (#326): varios archivos se importan uno tras otro, cada uno como su propia
+// importación, y los precios históricos y el FIFO se ejecutan una sola vez al final.
 router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
-  if (!req.file) { res.status(400).json({ error: 'No se recibió ningún archivo' }); return; }
-  const exchange: Exchange = isExchange(req.body.exchange) ? req.body.exchange : 'binance';
+  const archivos = archivosDe(req);
+  if (archivos.length === 0) { res.status(400).json({ error: 'No se recibió ningún archivo' }); return; }
+  let forzados: (Exchange | null)[];
+  try { forzados = exchangesForzados(req.body, archivos.length); } catch (e) { res.status(400).json({ error: (e as Error).message }); return; }
+  // En la confirmación el exchange llega siempre fijado desde la vista previa; sin él, Binance como antes.
+  const exchangeDe = (i: number): Exchange => forzados[i] ?? 'binance';
+  const lote = archivos.length > 1;
 
   // Configurar SSE. La cabecera CORS la pone el middleware global de app.ts
   // (buildCorsMiddleware, corre antes de llegar aquí) — no hace falta
@@ -49,36 +57,47 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
   }, 10000);
 
   try {
-    if (hasBinaryMagic(req.file.buffer)) {
-      send('error', '⛔ El archivo no es un CSV válido (cabecera binaria detectada)');
-      res.end();
-      return;
-    }
-
     const withdrawalDestinations = parseWithdrawalDestinations(req.body.withdrawalDestinations);
     const depositCostsRaw = parseDepositCosts(req.body.depositCosts);
 
-    const gate0 = await checkPreImportDepositGate(exchange, req.file.buffer, depositCostsRaw);
-    if (gate0.blocked) {
-      send('error',
-        `⛔ Revisión requerida: hay ${gate0.missingCount} depósito${gate0.missingCount > 1 ? 's' : ''} ` +
-        `externo${gate0.missingCount > 1 ? 's' : ''} sin coste de adquisición. ` +
-        `Vuelve al preview y asigna el coste en el panel de "Revisión obligatoria".`
-      );
-      res.end();
-      return;
+    // Todos los archivos pasan el gate de depósitos antes de importar ninguno.
+    let totalParsed = 0;
+    for (const [i, f] of archivos.entries()) {
+      const gate0 = await checkPreImportDepositGate(exchangeDe(i), f.buffer, depositCostsRaw);
+      if (gate0.blocked) {
+        send('error',
+          `⛔ Revisión requerida${lote ? ` en «${f.originalname}»` : ''}: hay ${gate0.missingCount} depósito${gate0.missingCount > 1 ? 's' : ''} ` +
+          `externo${gate0.missingCount > 1 ? 's' : ''} sin coste de adquisición. ` +
+          `Vuelve al preview y asigna el coste en el panel de "Revisión obligatoria".`
+        );
+        res.end();
+        return;
+      }
+      totalParsed += gate0.preparse.transactions.length;
     }
 
     // FASE 1: Importar transacciones
-    const totalParsed = gate0.preparse.transactions.length;
-    send('importing', `Importando ${totalParsed} transacciones...`, 0, totalParsed);
+    send('importing', `Importando ${totalParsed} transacciones${lote ? ` de ${archivos.length} archivos` : ''}...`, 0, totalParsed);
 
     const { existingDepositUpdates, newDepositCosts } = splitDepositCosts(depositCostsRaw);
     await applyExistingDepositCostUpdates(existingDepositUpdates);
 
-    const importResult = await importTransactionsPhase(
-      req.file.buffer, req.file.originalname, withdrawalDestinations, newDepositCosts, exchange, send, retiradasDe(req)
-    );
+    const retiradas = retiradasDe(req);
+    const importados: ArchivoImportado[] = [];
+    for (const [i, f] of archivos.entries()) {
+      if (lote) send('importing', `Archivo ${i + 1} de ${archivos.length}: ${f.originalname}`);
+      try {
+        const r = await importTransactionsPhase(f.buffer, f.originalname, withdrawalDestinations, newDepositCosts, exchangeDe(i), send, retiradas);
+        importados.push({ importId: r.importId, archivo: f.originalname, exchange: exchangeDe(i), nuevas: r.newTransactions, duplicadas: r.duplicateRows });
+      } catch (e) {
+        // En un lote, un archivo idéntico a uno ya importado se salta sin abortar el resto.
+        if (lote && (e as Error).message.startsWith('Este CSV exacto ya fue importado')) {
+          send('importing', `⚠ «${f.originalname}» ya estaba importado: se salta`);
+          continue;
+        }
+        throw e;
+      }
+    }
 
     // FASE 2: Precios históricos
     const precios = await fetchMissingHistoricalPrices(send);
@@ -103,10 +122,11 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
 
     send('done', 'Proceso completado correctamente', undefined, undefined, {
       resumen: {
-        importId: importResult.importId,
-        archivo: req.file.originalname,
-        nuevas: importResult.newTransactions,
-        duplicadas: importResult.duplicateRows,
+        importId: importados[0]?.importId ?? '',
+        archivo: archivos.map(f => f.originalname).join(', '),
+        archivos: importados,
+        nuevas: importados.reduce((s, a) => s + a.nuevas, 0),
+        duplicadas: importados.reduce((s, a) => s + a.duplicadas, 0),
         precios,
         avisos: agruparAvisosFifo(fifo.errors, fifo.warnings),
         impacto: impactoPorEjercicio(antes, despues),

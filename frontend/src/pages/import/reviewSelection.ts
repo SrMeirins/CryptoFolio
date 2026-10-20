@@ -22,3 +22,9 @@ export function newWithdrawals(preview: PreviewResult): PreviewTransaction[] {
 export function nadaQueImportar(preview: PreviewResult): boolean {
   return preview.newCount === 0 && preview.depositReviews.length === 0
 }
+
+/** Lote en el que ningún archivo se ha podido leer (#326). */
+export function loteIlegible(preview: PreviewResult): boolean {
+  const archivos = preview.archivos ?? []
+  return archivos.length > 1 && archivos.every(a => a.estado === 'no_reconocido')
+}

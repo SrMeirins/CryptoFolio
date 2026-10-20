@@ -17,23 +17,21 @@ import { waitForImportCommit, readProgressStream } from './import/importStream'
 import { useWithdrawalDestinations, useDepositCosts, clearImportSessionStorage } from './import/useImportSessionState'
 import { cardClasses, buttonClasses, PageHeader } from '../components/ui'
 import { ImportStepper } from './import/ImportStepper'
-import { firmaArchivo, pasoDeStage, ultimasPorExchange, type Paso } from './import/wizard'
+import { pasoDeStage, ultimasPorExchange, type Paso } from './import/wizard'
 import { navIcon } from '../constants/navigation'
-import { esArchivoRetiradas } from './import/direcciones'
+import { anadirASeleccion, clasificarArchivo, firmaLote, indicesAConfirmar, type ArchivoSel } from './import/lote'
 import { useAvisoSalida } from './import/useAvisoSalida'
 import { useTituloImportacion } from './import/useTituloImportacion'
 
-// Firma del archivo de la sesión: si se vuelve a subir el mismo, se conserva lo asignado (#318).
+// Firma de la selección: si se vuelven a subir los mismos archivos, se conserva lo asignado (#318, #326).
 const FIRMA_KEY = 'import_file_signature'
 
 export function ImportPage() {
   const queryClient = useQueryClient()
   const navigate    = useNavigate()
   const fileRef     = useRef<HTMLInputElement>(null)
-  const fileBufferRef = useRef<File | null>(null)
-  // Historial de retiradas de Binance opcional (#320): se envía junto al de transacciones.
-  const retiradasRef = useRef<File | null>(null)
-  const [retiradasNombre, setRetiradasNombre] = useState<string | null>(null)
+  // Archivos elegidos (#326): historiales de transacciones y de retiradas, con su exchange.
+  const [seleccion, setSeleccion] = useState<ArchivoSel[]>([])
 
   const [stage, setStage] = useState<'upload' | 'preview' | 'catalog' | 'progress' | 'done'>('upload')
   // Exchange detectado por el backend en la vista previa (#318); «Cambiar» lo fuerza.
@@ -68,13 +66,16 @@ export function ImportPage() {
   })
   const hasPendingDeposits = pendingDeposits.length > 0
 
-  async function handleFile(file: File, forzado?: 'binance' | 'bitvavo') {
+  // Analiza la selección (uno o varios archivos, #326). Sin exchange forzado, el backend lo detecta.
+  async function analizar(sel: ArchivoSel[]) {
+    const tx = sel.filter(s => s.tipo === 'transacciones')
+    if (tx.length === 0) { setSeleccion(sel); setError('Añade al menos un historial de transacciones'); return }
     setError(null)
     setLoading(true)
-    fileBufferRef.current = file
+    setSeleccion(sel)
 
-    // Otro archivo: las asignaciones de la sesión eran del anterior (#318). El mismo: se conservan.
-    const firma = firmaArchivo(file)
+    // Otra selección: las asignaciones de la sesión eran de la anterior (#318). La misma: se conservan.
+    const firma = firmaLote(sel)
     let anterior: string | null = null
     try { anterior = sessionStorage.getItem(FIRMA_KEY) } catch { /* sin almacenamiento */ }
     if (anterior !== firma) {
@@ -86,53 +87,66 @@ export function ImportPage() {
 
     try {
       const form = new FormData()
-      form.append('file', file)
-      if (retiradasRef.current) form.append('withdrawals', retiradasRef.current)
-      // Sin exchange, el backend lo detecta por las cabeceras.
-      if (forzado) form.append('exchange', forzado)
+      tx.forEach(f => form.append('files', f.file))
+      sel.filter(s => s.tipo === 'retiradas').forEach(f => form.append('withdrawals', f.file))
+      if (tx.some(f => f.forzado)) form.append('exchanges', JSON.stringify(tx.map(f => f.forzado)))
       const res  = await fetch('/api/imports/preview', { method: 'POST', body: form })
       const body: unknown = await res.json()
 
       if (!res.ok) {
         setError((body as { error?: string }).error || 'Error en preview')
-        setLoading(false)
         return
       }
 
       const data = body as PreviewResult
       setPreview(data)
-      setExchange(data.exchange ?? forzado ?? 'binance')
+      setExchange(data.exchange ?? 'binance')
       setStage('preview')
     } catch {
-      setError('Error al procesar el archivo')
+      setError('Error al procesar los archivos')
     } finally {
       setLoading(false)
     }
   }
 
-  // Uno o dos archivos (#320): se distingue el historial de retiradas por su cabecera.
+  // Archivos soltados o elegidos: se clasifican (transacciones o retiradas) y se añaden a la
+  // selección. Con un único historial en una selección vacía se analiza directamente, como siempre.
   async function handleFiles(files: File[]) {
     setError(null)
-    const tipos = await Promise.all(files.map(esArchivoRetiradas))
-    const retiradas = files.filter((_, i) => tipos[i])
-    const transacciones = files.filter((_, i) => !tipos[i])
-    if (retiradas.length > 1 || transacciones.length > 1) {
-      setError('Suelta un único historial de transacciones y, opcionalmente, uno de retiradas')
-      return
-    }
-    if (retiradas[0]) setRetiradas(retiradas[0])
-    if (transacciones[0]) await handleFile(transacciones[0])
+    const nuevos = await Promise.all(files.map(clasificarArchivo))
+    const { seleccion: sig, error: err } = anadirASeleccion(seleccion, nuevos)
+    if (err) { setError(err); return }
+    if (seleccion.length === 0 && nuevos.filter(n => n.tipo === 'transacciones').length === 1) { await analizar(sig); return }
+    setSeleccion(sig)
   }
 
-  function setRetiradas(file: File | null) {
-    retiradasRef.current = file
-    setRetiradasNombre(file?.name ?? null)
+  const transacciones = seleccion.filter(s => s.tipo === 'transacciones')
+  const retiradasSel = seleccion.filter(s => s.tipo === 'retiradas')
+
+  // «Leer como…» de un archivo del lote (índice entre los de transacciones).
+  function leerComo(indice: number, ex: 'binance' | 'bitvavo') {
+    const objetivo = transacciones[indice]
+    if (objetivo) void analizar(seleccion.map(s => (s.id === objetivo.id ? { ...s, forzado: ex } : s)))
   }
 
-  // Añadir o quitar el historial de retiradas desde la revisión: se relee con el mismo exchange.
+  function quitarArchivo(indice: number) {
+    const objetivo = transacciones[indice]
+    if (!objetivo) return
+    const sig = seleccion.filter(s => s.id !== objetivo.id)
+    if (sig.some(s => s.tipo === 'transacciones')) { void analizar(sig); return }
+    setSeleccion(sig)
+    setPreview(null)
+    setStage('upload')
+  }
+
+  // Añadir o quitar historiales de retiradas desde la revisión: se relee el lote.
   function cambiarRetiradas(file: File | null) {
-    setRetiradas(file)
-    if (fileBufferRef.current) void handleFile(fileBufferRef.current, exchange)
+    if (!file) { void analizar(seleccion.filter(s => s.tipo !== 'retiradas')); return }
+    void clasificarArchivo(file).then(n => {
+      const { seleccion: sig, error: err } = anadirASeleccion(seleccion, [{ ...n, tipo: 'retiradas', exchange: 'binance' }])
+      if (err) { setError(err); return }
+      void analizar(sig)
+    })
   }
 
   function finishImportSuccess() {
@@ -142,7 +156,11 @@ export function ImportPage() {
   }
 
   async function handleConfirm() {
-    if (!fileBufferRef.current) return
+    if (!preview || transacciones.length === 0) return
+    // Solo se envían los archivos con algo nuevo, con el exchange con que se leyeron (#326).
+    const archivos = preview.archivos ?? []
+    const indices = indicesAConfirmar(archivos)
+    if (indices.length === 0) { setError('Ningún archivo del lote se puede importar.'); return }
 
     // Solo los depósitos que el backend pide revisar: nuevos del archivo y pendientes de la BD (#316).
     const unreviewedDeposits = (preview?.depositReviews ?? []).some(d => !(d.txKey in depositCosts))
@@ -157,9 +175,9 @@ export function ImportPage() {
     setInicioImport(Date.now())
 
     const form = new FormData()
-    form.append('file', fileBufferRef.current)
-    if (retiradasRef.current) form.append('withdrawals', retiradasRef.current)
-    form.append('exchange', exchange)
+    indices.forEach(i => form.append('files', transacciones[i].file))
+    retiradasSel.forEach(f => form.append('withdrawals', f.file))
+    form.append('exchanges', JSON.stringify(indices.map(i => archivos.find(a => a.indice === i)?.exchange ?? exchange)))
     if (Object.keys(resolvedOps).length > 0)
       form.append('resolvedOperations', JSON.stringify(resolvedOps))
     if (Object.keys(withdrawalDestinations).length > 0)
@@ -224,8 +242,7 @@ export function ImportPage() {
     setResolvedOps({})
     setWithdrawalDestinations({})
     setDepositCosts({})
-    fileBufferRef.current = null
-    setRetiradas(null)
+    setSeleccion([])
     if (fileRef.current) fileRef.current.value = ''
     clearImportSessionStorage()
     try { sessionStorage.removeItem(FIRMA_KEY) } catch { /* sin almacenamiento */ }
@@ -274,8 +291,9 @@ export function ImportPage() {
           onDragOver={setDragOver}
           onFiles={fs => { void handleFiles(fs) }}
           ultimas={ultimasPorExchange(imports)}
-          retiradas={retiradasNombre}
-          onQuitarRetiradas={() => setRetiradas(null)}
+          seleccion={seleccion}
+          onQuitar={id => setSeleccion(prev => prev.filter(s => s.id !== id))}
+          onAnalizar={() => { void analizar(seleccion) }}
         />
       )}
 
@@ -305,9 +323,11 @@ export function ImportPage() {
           onReset={handleReset}
           onVerHistorial={() => navigate('/history')}
           exchange={exchange}
-          onCambiarExchange={ex => { if (fileBufferRef.current) void handleFile(fileBufferRef.current, ex) }}
+          onCambiarExchange={ex => leerComo(0, ex)}
+          onLeerComo={leerComo}
+          onQuitarArchivo={quitarArchivo}
           cambiando={loading}
-          retiradasNombre={retiradasNombre}
+          retiradasNombre={retiradasSel.length === 0 ? null : retiradasSel.length === 1 ? retiradasSel[0].file.name : `${retiradasSel.length} historiales`}
           onRetiradas={cambiarRetiradas}
         />
       )}

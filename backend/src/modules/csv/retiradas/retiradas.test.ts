@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { direccionValida, normalizarDireccion, txHashValido } from './direccion';
 import { redDeBinance } from './redesBinance';
-import { esHistorialRetiradas, parseHistorialRetiradas, type RetiradaBinance } from './historialRetiradas';
+import { esHistorialRetiradas, parseHistorialRetiradas, parseVariosHistoriales, type RetiradaBinance } from './historialRetiradas';
 import { emparejarRetiradas } from './emparejar';
 import { redDeActivo, resolverDestinos, type Red } from './resolverDestinos';
 import type { ParsedTransaction } from '../types';
@@ -56,6 +56,12 @@ describe('historial de retiradas de Binance', () => {
     expect(r[0].bruto).toBeCloseTo(10.2, 10);
     expect(r[0].timestamp.toISOString()).toBe('2024-03-01T10:00:00.000Z');
     expect(r[1]).toMatchObject({ address: null, txHash: null });
+  });
+
+  it('varios historiales solapados se unen sin repetir retiradas (#326)', () => {
+    const fila = (d: string) => `2024-03-0${d} 10:00:00,XRP,XRP,10,0.2,rSintetica1234,${'b'.repeat(64)},Completed`;
+    const r = parseVariosHistoriales([csv([fila('1'), fila('2')]), csv([fila('2'), fila('3')])]);
+    expect(r.map(x => x.timestamp.getUTCDate())).toEqual([1, 2, 3]);
   });
 
   it('un CSV con otras columnas falla con un mensaje claro', () => {

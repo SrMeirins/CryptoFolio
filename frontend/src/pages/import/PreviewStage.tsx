@@ -5,16 +5,17 @@ import { UnknownOperationsCard } from './UnknownOperationsCard'
 import { TransactionsTable } from './TransactionsTable'
 import type { PreviewResult, DepositReview, WizardResult } from './types'
 import { cardClasses, buttonClasses } from '../../components/ui'
-import { nadaQueImportar, newTransactions, newWithdrawals, txKey } from './reviewSelection'
+import { loteIlegible, nadaQueImportar, newTransactions, newWithdrawals, txKey } from './reviewSelection'
 import { EXCHANGE_LABEL, textoPendiente } from './wizard'
-import { ExchangeBadge } from './UploadZone'
+import { ExchangeBadge } from './ExchangeBadge'
 import { RetiradasCard } from './RetiradasCard'
+import { LoteCard } from './LoteCard'
 
 export function PreviewStage({
   preview, showTxTable, setShowTxTable, txPage, setTxPage, txPageSize,
   resolvedOps, withdrawalDestinations, depositCosts,
   onWithdrawalDestination, onDepositCost, onIgnoreOp, onCatalog, onConfirm, error, onReset, onVerHistorial,
-  exchange, onCambiarExchange, cambiando, retiradasNombre, onRetiradas,
+  exchange, onCambiarExchange, onLeerComo, onQuitarArchivo, cambiando, retiradasNombre, onRetiradas,
 }: {
   preview: PreviewResult
   showTxTable: boolean
@@ -37,6 +38,9 @@ export function PreviewStage({
   exchange: 'binance' | 'bitvavo'
   /** Vuelve a leer el archivo con otro exchange (#318). */
   onCambiarExchange: (ex: 'binance' | 'bitvavo') => void
+  /** Lote (#326): «Leer como…» y quitar un archivo concreto. */
+  onLeerComo: (indice: number, ex: 'binance' | 'bitvavo') => void
+  onQuitarArchivo: (indice: number) => void
   cambiando: boolean
   /** Historial de retiradas de Binance aportado (#320). */
   retiradasNombre: string | null
@@ -59,6 +63,9 @@ export function PreviewStage({
   const newTxs    = newTransactions(preview)
   const otro = exchange === 'binance' ? 'bitvavo' : 'binance'
   const deteccion = preview.deteccion
+  const archivos = preview.archivos ?? []
+  const esLote = archivos.length > 1
+  const hayBinance = esLote ? archivos.some(a => a.exchange === 'binance' && a.estado !== 'no_reconocido') : exchange === 'binance'
   const chip = (
     <div className="flex items-center gap-2 flex-wrap text-xs">
       <span className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-fg-muted">
@@ -102,22 +109,47 @@ export function PreviewStage({
     )
   }
 
+  const loteCard = esLote && (
+    <LoteCard archivos={archivos} repetidas={preview.repetidasEnLote ?? 0} cambiando={cambiando}
+      onLeerComo={onLeerComo} onQuitar={onQuitarArchivo} />
+  )
+
+  // Lote sin ningún archivo legible (#326): el motivo de cada uno y qué hacer.
+  if (loteIlegible(preview)) {
+    return (
+      <div className="space-y-4">
+        <div className={cardClasses('md', 'flex items-start gap-3')} role="alert">
+          <AlertTriangle size={18} className="text-warning shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="space-y-2">
+            <h2 className="font-semibold text-fg">No se ha podido leer ningún archivo del lote</h2>
+            <p className="text-sm text-fg-muted">Revisa que sean exportaciones del historial de transacciones, o fuerza el exchange de cada uno con «Leer como…».</p>
+            <button type="button" onClick={onReset} className={buttonClasses('ghost', 'sm')}>Empezar de nuevo</button>
+          </div>
+        </div>
+        {loteCard}
+      </div>
+    )
+  }
+
   if (nadaQueImportar(preview)) {
     const range = preview.validation.dateRange
     return (
-      <div className={cardClasses('md', 'text-center space-y-4 py-10')} role="status">
-        <CheckCircle2 size={36} className="mx-auto text-positive" aria-hidden="true" />
-        <div className="space-y-1">
-          <div className="flex justify-center mb-2">{chip}</div>
-          <h2 className="text-lg font-semibold text-fg">Ya está todo importado</h2>
-          <p className="text-sm text-fg-muted">
-            Las {preview.duplicateCount} transacciones de este archivo{range ? ` (${range.from} – ${range.to})` : ''} ya estaban en tu historial. No hay nada nuevo que importar.
-          </p>
+      <div className="space-y-4">
+        <div className={cardClasses('md', 'text-center space-y-4 py-10')} role="status">
+          <CheckCircle2 size={36} className="mx-auto text-positive" aria-hidden="true" />
+          <div className="space-y-1">
+            {!esLote && <div className="flex justify-center mb-2">{chip}</div>}
+            <h2 className="text-lg font-semibold text-fg">Ya está todo importado</h2>
+            <p className="text-sm text-fg-muted">
+              Las {preview.duplicateCount} transacciones de {esLote ? 'estos archivos' : 'este archivo'}{range ? ` (${range.from} – ${range.to})` : ''} ya estaban en tu historial. No hay nada nuevo que importar.
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <button type="button" onClick={onReset} className={buttonClasses('primary', 'sm', 'flex gap-1.5')}><Upload size={13} aria-hidden="true" /> Subir otro archivo</button>
+            <button type="button" onClick={onVerHistorial} className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}><History size={13} aria-hidden="true" /> Ver en Historial</button>
+          </div>
         </div>
-        <div className="flex items-center justify-center gap-2 flex-wrap">
-          <button type="button" onClick={onReset} className={buttonClasses('primary', 'sm', 'flex gap-1.5')}><Upload size={13} aria-hidden="true" /> Subir otro archivo</button>
-          <button type="button" onClick={onVerHistorial} className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}><History size={13} aria-hidden="true" /> Ver en Historial</button>
-        </div>
+        {loteCard}
       </div>
     )
   }
@@ -131,8 +163,8 @@ export function PreviewStage({
       )}
       <div className={cardClasses('md', 'space-y-4')}>
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h2 className="font-medium text-sm">Resumen del archivo</h2>
-          {chip}
+          <h2 className="font-medium text-sm">{esLote ? `Resumen del lote · ${archivos.length} archivos` : 'Resumen del archivo'}</h2>
+          {!esLote && chip}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-background-tertiary rounded-lg p-3 text-center">
@@ -196,7 +228,9 @@ export function PreviewStage({
         />
       )}
 
-      {exchange === 'binance' && withdrawals.length > 0 && (
+      {loteCard}
+
+      {hayBinance && withdrawals.length > 0 && (
         <RetiradasCard resumen={preview.retiradas} nombre={retiradasNombre} cargando={cambiando}
           onAnadir={f => onRetiradas(f)} onQuitar={() => onRetiradas(null)} />
       )}
