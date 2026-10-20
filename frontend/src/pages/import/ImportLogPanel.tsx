@@ -1,9 +1,11 @@
 import { useRef, useEffect } from 'react'
 import type { ProgressEvent } from './types'
+import { eventosLog } from './progreso'
 
 export function ImportLogPanel({ log, done }: { log: ProgressEvent[]; done: boolean }) {
   const logRef = useRef<HTMLDivElement>(null)
 
+  const eventos = eventosLog(log)
   useEffect(() => {
     if (!done && logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight
@@ -15,10 +17,10 @@ export function ImportLogPanel({ log, done }: { log: ProgressEvent[]; done: bool
       ref={logRef}
       className="bg-overlay/5 rounded-lg p-4 font-mono text-xs space-y-1 max-h-64 overflow-y-auto"
     >
-      {log.length === 0 && (
+      {eventos.length === 0 && (
         <span className="text-fg-subtle">Esperando inicio...</span>
       )}
-      {log.map((event, absIdx) => ({ event, absIdx })).slice(-300).map(({ event, absIdx }) => {
+      {eventos.map((event, absIdx) => ({ event, absIdx })).slice(-300).map(({ event, absIdx }) => {
         const msg = event.message
         const isRateLimit      = msg.startsWith('⏳') || msg.includes('Rate limit') || msg.includes('429')
         const isPrefetch       = msg.startsWith('🔄')
@@ -31,7 +33,7 @@ export function ImportLogPanel({ log, done }: { log: ProgressEvent[]; done: bool
         const color =
           event.phase === 'error' ? 'text-negative'         :
           event.phase === 'done'  ? 'text-positive'       :
-          isRateLimit             ? 'text-orange-400'         :
+          isRateLimit             ? 'text-warning'         :
           isPrefetch              ? 'text-accent-purple'         :
           isFallback              ? 'text-warning'         :
           isFifoError             ? 'text-warning'         :

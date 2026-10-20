@@ -79,6 +79,28 @@ describe('POST /api/imports/confirm', () => {
     expect(events.at(-1)?.phase).toBe('done');
   });
 
+  it('el evento final trae el resumen estructurado y el FIFO informa de su avance (#324)', async () => {
+    const buffer = Buffer.from(csv([
+      '123,2024-08-01 10:00:00,Spot,Deposit,EUR,250,',
+      '123,2024-08-02 10:00:00,Spot,Withdraw,ETH,-0.1,',
+    ]), 'utf-8');
+    const res = await request(app).post('/api/imports/confirm').attach('file', buffer, 'resumen.csv');
+    const events = parseSseEvents(res.text) as Array<{ phase: string; message: string; progress?: number; total?: number; soloProgreso?: boolean; resumen?: Record<string, unknown> }>;
+
+    const fin = events.at(-1)!;
+    expect(fin.phase).toBe('done');
+    expect(fin.resumen).toMatchObject({ archivo: 'resumen.csv', nuevas: 2, duplicadas: 0, precios: { necesarios: 0, obtenidos: 0, sinPrecio: [] } });
+    expect(fin.resumen!.importId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(Array.isArray(fin.resumen!.avisos)).toBe(true);
+    expect(Array.isArray(fin.resumen!.impacto)).toBe(true);
+    // Los avisos van en lenguaje claro, sin identificadores internos.
+    expect(JSON.stringify(fin.resumen!.avisos)).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/);
+
+    const fifo = events.filter(e => e.phase === 'fifo' && e.soloProgreso);
+    expect(fifo.length).toBeGreaterThan(0);
+    expect(fifo.at(-1)).toMatchObject({ progress: fifo.at(-1)!.total });
+  });
+
   it('un CSV con depósito cripto externo sin coste asignado bloquea en el gate 0 (fase "error", nunca llega a importar)', async () => {
     const before = await pool.query('SELECT COUNT(*) FROM csv_imports');
     const buffer = Buffer.from(csv([

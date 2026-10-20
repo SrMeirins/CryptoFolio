@@ -131,6 +131,23 @@ describe('runFifoEngine — atomicidad', () => {
   });
 });
 
+describe('runFifoEngine — progreso (#324)', () => {
+  it('informa del avance hasta el total sin cambiar el resultado', async () => {
+    await clearTransactions();
+    await insertTx({ operation_type: 'BUY', asset: 'BTC', amount: 1, amount_net: 1, cost_asset: 'EUR', cost_amount: 100, timestamp: '2024-01-01T00:00:00Z' });
+    await insertTx({ operation_type: 'SELL', asset: 'BTC', amount: 0.4, amount_net: 0.4, cost_asset: 'EUR', cost_amount: 60, timestamp: '2024-02-01T00:00:00Z' });
+
+    const avances: Array<[number, number]> = [];
+    const conProgreso = await runFifoEngine((d, t) => avances.push([d, t]));
+    const sinProgreso = await runFifoEngine();
+
+    expect(avances.at(-1)).toEqual([2, 2]);
+    expect(avances.every(([d, t], i) => t === 2 && (i === 0 || d >= avances[i - 1][0]))).toBe(true);
+    expect(conProgreso.lotsConsumed).toBe(sinProgreso.lotsConsumed);
+    expect(conProgreso.totalGainEur).toBeCloseTo(sinProgreso.totalGainEur, 8);
+  });
+});
+
 describe('consumeLots — shortfall', () => {
   it('reporta un error cuando se vende más cantidad de la que hay en lotes abiertos, en vez de fallar en silencio', async () => {
     await clearTransactions();

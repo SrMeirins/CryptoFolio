@@ -5,7 +5,7 @@ import { portfolioApi, Transaction } from '../api/portfolio'
 import {
   Search, ChevronLeft, ChevronRight, X, RefreshCw,
   Download, PenLine, Calendar,
-  ArrowUpDown, ArrowUp, ArrowDown, Package,
+  ArrowUpDown, ArrowUp, ArrowDown, Package, FileText,
 } from 'lucide-react'
 import { useToast } from '../hooks/useToast'
 import { ManualTxModal } from '../components/ManualTxModal'
@@ -42,11 +42,14 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 interface Filters {
   asset: string; account: string; type: string; wallet_id: string
   manualOnly: boolean; date_from: string; date_to: string; search: string; offset: number
+  /** Transacciones de una importación (#324), desde su resultado o la lista de importaciones. */
+  import_id: string
 }
 const INITIAL: Filters = {
   asset: '', account: '', type: '', wallet_id: '',
-  manualOnly: false, date_from: '', date_to: '', search: '', offset: 0,
+  manualOnly: false, date_from: '', date_to: '', search: '', offset: 0, import_id: '',
 }
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // ── Página principal ───────────────────────────────────────────────────────
 export function History() {
@@ -55,9 +58,12 @@ export function History() {
   const searchRef   = useRef<HTMLInputElement>(null)
 
   // ?buscar=XRP&tx=<id> llega desde la actividad reciente del Dashboard (#237).
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const focusTx = params.get('tx')
-  const [filters, setFilters]         = useState<Filters>(() => ({ ...INITIAL, search: params.get('buscar') ?? '' }))
+  const [filters, setFilters]         = useState<Filters>(() => {
+    const imp = params.get('import') ?? ''
+    return { ...INITIAL, search: params.get('buscar') ?? '', import_id: UUID_RE.test(imp) ? imp : '' }
+  })
   const [sortKey, setSortKey]         = useState<SortKey>('fecha')
   const [sortDir, setSortDir]         = useState<SortDir>('desc')
   const [deletingId, setDeletingId]   = useState<string | null>(null)
@@ -81,7 +87,16 @@ export function History() {
     ...(filters.date_to    ? { date_to:        filters.date_to }            : {}),
     ...(filters.search     ? { search:         filters.search }             : {}),
     ...(filters.manualOnly ? { manually_added: 'true' }                     : {}),
+    ...(filters.import_id  ? { import_id:      filters.import_id }          : {}),
   }), [filters])
+
+  // Nombre del archivo de la importación filtrada, para la etiqueta.
+  const { data: imports = [] } = useQuery({ queryKey: ['imports'], queryFn: portfolioApi.getImports, enabled: !!filters.import_id })
+  const importFiltrada = imports.find(i => i.id === filters.import_id)
+  function quitarImport() {
+    setFilters(prev => ({ ...prev, import_id: '', offset: 0 }))
+    if (params.has('import')) { const p = new URLSearchParams(params); p.delete('import'); setParams(p, { replace: true }) }
+  }
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['transactions', queryParams],
@@ -128,7 +143,7 @@ export function History() {
   function setFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters(prev => ({ ...prev, [key]: value, ...(key !== 'offset' ? { offset: 0 } : {}) }))
   }
-  function clearFilters() { setFilters(INITIAL); setSortKey('fecha'); setSortDir('desc') }
+  function clearFilters() { quitarImport(); setFilters(INITIAL); setSortKey('fecha'); setSortDir('desc') }
 
   function toggleSort(col: SortKey) {
     if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -173,7 +188,7 @@ export function History() {
   }
 
   const hasActiveFilters = !!(filters.asset || filters.account || filters.type || filters.wallet_id ||
-    filters.manualOnly || filters.date_from || filters.date_to || filters.search)
+    filters.manualOnly || filters.date_from || filters.date_to || filters.search || filters.import_id)
 
   const KNOWN_ACCOUNTS = ['Spot', 'Funding', 'Cross Margin', 'Isolated Margin', 'Futures', 'Manual']
 
@@ -210,6 +225,17 @@ export function History() {
             </button>
 </>}
         />
+
+        {filters.import_id && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-brand/30 bg-brand/8 px-2.5 py-1 text-brand">
+              <FileText size={12} aria-hidden="true" />
+              De la importación <span className="font-medium">{importFiltrada?.filename ?? '…'}</span>
+              <button type="button" onClick={quitarImport} aria-label="Quitar el filtro de importación"
+                className="ml-0.5 rounded hover:text-fg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60"><X size={11} aria-hidden="true" /></button>
+            </span>
+          </div>
+        )}
 
         {/* ── Filtros ── */}
         <div className="flex items-center gap-2 flex-wrap">

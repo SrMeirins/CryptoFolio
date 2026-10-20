@@ -39,7 +39,7 @@ export async function enrichIncomeTransactionsWithPrices(
 
   // Activar callback CoinGecko ANTES del prefetch para que rate limits y progreso
   // aparezcan en el log de la UI desde el primer momento.
-  setCoinGeckoStatusCallback(onStatus);
+  setCoinGeckoStatusCallback(onStatus ? msg => onStatus(msg) : undefined);
 
   // Pre-warm precios CoinGecko via market_chart/range antes del loop de enriquecimiento.
   // Solo para activos que genuinamente usan CoinGecko como fuente (price_source='coingecko'

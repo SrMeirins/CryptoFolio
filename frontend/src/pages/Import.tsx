@@ -20,6 +20,8 @@ import { ImportStepper } from './import/ImportStepper'
 import { firmaArchivo, pasoDeStage, ultimasPorExchange, type Paso } from './import/wizard'
 import { navIcon } from '../constants/navigation'
 import { esArchivoRetiradas } from './import/direcciones'
+import { useAvisoSalida } from './import/useAvisoSalida'
+import { useTituloImportacion } from './import/useTituloImportacion'
 
 // Firma del archivo de la sesión: si se vuelve a subir el mismo, se conserva lo asignado (#318).
 const FIRMA_KEY = 'import_file_signature'
@@ -45,6 +47,7 @@ export function ImportPage() {
   const [withdrawalDestinations, setWithdrawalDestinations] = useWithdrawalDestinations()
   const [depositCosts, setDepositCosts] = useDepositCosts()
   const [progressLog, setProgressLog] = useState<ProgressEvent[]>([])
+  const [inicioImport, setInicioImport] = useState(0)
   const [showTxTable, setShowTxTable] = useState(false)
   const [txPage, setTxPage]           = useState(0)
   const [showManualTx, setShowManualTx] = useState(false)
@@ -54,6 +57,10 @@ export function ImportPage() {
     queryKey: ['imports'],
     queryFn: portfolioApi.getImports,
   })
+
+  // Mientras importa: aviso al salir y progreso en el título de la pestaña (#324).
+  useAvisoSalida(stage === 'progress')
+  useTituloImportacion(progressLog, stage === 'progress' || stage === 'done')
 
   const { data: pendingDeposits = [] } = useQuery({
     queryKey: ['pending-deposits'],
@@ -147,6 +154,7 @@ export function ImportPage() {
 
     setStage('progress')
     setProgressLog([])
+    setInicioImport(Date.now())
 
     const form = new FormData()
     form.append('file', fileBufferRef.current)
@@ -172,7 +180,7 @@ export function ImportPage() {
       }
 
       sawTerminal = await readProgressStream(res, event => {
-        setProgressLog(prev => [...prev, event])
+        setProgressLog(prev => [...prev, { ...event, t: Date.now() }])
         if (event.phase === 'done') finishImportSuccess()
       })
     } catch {
@@ -329,7 +337,11 @@ export function ImportPage() {
         <ProgressStage
           log={progressLog}
           done={stage === 'done'}
+          inicio={inicioImport}
           onGoToDashboard={() => navigate('/')}
+          onReset={handleReset}
+          onVerHistorial={id => navigate(`/history?import=${encodeURIComponent(id)}`)}
+          onIrFiscal={year => navigate(year ? `/fiscal?anio=${year}` : '/fiscal')}
         />
       )}
 

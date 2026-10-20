@@ -1,6 +1,7 @@
 import { db } from '../../db/client';
 import { Exchange, parseExchangeCsv } from './exchanges';
 import { importCsvFile, ImportResult } from './importer';
+import type { ResumenImportacion } from './resumenImportacion';
 import { runFifoEngine, FifoRunResult } from '../fifo/engine';
 import { loadAssetMetadata, getHistoricalPriceEur } from '../prices/binance';
 import { setCoinGeckoStatusCallback, prefetchHistoricalPrices as prefetchCoinGeckoHistoricalPrices } from '../prices/coingecko';
@@ -10,7 +11,15 @@ import { setCoinGeckoStatusCallback, prefetchHistoricalPrices as prefetchCoinGec
 // recibe un emisor de progreso genérico (no atado a SSE) — el router le pasa
 // una función que escribe al stream; cualquier otro consumidor (tests, una
 // futura cola en background) puede pasar otra implementación.
-export type ProgressEmitter = (phase: string, message: string, progress?: number, total?: number) => void;
+/**
+ * Datos extra de un evento (#324): `espera` (segundos de una espera por rate
+ * limit), `soloProgreso` (avance sin interés para el log) y `resumen` (evento final).
+ */
+export interface ExtraEvento { espera?: number; soloProgreso?: boolean; resumen?: ResumenImportacion }
+export type ProgressEmitter = (phase: string, message: string, progress?: number, total?: number, extra?: ExtraEvento) => void;
+
+export interface ResumenPrecios { necesarios: number; obtenidos: number; sinPrecio: { activo: string; fecha: string }[] }
+const MAX_SIN_PRECIO = 50;
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -118,7 +127,7 @@ export async function importTransactionsPhase(
       if (done - lastImportReport >= IMPORT_REPORT_EVERY || done === total) {
         lastImportReport = done;
         const label = asset && operation ? `${asset} · ${operation}` : 'Procesando...';
-        emit('importing', label, done, total);
+        emit('importing', label, done, total, { soloProgreso: true });
       }
     },
     (message, progress, total) => {
@@ -142,7 +151,7 @@ export async function importTransactionsPhase(
 
 // FASE 2: detecta y precarga los precios históricos que faltan (Binance →
 // CoinGecko fallback), en lotes con concurrencia acotada.
-export async function fetchMissingHistoricalPrices(emit: ProgressEmitter): Promise<void> {
+export async function fetchMissingHistoricalPrices(emit: ProgressEmitter): Promise<ResumenPrecios> {
   emit('prices', 'Detectando precios históricos necesarios...');
   await loadAssetMetadata();
 
@@ -197,13 +206,15 @@ export async function fetchMissingHistoricalPrices(emit: ProgressEmitter): Promi
 
   if (toFetch === 0) {
     emit('prices', '✓ Todos los precios históricos en caché');
-    return;
+    return { necesarios: 0, obtenidos: 0, sinPrecio: [] };
   }
+  const sinPrecio: ResumenPrecios['sinPrecio'] = [];
+  let sinPrecioTotal = 0;
 
   emit('prices', `Cargando ${toFetch} precios históricos (Binance → CoinGecko fallback)...`, 0, toFetch);
 
   // Activar callback CoinGecko para que rate limits aparezcan en fase 'prices'
-  setCoinGeckoStatusCallback((msg) => emit('prices', msg));
+  setCoinGeckoStatusCallback((msg, info) => emit('prices', msg, undefined, undefined, info?.esperaSeg ? { espera: info.esperaSeg } : undefined));
 
   try {
     // Pre-warm CoinGecko solo para activos que dependen de CoinGecko (no Binance).
@@ -251,6 +262,10 @@ export async function fetchMissingHistoricalPrices(emit: ProgressEmitter): Promi
           const dateStr = date.toISOString().slice(0, 10);
           const price = await getHistoricalPriceEur(symbol, date).catch(() => 0);
           done++;
+          if (!(price > 0)) {
+            sinPrecioTotal++;
+            if (sinPrecio.length < MAX_SIN_PRECIO) sinPrecio.push({ activo: symbol, fecha: dateStr });
+          }
           const label = price > 0
             ? `✓ ${symbol} @ ${dateStr}`
             : `— ${symbol} @ ${dateStr} (sin precio)`;
@@ -261,13 +276,14 @@ export async function fetchMissingHistoricalPrices(emit: ProgressEmitter): Promi
   } finally {
     setCoinGeckoStatusCallback(undefined);
   }
+  return { necesarios: toFetch, obtenidos: toFetch - sinPrecioTotal, sinPrecio };
 }
 
 // FASE 3: ejecuta el motor FIFO y emite un resumen legible de resultado,
 // agrupando advertencias repetidas para no saturar el log del cliente.
 export async function runFifoPhase(emit: ProgressEmitter): Promise<FifoRunResult> {
   emit('fifo', 'Ejecutando motor FIFO...');
-  const fifoResult = await runFifoEngine();
+  const fifoResult = await runFifoEngine((done, total) => emit('fifo', 'Calculando FIFO', done, total, { soloProgreso: true }));
   emit('fifo', `✓ FIFO completado: ${fifoResult.lotsCreated} lotes, ${fifoResult.lotsConsumed} consumos`);
 
   if (fifoResult.errors.length > 0) {

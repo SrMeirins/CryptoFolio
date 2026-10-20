@@ -75,6 +75,24 @@ export interface ProgressEvent {
   message: string
   progress?: number
   total?: number
+  /** Segundos de espera por rate limit de CoinGecko (#324). */
+  espera?: number
+  /** Avance sin interés para el log técnico (#324). */
+  soloProgreso?: boolean
+  /** Resumen estructurado del evento final (#324). */
+  resumen?: ResumenImportacion
+  /** Instante de recepción en el cliente (ms), para la cuenta atrás. */
+  t?: number
+}
+
+export interface ResumenImportacion {
+  importId: string
+  archivo: string
+  nuevas: number
+  duplicadas: number
+  precios: { necesarios: number; obtenidos: number; sinPrecio: { activo: string; fecha: string }[] }
+  avisos: { tipo: 'sin_compras' | 'transferencia' | 'lote_sintetico' | 'otro'; activo: string | null; veces: number; mensaje: string }[]
+  impacto: { year: number; antes: number; despues: number }[]
 }
 
 export const LANG_LABELS: Record<string, string> = {
