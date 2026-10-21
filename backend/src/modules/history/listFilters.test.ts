@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildHistoryWhere, escapeLike, historyQuerySchema, MAX_PAGE_SIZE } from './listFilters';
+import { buildHistoryOrderBy, buildHistoryWhere, escapeLike, hasFilters, historyExportSchema, historyQuerySchema, MAX_PAGE_SIZE } from './listFilters';
 
 // Validación de los filtros de GET /transactions (#346).
 const parse = (q: Record<string, unknown>) => historyQuerySchema.safeParse(q);
@@ -83,5 +83,34 @@ describe('buildHistoryWhere', () => {
     const f = historyQuerySchema.parse({ date_to: '2026-01-31' });
     const { where } = buildHistoryWhere(f, 'Atlantic/Canary');
     expect(where).toBe('WHERE t.timestamp < ($2::date + 1)::timestamp AT TIME ZONE $1');
+  });
+});
+
+describe('orden y exportación (#349)', () => {
+  it('sort y dir: por defecto fecha desc; solo valores de la lista blanca', () => {
+    const r = parse({});
+    expect(r.success && [r.data.sort, r.data.dir]).toEqual(['fecha', 'desc']);
+    expect(parse({ sort: 'valor', dir: 'asc' }).success).toBe(true);
+    expect(parse({ sort: 't.notes; DROP TABLE transactions' }).success).toBe(false);
+    expect(parse({ dir: 'DESC' }).success).toBe(false);
+  });
+
+  it('la exportación acepta los mismos filtros pero no la paginación', () => {
+    expect(historyExportSchema.safeParse({ asset: 'btc', sort: 'tipo' }).success).toBe(true);
+    expect(historyExportSchema.safeParse({ limit: '10' }).success).toBe(false);
+    expect(historyExportSchema.safeParse({ offset: '0' }).success).toBe(false);
+  });
+
+  it('hasFilters ignora orden y moneda', () => {
+    expect(hasFilters(historyExportSchema.parse({ sort: 'valor', currency: 'USD' }))).toBe(false);
+    expect(hasFilters(historyExportSchema.parse({ manually_added: 'false' }))).toBe(true);
+  });
+
+  it('ORDER BY con desempate estable y nulos al final al ordenar por valor', () => {
+    expect(buildHistoryOrderBy('fecha', 'asc')).toBe('ORDER BY t.timestamp ASC, t.id ASC');
+    for (const dir of ['asc', 'desc'] as const) {
+      expect(buildHistoryOrderBy('valor', dir)).toMatch(/^ORDER BY \(t\.value_eur IS NULL\) ASC, t\.value_eur (ASC|DESC), t\.timestamp DESC, t\.id DESC$/);
+    }
+    expect(buildHistoryOrderBy('activo', 'asc')).toContain('t.id DESC');
   });
 });

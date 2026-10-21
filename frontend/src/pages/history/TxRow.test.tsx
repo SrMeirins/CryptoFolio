@@ -17,6 +17,7 @@ function tx(overrides: Partial<Transaction>): Transaction {
     account: null, notes: null, manually_added: false, created_at: '2026-01-15T10:30:00.000Z',
     destination_wallet_id: null, destination_wallet_name: null, destination_wallet_color: null,
     linked_tx_id: null, linked_tx_timestamp: null, linked_tx_operation_type: null, linked_tx_amount: null, linked_tx_asset: null,
+    import_id: null, import_filename: null, tx_hash: null,
     value_eur: 5, value_source: 'estimado', fee_value_eur: null, fee_value_source: null,
     usd_per_eur: 1.1,
     ...overrides,

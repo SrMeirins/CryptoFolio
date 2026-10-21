@@ -201,6 +201,54 @@ describe('routes/transactions — listado, stats y facetas', () => {
     });
   });
 
+  describe('GET / — orden en el servidor (#349)', () => {
+    const ordenIds = async (qs: string) =>
+      (await request(app).get(`/api/transactions?limit=200&${qs}`)).body.transactions.map((t: { id: string }) => t.id) as string[];
+    const k = (...keys: string[]) => keys.map(key => ids[key]);
+
+    it('por valor desc: el mayor de todo lo filtrado primero y los sin precio al final', async () => {
+      const orden = await ordenIds('sort=valor&dir=desc');
+      expect(orden[0]).toBe(ids.depositBnb);
+      // Sin precio al final, desempatadas por fecha descendente.
+      expect(orden.slice(-2)).toEqual(k('lost', 'noPrice'));
+    });
+
+    it('por valor asc: empates por fecha descendente y los sin precio también al final', async () => {
+      const orden = await ordenIds('sort=valor&dir=asc');
+      // feeRow y withdrawOwn valen 5: primero el más reciente.
+      expect(orden.slice(0, 2)).toEqual(k('withdrawOwn', 'feeRow'));
+      expect(orden.slice(-2)).toEqual(k('lost', 'noPrice'));
+    });
+
+    it('por tipo: alfabético por la etiqueta visible; por activo: alfabético', async () => {
+      expect((await ordenIds('sort=tipo&dir=asc'))[0]).toBe(ids.feeRow);   // «Comisión exchange»
+      expect((await ordenIds('sort=activo&dir=asc'))[0]).toBe(ids.shortfall); // ADA
+    });
+
+    it.each(['fecha', 'valor', 'activo', 'tipo'])('paginar por %s no repite ni omite filas', async (sort) => {
+      for (const dir of ['asc', 'desc']) {
+        const vistos: string[] = [];
+        for (let offset = 0; offset < 11; offset += 3) {
+          const res = await request(app).get(`/api/transactions?sort=${sort}&dir=${dir}&limit=3&offset=${offset}`);
+          vistos.push(...res.body.transactions.map((t: { id: string }) => t.id));
+        }
+        expect(vistos).toHaveLength(11);
+        expect(new Set(vistos).size).toBe(11);
+      }
+    });
+
+    it('sort y dir inválidos → 400', async () => {
+      expect((await request(app).get('/api/transactions?sort=notes')).status).toBe(400);
+      expect((await request(app).get('/api/transactions?dir=sideways')).status).toBe(400);
+    });
+
+    it('cada fila trae el archivo de origen y el hash para la trazabilidad', async () => {
+      const rows = (await request(app).get('/api/transactions')).body.transactions;
+      expect(rows[0]).toHaveProperty('import_filename');
+      expect(rows[0]).toHaveProperty('tx_hash');
+    });
+  });
+
   describe('GET / — flujos', () => {
     it('separa entradas y salidas; los movimientos entre wallets propias no cuentan', async () => {
       const { flows } = (await request(app).get('/api/transactions')).body;
