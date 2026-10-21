@@ -100,11 +100,20 @@ urls: ## Imprimir las URLs reales (resolviendo puertos asignados)
 	echo "  🔌   Backend   → http://$${b:-<sin subir>}"; \
 	echo "  🐘   Postgres  → $${p:-<sin subir>}"; echo ""
 
-open: ## Abrir el frontend en el navegador (best-effort, Linux/macOS)
+# `up -d` vuelve en cuanto los contenedores arrancan, no cuando Vite ya sirve
+# la página: se espera a que el frontend responda (máx. OPEN_TIMEOUT s) para
+# que el navegador no abra una pestaña con error de conexión.
+OPEN_TIMEOUT ?= 60
+open: ## Abrir el frontend en el navegador cuando responda (best-effort, Linux/macOS)
 	@f=$$( $(COMPOSE) port frontend 5173 2>/dev/null); \
-	if [ -z "$$f" ]; then \
-	  exit 0; \
-	elif command -v xdg-open >/dev/null 2>&1; then \
+	if [ -z "$$f" ]; then exit 0; fi; \
+	printf '⏳ Esperando a que el frontend responda'; \
+	for i in $$(seq 1 $(OPEN_TIMEOUT)); do \
+	  if curl -fs -o /dev/null --max-time 2 "http://$$f/"; then echo ' ✓'; break; fi; \
+	  printf '.'; sleep 1; \
+	  if [ "$$i" -eq $(OPEN_TIMEOUT) ]; then echo ' (sin respuesta tras $(OPEN_TIMEOUT) s, se abre igualmente)'; fi; \
+	done; \
+	if command -v xdg-open >/dev/null 2>&1; then \
 	  xdg-open "http://$$f" >/dev/null 2>&1 & \
 	elif command -v open >/dev/null 2>&1; then \
 	  open "http://$$f" >/dev/null 2>&1 & \
