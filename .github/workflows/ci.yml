@@ -45,8 +45,10 @@ jobs:
   audit:
     name: Auditoría de dependencias — ${{ matrix.package }}
     # Falla ante vulnerabilidades altas o críticas en dependencias de
-    # producción (#203). Las de herramientas de desarrollo (compilación,
-    # empaquetado) no llegan a la app y se siguen en sus propias issues.
+    # producción (#203) y, desde #355, también en las de desarrollo: una
+    # vulnerabilidad en la cadena de herramientas (vite, el servidor de
+    # desarrollo) afecta a quien trabaja en el repo. Además, toda dependencia
+    # debe declararse con versión exacta.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -64,6 +66,13 @@ jobs:
       - name: npm audit (producción)
         working-directory: ${{ matrix.package }}
         run: npm audit --omit=dev --audit-level=high
+
+      - name: npm audit (desarrollo)
+        working-directory: ${{ matrix.package }}
+        run: npm audit --audit-level=high
+
+      - name: Versiones exactas
+        run: node scripts/check-exact-versions.mjs ${{ matrix.package }}/package.json
 
   test-backend:
     name: Tests — backend
