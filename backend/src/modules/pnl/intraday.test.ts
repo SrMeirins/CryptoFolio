@@ -71,6 +71,20 @@ describe('buildIntradaySeries', () => {
     expect(r.points[2].stepPct).toBeCloseTo(-6.875, 3);   // −11 sobre 160
   });
 
+  it('el % de cada punto es sobre el capital aportado; el TWR va aparte (#353)', () => {
+    // Pierde la mitad con 100 € y luego se aportan 900 €: TWR −50 %, capital −5 %.
+    const r = buildIntradaySeries({
+      instants: [0, 1, 2],
+      holdings: [new Map([['BTC', 1]]), new Map([['BTC', 1]]), new Map([['BTC', 1], ['EUR', 900]])],
+      flows: [{ asset: 'EUR', at: 2, quantity: 900, kind: 'capital' }],
+      priceOf: (a, i) => (a === 'BTC' ? [100, 50, 50][i] : null),
+      fxAt: () => 1,
+    });
+    expect(r.twrPct).toBeCloseTo(-50, 4);
+    expect(r.peakCapitalPct).toBeCloseTo(-5, 4);
+    expect(r.points.at(-1)?.pct).toBeCloseTo(-5, 4);
+  });
+
   it('los préstamos de margen no se marcan como depósitos', () => {
     const r = buildIntradaySeries({
       instants: [0, 1], holdings: [new Map([['EUR', 10]]), new Map([['EUR', 110]])],

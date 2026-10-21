@@ -1,8 +1,9 @@
 // Cálculo puro del P&L diario y de la rentabilidad acumulada (#165).
 //
 // P&L(d)  = V(d) − V(d−1) − (entradas(d) − salidas(d))
-// %(d)    = P&L(d) / (V(d−1) + entradas(d))        (null si la base es < 1 €:
-//           con una cartera casi vacía el % no es representativo y dispararía el TWR)
+// %(d)    = P&L(d) / (V(d−1) + entradas(d))        (null si la base no llega al
+//           umbral de capital ínfimo, ver minBaseFor: con una cartera casi vacía
+//           el % no es representativo y hundiría el TWR para siempre, #353)
 // TWR     = Π(1 + %(d)/100) − 1                    (rentabilidad ponderada en el tiempo)
 // Dietz   = P&L acumulado / (V0 + Σ Fₖ · (m − k)/m)  (Dietz modificado hasta el día m:
 //           cada flujo neto Fₖ pesa por la fracción del periodo que estuvo invertido).
@@ -41,7 +42,19 @@ export interface DayPnl extends DayValuation {
   cumulativePeakCapitalPct: number; // P&L acumulado sobre el máximo capital neto aportado
 }
 
-const MIN_BASE_EUR = 1;
+// Umbral de capital ínfimo (#353): el % de un día (y el TWR, el Dietz y el %
+// sobre capital) solo cuenta si la base llega al 1 % del valor máximo del
+// periodo, con un mínimo absoluto de 1 en la moneda de la serie. Es el mismo
+// criterio que minBase() del frontend (utils/evolutionSummary.ts). Antes era
+// 1 € fijo: días con 5–10 € en cartera y caídas del 15 % hundían el TWR.
+export const MIN_BASE_SHARE = 0.01;
+export const MIN_BASE_ABS = 1;
+
+/** Base mínima para que el % de un día cuente, según el valor máximo del periodo. */
+export function minBaseFor(previousValue: number, days: readonly Pick<DayValuation, 'value'>[]): number {
+  const peak = days.reduce((m, d) => Math.max(m, d.value), previousValue);
+  return Math.max(MIN_BASE_ABS, peak * MIN_BASE_SHARE);
+}
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const round4 = (n: number) => Math.round(n * 10_000) / 10_000;
 
@@ -49,6 +62,7 @@ export function computeDailyPnl(
   previousValue: number,
   days: readonly DayValuation[],
 ): { days: DayPnl[]; totalPnl: number; twrPct: number; dietzPct: number; peakCapitalPct: number } {
+  const threshold = minBaseFor(previousValue, days);
   let prev = previousValue;
   let growth = 1;
   let totalPnl = 0;
@@ -64,7 +78,7 @@ export function computeDailyPnl(
     const m = index + 1;
     const pnl = day.value - prev - (day.inflow - day.outflow);
     const base = prev + day.inflow;
-    const pct = base >= MIN_BASE_EUR ? (pnl / base) * 100 : null;
+    const pct = base >= threshold ? (pnl / base) * 100 : null;
     if (pct !== null) growth *= 1 + pct / 100;
     totalPnl += pnl;
 
@@ -72,11 +86,11 @@ export function computeDailyPnl(
     sumFlows += netFlow;
     sumIndexedFlows += m * netFlow;
     const dietzBase = previousValue + (m * sumFlows - sumIndexedFlows) / m;
-    if (dietzBase >= MIN_BASE_EUR) dietz = (totalPnl / dietzBase) * 100;
+    if (dietzBase >= threshold) dietz = (totalPnl / dietzBase) * 100;
 
     netCapital += day.netCapitalFlow;
     peakCapital = Math.max(peakCapital, netCapital);
-    if (peakCapital >= MIN_BASE_EUR) peakCapitalPct = (totalPnl / peakCapital) * 100;
+    if (peakCapital >= threshold) peakCapitalPct = (totalPnl / peakCapital) * 100;
 
     result.push({
       ...day,

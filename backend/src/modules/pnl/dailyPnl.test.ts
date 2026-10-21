@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeDailyPnl, valueHoldings, type DayValuation } from './dailyPnl';
+import { computeDailyPnl, minBaseFor, valueHoldings, type DayValuation } from './dailyPnl';
 import { holdingsAtInstants } from './positions';
 
 const day = (date: string, value: number, inflow = 0, outflow = 0, netCapitalFlow = inflow - outflow): DayValuation =>
@@ -113,5 +113,43 @@ describe('holdingsAtInstants', () => {
   it('descarta las cantidades residuales', () => {
     const [h] = holdingsAtInstants([{ asset: 'XRP', at: 1, delta: 1 }, { asset: 'XRP', at: 2, delta: -1 + 1e-12 }], [3]);
     expect(h.has('XRP')).toBe(false);
+  });
+});
+
+describe('umbral de capital ínfimo (#353)', () => {
+  // Cartera casi vacía (8 €) con dos días de −15 % y después una aportación
+  // de 2.000 € que pierde 100 €: el % debe cuadrar con los euros.
+  const serie = [
+    day('2025-03-01', 6.8),           // −15 % sobre 8 €
+    day('2025-03-02', 5.78),          // −15 % sobre 6,8 €
+    day('2025-03-03', 2005.78, 2000), // aportación
+    day('2025-03-04', 1905.78),       // −100 €
+  ];
+
+  it('minBaseFor: 1 % del valor máximo del periodo, con un mínimo de 1', () => {
+    expect(minBaseFor(8, serie)).toBeCloseTo(20.0578, 4);
+    expect(minBaseFor(0, [day('2025-03-01', 50)])).toBe(1);
+  });
+
+  it('los días con base por debajo del umbral no cuentan en el % ni en el TWR', () => {
+    const { days, twrPct } = computeDailyPnl(8, serie);
+    expect(days[0].pct).toBeNull();
+    expect(days[1].pct).toBeNull();
+    // Solo cuenta el día de −100 € sobre 2.005,78 €: ≈ −4,99 % (antes −30 % por los días de 8 €).
+    expect(twrPct).toBeCloseTo(-100 / 2005.78 * 100, 2);
+  });
+
+  it('el % sobre capital aportado cuadra con el P&L en euros', () => {
+    const { totalPnl, peakCapitalPct, days } = computeDailyPnl(8, serie);
+    expect(totalPnl).toBeCloseTo(-102.22, 2);
+    expect(peakCapitalPct).toBeCloseTo(totalPnl / 2008 * 100, 3);
+    // Mientras el capital es ínfimo la curva no se dispara.
+    expect(days[0].cumulativePeakCapitalPct).toBe(0);
+    expect(days.at(-1)?.cumulativePeakCapitalPct).toBe(peakCapitalPct);
+  });
+
+  it('con una cartera normal el umbral no cambia nada', () => {
+    const { days } = computeDailyPnl(1000, [day('2026-01-10', 1100), day('2026-01-11', 990)]);
+    expect(days.map(d => d.pct)).toEqual([10, -10]);
   });
 });

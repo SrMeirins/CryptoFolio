@@ -16,7 +16,7 @@ describe('periodos', () => {
   it('YTD empieza el 1 de enero del año en curso', () => {
     expect(periodFrom('YTD', TODAY)).toBe('2026-01-01')
     expect(evolutionQuery('YTD', '2027-01-01', null)).toEqual({ intraday: false, from: '2027-01-01' })
-    expect(metricFor('YTD')).toBe('twr')
+    expect(metricFor('YTD')).toBe('peakCapital')
   })
 
   it('rango personalizado: fechas elegidas, acotadas a hoy y con un solo día si falta el final', () => {
@@ -32,13 +32,13 @@ describe('serie común de P&L y Valor', () => {
     cumulativePeakCapitalPct: pct / 2, capitalIn: 0, capitalOut: 0, complete: true, live,
   })
 
-  it('diaria: fecha a medianoche UTC, valor del día y métrica del periodo', () => {
+  it('diaria: fecha a medianoche UTC, valor del día y % sobre capital aportado (#353)', () => {
     const days = [day('2026-10-14', 100, 0, 0), day('2026-10-15', 110, 10, 10, true)]
     expect(fromDaily(days, '7D')).toEqual([
       { x: Date.UTC(2026, 9, 14), pct: 0, pnl: 0, value: 100, stepPct: 0, deposit: 0, withdrawal: 0, live: false },
-      { x: Date.UTC(2026, 9, 15), pct: 10, pnl: 10, value: 110, stepPct: 10, deposit: 0, withdrawal: 0, live: true },
+      { x: Date.UTC(2026, 9, 15), pct: 5, pnl: 10, value: 110, stepPct: 10, deposit: 0, withdrawal: 0, live: true },
     ])
-    expect(fromDaily(days, 'Todo')[1].pct).toBe(5)   // sobre capital aportado
+    expect(fromDaily(days, 'Todo')[1].pct).toBe(5)   // mismo criterio que «Todo»
   })
 
   it('intradía: instante exacto de cada punto', () => {
