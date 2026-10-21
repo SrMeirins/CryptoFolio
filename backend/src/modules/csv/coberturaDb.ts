@@ -39,6 +39,8 @@ async function cargar() {
 export async function coberturaActual(
   extra: readonly { exchange: ExchangeCobertura; rango: RangoImportacion }[] = [],
   hoy: string = hoyUtc(),
+  /** Actividad mensual de los archivos del lote, que aún no está en la BD. */
+  extraMeses: readonly { exchange: ExchangeCobertura; mes: string; n: number }[] = [],
 ): Promise<{ antes: Map<ExchangeCobertura, CoberturaExchange | null>; despues: CoberturaExchange[] }> {
   const { rangos, revisiones, meses } = await cargar();
   const antes = new Map<ExchangeCobertura, CoberturaExchange | null>();
@@ -49,7 +51,9 @@ export async function coberturaActual(
     const m = meses.filter(x => x.exchange === ex).map(({ mes, n }) => ({ mes, n }));
     antes.set(ex, calcularCobertura(ex, propios, revs, hoy, m));
     const conLote = [...propios, ...extra.filter(e => e.exchange === ex).map(e => e.rango)];
-    const c = calcularCobertura(ex, conLote, revs, hoy, m);
+    const mConLote = new Map(m.map(x => [x.mes, x.n]));
+    for (const e of extraMeses.filter(x => x.exchange === ex)) mConLote.set(e.mes, (mConLote.get(e.mes) ?? 0) + e.n);
+    const c = calcularCobertura(ex, conLote, revs, hoy, [...mConLote].sort().map(([mes, n]) => ({ mes, n })));
     if (c) despues.push(c);
   }
   return { antes, despues };

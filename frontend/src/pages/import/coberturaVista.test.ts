@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fechasParaCopiar, marcasAnio, nivelesMeses, rangoExportar, segmento, textoEncaje } from './coberturaVista'
+import { fechasParaCopiar, marcasAnio, rangoExportar, segmento, textoEncaje } from './coberturaVista'
 
 // Cobertura temporal (#328). Datos sintéticos.
 describe('coberturaVista', () => {
@@ -16,10 +16,7 @@ describe('coberturaVista', () => {
     expect(marcasAnio('2026-06-25', '2026-10-20')).toEqual([])
   })
 
-  it('rellena los meses sin actividad y escala la intensidad al máximo', () => {
-    const n = nivelesMeses([{ mes: '2024-11', n: 40 }, { mes: '2025-01', n: 10 }], '2024-11-03', '2025-02-10')
-    expect(n.map(x => [x.mes, x.nivel])).toEqual([['2024-11', 4], ['2024-12', 0], ['2025-01', 1], ['2025-02', 0]])
-  })
+
 
   it('textos y fechas para exportar', () => {
     const h = { desde: '2026-06-17', hasta: '2026-10-20', dias: 126, revisionId: null }
@@ -27,6 +24,8 @@ describe('coberturaVista', () => {
     expect(fechasParaCopiar(h)).toBe('17/06/2026 – 20/10/2026')
     expect(textoEncaje({ tipo: 'deja_hueco', exchange: 'binance', desde: '2026-06-17', hasta: '2026-06-30', dias: 14 }))
       .toBe('Deja un hueco de 14 días en Binance del 17 jun 2026 al 30 jun 2026: si operaste entonces, exporta ese tramo.')
+    expect(textoEncaje({ tipo: 'primera', exchange: 'binance', desde: '2022-02-15', hasta: '2026-06-16', dias: 126 }))
+      .toBe('Primera importación de Binance: del 15 feb 2022 al 16 jun 2026; faltan 126 días hasta hoy.')
     expect(textoEncaje({ tipo: 'al_dia', exchange: 'bitvavo', desde: '2026-09-04', hasta: '2026-10-19', dias: 0 })).toBe('Pone Bitvavo al día hasta el 19 oct 2026.')
   })
 })

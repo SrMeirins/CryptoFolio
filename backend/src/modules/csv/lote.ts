@@ -62,13 +62,17 @@ export function combinarVistasPrevias(vistas: readonly VistaArchivo[]): PreviewL
     const r = v.resultado;
     let nuevas = 0;
     let repetidas = 0;
+    // Solo cuentan las filas de archivos ANTERIORES: dentro de un mismo archivo varias
+    // transacciones pueden compartir fila (p. ej. una compra y su comisión en Binance).
+    const delArchivo = new Set<string>();
     for (const tx of r.transactions) {
       let isNew = tx.isNew;
       if (isNew && tx.rawRowHashes.some(h => vistos.has(h))) { isNew = false; repetidas++; }
       if (isNew) nuevas++;
-      tx.rawRowHashes.forEach(h => vistos.add(h));
+      tx.rawRowHashes.forEach(h => delArchivo.add(h));
       transactions.push({ ...tx, isNew, archivo: indice });
     }
+    delArchivo.forEach(h => vistos.add(h));
 
     const reconocido = r.validation.valid;
     const estado: EstadoArchivo = !reconocido ? 'no_reconocido' : nuevas === 0 ? 'sin_novedades' : 'listo';

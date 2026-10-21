@@ -31,21 +31,6 @@ export function marcasAnio(inicio: string, fin: string): { anio: number; left: n
   return out
 }
 
-/** Todos los meses de la escala con su número de transacciones y un nivel 0–4 relativo al máximo. */
-export function nivelesMeses(meses: readonly { mes: string; n: number }[], inicio: string, fin: string): { mes: string; n: number; nivel: number }[] {
-  const porMes = new Map(meses.map(m => [m.mes, m.n]))
-  const max = Math.max(1, ...meses.map(m => m.n))
-  const out: { mes: string; n: number; nivel: number }[] = []
-  let [y, m] = [Number(inicio.slice(0, 4)), Number(inicio.slice(5, 7))]
-  const [yf, mf] = [Number(fin.slice(0, 4)), Number(fin.slice(5, 7))]
-  while (y < yf || (y === yf && m <= mf)) {
-    const mes = `${y}-${String(m).padStart(2, '0')}`
-    const n = porMes.get(mes) ?? 0
-    out.push({ mes, n, nivel: n === 0 ? 0 : Math.max(1, Math.ceil((n / max) * 4)) })
-    if (++m > 12) { m = 1; y++ }
-  }
-  return out
-}
 
 const f = formatFiscalDate
 const dias = (n: number) => `${n} ${n === 1 ? 'día' : 'días'}`
@@ -67,6 +52,7 @@ const NOMBRE = { binance: 'Binance', bitvavo: 'Bitvavo' } as const
 export function textoEncaje(c: CambioEncaje): string {
   const ex = NOMBRE[c.exchange]
   switch (c.tipo) {
+    case 'primera': return `Primera importación de ${ex}: del ${f(c.desde)} al ${f(c.hasta)}${c.dias > 0 ? `; faltan ${dias(c.dias)} hasta hoy` : ', al día'}.`
     case 'rellena': return `Rellena el hueco de ${ex} del ${f(c.desde)} al ${f(c.hasta)} (${dias(c.dias)}).`
     case 'rellena_parte': return `Rellena en parte el hueco de ${ex} del ${f(c.desde)} al ${f(c.hasta)}; queda algún tramo sin datos.`
     case 'deja_hueco': return `Deja un hueco de ${dias(c.dias)} en ${ex} del ${f(c.desde)} al ${f(c.hasta)}: si operaste entonces, exporta ese tramo.`
