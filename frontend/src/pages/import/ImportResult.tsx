@@ -8,6 +8,8 @@ import { formatEur, pnlColor } from '../../utils/format'
 import { formatFiscalDate } from '../../utils/fiscalTable'
 import { formatoDuracion } from './progreso'
 import { ExchangeBadge } from './ExchangeBadge'
+import { usePreparacionHistoricos } from '../../hooks/usePreparacionHistoricos'
+import { porcentajePreparacion } from '../../utils/preparacion'
 
 const signed = (v: number) => `${v >= 0 ? '+' : ''}${formatEur(v)}`
 const fmt = new Intl.NumberFormat('es-ES')
@@ -24,6 +26,9 @@ export function ImportResult({ resumen, duracion, log, onGoToDashboard, onReset,
   onIrFiscal: (year?: number) => void
 }) {
   const [verLog, setVerLog] = useState(false)
+  // El dashboard necesita los cierres históricos: se preparan en segundo plano (#334).
+  const preparacion = usePreparacionHistoricos()
+  const prog = preparacion.datos?.progreso
   const avisos = resumen?.avisos ?? []
   const sinPrecio = resumen?.precios.sinPrecio ?? []
   const faltanPrecios = resumen ? resumen.precios.necesarios - resumen.precios.obtenidos : 0
@@ -41,6 +46,19 @@ export function ImportResult({ resumen, duracion, log, onGoToDashboard, onReset,
               {porArchivo ? <>{porArchivo.length} archivos · </> : resumen ? <>{resumen.archivo} · </> : null}en {formatoDuracion(duracion)}
             </p>
           </div>
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap rounded-xl border border-border px-3 py-2 text-xs" role="status" aria-live="polite">
+          {preparacion.listo ? (
+            <span className="text-positive">Dashboard listo: históricos completos.</span>
+          ) : (
+            <>
+              <span className="text-fg-muted">Preparando el dashboard: precios de cierre{prog && prog.total > 0 ? ` ${prog.listos} de ${prog.total} activos` : '…'}</span>
+              <span className="flex-1 min-w-24 h-1.5 rounded-full bg-background-tertiary overflow-hidden" aria-hidden="true">
+                <span className="block h-full rounded-full bg-brand-solid transition-all duration-500" style={{ width: `${porcentajePreparacion(prog, 5)}%` }} />
+              </span>
+            </>
+          )}
         </div>
 
         {resumen ? (

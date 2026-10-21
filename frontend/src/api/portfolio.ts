@@ -48,9 +48,15 @@ export interface DailyPnlResponse {
   dietzPct: number
   peakCapitalPct: number
   days: DailyPnlDay[]
-  // Base del día en curso para recalcularlo con los precios en vivo (#213); null si hoy no está en el rango.
+  // Base del día en curso para recalcularlo con los precios en vivo (#213); null si hoy no está en el rango
+  // o si el cierre de ayer aún no está completo (#334).
   today: LiveDayBase | null
+  /** Activos con todos sus cierres del rango sobre los necesarios (#334). */
+  progreso?: { listos: number; total: number }
 }
+
+/** Preparación de los históricos de todo el periodo (#334). */
+export interface PreparacionHistoricos { completo: boolean; progreso: { listos: number; total: number } }
 
 export interface DayDetailResponse {
   date: string
@@ -603,6 +609,7 @@ export const portfolioApi = {
   getDayDetail: (date: string, currency: Currency = 'EUR') => api.get<DayDetailResponse>(`/v1/pnl/day?${new URLSearchParams({ date, currency })}`),
   // Evolución de las últimas 24 h cada 15 min (#215).
   getIntradayPnl: (currency: Currency = 'EUR') => api.get<IntradayPnlResponse>(`/v1/pnl/intraday?${new URLSearchParams({ currency })}`),
+  getPreparacionHistoricos: () => api.get<PreparacionHistoricos>('/v1/pnl/preparacion'),
   getPendingDeposits: () => api.get<Array<{
     id: string; timestamp: string; asset: string; amount: string;
     wallet_name: string; historicalPrice: number | null;

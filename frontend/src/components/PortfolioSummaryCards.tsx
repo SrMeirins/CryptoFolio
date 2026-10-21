@@ -3,6 +3,7 @@ import { MetricCard, type Change24h } from './MetricCard'
 import { formatMoney, type Currency, formatPercent } from '../utils/format'
 import { costSecondary, flowSecondary, returnSecondary } from '../utils/summaryCards'
 import { todayChip } from '../utils/windowChip'
+import { PreparandoHistoricos } from './PreparandoHistoricos'
 import { WindowChip } from './WindowChip'
 import { Sparkline } from './Sparkline'
 
@@ -22,7 +23,7 @@ export function PortfolioSummaryCards({
   totalValue, totalCost, pnl, pnlPct, hasPrices, loading,
   valueTooltip, costTooltip, pnlTooltip, pnlPctTooltip,
   eurFlow, eurFlowTooltip,
-  change24h, currency = 'EUR', assetCount, todayPnl = null, valueTrend = [],
+  change24h, currency = 'EUR', assetCount, todayPnl = null, todayPending = false, valueTrend = [],
 }: {
   totalValue: number
   totalCost:  number
@@ -41,6 +42,8 @@ export function PortfolioSummaryCards({
   assetCount: number
   /** P&L de hoy en vivo (#213), en `currency`; null mientras no hay dato. */
   todayPnl?: number | null
+  /** Aún se preparan los históricos: «Calculando…» en lugar del P&L de hoy (#334). */
+  todayPending?: boolean
   /** Valor de la cartera de los últimos 30 días para el mini-gráfico (#251). */
   valueTrend?: readonly number[]
 }) {
@@ -88,7 +91,7 @@ export function PortfolioSummaryCards({
         positive={hasPrices ? pnl >= 0 : undefined}
         loading={loading}
         tooltip={pnlTooltip}
-        secondary={today && (
+        secondary={todayPending ? <PreparandoHistoricos datos={undefined} compacto /> : today && (
           <WindowChip window="today" tone={today.tone} triggerLabel={today.aria}>{today.text}</WindowChip>
         )}
       />

@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
+import { usePreparacionHistoricos } from '../../hooks/usePreparacionHistoricos'
+import { PreparandoHistoricos } from '../../components/PreparandoHistoricos'
 import { useLiveDayPnl } from '../../hooks/useLiveDayPnl'
 import { dailyPnlQuery } from '../../queries/currencyQueries'
 import { madridToday } from '../../utils/pnlChart'
@@ -55,6 +57,9 @@ export function PnlCalendar() {
   // Un mes futuro (sin rango) compartiría clave con "Todo": se descarta.
   const data = range ? monthData : undefined
   const currency = (view === 'year' ? yearData?.currency : data?.currency) ?? requested
+
+  // Sin todos los cierres, ni calendario ni mejor/peor día: progreso (#334).
+  const preparacion = usePreparacionHistoricos()
 
   // Hoy con los precios en vivo (#213): sustituye al valor de la última consulta.
   const live = useLiveDayPnl(data?.today, currency)
@@ -111,7 +116,7 @@ export function PnlCalendar() {
         </>}
       />
 
-      {view === 'year' ? (
+      {!preparacion.listo ? <PreparandoHistoricos datos={preparacion.datos} /> : view === 'year' ? (
         <CalendarYearView year={ym.year} months={months} current={current} currency={currency}
           onOpen={next => { setView('month'); go(next) }} />
       ) : (
@@ -119,7 +124,6 @@ export function PnlCalendar() {
           {complete.length > 0 && <CalendarStats stats={stats} total={monthSummary(complete)} currency={currency} />}
           <MonthTrend days={days} currency={currency} hovered={hovered} onHover={setHovered}
             lastDay={Number(weeks.flat().filter(Boolean).at(-1)?.slice(8) ?? 31)} />
-          {data?.refreshing && <p className="text-xs text-fg-subtle mb-2">Descargando precios de cierre…</p>}
           {isError && <p className="text-xs text-fg-subtle py-6 text-center">No se pudo cargar el P&L del mes.</p>}
           {isLoading && (
             <div role="status" aria-label="Cargando el calendario" className="grid grid-cols-7 gap-1.5">
