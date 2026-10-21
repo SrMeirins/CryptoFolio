@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../../db/client';
 import { DIRECCION_RE, normalizarDireccion } from '../../modules/csv/retiradas/direccion';
+import { verificarEnSegundoPlano } from '../../modules/walletSync/walletSync';
 import { longText, sendZodError, shortText } from './shared';
 
 const router = Router();
@@ -67,6 +68,8 @@ router.post('/link-address', async (req: Request, res: Response) => {
       return { wallet, addressId: addr.rows[0].id as string };
     });
     res.status(201).json(result);
+    // Verificación on-chain automática en segundo plano (#336).
+    verificarEnSegundoPlano(result.addressId);
   } catch (err) {
     if (err instanceof ConflictoError) { res.status(409).json({ error: err.message }); return; }
     if (err instanceof NoEncontradaError) { res.status(404).json({ error: err.message }); return; }

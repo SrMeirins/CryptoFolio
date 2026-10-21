@@ -5,6 +5,7 @@ import { detectarExchange, type Exchange } from '../../modules/csv/exchanges';
 import { retirosExistentes } from '../../modules/csv/retiradas/existentes';
 import { runFifoEngine } from '../../modules/fifo/engine';
 import { aplicarComisionRetiro } from '../../modules/csv/retiradas/comision';
+import { verificarEnSegundoPlano } from '../../modules/walletSync/walletSync';
 import { archivosDe, exchangesForzados, retiradasDe, uploadCsv } from './importsValidation';
 
 const router = Router();
@@ -94,6 +95,8 @@ router.post('/retiros-existentes', uploadCsv, async (req: Request, res: Response
     // Un cambio de destino o de comisión altera lotes y eventos fiscales: se recalcula el FIFO.
     const fifo = resultado.destinos > 0 || resultado.comisiones > 0;
     if (fifo) await runFifoEngine();
+    // Direcciones nuevas o saldos cambiados: se verifican on-chain en segundo plano (#336).
+    if (fifo || resultado.direcciones > 0) verificarEnSegundoPlano();
     res.json({ ...resultado, fifo });
   } catch (e) {
     if (e instanceof PeticionInvalida) { res.status(400).json({ error: e.message }); return; }

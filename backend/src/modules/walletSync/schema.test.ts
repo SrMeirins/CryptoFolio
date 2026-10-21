@@ -22,7 +22,7 @@ describe('esquema — network_api_keys y balance_sync_log', () => {
         WHERE table_name = 'balance_sync_log' ORDER BY column_name
       `);
       expect(log.rows.map(r => r.column_name)).toEqual([
-        'asset', 'checked_at', 'discrepancy_pct', 'expected_balance',
+        'asset', 'checked_at', 'discrepancy_pct', 'error', 'expected_balance',
         'id', 'onchain_balance', 'status', 'wallet_address_id',
       ]);
     } finally {

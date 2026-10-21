@@ -48,3 +48,24 @@ export function getAddressPlaceholder(network: Network | undefined): string {
 // Compartido por AddAddressForm y AddWalletForm — antes declarado por
 // duplicado e idéntico en ambos.
 export const inputClass = fieldClasses()
+
+type EstadoSync = 'ok' | 'discrepancy' | 'error' | 'pending'
+
+/**
+ * Etiqueta del estado de una dirección (#336): en un error, el motivo concreto
+ * («Falta API key», «Falta contrato», «No verificable») en vez de un genérico.
+ */
+export function etiquetaEstado(status: EstadoSync, detalles: readonly { diagnostico?: { tipo: string } }[]): { label: string; className: string } {
+  if (status !== 'error') return SYNC_BADGE[status]
+  const tipos = new Set(detalles.map(d => d.diagnostico?.tipo))
+  if (tipos.has('api_key')) return { label: 'Falta API key', className: 'bg-warning/15 text-warning' }
+  if (tipos.has('contrato')) return { label: 'Falta contrato', className: 'bg-warning/15 text-warning' }
+  if (tipos.has('red')) return SYNC_BADGE.error
+  if (tipos.has('sin_proveedor')) return { label: 'No verificable', className: 'bg-overlay/30 text-fg-subtle' }
+  return SYNC_BADGE.error
+}
+
+/** ¿Hay direcciones aún sin verificar? Mientras, la lista se refresca sola (#336). */
+export function hayPendientes(wallets: readonly { addresses?: readonly { address: string | null; sync_status: EstadoSync }[] }[]): boolean {
+  return wallets.some(w => (w.addresses ?? []).some(a => a.address && a.sync_status === 'pending'))
+}

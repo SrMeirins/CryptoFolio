@@ -93,6 +93,9 @@ async function buildPlans(
   const tokens = await client.query(`SELECT asset, contract_address FROM network_assets WHERE network_id = $1`, [networkId]);
   for (const token of tokens.rows) {
     const expectedBalance = await getExpectedBalance(token.asset, walletId, client);
+    // Un token que no tienes y sin contrato configurado no se puede ni hace falta
+    // verificar: antes daba «error» y generaría avisos falsos (#336).
+    if (!token.contract_address && expectedBalance <= FIFO_DUST_EPSILON) continue;
     if (!token.contract_address) {
       // Sin contract_address no hay forma de consultar el saldo de este
       // token — nunca se debe caer al saldo nativo por error (pasar
@@ -152,10 +155,11 @@ async function resolveOutcome(plan: AssetSyncPlan, apiKey: string | undefined): 
 async function persistResults(walletAddressId: string, nativeAsset: string, results: SyncResult[]): Promise<void> {
   await db.transaction(async client => {
     for (const r of results) {
+      // El motivo se guarda (#336) para explicar en la app qué falla y qué hacer.
       await client.query(
-        `INSERT INTO balance_sync_log (wallet_address_id, asset, onchain_balance, expected_balance, discrepancy_pct, status)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [walletAddressId, r.asset, r.onchainBalance, r.expectedBalance, r.discrepancyPct, r.status]
+        `INSERT INTO balance_sync_log (wallet_address_id, asset, onchain_balance, expected_balance, discrepancy_pct, status, error)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [walletAddressId, r.asset, r.onchainBalance, r.expectedBalance, r.discrepancyPct, r.status, r.error?.slice(0, 500) ?? null]
       );
     }
 
@@ -227,4 +231,22 @@ export async function syncAllWalletAddresses(): Promise<void> {
     }
   }
   await pool.query(`DELETE FROM balance_sync_log WHERE checked_at < NOW() - INTERVAL '90 days'`);
+}
+
+/**
+ * Verificación en segundo plano (#336): tras guardar una dirección o importar.
+ * No bloquea a quien la lanza; los fallos quedan en el registro y en los avisos.
+ */
+export function verificarEnSegundoPlano(walletAddressId?: string): void {
+  const tarea = walletAddressId ? syncWalletAddress(walletAddressId).then(() => undefined) : syncAllWalletAddresses();
+  tarea.catch(err => console.error('[walletSync] verificación en segundo plano fallida:', err instanceof Error ? err.message : err));
+}
+
+/** Al arrancar: si hay direcciones sin verificar en las últimas 24 h, se verifican (#336). */
+export async function verificarSiAntiguas(): Promise<void> {
+  const r = await pool.query(
+    `SELECT count(*)::int AS n FROM wallet_addresses
+     WHERE address IS NOT NULL AND (last_sync_at IS NULL OR last_sync_at < now() - interval '24 hours')`,
+  );
+  if (r.rows[0].n > 0) await syncAllWalletAddresses();
 }
