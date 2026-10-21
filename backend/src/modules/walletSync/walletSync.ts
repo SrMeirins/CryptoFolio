@@ -1,4 +1,5 @@
 import { PoolClient } from 'pg';
+import { enSegundoPlano } from '../../utils/enSegundoPlano';
 import { db, pool } from '../../db/client';
 import { getOpenLots, FIFO_DUST_EPSILON } from '../fifo/engine';
 import { getProviderForNetwork } from './providers/registry';
@@ -238,8 +239,7 @@ export async function syncAllWalletAddresses(): Promise<void> {
  * No bloquea a quien la lanza; los fallos quedan en el registro y en los avisos.
  */
 export function verificarEnSegundoPlano(walletAddressId?: string): void {
-  const tarea = walletAddressId ? syncWalletAddress(walletAddressId).then(() => undefined) : syncAllWalletAddresses();
-  tarea.catch(err => console.error('[walletSync] verificación en segundo plano fallida:', err instanceof Error ? err.message : err));
+  enSegundoPlano('walletSync', () => (walletAddressId ? syncWalletAddress(walletAddressId) : syncAllWalletAddresses()));
 }
 
 /** Al arrancar: si hay direcciones sin verificar en las últimas 24 h, se verifican (#336). */
