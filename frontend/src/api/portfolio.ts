@@ -295,6 +295,10 @@ export interface Transaction {
   linked_tx_operation_type: string | null
   linked_tx_amount: string | null
   linked_tx_asset: string | null
+  /** Importación de origen y hash on-chain, para la trazabilidad (#349). */
+  import_id: string | null
+  import_filename: string | null
+  tx_hash: string | null
   /** Valor en EUR de la operación en su fecha (#346); null si no hay precio. */
   value_eur: number | null
   value_source: ValuationSource

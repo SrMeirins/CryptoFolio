@@ -1,11 +1,10 @@
-import { Fragment, useState, useMemo, useRef, useCallback } from 'react'
+import { Fragment, useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi, Transaction } from '../api/portfolio'
 import {
   Search, ChevronLeft, ChevronRight, X, RefreshCw,
-  Download, PenLine, Calendar,
-  ArrowUpDown, ArrowUp, ArrowDown, Package, FileText,
+  Download, PenLine, Calendar, Package, FileText,
 } from 'lucide-react'
 import { useToast } from '../hooks/useToast'
 import { ManualTxModal } from '../components/ManualTxModal'
@@ -17,26 +16,16 @@ import { txStatsQuery } from '../queries/currencyQueries'
 import { invalidateTransactionQueries } from '../utils/queryInvalidation'
 import { useWalletsQuery } from '../hooks/useWallets'
 import { OP_META } from '../constants/operations'
-import { buildHistoryCsv } from './history/buildHistoryCsv'
-import { fmtDateGroup, calcEurValue, localDayKey } from './history/helpers'
+import { fmtDateGroup, localDayKey } from './history/helpers'
+import { DEFAULT_SORT, exportCsvUrl, groupsByDay, nextSort, type SortKey, type SortState } from './history/sorting'
+import { SortHeader } from './history/SortHeader'
 import { TxRow } from './history/TxRow'
 import { StatsBar } from './history/StatsBar'
 import { AnalyticsPanel } from './history/AnalyticsPanel'
 import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses, tableHeadRowClasses, Button, EmptyState, LoadingState, PageHeader, Dropdown } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 
-type SortKey = 'fecha' | 'eur' | 'activo'
-type SortDir = 'asc' | 'desc'
-
 const PAGE_SIZE = 50
-
-// ── SortIcon ─────────────────────────────────────────────────────────────
-function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
-  if (col !== sortKey) return <ArrowUpDown size={10} className="text-fg-subtle ml-1" />
-  return sortDir === 'asc'
-    ? <ArrowUp size={10} className="text-brand ml-1" />
-    : <ArrowDown size={10} className="text-brand ml-1" />
-}
 
 // ── Filtros ────────────────────────────────────────────────────────────────
 interface Filters {
@@ -64,8 +53,8 @@ export function History() {
     const imp = params.get('import') ?? ''
     return { ...INITIAL, search: params.get('buscar') ?? '', import_id: UUID_RE.test(imp) ? imp : '' }
   })
-  const [sortKey, setSortKey]         = useState<SortKey>('fecha')
-  const [sortDir, setSortDir]         = useState<SortDir>('desc')
+  // Orden en el servidor (#349): abarca todas las páginas, no solo la visible.
+  const [sort, setSort]               = useState<SortState>(DEFAULT_SORT)
   const [deletingId, setDeletingId]   = useState<string | null>(null)
   const [editingTx, setEditingTx]     = useState<Transaction | null>(null)
   const [showNewTx, setShowNewTx]     = useState(false)
@@ -88,7 +77,9 @@ export function History() {
     ...(filters.search     ? { search:         filters.search }             : {}),
     ...(filters.manualOnly ? { manually_added: 'true' }                     : {}),
     ...(filters.import_id  ? { import_id:      filters.import_id }          : {}),
-  }), [filters])
+    sort: sort.key,
+    dir:  sort.dir,
+  }), [filters, sort])
 
   // Nombre del archivo de la importación filtrada, para la etiqueta.
   const { data: imports = [] } = useQuery({ queryKey: ['imports'], queryFn: portfolioApi.getImports, enabled: !!filters.import_id })
@@ -117,21 +108,23 @@ export function History() {
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const currentPage = Math.floor(filters.offset / PAGE_SIZE)
 
-  // Ordenación cliente sobre la página actual
-  const transactions = useMemo(() => {
-    const arr = [...rawTransactions]
-    const dir = sortDir === 'asc' ? 1 : -1
-    if (sortKey === 'fecha') {
-      arr.sort((a, b) => dir * (new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()))
-    } else if (sortKey === 'eur') {
-      arr.sort((a, b) => dir * ((calcEurValue(a) ?? 0) - (calcEurValue(b) ?? 0)))
-    } else if (sortKey === 'activo') {
-      arr.sort((a, b) => dir * a.asset.localeCompare(b.asset))
-    }
-    return arr
-  }, [rawTransactions, sortKey, sortDir])
+  // Precarga de la página siguiente con los mismos filtros y orden: pasar de
+  // página es inmediato.
+  useEffect(() => {
+    if (!data || filters.offset + PAGE_SIZE >= data.total) return
+    const next = { ...queryParams, offset: String(filters.offset + PAGE_SIZE) }
+    void queryClient.prefetchQuery({
+      queryKey: ['transactions', next],
+      queryFn:  () => portfolioApi.getTransactions(next, 'USD'),
+    })
+  }, [data, queryParams, filters.offset, queryClient])
 
+  const transactions = rawTransactions
+  // Cabeceras por día solo ordenando por fecha; con otro orden, lista plana
+  // (un único grupo sin cabecera).
+  const byDay = groupsByDay(sort)
   const grouped = useMemo(() => {
+    if (!byDay) return [['', transactions] as [string, Transaction[]]]
     const map = new Map<string, Transaction[]>()
     for (const tx of transactions) {
       // Día local, el mismo de la hora que muestra la fila (no el día UTC).
@@ -140,16 +133,16 @@ export function History() {
       map.get(day)!.push(tx)
     }
     return [...map.entries()]
-  }, [transactions])
+  }, [transactions, byDay])
 
   function setFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters(prev => ({ ...prev, [key]: value, ...(key !== 'offset' ? { offset: 0 } : {}) }))
   }
-  function clearFilters() { quitarImport(); setFilters(INITIAL); setSortKey('fecha'); setSortDir('desc') }
+  function clearFilters() { quitarImport(); setFilters(INITIAL); setSort(DEFAULT_SORT) }
 
   function toggleSort(col: SortKey) {
-    if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortKey(col); setSortDir('desc') }
+    setSort(s => nextSort(s, col))
+    setFilters(prev => ({ ...prev, offset: 0 }))
   }
 
   // Click en top activos → aplica buscador
@@ -180,14 +173,14 @@ export function History() {
     setEditingTx(null); setShowNewTx(false)
   }
 
+  // Todo lo filtrado, en el orden elegido, lo genera el backend en streaming (#349).
   function exportCsv() {
-    const rows = buildHistoryCsv(transactions)
-    const blob = new Blob(['﻿' + rows], { type: 'text/csv;charset=utf-8' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href = url; a.download = `historial_${new Date().toISOString().slice(0, 10)}.csv`
-    a.click(); URL.revokeObjectURL(url)
+    const a = document.createElement('a')
+    a.href = exportCsvUrl(queryParams)
+    a.download = ''
+    a.click()
   }
+
 
   const hasActiveFilters = !!(filters.asset || filters.account || filters.type || filters.wallet_id ||
     filters.manualOnly || filters.date_from || filters.date_to || filters.search || filters.import_id)
@@ -226,9 +219,11 @@ export function History() {
                 <X size={11} /> Limpiar
               </button>
             )}
-            <button type="button" onClick={exportCsv}
+            <button type="button" onClick={exportCsv} disabled={total === 0}
+              title={total > 0 ? `Exporta las ${formatNumber(total, 0)} transacciones${hasActiveFilters ? ' filtradas' : ''}` : 'No hay transacciones que exportar'}
+              aria-label={`Exportar a CSV ${formatNumber(total, 0)} transacciones`}
               className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
-              <Download size={13} /> CSV
+              <Download size={13} aria-hidden="true" /> CSV{total > 0 && <span className="mono text-fg-subtle">({formatNumber(total, 0)})</span>}
             </button>
             <button type="button" onClick={() => setShowNewTx(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-brand/15 border border-brand/30 rounded-lg text-xs text-brand hover:bg-brand/25 transition-colors font-medium">
@@ -325,22 +320,10 @@ export function History() {
               <table className="w-full">
                 <thead>
                   <tr className={tableHeadRowClasses()}>
-                    <th className="text-left px-4 py-2.5 font-medium">
-                      <button type="button" onClick={() => toggleSort('fecha')} className="flex items-center hover:text-fg transition-colors">
-                        Fecha <SortIcon col="fecha" sortKey={sortKey} sortDir={sortDir} />
-                      </button>
-                    </th>
-                    <th className="text-left px-3 py-2.5 font-medium">Tipo</th>
-                    <th className="text-left px-3 py-2.5 font-medium">
-                      <button type="button" onClick={() => toggleSort('activo')} className="flex items-center hover:text-fg transition-colors">
-                        Activo <SortIcon col="activo" sortKey={sortKey} sortDir={sortDir} />
-                      </button>
-                    </th>
-                    <th className="text-right px-3 py-2.5 font-medium">
-                      <button type="button" onClick={() => toggleSort('eur')} className="flex items-center ml-auto hover:text-fg transition-colors">
-                        Valor {currency} <SortIcon col="eur" sortKey={sortKey} sortDir={sortDir} />
-                      </button>
-                    </th>
+                    <SortHeader col="fecha" sort={sort} onSort={toggleSort} className="px-4 py-2.5">Fecha</SortHeader>
+                    <SortHeader col="tipo" sort={sort} onSort={toggleSort} className="px-3 py-2.5">Tipo</SortHeader>
+                    <SortHeader col="activo" sort={sort} onSort={toggleSort} className="px-3 py-2.5">Activo</SortHeader>
+                    <SortHeader col="valor" sort={sort} onSort={toggleSort} align="right" className="px-3 py-2.5">Valor {currency}</SortHeader>
                     <th className="text-left px-3 py-2.5 font-medium">Fee</th>
                     <th className="text-left px-3 py-2.5 font-medium">Wallet</th>
                     <th className="px-3 py-2.5 w-16" />
@@ -348,8 +331,8 @@ export function History() {
                 </thead>
                 <tbody>
                   {grouped.map(([day, txs]) => (
-                    <Fragment key={day}>
-                      <tr className="bg-background-tertiary/25">
+                    <Fragment key={day || 'todas'}>
+                      {byDay && <tr className="bg-background-tertiary/25">
                         <td colSpan={7} className="px-4 py-1.5">
                           <div className="flex items-center gap-2">
                             <Calendar size={9} className="text-fg-subtle" />
@@ -361,7 +344,7 @@ export function History() {
                             </span>
                           </div>
                         </td>
-                      </tr>
+                      </tr>}
                       {txs.map(tx => (
                         <TxRow
                           key={tx.id}

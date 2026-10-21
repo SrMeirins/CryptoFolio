@@ -4,6 +4,7 @@ import { usdPerEurSql } from '../../modules/fiat/displayCurrency';
 import { MADRID_TZ } from '../../modules/fiscal/madridTime';
 import { buildHistoryWhere, historyQuerySchema } from '../../modules/history/listFilters';
 import { FLOW_DIRECTION, VALUATION_COLUMNS, VALUATION_CTES, valuationJoins } from '../../modules/history/valuationSql';
+import { historyRowsSql } from '../../modules/history/historyQuery';
 import { sendZodError } from './transactionsShared';
 
 const router = Router();
@@ -33,40 +34,11 @@ router.get('/', async (req: Request, res: Response) => {
 
   const { where, params } = buildHistoryWhere(filters, HISTORY_TZ);
   const tz = `$${params.length + 1}`;
-  const limit = `$${params.length + 2}`;
-  const offset = `$${params.length + 3}`;
 
-  // La valoración se aplica solo a la página pedida (las CTE agregan una vez).
-  const result = await db.query(
-    `WITH ${VALUATION_CTES},
-     page AS (
-       SELECT t.* FROM transactions t ${where}
-       ORDER BY t.timestamp DESC, t.id
-       LIMIT ${limit} OFFSET ${offset}
-     )
-     SELECT
-       t.id, t.operation_type, t.timestamp, t.asset, t.amount, t.amount_net,
-       t.cost_asset, t.cost_amount, t.price_per_unit,
-       t.fee_asset, t.fee_amount,
-       t.wallet_id, w.name AS wallet_name, w.color AS wallet_color, w.type AS wallet_kind,
-       t.account, t.destination_wallet_id,
-       dw.name AS destination_wallet_name, dw.color AS destination_wallet_color,
-       t.destination_pending, t.notes, t.manually_added, t.created_at,
-       t.linked_tx_id,
-       lt.timestamp AS linked_tx_timestamp,
-       lt.operation_type AS linked_tx_operation_type,
-       lt.amount AS linked_tx_amount,
-       lt.asset AS linked_tx_asset,
-       ${VALUATION_COLUMNS},
-       ${usdPerEurSql('t.timestamp')} AS usd_per_eur
-     FROM page t
-     JOIN wallets w ON w.id = t.wallet_id
-     LEFT JOIN wallets dw ON dw.id = t.destination_wallet_id
-     LEFT JOIN transactions lt ON lt.id = t.linked_tx_id
-     ${valuationJoins(tz)}
-     ORDER BY t.timestamp DESC, t.id`,
-    [...params, HISTORY_TZ, filters.limit, filters.offset]
-  );
+  // Orden en el servidor (#349): se valora todo lo filtrado antes de paginar,
+  // así «ordenar por valor» abarca todas las páginas.
+  const rows = historyRowsSql(filters, HISTORY_TZ, { limit: filters.limit, offset: filters.offset });
+  const result = await db.query(rows.sql, rows.params);
 
   // Total y flujos sobre todo lo filtrado: entradas y salidas por separado
   // (antes una sola suma que mezclaba compras, ventas y precios en otro activo).
