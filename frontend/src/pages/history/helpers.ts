@@ -98,3 +98,14 @@ export function flowSign(operationType: string): '+' | '−' | '' {
   if (OUTFLOW.has(operationType)) return '−'
   return ''
 }
+
+/** Filas de la tabla accesible del gráfico mensual (#351). */
+export function monthlyTableRows(monthly: { mes: string; total_ops: number; compras: number; ventas: number; otras_salidas: number; ingresos: number; transferencias: number }[]) {
+  return monthly.map(m => ({
+    mes: fmtMonthLabel(m.mes),
+    compras: m.compras, ventas: m.ventas, otrasSalidas: m.otras_salidas, ingresos: m.ingresos,
+    transferencias: m.transferencias,
+    otros: m.total_ops - m.compras - m.ventas - m.otras_salidas - m.ingresos - m.transferencias,
+    total: m.total_ops,
+  }))
+}

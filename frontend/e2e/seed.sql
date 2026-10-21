@@ -12,3 +12,9 @@ FROM w, (VALUES
   ('SELL',           '2025-03-01T10:00:00Z', 'BTC', 0.015,         'EUR', 700),
   ('STAKING_REWARD', '2025-04-01T10:00:00Z', 'XRP', 5,             NULL,  NULL)
 ) AS v(op, ts, asset, amount, cost_asset, cost_amount);
+
+-- Una transacción manual, para recorrer con teclado su confirmación de borrado
+-- (#351). La prueba solo la abre y la cancela: nunca borra.
+INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, cost_asset, cost_amount, wallet_id, account, manually_added, notes)
+SELECT 'BUY', '2025-05-01T10:00:00Z', 'XRP', 10, 10, 'EUR', 5, id, 'Spot', TRUE, 'Compra manual de prueba'
+FROM wallets WHERE name = 'Binance Spot';
