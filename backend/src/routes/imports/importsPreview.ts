@@ -42,10 +42,21 @@ router.post('/preview', uploadCsv, async (req: Request, res: Response) => {
       exchange: a.exchange,
       rango: { importId: null, archivo: a.nombre, desde: a.rango!.from, hasta: a.rango!.to, transacciones: a.nuevas, nuevo: true },
     }));
-    const { antes, despues } = await coberturaActual(nuevos);
+    // Actividad mensual de las transacciones nuevas del lote, para la línea de tiempo.
+    const porMes = new Map<string, number>();
+    for (const t of lote.transactions) {
+      if (!t.isNew) continue;
+      const clave = `${lote.archivos[t.archivo].exchange}|${new Date(t.timestamp).toISOString().slice(0, 7)}`;
+      porMes.set(clave, (porMes.get(clave) ?? 0) + 1);
+    }
+    const extraMeses = [...porMes].map(([k, n]) => ({ exchange: k.split('|')[0] as Exchange, mes: k.split('|')[1], n }));
+    const { antes, despues } = await coberturaActual(nuevos, undefined, extraMeses);
+    // Toda la cobertura (para una sola línea de tiempo con contexto); los cambios, solo de los exchanges del lote.
     const exchangesLote = new Set(nuevos.map(n => n.exchange));
-    const cobertura = despues.filter(c => exchangesLote.has(c.exchange));
-    const encaje = { cobertura, cambios: cobertura.flatMap(c => compararCobertura(antes.get(c.exchange) ?? null, c)) };
+    const encaje = {
+      cobertura: nuevos.length > 0 ? despues : [],
+      cambios: despues.filter(c => exchangesLote.has(c.exchange)).flatMap(c => compararCobertura(antes.get(c.exchange) ?? null, c)),
+    };
     // Retiros ya importados que se pueden completar con estos archivos (#330).
     const existentes = await retirosExistentes(vistas.map((v, i) => ({ exchange: v.exchange, buffer: archivos[i].buffer })), retiradas);
     res.json({

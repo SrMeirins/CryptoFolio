@@ -29,6 +29,15 @@ describe('combinarVistasPrevias', () => {
     expect(l.validation.dateRange).toEqual({ from: '2023-06-01', to: '2024-06-30' });
   });
 
+  it('dentro de un mismo archivo, transacciones que comparten fila no son repetidas (compra + comisión)', () => {
+    const l = combinarVistasPrevias([vista('binance.csv', resultado({ transactions: [tx('f1'), { ...tx('f1'), operationType: 'FEE_EXCHANGE' as const }] }))]);
+    expect(l.newCount).toBe(2);
+    expect(l.repetidasEnLote).toBe(0);
+    // Pero si otro archivo trae esa misma fila, sí es repetida.
+    const l2 = combinarVistasPrevias([vista('a.csv', resultado({ transactions: [tx('f1'), tx('f1')] })), vista('b.csv', resultado({ transactions: [tx('f1')] }))]);
+    expect(l2.repetidasEnLote).toBe(1);
+  });
+
   it('aparta los no reconocidos y los que no traen nada nuevo, con su motivo', () => {
     const invalido = resultado({ validation: { ...resultado({}).validation, valid: false, errors: ['Cabeceras no reconocidas'] } });
     const l = combinarVistasPrevias([

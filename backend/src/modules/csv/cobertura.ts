@@ -92,7 +92,7 @@ export function calcularCobertura(
   return { exchange, desde: tramos[0].desde, hasta: fin, tramos, huecos, pendiente, meses };
 }
 
-export type TipoEncaje = 'rellena' | 'rellena_parte' | 'deja_hueco' | 'al_dia' | 'avanza';
+export type TipoEncaje = 'primera' | 'rellena' | 'rellena_parte' | 'deja_hueco' | 'al_dia' | 'avanza';
 export interface Encaje { tipo: TipoEncaje; exchange: ExchangeCobertura; desde: string; hasta: string; dias: number }
 
 const dentro = (h: Hueco, en: Hueco) => h.desde >= en.desde && h.hasta <= en.hasta;
@@ -101,6 +101,8 @@ const dentro = (h: Hueco, en: Hueco) => h.desde >= en.desde && h.hasta <= en.has
 export function compararCobertura(antes: CoberturaExchange | null, despues: CoberturaExchange): Encaje[] {
   const ex = despues.exchange;
   const out: Encaje[] = [];
+  // Primera importación del exchange: qué periodo cubre y cuánto falta hasta hoy (en días).
+  if (!antes) out.push({ tipo: 'primera', exchange: ex, desde: despues.desde, hasta: despues.hasta, dias: despues.pendiente?.dias ?? 0 });
   const huecosAntes = antes?.huecos ?? [];
   for (const a of huecosAntes) {
     const restos = despues.huecos.filter(d => dentro(d, a));

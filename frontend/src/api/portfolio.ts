@@ -398,7 +398,7 @@ export interface CoberturaExchange {
   pendiente: HuecoCobertura | null
   meses: { mes: string; n: number }[]
 }
-export type TipoEncaje = 'rellena' | 'rellena_parte' | 'deja_hueco' | 'al_dia' | 'avanza'
+export type TipoEncaje = 'primera' | 'rellena' | 'rellena_parte' | 'deja_hueco' | 'al_dia' | 'avanza'
 export interface CambioEncaje { tipo: TipoEncaje; exchange: 'binance' | 'bitvavo'; desde: string; hasta: string; dias: number }
 
 export interface Network {

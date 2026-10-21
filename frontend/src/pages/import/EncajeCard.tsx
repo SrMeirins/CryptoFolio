@@ -1,11 +1,12 @@
 import { CalendarCheck, CalendarPlus, CalendarRange, CalendarX } from 'lucide-react'
 import { cardClasses } from '../../components/ui'
-import { CoberturaBarra } from './CoberturaBarra'
+import { LineaTiempo } from './LineaTiempo'
 import { ExchangeBadge } from './ExchangeBadge'
 import { textoEncaje } from './coberturaVista'
 import type { CambioEncaje, CoberturaExchange, TipoEncaje } from './types'
 
 const ICONO: Record<TipoEncaje, { icon: typeof CalendarCheck; clase: string }> = {
+  primera: { icon: CalendarPlus, clase: 'text-brand' },
   rellena: { icon: CalendarCheck, clase: 'text-positive' },
   rellena_parte: { icon: CalendarRange, clase: 'text-info' },
   deja_hueco: { icon: CalendarX, clase: 'text-warning' },
@@ -19,31 +20,24 @@ export function EncajeCard({ cobertura, cambios }: { cobertura: CoberturaExchang
   if (cobertura.length === 0) return null
   return (
     <section aria-labelledby="encaje-titulo" className={cardClasses('md', 'space-y-4')}>
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h2 id="encaje-titulo" className="text-sm font-medium text-fg">Cómo encaja en tu historial</h2>
-        <span className="inline-flex items-center gap-1.5 text-[11px] text-fg-subtle"><span className="w-3 h-2 rounded-sm bg-brand-solid/85" aria-hidden="true" /> archivos nuevos</span>
-      </div>
-      {cobertura.map(c => {
-        const propios = cambios.filter(x => x.exchange === c.exchange)
-        return (
-          <div key={c.exchange} className="space-y-2">
-            <p className="flex items-center gap-2 text-sm font-medium text-fg"><ExchangeBadge exchange={c.exchange} size={16} />{c.exchange === 'binance' ? 'Binance' : 'Bitvavo'}</p>
-            <CoberturaBarra c={c} />
-            {propios.length > 0 && (
-              <ul className="space-y-1.5">
-                {propios.map((x, i) => {
-                  const { icon: Icon, clase } = ICONO[x.tipo]
-                  return (
-                    <li key={i} className="flex items-start gap-2 text-xs text-fg-muted">
-                      <Icon size={13} className={`shrink-0 mt-0.5 ${clase}`} aria-hidden="true" />{textoEncaje(x)}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
-        )
-      })}
+      <h2 id="encaje-titulo" className="text-sm font-medium text-fg">Cómo encaja en tu historial</h2>
+      <LineaTiempo coberturas={cobertura} />
+      {cambios.length > 0 ? (
+        <ul className="space-y-1.5">
+          {cambios.map((x, i) => {
+            const { icon: Icon, clase } = ICONO[x.tipo]
+            return (
+              <li key={i} className="flex items-start gap-2 text-xs text-fg-muted">
+                <Icon size={13} className={`shrink-0 mt-0.5 ${clase}`} aria-hidden="true" />
+                <ExchangeBadge exchange={x.exchange} size={14} />
+                <span>{textoEncaje(x)}</span>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        <p className="text-xs text-fg-muted">Encaja sin dejar huecos nuevos.</p>
+      )}
     </section>
   )
 }

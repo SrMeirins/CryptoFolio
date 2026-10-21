@@ -56,7 +56,9 @@ describe('compararCobertura', () => {
 
   it('primera importación de un exchange: solo los huecos que deja el propio lote', () => {
     const despues = calcularCobertura('bitvavo', [r('2025-01-01', '2025-03-31', 1, true), r('2025-06-01', '2026-10-19', 1, true)], [], HOY)!;
-    expect(compararCobertura(null, despues).map(x => x.tipo)).toEqual(['deja_hueco']);
+    const e = compararCobertura(null, despues);
+    expect(e.map(x => x.tipo)).toEqual(['primera', 'deja_hueco']);
+    expect(e[0]).toMatchObject({ desde: '2025-01-01', hasta: '2026-10-19', dias: 0 });
   });
 });
 

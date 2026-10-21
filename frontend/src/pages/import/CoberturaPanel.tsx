@@ -5,7 +5,7 @@ import { portfolioApi } from '../../api/portfolio'
 import { cardClasses } from '../../components/ui'
 import { formatNumber } from '../../utils/format'
 import { formatFiscalDate } from '../../utils/fiscalTable'
-import { CoberturaBarra } from './CoberturaBarra'
+import { LineaTiempo } from './LineaTiempo'
 import { ExchangeBadge } from './ExchangeBadge'
 import { fechasParaCopiar, rangoExportar } from './coberturaVista'
 import type { CoberturaExchange, HuecoCobertura } from './types'
@@ -82,20 +82,20 @@ export function CoberturaPanel({ onVerGuia }: { onVerGuia: (ex: 'binance' | 'bit
     <section aria-labelledby="cobertura-titulo" className={cardClasses('md', 'space-y-5')}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 id="cobertura-titulo" className="text-sm font-medium text-fg">Cobertura de tus importaciones</h2>
-        <span className="text-[11px] text-fg-subtle">Cada barra va de tu primera transacción a hoy · debajo, actividad por mes</span>
+        <span className="text-[11px] text-fg-subtle">De tu primera transacción a hoy · debajo, actividad por mes</span>
       </div>
+      <LineaTiempo coberturas={data} />
       {data.map(c => {
         const total = c.tramos.reduce((s, t) => s + t.transacciones, 0)
         const items = [...c.huecos.map(h => ({ h, tipo: 'hueco' as const })), ...(c.pendiente ? [{ h: c.pendiente, tipo: 'pendiente' as const }] : [])]
         return (
-          <div key={c.exchange} className="space-y-2">
+          <div key={c.exchange} className="space-y-2 border-t border-border pt-3">
             <p className="flex items-center gap-2 text-sm">
               <ExchangeBadge exchange={c.exchange} size={18} />
               <span className="font-medium text-fg">{NOMBRE[c.exchange]}</span>
               <span className="text-xs text-fg-subtle">{formatFiscalDate(c.desde)} – {formatFiscalDate(c.hasta)} · {formatNumber(total, 0)} transacciones</span>
               {items.length === 0 && <span className="ml-auto inline-flex items-center gap-1 text-xs text-positive"><Check size={12} aria-hidden="true" /> Al día</span>}
             </p>
-            <CoberturaBarra c={c} />
             {items.length > 0 && (
               <ul className="space-y-2 pt-1">
                 {items.map(({ h, tipo }) => <Tramo key={`${tipo}-${h.desde}`} c={c} h={h} tipo={tipo} onVerGuia={onVerGuia} />)}
