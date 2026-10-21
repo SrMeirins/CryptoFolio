@@ -43,6 +43,18 @@ function moneyFmt(currency: Currency, decimals: number): Intl.NumberFormat {
   return fmt
 }
 
+// Precios muy pequeños (#337): con cifras significativas en vez de decimales
+// fijos (0,0000094963 € y no 0,00000949 € ni 9.4963e-6).
+const _significantMoney = new Map<Currency, Intl.NumberFormat>()
+function significantMoneyFmt(currency: Currency): Intl.NumberFormat {
+  let fmt = _significantMoney.get(currency)
+  if (!fmt) {
+    fmt = esFormat({ style: 'currency', currency, currencyDisplay: 'narrowSymbol', maximumSignificantDigits: 5 })
+    _significantMoney.set(currency, fmt)
+  }
+  return fmt
+}
+
 const _numberFormatters = new Map<string, Intl.NumberFormat>()
 
 /**
@@ -104,7 +116,8 @@ export function formatPrice(value: number, currency: Currency = 'EUR'): string {
   else if (abs >= 1)    d = 4
   else if (abs >= 0.1)  d = 5
   else if (abs >= 0.01) d = 6
-  else                  d = 8
+  else if (abs >= 0.0001) d = 8
+  else return significantMoneyFmt(currency).format(value)
   return moneyFmt(currency, d).format(value)
 }
 
@@ -143,4 +156,9 @@ export function formatPct(value: number): string {
 /** Importe en EUR sin decimales, para espacios reducidos (p. ej. "-203 €"). */
 export function formatEurCompact(value: number): string {
   return formatMoneyCompact(value, 'EUR')
+}
+
+/** Número con hasta `digits` cifras significativas (precios muy pequeños, #337). */
+export function formatSignificant(value: number, digits = 5): string {
+  return esFormat({ maximumSignificantDigits: digits }).format(value)
 }

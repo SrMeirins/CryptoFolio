@@ -5,7 +5,7 @@ import { Search, Plus, RefreshCw, CheckCircle, AlertCircle, ChevronDown, X, Zap 
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useToast } from '../../hooks/useToast'
 import { usePricesStore } from '../../store/pricesStore'
-import { type SortKey, type SortDir } from './assets/helpers'
+import { type SortKey, type SortDir, type FiltroPrecio, FILTROS_PRECIO, cumpleFiltro } from './assets/helpers'
 import { SortButton } from './assets/SortButton'
 import { AssetItem } from './assets/AssetItem'
 import { AddAssetDialog } from './assets/AddAssetDialog'
@@ -27,6 +27,8 @@ export function AssetsSection() {
   const [page, setPage]                 = useState(0)
   const [sortKey, setSortKey]           = useState<SortKey>('name')
   const [sortDir, setSortDir]           = useState<SortDir>('asc')
+  // Filtro rápido por estado del precio (#337).
+  const [filtro, setFiltro]             = useState<FiltroPrecio>('todos')
 
   const { data: assets = [], isLoading } = useQuery({
     queryKey: ['assets'],
@@ -39,9 +41,12 @@ export function AssetsSection() {
     setPage(0)
   }
 
+  const precioDe = (a: AssetMetadata) => prices[a.symbol] ?? a.precio_actual
+  const conteo = (f: FiltroPrecio) => assets.filter(a => cumpleFiltro(a, precioDe(a), f)).length
   const filtered = assets.filter(a =>
-    a.symbol.toLowerCase().includes(search.toLowerCase()) ||
-    a.name?.toLowerCase().includes(search.toLowerCase())
+    (a.symbol.toLowerCase().includes(search.toLowerCase()) ||
+     a.name?.toLowerCase().includes(search.toLowerCase())) &&
+    cumpleFiltro(a, precioDe(a), filtro)
   )
 
   function sortAssets(list: AssetMetadata[]): AssetMetadata[] {
@@ -145,6 +150,23 @@ export function AssetsSection() {
             onSaved={() => { queryClient.invalidateQueries({ queryKey: ['assets'] }); setShowAdd(false) }}
           />
         )}
+
+        {/* Filtros rápidos por estado del precio (#337) */}
+        <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Filtrar por estado del precio">
+          {FILTROS_PRECIO.map(f => {
+            const n = f.value === 'todos' ? assets.length : conteo(f.value)
+            const activo = filtro === f.value
+            return (
+              <button key={f.value} type="button" aria-pressed={activo} title={f.title}
+                onClick={() => { setFiltro(f.value); setPage(0) }}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
+                  activo ? 'border-brand bg-brand/10 text-brand' : 'border-border text-fg-muted hover:text-fg'}`}>
+                {f.label}
+                <span className={`mono text-[10px] px-1 rounded ${f.value === 'sin_precio' && n > 0 ? 'bg-negative/15 text-negative' : 'bg-overlay/10'}`}>{n}</span>
+              </button>
+            )
+          })}
+        </div>
 
         {/* Search + sort */}
         <div className="flex items-center gap-2">

@@ -26,6 +26,9 @@ vi.mock('./coingecko', () => ({
   getCurrentPricesEur: getCurrentPricesEurMock,
   searchAndSaveCoinGeckoId: searchAndSaveCoinGeckoIdMock,
 }));
+// Fuentes de respaldo (#337): sin dato por defecto.
+const { respaldoDiaMock } = vi.hoisted(() => ({ respaldoDiaMock: vi.fn(async () => null) }));
+vi.mock('./respaldo/cascada', () => ({ precioDiaRespaldo: respaldoDiaMock }));
 
 function pairInfo(overrides: Partial<{
   binanceEurPair: string | null; binanceUsdtPair: string | null;
@@ -139,6 +142,37 @@ describe('binance — getHistoricalPriceEur (cascada EUR>USDT>BTC>ETH>CoinGecko)
     expect(price).toBe(0);
     expect(inserts).toHaveLength(1);
     expect(inserts[0]).toEqual(['XYZ', '2024-01-15']);
+  });
+
+  it('si Binance y CoinGecko no lo tienen, usa el respaldo y guarda su fuente (#337)', async () => {
+    const inserts: unknown[][] = [];
+    queryMock.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (/^INSERT INTO price_cache/.test(sql)) inserts.push(params ?? []);
+      return { rows: [] };
+    });
+    getOrDetectPairInfoMock.mockResolvedValue(pairInfo());
+    searchAndSaveCoinGeckoIdMock.mockResolvedValue(null);
+    getCoinGeckoHistoricalPriceMock.mockResolvedValue(0);
+    respaldoDiaMock.mockResolvedValueOnce({ precio: 0.0000005, fuente: 'okx' });
+
+    expect(await bin.getHistoricalPriceEur('NFT', new Date('2024-01-15'))).toBe(0.0000005);
+    expect(respaldoDiaMock).toHaveBeenCalledWith('NFT', '2024-01-15', expect.any(Function));
+    expect(inserts).toEqual([['NFT', 0.0000005, '2024-01-15', 'okx']]);
+  });
+
+  it('un fallo de red del respaldo es temporal: no guarda la marca de «sin precio» (#337)', async () => {
+    const inserts: unknown[][] = [];
+    queryMock.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (/^INSERT INTO price_cache/.test(sql)) inserts.push(params ?? []);
+      return { rows: [] };
+    });
+    getOrDetectPairInfoMock.mockResolvedValue(pairInfo());
+    searchAndSaveCoinGeckoIdMock.mockResolvedValue(null);
+    getCoinGeckoHistoricalPriceMock.mockResolvedValue(0);
+    respaldoDiaMock.mockRejectedValueOnce(new Error('OKX HTTP 503'));
+
+    expect(await bin.getHistoricalPriceEur('NFT', new Date('2024-01-16'))).toBe(0);
+    expect(inserts).toEqual([]);
   });
 
   it('deduplica llamadas concurrentes para el mismo símbolo y fecha (una sola resolución)', async () => {

@@ -3,15 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Precios de cierre diario a las 00:00 Europe/Madrid (#164). Sin red ni
 // Postgres reales: db, pairDetector, CoinGecko y fetch se sustituyen.
 
-const { queryMock, pairInfoMock, coinGeckoMock, marketChartMock } = vi.hoisted(() => ({
+const { queryMock, pairInfoMock, coinGeckoMock, marketChartMock, respaldoMock } = vi.hoisted(() => ({
   queryMock: vi.fn(),
   pairInfoMock: vi.fn(),
   coinGeckoMock: vi.fn(),
   marketChartMock: vi.fn(),
+  respaldoMock: vi.fn(async () => null),
 }));
 vi.mock('../../db/client', () => ({ db: { query: queryMock } }));
 vi.mock('./pairDetector', () => ({ getOrDetectPairInfo: pairInfoMock }));
 vi.mock('./coingecko', () => ({ getHistoricalPriceEur: coinGeckoMock, fetchMarketChart: marketChartMock }));
+// Fuentes de respaldo (#337): sin dato por defecto; cada test decide.
+vi.mock('./respaldo/cascada', () => ({ precioDiaRespaldo: respaldoMock }));
 
 function pairs(overrides: Partial<Record<'binanceEurPair' | 'binanceUsdtPair' | 'binanceBtcPair' | 'binanceEthPair', string>> = {}) {
   return {
@@ -144,6 +147,24 @@ describe('closePrices — getClosePriceEur', () => {
     queryMock.mockResolvedValueOnce({ rows: [{ price_eur: '2.4' }] });
     expect(await cp.getClosePriceEur('XRP', '2026-01-15')).toBe(2.4);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('si Binance y CoinGecko no lo tienen, usa el respaldo con el precio de las 00:00 UTC siguientes (#337)', async () => {
+    pairInfoMock.mockResolvedValue(pairs());
+    coinGeckoMock.mockResolvedValue(0);
+    respaldoMock.mockResolvedValueOnce({ precio: 0.0000002, fuente: 'okx' });
+
+    expect(await cp.getClosePriceEur('NFT', '2023-04-12')).toBe(0.0000002);
+    expect(respaldoMock).toHaveBeenCalledWith('NFT', '2023-04-13', expect.any(Function));
+    expect(insertCalls()[0][1]).toEqual(['NFT', '2023-04-12', 0.0000002, 'okx_1d']);
+  });
+
+  it('un fallo de red del respaldo no deja marca de «sin precio» (#337)', async () => {
+    pairInfoMock.mockResolvedValue(pairs());
+    coinGeckoMock.mockResolvedValue(0);
+    respaldoMock.mockRejectedValueOnce(new Error('OKX HTTP 503'));
+    await expect(cp.getClosePriceEur('NFT', '2023-04-12')).rejects.toThrow('OKX HTTP 503');
+    expect(insertCalls()).toHaveLength(0);
   });
 
   it('sin precio en ninguna fuente: guarda la marca y no vuelve a intentarlo', async () => {

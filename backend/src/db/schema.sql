@@ -372,7 +372,7 @@ CREATE TABLE price_close_madrid (
   source      TEXT NOT NULL,
   fetched_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (asset, close_date),
-  CONSTRAINT chk_price_close_madrid_source CHECK (source IN ('binance_1h', 'coingecko_daily', 'none')),
+  CONSTRAINT chk_price_close_madrid_source CHECK (source IN ('binance_1h', 'coingecko_daily', 'coinpaprika_daily', 'okx_1d', 'none')),
   CONSTRAINT chk_price_close_madrid_price CHECK (price_eur > 0 OR (price_eur = -1 AND source = 'none'))
 );
 
@@ -413,7 +413,9 @@ CREATE TABLE asset_metadata (
   last_price_check   TIMESTAMPTZ,
   -- Pares quitados a mano en Ajustes ('eur', 'usdt', 'btc', 'eth'): el
   -- relleno automático de pares no los vuelve a añadir (#277).
-  disabled_pairs     TEXT[] NOT NULL DEFAULT '{}'
+  disabled_pairs     TEXT[] NOT NULL DEFAULT '{}',
+  -- Id de CoinPaprika (#337): fuente de respaldo; se busca una sola vez por activo.
+  coinpaprika_id     TEXT CHECK (char_length(coinpaprika_id) <= 100)
 );
 
 INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_eur_pair, price_source) VALUES
