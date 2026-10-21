@@ -19,6 +19,7 @@ import { FiscalCard } from './dashboard/FiscalCard'
 import { madridToday } from '../utils/pnlChart'
 import { monthRange, ymOf } from '../utils/pnlCalendar'
 import { useLiveDayPnl } from '../hooks/useLiveDayPnl'
+import { usePreparacionHistoricos } from '../hooks/usePreparacionHistoricos'
 import { PageHeader, panelClasses, panelEnterStyle } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 import { dashboardSubtitle } from '../utils/panelSubtitles'
@@ -65,13 +66,15 @@ export function Dashboard() {
     { refetchInterval: 60_000, enabled: month !== null },
   )
   const liveToday = useLiveDayPnl(monthPnl?.currency === currency ? monthPnl.today : null, currency)
+  // Sin todos los cierres históricos, ni P&L de hoy ni mini-gráfico (#334).
+  const preparacion = usePreparacionHistoricos()
   // Mini-gráfico de la tarjeta Valor (#251): misma consulta (y caché) que el
   // gráfico de evolución en su periodo por defecto, «Todo».
   const { data: allPnl } = useCurrencyQuery(c => dailyPnlQuery(c), { refetchInterval: 60_000 })
   const hasPrices = Object.keys(prices).length > 0
   const valueTrend = useMemo(
-    () => (allPnl?.currency === currency ? valueSparkline(allPnl.days, hasPrices ? totalValue : null) : []),
-    [allPnl, currency, hasPrices, totalValue],
+    () => (preparacion.listo && allPnl?.currency === currency ? valueSparkline(allPnl.days, hasPrices ? totalValue : null) : []),
+    [preparacion.listo, allPnl, currency, hasPrices, totalValue],
   )
 
   // Variación de 24h en tiempo real con el precio de hace 24h del WebSocket (#147).
@@ -121,7 +124,8 @@ export function Dashboard() {
         change24h={change24h}
         currency={currency}
         assetCount={assetCount}
-        todayPnl={liveToday?.pnl ?? null}
+        todayPnl={preparacion.listo ? liveToday?.pnl ?? null : null}
+        todayPending={!preparacion.listo}
         valueTrend={valueTrend}
         eurFlow={eurFlow}
         valueTooltip={

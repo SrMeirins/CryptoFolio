@@ -25,6 +25,8 @@ export interface PnlResponse {
   peakCapitalPct: number; // P&L sobre el máximo capital neto aportado, sin margen (periodo completo)
   days: DayPnl[];
   today: LiveDayBase | null; // base del día en curso si está en el rango (#213)
+  /** Activos con todos sus cierres del rango sobre los necesarios (#334). */
+  progreso: { listos: number; total: number };
 }
 
 /**
@@ -60,7 +62,7 @@ export async function getDailyPnl(
   const to = query.to ?? today;
   const firstActivity = events.length > 0 ? madridDateOf(events.reduce((min, e) => Math.min(min, e.at), Infinity)) : to;
   const from = !query.from || query.from < firstActivity ? (firstActivity <= to ? firstActivity : to) : query.from;
-  const empty: PnlResponse = { currency, from, to, timezone: 'Europe/Madrid', refreshing: false, totalPnl: 0, twrPct: 0, dietzPct: 0, peakCapitalPct: 0, days: [], today: null };
+  const empty: PnlResponse = { currency, from, to, timezone: 'Europe/Madrid', refreshing: false, totalPnl: 0, twrPct: 0, dietzPct: 0, peakCapitalPct: 0, days: [], today: null, progreso: { listos: 0, total: 0 } };
   if (events.length === 0 || from > to) return empty;
 
   // Día anterior (base) + días pedidos. El día de hoy se valora en este instante.
@@ -158,8 +160,13 @@ export async function getDailyPnl(
 
   const refreshing = pending.size > 0;
   if (refreshing) schedulePrefetch(pending);
-  const liveDay = todayIdx > 0 ? liveDayBase(today, valueAt(todayIdx - 1), holdings[todayIdx], todayFlows, priceTable, todayIdx) : null;
-  return { currency, from, to, timezone: 'Europe/Madrid', refreshing, totalPnl, twrPct, dietzPct, peakCapitalPct, days, today: liveDay };
+  // Sin el cierre completo de ayer, el P&L de hoy compararía con una cartera a
+  // medio valorar (casi todo saldría como ganancia): mejor no darlo (#334).
+  const liveDay = todayIdx > 0 && !pendingDay[todayIdx - 1]
+    ? liveDayBase(today, valueAt(todayIdx - 1), holdings[todayIdx], todayFlows, priceTable, todayIdx)
+    : null;
+  const progreso = { listos: assets.size - pending.size, total: assets.size };
+  return { currency, from, to, timezone: 'Europe/Madrid', refreshing, totalPnl, twrPct, dietzPct, peakCapitalPct, days, today: liveDay, progreso };
 }
 
 function liveDayBase(
@@ -220,4 +227,14 @@ function schedulePrefetch(ranges: ReadonlyMap<string, { from: string; to: string
 /** Solo para tests: espera a que termine la precarga en curso. */
 export function waitForPrefetch(): Promise<void> {
   return prefetching ?? Promise.resolve();
+}
+
+/**
+ * Preparación de los históricos (#334): cierres descargados de todo el periodo
+ * con actividad. Lanza la precarga de lo que falte. El dashboard no muestra
+ * cifras derivadas del histórico hasta que está completo.
+ */
+export async function estadoPreparacion(): Promise<{ completo: boolean; progreso: { listos: number; total: number } }> {
+  const r = await getDailyPnl();
+  return { completo: !r.refreshing, progreso: r.progreso };
 }

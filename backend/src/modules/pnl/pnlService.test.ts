@@ -195,6 +195,38 @@ describe('getDailyPnl — flujos de capital y rendimiento', () => {
     expect(r.days.map(x => x.complete)).toEqual([true, false]);
   });
 
+  it('sin el cierre de ayer no da P&L de hoy y expone el progreso (#334)', async () => {
+    await reset();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-02T10:00:00Z'));
+    try {
+      await tx('DEPOSIT_FIAT', '2026-07-30T09:00:00Z', 'EUR', 200);
+      await tx('BUY', '2026-07-30T10:00:00Z', 'XRP', 100, { cost_asset: 'EUR', cost_amount: 100 });
+      await tx('BUY', '2026-07-30T11:00:00Z', 'ADA', 100, { cost_asset: 'EUR', cost_amount: 100 });
+      await runFifoEngine();
+      // XRP tiene todos sus cierres; ADA aún no (se está descargando).
+      await closes('XRP', { '2026-07-29': 1, '2026-07-30': 1, '2026-07-31': 1, '2026-08-01': 1 });
+      livePrices.set('XRP', 1); livePrices.set('ADA', 1);
+
+      const r = await getDailyPnl({ from: '2026-07-30' });
+      expect(r.refreshing).toBe(true);
+      expect(r.today).toBeNull();
+      expect(r.progreso).toEqual({ listos: 1, total: 2 });
+
+      await closes('ADA', { '2026-07-29': 1, '2026-07-30': 1, '2026-07-31': 1, '2026-08-01': 1 });
+      const completo = await getDailyPnl({ from: '2026-07-30' });
+      expect(completo.refreshing).toBe(false);
+      expect(completo.today).not.toBeNull();
+      expect(completo.progreso).toEqual({ listos: 2, total: 2 });
+
+      const { estadoPreparacion } = await import('./pnlService');
+      expect(await estadoPreparacion()).toEqual({ completo: true, progreso: { listos: 2, total: 2 } });
+    } finally {
+      livePrices.clear();
+      vi.useRealTimers();
+    }
+  });
+
   it('incluye la base del día en curso para recalcularlo en vivo en el cliente (#213)', async () => {
     await reset();
     vi.useFakeTimers({ toFake: ['Date'] });

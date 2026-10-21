@@ -12,6 +12,8 @@ import type { QueryClient } from '@tanstack/react-query'
 // (el prefijo cubre las dos monedas).
 const TRANSACTION_AFFECTED_KEYS = [
   'transactions', 'tx-stats', 'fifo-lots', 'fiscal-summary', 'eur-flow', 'daily-pnl', 'intraday-pnl', 'pnl-day', 'recent-transactions',
+  // Tras cambiar transacciones pueden faltar cierres nuevos (#334).
+  'pnl-preparacion',
 ] as const
 
 /**

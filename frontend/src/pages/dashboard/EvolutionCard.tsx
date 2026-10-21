@@ -6,6 +6,8 @@ import { CalendarDayDetail } from './calendar/CalendarDayDetail'
 import { DateRangePicker } from '../../components/DateRangePicker'
 import { SegmentedControl, Tabs, cardClasses, tabId, tabPanelId, PanelHeader } from '../../components/ui'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
+import { usePreparacionHistoricos } from '../../hooks/usePreparacionHistoricos'
+import { PreparandoHistoricos } from '../../components/PreparandoHistoricos'
 import { useLiveDayPnl } from '../../hooks/useLiveDayPnl'
 import { dailyPnlQuery, intradayPnlQuery } from '../../queries/currencyQueries'
 import { METRIC_LABELS, PERIOD_TITLES, PNL_PERIODS, madridToday, metricFor, type PnlPeriod } from '../../utils/pnlChart'
@@ -58,7 +60,7 @@ export function EvolutionCard() {
   const valueChange = points.length >= 2 ? points[points.length - 1].value - points[0].value : null
   const labels = METRIC_LABELS[metric]
   const approximate = query.intraday ? intraday.data?.approximate ?? [] : []
-  const refreshing = !query.intraday && !!daily.data?.refreshing
+  const preparacion = usePreparacionHistoricos()
   const animationKey = `${period}-${range?.from ?? ''}-${range?.to ?? ''}-${tab}-${unit}`
   // Al cambiar de periodo o de rango el detalle abierto deja de aplicar.
   const periodKey = `${period}-${range?.from ?? ''}-${range?.to ?? ''}`
@@ -101,6 +103,8 @@ export function EvolutionCard() {
       />
 
       <div id={tabPanelId(baseId)} role="tabpanel" aria-labelledby={tabId(baseId, tab)}>
+        {/* Sin todos los cierres no hay curva fiable: progreso en vez de cifras (#334). 24h no depende de ellos. */}
+        {!query.intraday && !preparacion.listo ? <PreparandoHistoricos datos={preparacion.datos} /> : <>
         <EvolutionSummary
           summary={summary}
           currency={currency}
@@ -122,7 +126,6 @@ export function EvolutionCard() {
           }
           extra={
             <>
-              {refreshing && <span className="text-xs text-fg-subtle">Descargando precios de cierre…</span>}
               {tab === 'pnl' && (
                 <SegmentedControl label="Unidad de la curva" variant="accent" value={unit} onChange={setUnit}
                   options={[{ value: 'pct', label: '%', title: 'Rentabilidad en %' }, { value: 'eur', label: currency === 'USD' ? '$' : '€', title: `P&L en ${currency}` }]} />
@@ -136,6 +139,7 @@ export function EvolutionCard() {
           </div>
         )}
         {tab === 'pnl' ? <PnlChart {...state} unit={unit} /> : <ValueChart {...state} />}
+        </>}
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { getDailyPnl } from '../modules/pnl/pnlService';
+import { estadoPreparacion, getDailyPnl } from '../modules/pnl/pnlService';
 import { getIntradayPnl } from '../modules/pnl/intraday';
 import { getDayDetail } from '../modules/pnl/dayDetail';
 import { madridDateOf } from '../modules/prices/closePrices';
@@ -47,6 +47,16 @@ router.get('/daily', async (req: Request, res: Response) => {
     res.json(await getDailyPnl(parsed.data));
   } catch (e) {
     sendInternalError(res, e, 'GET /api/v1/pnl/daily');
+  }
+});
+
+// GET /api/v1/pnl/preparacion (#334): ¿están todos los cierres históricos?
+// Progreso por activos; mientras no esté completo, el dashboard muestra carga.
+router.get('/preparacion', async (_req: Request, res: Response) => {
+  try {
+    res.json(await estadoPreparacion());
+  } catch (e) {
+    sendInternalError(res, e, 'GET /api/v1/pnl/preparacion');
   }
 });
 

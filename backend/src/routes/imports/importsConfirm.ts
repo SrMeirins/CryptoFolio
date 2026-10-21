@@ -8,6 +8,7 @@ import {
 import { archivosDe, exchangesForzados, uploadCsv, parseWithdrawalDestinations, parseDepositCosts, retiradasDe } from './importsValidation';
 import { cargarAniosFiscales } from '../../modules/fiscal/carryforward';
 import { madridYearMonth } from '../../modules/fiscal/madridTime';
+import { estadoPreparacion } from '../../modules/pnl/pnlService';
 import { agruparAvisosFifo, impactoPorEjercicio, type ArchivoImportado } from '../../modules/csv/resumenImportacion';
 
 const router = Router();
@@ -119,6 +120,9 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
     const antes = await cargarAniosFiscales(anio);
     const fifo = await runFifoPhase(send);
     const despues = await cargarAniosFiscales(anio);
+
+    // Arranca ya la descarga de cierres para el dashboard (#334); no se espera.
+    void estadoPreparacion().catch(e => console.error('[IMPORT] Preparación de históricos fallida:', (e as Error).message));
 
     send('done', 'Proceso completado correctamente', undefined, undefined, {
       resumen: {
