@@ -54,6 +54,8 @@ export interface DestinoRetiro {
   networkId: string | null
   network: string | null
   txHash: string | null
+  /** Comisión de red del historial de retiradas de Binance (#335); llega a destino el importe sin ella. */
+  fee?: number | null
 }
 
 export interface UnknownOperationSample {
@@ -153,4 +155,4 @@ export interface RetiroExistente {
   destino: DestinoRetiro
 }
 
-export interface ResultadoExistentes { direcciones: number; destinos: number; fifo: boolean }
+export interface ResultadoExistentes { direcciones: number; destinos: number; comisiones: number; fifo: boolean }

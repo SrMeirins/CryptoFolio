@@ -42,6 +42,8 @@ describe('importCsvFile — destino on-chain de los retiros (#320)', () => {
     expect(r.duplicateRows).toBe(1);
     expect(await fila()).toEqual({ address: 'rSintetica1234', red: 'XRP Ledger', tx_hash: HASH });
     expect((await pool.query(`SELECT count(*)::int AS n FROM transactions WHERE asset = 'XRP'`)).rows[0].n).toBe(1);
+    // Y separa la comisión de red del retiro ya importado (#335).
+    expect((await pool.query(`SELECT amount::float AS a, fee_amount::float AS f FROM transactions WHERE asset = 'XRP'`)).rows[0]).toEqual({ a: 10, f: 0.2 });
   });
 
   it('un retiro nuevo emparejado se inserta con su destino', async () => {
@@ -54,5 +56,8 @@ describe('importCsvFile — destino on-chain de los retiros (#320)', () => {
        LEFT JOIN networks n ON n.id = t.counterparty_network_id WHERE t.asset = 'ADA'`,
     )).rows[0];
     expect(row).toEqual({ address: 'addr1sintetica0000', red: 'Cardano' });
+    // Retiro nuevo con comisión separada (#335): llegan 50 ADA y 0,5 son comisión.
+    expect((await pool.query(`SELECT amount::float AS a, amount_net::float AS n, fee_asset, fee_amount::float AS f FROM transactions WHERE asset = 'ADA'`)).rows[0])
+      .toEqual({ a: 50, n: 50, fee_asset: 'ADA', f: 0.5 });
   });
 });

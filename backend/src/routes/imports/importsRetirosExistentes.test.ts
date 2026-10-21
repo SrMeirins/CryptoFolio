@@ -74,9 +74,13 @@ describe('retiros ya importados (#330)', () => {
 
     const ok = await request(app).post('/api/imports/retiros-existentes')
       .field('reasignaciones', JSON.stringify({ [id]: wallet })).attach('withdrawals', retiradas, 'r.csv');
-    expect(ok.body).toEqual({ direcciones: 1, destinos: 1, fifo: true });
-    const fila = (await pool.query(`SELECT counterparty_address, tx_hash, destination_wallet_id FROM transactions WHERE id = $1`, [id])).rows[0];
-    expect(fila).toEqual({ counterparty_address: 'rSinteticaLedger1', tx_hash: HASH, destination_wallet_id: wallet });
+    expect(ok.body).toEqual({ direcciones: 1, destinos: 1, comisiones: 1, fifo: true });
+    const fila = (await pool.query(`SELECT counterparty_address, tx_hash, destination_wallet_id, amount::float AS amount, fee_asset, fee_amount::float AS fee FROM transactions WHERE id = $1`, [id])).rows[0];
+    // Comisión de red separada (#335): llegan 10 XRP y 0,2 son comisión.
+    expect(fila).toEqual({ counterparty_address: 'rSinteticaLedger1', tx_hash: HASH, destination_wallet_id: wallet, amount: 10, fee_asset: 'XRP', fee: 0.2 });
+    // El FIFO consume la comisión como disposición: el lote movido a la wallet es de 10, no de 10,2.
+    const enWallet = (await pool.query(`SELECT COALESCE(SUM(quantity_remaining), 0)::float AS q FROM fifo_lots WHERE wallet_id = $1 AND asset = 'XRP'`, [wallet])).rows[0].q;
+    expect(enWallet).toBeCloseTo(10, 8);
     // El FIFO ya mueve el lote a la wallet propia.
     expect((await pool.query(`SELECT count(*)::int AS n FROM fifo_lots WHERE wallet_id = $1 AND asset = 'XRP'`, [wallet])).rows[0].n).toBeGreaterThan(0);
 
@@ -84,8 +88,20 @@ describe('retiros ya importados (#330)', () => {
     expect((await request(app).post('/api/imports/preview').attach('withdrawals', retiradas, 'r.csv')).body.existentes).toEqual([]);
   });
 
+  it('un retiro con dirección pero sin comisión separada (importado antes de #335) se ofrece y se corrige', async () => {
+    // Deshace la comisión del caso anterior para simular un retiro importado antes del arreglo.
+    await pool.query(`UPDATE transactions SET amount = amount + fee_amount, amount_net = amount_net + fee_amount, fee_asset = NULL, fee_amount = NULL WHERE asset = 'XRP' AND fee_amount IS NOT NULL`);
+    const pre = await request(app).post('/api/imports/preview').attach('withdrawals', retiradas, 'r.csv');
+    expect(pre.body.existentes).toHaveLength(1);
+    expect(pre.body.existentes[0].destino.fee).toBeCloseTo(0.2, 10);
+    const r = await request(app).post('/api/imports/retiros-existentes').attach('withdrawals', retiradas, 'r.csv');
+    expect(r.body).toEqual({ direcciones: 0, destinos: 0, comisiones: 1, fifo: true });
+    expect((await pool.query(`SELECT amount::float AS a, fee_amount::float AS f FROM transactions WHERE asset = 'XRP' AND operation_type = 'WITHDRAW'`)).rows[0]).toEqual({ a: 10, f: 0.2 });
+  });
+
   it('solo completar direcciones (sin reasignar) no recalcula el FIFO', async () => {
     const r = await request(app).post('/api/imports/retiros-existentes').attach('files', bitvavo, 'bitvavo.csv');
-    expect(r.body).toEqual({ direcciones: 1, destinos: 0, fifo: false });
+    // Bitvavo ya separaba la comisión en el parser: no hay nada que corregir.
+    expect(r.body).toEqual({ direcciones: 1, destinos: 0, comisiones: 0, fifo: false });
   });
 });

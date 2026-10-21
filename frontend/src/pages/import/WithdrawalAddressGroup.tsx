@@ -101,6 +101,11 @@ export function WithdrawalAddressGroup({ id, grupo, red, destinations, coldWalle
                 <span className="mono text-fg-muted w-20 shrink-0">{fecha(tx.timestamp)}</span>
                 <CryptoIcon symbol={tx.asset} size={16} />
                 <span className="mono font-semibold text-negative">−{fmtAmt(tx.amountNet)} <span className="text-fg-subtle font-normal">{tx.asset}</span></span>
+                {tx.destino?.fee ? (
+                  <span className="text-fg-subtle" title="Comisión de red: se descuenta y cuenta como disposición; a destino llega el resto">
+                    llegan <span className="mono text-fg-muted">{fmtAmt(tx.amountNet - tx.destino.fee)}</span> · comisión <span className="mono text-fg-muted">{fmtAmt(tx.destino.fee)}</span>
+                  </span>
+                ) : null}
                 <span className="text-fg-subtle">{tx.account}</span>
                 <span className="flex-1" />
                 {txUrl && (

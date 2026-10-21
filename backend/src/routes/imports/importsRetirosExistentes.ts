@@ -4,6 +4,7 @@ import { db } from '../../db/client';
 import { detectarExchange, type Exchange } from '../../modules/csv/exchanges';
 import { retirosExistentes } from '../../modules/csv/retiradas/existentes';
 import { runFifoEngine } from '../../modules/fifo/engine';
+import { aplicarComisionRetiro } from '../../modules/csv/retiradas/comision';
 import { archivosDe, exchangesForzados, retiradasDe, uploadCsv } from './importsValidation';
 
 const router = Router();
@@ -83,12 +84,17 @@ router.post('/retiros-existentes', uploadCsv, async (req: Request, res: Response
         }
         destinos++;
       }
-      return { direcciones, destinos };
+
+      // Comisión de red (#335), después de los destinos: solo en los que siguen siendo retiros.
+      let comisiones = 0;
+      for (const e of existentes) if (await aplicarComisionRetiro(client, e.id, e.destino.fee)) comisiones++;
+      return { direcciones, destinos, comisiones };
     });
 
-    // Un cambio de destino altera lotes y eventos fiscales: se recalcula el FIFO.
-    if (resultado.destinos > 0) await runFifoEngine();
-    res.json({ ...resultado, fifo: resultado.destinos > 0 });
+    // Un cambio de destino o de comisión altera lotes y eventos fiscales: se recalcula el FIFO.
+    const fifo = resultado.destinos > 0 || resultado.comisiones > 0;
+    if (fifo) await runFifoEngine();
+    res.json({ ...resultado, fifo });
   } catch (e) {
     if (e instanceof PeticionInvalida) { res.status(400).json({ error: e.message }); return; }
     throw e;
