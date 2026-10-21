@@ -233,6 +233,11 @@ export interface AssetMetadata {
   price_source: string
   auto_detected: boolean
   last_price_check: string | null
+  /** Tiene lotes abiertos (#337). */
+  en_cartera?: boolean
+  /** Precio en vivo en EUR y su fuente, si lo hay (#337). */
+  precio_actual?: number | null
+  fuente_actual?: 'binance' | 'coingecko' | 'coinpaprika' | 'okx' | null
 }
 
 export interface ManualTxPreview {

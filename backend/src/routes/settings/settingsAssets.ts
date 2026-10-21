@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { getLivePrice, getLiveSource } from '../../modules/prices/liveFeed';
 import { nextDisabledPairs } from '../../modules/prices/disabledPairs';
 import { z } from 'zod';
 import { db } from '../../db/client';
@@ -34,13 +35,17 @@ const updateAssetSchema = z.object({
 // ── GET /api/settings/assets ───────────────────────────────────────────────
 router.get('/assets', async (_req: Request, res: Response) => {
   const result = await db.query(
-    `SELECT symbol, name, coingecko_id, is_stablecoin,
-            binance_eur_pair, binance_usdt_pair, binance_btc_pair,
-            price_source, auto_detected, last_price_check
-     FROM asset_metadata
-     ORDER BY symbol`
+    `SELECT am.symbol, am.name, am.coingecko_id, am.is_stablecoin,
+            am.binance_eur_pair, am.binance_usdt_pair, am.binance_btc_pair,
+            am.price_source, am.auto_detected, am.last_price_check,
+            EXISTS (SELECT 1 FROM fifo_lots fl WHERE fl.asset = am.symbol AND NOT fl.is_closed) AS en_cartera
+     FROM asset_metadata am
+     ORDER BY am.symbol`
   );
-  res.json(result.rows);
+  // Precio en vivo y su fuente (#337), para filtrar los activos sin precio o de respaldo.
+  res.json(result.rows.map((r: { symbol: string }) => ({
+    ...r, precio_actual: getLivePrice(r.symbol), fuente_actual: getLiveSource(r.symbol),
+  })));
 });
 
 // ── POST /api/settings/assets ──────────────────────────────────────────────

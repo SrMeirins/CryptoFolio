@@ -11,6 +11,7 @@ import { sendInternalError } from '../../middleware/errorHandler';
 import { coberturaActual } from '../../modules/csv/coberturaDb';
 import { avisosCobertura } from '../../modules/csv/coberturaAvisos';
 import { avisosVerificacion } from '../../modules/walletSync/avisos';
+import { getLivePrice } from '../../modules/prices/liveFeed';
 const router = Router();
 
 const bulkSetCostsSchema = z.object({
@@ -82,20 +83,25 @@ router.get('/notifications', async (_req: Request, res: Response) => {
     id: string; type: 'error' | 'warning' | 'info'; category: string; message: string; count?: number;
   }> = [];
 
-  // 1. Activos sin precio configurado — excluye stablecoins y activos con fuente CoinGecko
-  const noPriceRes = await db.query(
-    `SELECT am.symbol
+  // 1. Activos sin precio: sin fuente configurada, o en cartera sin precio en vivo
+  //    de ninguna fuente aunque la tengan (p. ej. par retirado) (#337).
+  const candidatosRes = await db.query(
+    `SELECT am.symbol, am.price_source,
+            EXISTS (SELECT 1 FROM fifo_lots fl WHERE fl.asset = am.symbol AND NOT fl.is_closed) AS en_cartera
      FROM asset_metadata am
-     WHERE am.price_source = 'unknown' AND am.is_stablecoin = FALSE
+     WHERE am.is_stablecoin = FALSE AND am.price_source <> 'fiat'
      ORDER BY am.symbol`
   );
-  if (noPriceRes.rows.length > 0) {
+  const sinPrecio = (candidatosRes.rows as { symbol: string; price_source: string; en_cartera: boolean }[])
+    .filter(r => r.price_source === 'unknown' || (r.en_cartera && getLivePrice(r.symbol) === null))
+    .map(r => r.symbol);
+  if (sinPrecio.length > 0) {
     notifications.push({
       id: 'no-price',
       type: 'warning',
       category: 'Precios',
-      message: `${noPriceRes.rows.length} activo${noPriceRes.rows.length > 1 ? 's' : ''} sin precio configurado: ${noPriceRes.rows.map((r: {symbol: string}) => r.symbol).join(', ')}`,
-      count: noPriceRes.rows.length,
+      message: `${sinPrecio.length} activo${sinPrecio.length > 1 ? 's' : ''} sin precio: ${sinPrecio.join(', ')}. Revísalos en Ajustes › Activos con el filtro «Sin precio».`,
+      count: sinPrecio.length,
     });
   }
 

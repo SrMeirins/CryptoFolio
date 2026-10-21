@@ -1,4 +1,6 @@
 import { db } from '../../db/client';
+import { precioActualRespaldo } from './respaldo/cascada';
+import { PRICE_ALIASES } from './priceAliases';
 import { WebSocket } from 'ws';
 import { getOrDetectPairInfo, loadPairCache, getPairInfo } from './pairDetector';
 import { getCurrentPricesEur, loadAssetMetadata as loadCoinGeckoIdMap } from './coingecko';
@@ -29,9 +31,27 @@ const broadcaster = createPriceBroadcaster();
 // Único punto de escritura del caché en vivo: registra el cambio para la
 // siguiente emisión agrupada.
 function setLivePrice(symbol: string, price: number): void {
-  if (liveCache.get(symbol) === price) return;
-  liveCache.set(symbol, price);
-  broadcaster.queue(symbol, price);
+  if (liveCache.get(symbol) !== price) {
+    liveCache.set(symbol, price);
+    broadcaster.queue(symbol, price);
+  }
+  // Alias (#337): BETH, WETH… valen lo mismo que su activo; su par puede estar
+  // retirado (BETHETH en BREAK), así que se alimentan del precio del original.
+  for (const [alias, original] of Object.entries(PRICE_ALIASES)) {
+    if (original === symbol && liveCache.get(alias) !== price) {
+      liveCache.set(alias, price);
+      broadcaster.queue(alias, price);
+    }
+  }
+}
+
+// Fuente del precio en vivo de los activos que no vienen de Binance (#337).
+const liveSources = new Map<string, 'coingecko' | 'coinpaprika' | 'okx'>();
+
+/** Fuente del precio en vivo: Binance salvo que lo haya dado una fuente alternativa. */
+export function getLiveSource(symbol: string): 'binance' | 'coingecko' | 'coinpaprika' | 'okx' | null {
+  if (!liveCache.has(symbol)) return null;
+  return liveSources.get(symbol) ?? 'binance';
 }
 
 // Precio de hace 24h (apertura de la ventana móvil de 24h de Binance) en EUR,
@@ -117,26 +137,70 @@ async function loadInitialPrices(): Promise<void> {
 // CoinGecko no tiene WebSocket — es la única forma de refrescar estos
 // precios. Se ejecuta tras la carga inicial y luego cada COINGECKO_REFRESH_MS.
 async function refreshCoinGeckoOnlyPrices(): Promise<void> {
+  // Activos de solo CoinGecko que han recibido precio en este ciclo.
+  const resueltos = new Set<string>();
+  let soloCoinGecko: string[] = [];
   try {
     const res = await db.query(
       `SELECT symbol FROM asset_metadata WHERE price_source = 'coingecko'`
     );
-    const symbols = (res.rows as { symbol: string }[]).map(r => r.symbol);
-    if (symbols.length === 0) return;
+    soloCoinGecko = (res.rows as { symbol: string }[]).map(r => r.symbol);
+    if (soloCoinGecko.length > 0) {
+      // getCurrentPricesEur solo resuelve símbolos con coingecko_id ya cargado
+      // en memoria (coingeckoIds.ts) — nada más lo invocaba en el arranque real
+      // del servidor, así que sin esto el mapa estaba siempre vacío y el
+      // fallback no resolvía ningún precio. Recargarlo aquí (barato, una query)
+      // también mantiene el mapa al día si el usuario edita el coingecko_id.
+      await loadCoinGeckoIdMap();
 
-    // getCurrentPricesEur solo resuelve símbolos con coingecko_id ya cargado
-    // en memoria (coingeckoIds.ts) — nada más lo invocaba en el arranque real
-    // del servidor, así que sin esto el mapa estaba siempre vacío y el
-    // fallback no resolvía ningún precio. Recargarlo aquí (barato, una query)
-    // también mantiene el mapa al día si el usuario edita el coingecko_id.
-    await loadCoinGeckoIdMap();
-
-    const prices = await getCurrentPricesEur(symbols);
-    for (const [symbol, price] of prices) {
-      if (symbol !== 'EUR') setLivePrice(symbol, price);
+      const prices = await getCurrentPricesEur(soloCoinGecko);
+      for (const [symbol, price] of prices) {
+        if (symbol === 'EUR') continue;
+        setLivePrice(symbol, price);
+        liveSources.set(symbol, 'coingecko');
+        resueltos.add(symbol);
+      }
     }
   } catch (e) {
     console.error('[PRICES] Error refrescando precios CoinGecko-only:', (e as Error).message);
+  }
+  // Tras CoinGecko (también si ha fallado): lo que siga sin precio, al respaldo (#337).
+  await refrescarRespaldo(soloCoinGecko.filter(s => !resueltos.has(s)))
+    .catch(e => console.error('[PRICES] Error en el respaldo de precios:', (e as Error).message));
+}
+
+// ── Respaldo de CoinGecko (#337) ────────────────────────────────────────────
+// Se piden a CoinPaprika y, si no, a OKX: los activos de solo CoinGecko que no
+// han recibido precio en este ciclo (fallo o 429), los que no tienen ningún
+// precio en vivo (desconocidos, par retirado) y los que ya venían del respaldo.
+// Una consulta cada 10 min por activo: la cuota de CoinPaprika es mensual
+// (20.000) y este ciclo se repite cada minuto.
+const RESPALDO_EN_VIVO_MS = 10 * 60_000;
+const ultimoRespaldo = new Map<string, number>();
+
+async function refrescarRespaldo(soloCoinGeckoSinPrecio: readonly string[]): Promise<void> {
+  // Solo activos que se tienen (lotes abiertos): el catálogo trae muchos más.
+  const res = await db.query(
+    `SELECT am.symbol FROM asset_metadata am
+     WHERE NOT am.is_stablecoin AND am.price_source <> 'fiat' AND am.symbol <> ALL($1::text[])
+       AND EXISTS (SELECT 1 FROM fifo_lots fl WHERE fl.asset = am.symbol AND NOT fl.is_closed)`,
+    [Object.keys(PRICE_ALIASES)],
+  );
+  const usdtEur = () => liveCache.get('USDT') ?? (eurUsdtRate > 0 ? eurUsdtRate : null);
+  const pendientes = (res.rows as { symbol: string }[]).map(r => r.symbol).filter(symbol => {
+    const fuente = liveSources.get(symbol);
+    return soloCoinGeckoSinPrecio.includes(symbol) || !liveCache.has(symbol) || fuente === 'coinpaprika' || fuente === 'okx';
+  });
+  for (const symbol of pendientes) {
+    const ultimo = ultimoRespaldo.get(symbol);
+    if (ultimo !== undefined && liveCache.has(symbol) && Date.now() - ultimo < RESPALDO_EN_VIVO_MS) continue;
+    ultimoRespaldo.set(symbol, Date.now());
+    try {
+      const r = await precioActualRespaldo(symbol, usdtEur);
+      if (r) { setLivePrice(symbol, r.precio); liveSources.set(symbol, r.fuente); }
+    } catch (e) {
+      console.warn(`[PRICES] Respaldo sin precio para ${symbol}:`, (e as Error).message);
+    }
   }
 }
 

@@ -58,3 +58,14 @@ describe('separador de miles y coma decimal en toda la app (#210)', () => {
     expect(formatPct(3.2)).toBe('+3,20%')
   })
 })
+
+describe('precios muy pequeños (#337)', () => {
+  it('con cifras significativas, sin notación científica', async () => {
+    const { formatPrice, formatSignificant } = await import('./format')
+    const sinDuro = (t: string) => t.replace(/\u00a0/g, ' ')
+    expect(sinDuro(formatPrice(0.0000094963))).toBe('0,0000094963 €')
+    expect(sinDuro(formatPrice(0.00000024))).toBe('0,00000024 €')
+    expect(sinDuro(formatPrice(0.074206))).toBe('0,074206 €')
+    expect(formatSignificant(0.0000094963)).toBe('0,0000094963')
+  })
+})

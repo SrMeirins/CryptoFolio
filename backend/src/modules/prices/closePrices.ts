@@ -1,4 +1,5 @@
 import { db } from '../../db/client';
+import { precioDiaRespaldo } from './respaldo/cascada';
 import { getOrDetectPairInfo } from './pairDetector';
 import { getHistoricalPriceEur as getCoinGeckoDailyPriceEur, fetchMarketChart } from './coingecko';
 import { fetchWithTimeout } from './httpTimeout';
@@ -37,7 +38,7 @@ function withinCoinGeckoHistory(day: string): boolean {
   return Date.parse(`${nextDay(day)}T00:00:00Z`) > Date.now() - (COINGECKO_HISTORY_DAYS - 1) * DAY_MS;
 }
 
-export type CloseSource = 'binance_1h' | 'coingecko_daily' | 'none';
+export type CloseSource = 'binance_1h' | 'coingecko_daily' | 'coinpaprika_daily' | 'okx_1d' | 'none';
 
 // ── Fechas ─────────────────────────────────────────────────────────────────
 
@@ -231,6 +232,14 @@ async function resolveClose(asset: string, day: string, closeMs: number): Promis
     const nextUtcMidnight = new Date(`${nextDay(day)}T00:00:00.000Z`);
     const gecko = await getCoinGeckoDailyPriceEur(asset, nextUtcMidnight);
     if (gecko > 0) { price = gecko; source = 'coingecko_daily'; }
+  }
+  // Respaldo (#337): CoinPaprika (último año) y OKX (histórico profundo), con el
+  // precio de las 00:00 UTC del día siguiente, como el respaldo de CoinGecko. Un
+  // fallo de red lanza y no deja marca: se reintentará.
+  // USDT queda fuera: es la propia conversión y se esperaría a sí mismo.
+  if (price === null && asset !== 'USDT') {
+    const r = await precioDiaRespaldo(asset, nextDay(day), async () => getClosePriceEur('USDT', day));
+    if (r) { price = r.precio; source = r.fuente === 'okx' ? 'okx_1d' : 'coinpaprika_daily'; }
   }
   if (price === null) source = 'none';
 

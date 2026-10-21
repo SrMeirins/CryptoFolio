@@ -62,6 +62,9 @@ vi.mock('./coingecko', () => ({
   getCurrentPricesEur: vi.fn(async () => new Map()),
   loadAssetMetadata: vi.fn(async () => {}),
 }));
+// Fuentes de respaldo (#337): sin dato salvo que el test diga otra cosa.
+const { respaldoActualMock } = vi.hoisted(() => ({ respaldoActualMock: vi.fn(async (): Promise<{ precio: number; fuente: 'coinpaprika' | 'okx' } | null> => null) }));
+vi.mock('./respaldo/cascada', () => ({ precioActualRespaldo: respaldoActualMock }));
 
 function asset(symbol: string, pairs: Partial<Record<'binance_eur_pair' | 'binance_usdt_pair' | 'binance_btc_pair' | 'binance_eth_pair', string>>) {
   return {
@@ -311,5 +314,55 @@ describe('liveFeed — el par más rápido con respaldo (#277)', () => {
     tick('XRPUSDT', '2.5', '2.0');
     tick('XRPEUR', '2.03', '1.0');
     expect(feed.getAllOpen24Prices().get('XRP')).toBeCloseTo(1.6, 10);   // 2,0 × 0,8, no el 1,0 del par EUR
+  });
+});
+
+describe('liveFeed — alias y respaldo de CoinGecko (#337)', () => {
+  let feed: typeof import('./liveFeed');
+  const tick = (pair: string, price: string) =>
+    sockets[0].handlers.message?.(Buffer.from(JSON.stringify({ data: { s: pair, c: price, o: price } })));
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    sockets.length = 0;
+    assetRows.current = [asset('ETH', { binance_eur_pair: 'ETHEUR' })];
+    queryMock.mockReset();
+    queryMock.mockImplementation(async (sql: string) => {
+      const q = String(sql);
+      if (q.includes('fifo_lots')) return { rows: [{ symbol: 'NFT' }] };          // en cartera, sin par en Binance
+      if (q.includes("price_source = 'coingecko'")) return { rows: [] };
+      return q.includes('FROM asset_metadata') ? { rows: assetRows.current } : { rows: [] };
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [] })));
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    respaldoActualMock.mockReset();
+    respaldoActualMock.mockImplementation(async () => null);
+
+    feed = await import('./liveFeed');
+    feed.startLivePrices();
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+  });
+
+  afterEach(() => {
+    feed.stopLivePrices();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('un alias (BETH) toma el precio en vivo de su activo (ETH) aunque su par esté retirado', () => {
+    tick('ETHEUR', '3000');
+    expect(feed.getLivePrice('ETH')).toBe(3000);
+    expect(feed.getLivePrice('BETH')).toBe(3000);
+    expect(feed.getLiveSource('ETH')).toBe('binance');
+  });
+
+  it('un activo en cartera sin precio en Binance ni CoinGecko recibe el del respaldo, con su fuente', async () => {
+    respaldoActualMock.mockImplementation(async () => ({ precio: 0.0000002, fuente: 'okx' }));
+    await vi.advanceTimersByTimeAsync(61_000);
+    await vi.waitFor(() => expect(feed.getLivePrice('NFT')).toBe(0.0000002));
+    expect(feed.getLiveSource('NFT')).toBe('okx');
+    expect(respaldoActualMock).toHaveBeenCalledWith('NFT', expect.any(Function));
   });
 });

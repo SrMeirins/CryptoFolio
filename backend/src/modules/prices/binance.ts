@@ -1,4 +1,5 @@
 import { db } from '../../db/client';
+import { precioDiaRespaldo } from './respaldo/cascada';
 import { getOrDetectPairInfo, loadPairCache, getPairInfo } from './pairDetector';
 import {
   getHistoricalPriceEur as getCoinGeckoHistoricalPrice,
@@ -171,6 +172,8 @@ async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<numbe
   // Algún par de Binance falló por la red (no por falta de datos): el precio
   // puede existir y no debe darse por perdido (#267).
   let transient = [eurR, usdtR, btcR, ethR].some(r => r.status === 'rejected' && !isDefinitiveNoData(r.reason));
+  // Fuente del precio, para registrarla en la caché (#337).
+  let fuente = 'binance';
 
   // 4. Fallback a CoinGecko si Binance no tiene datos históricos
   //    (activos delistados, tokens no nativos de Binance, etc.)
@@ -179,9 +182,21 @@ async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<numbe
       // Asegurar que tenemos coingecko_id antes de llamar
       await searchAndSaveCoinGeckoId(symbol);
       priceEur = await getCoinGeckoHistoricalPrice(symbol, date);
+      if (priceEur) fuente = 'coingecko';
       if (!priceEur && coinGeckoSearchFailedTransiently(symbol)) transient = true;
     } catch {
       // Error de red o rate limit de CoinGecko: temporal.
+      transient = true;
+    }
+  }
+
+  // 5. Respaldo (#337): CoinPaprika (último año) y OKX (histórico profundo), por
+  //    si Binance y CoinGecko no lo tienen o CoinGecko está en rate limit.
+  if (!priceEur) {
+    try {
+      const r = await precioDiaRespaldo(symbol, dateStr, () => getHistoricalUsdtEur(date));
+      if (r) { priceEur = r.precio; fuente = r.fuente; transient = false; }
+    } catch {
       transient = true;
     }
   }
@@ -193,7 +208,7 @@ async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<numbe
   }
 
   if (!priceEur) {
-    console.warn(`[PRICES] Sin precio para ${symbol} @ ${dateStr} en Binance ni CoinGecko`);
+    console.warn(`[PRICES] Sin precio para ${symbol} @ ${dateStr} en ninguna fuente (Binance, CoinGecko, CoinPaprika, OKX)`);
     // Persistir sentinel -1: evita reintentos en el motor FIFO y próximas sesiones.
     // ON CONFLICT DO NOTHING para no pisar un precio real que llegara después.
     noPricePairs.add(key);
@@ -207,7 +222,7 @@ async function _getHistoricalPriceEur(symbol: string, date: Date): Promise<numbe
   }
 
   transientMisses.delete(key);
-  await cachePrice(symbol, priceEur, dateStr);
+  await cachePrice(symbol, priceEur, dateStr, fuente);
   return priceEur;
 }
 
@@ -225,12 +240,12 @@ async function getHistoricalUsdtEur(date: Date): Promise<number> {
   return usdtEur;
 }
 
-async function cachePrice(symbol: string, price: number, dateStr: string): Promise<void> {
+async function cachePrice(symbol: string, price: number, dateStr: string, source = 'binance'): Promise<void> {
   await db.query(
     `INSERT INTO price_cache (asset, price_eur, price_date, source)
-     VALUES ($1, $2, $3, 'binance')
-     ON CONFLICT (asset, price_date) DO UPDATE SET price_eur = EXCLUDED.price_eur`,
-    [symbol, price, dateStr]
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (asset, price_date) DO UPDATE SET price_eur = EXCLUDED.price_eur, source = EXCLUDED.source`,
+    [symbol, price, dateStr, source]
   );
 }
 
