@@ -24,7 +24,7 @@ function ChartTooltip({ active, payload, label }: {
 export function AnalyticsPanel({ stats, onAssetClick }: {
   stats: {
     currency?: Currency
-    monthly:   { mes: string; total_ops: number; compras: number; ventas: number; ingresos: number; transferencias: number; eur_invertido: number }[]
+    monthly:   { mes: string; total_ops: number; compras: number; ventas: number; otras_salidas: number; ingresos: number; transferencias: number; eur_invertido: number }[]
     topAssets: { asset: string; ops: number; eur_volume: number }[]
     fees:      { asset: string; ops: number; total_amount: number; total_eur: number }[]
   }
@@ -36,9 +36,10 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
     name:          fmtMonthLabel(m.mes),
     Compras:       m.compras,
     Ventas:        m.ventas,
+    'Otras salidas': m.otras_salidas,
     Ingresos:      m.ingresos,
     Transferencias: m.transferencias,
-    Otros:         m.total_ops - m.compras - m.ventas - m.ingresos - m.transferencias,
+    Otros:         m.total_ops - m.compras - m.ventas - m.otras_salidas - m.ingresos - m.transferencias,
   }))
   const maxOps = Math.max(...stats.monthly.map(m => m.total_ops), 1)
 
@@ -70,15 +71,16 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: c.cursorSoft }} />
                 <Bar dataKey="Compras"        stackId="a" fill={c.gain} />
                 <Bar dataKey="Ventas"         stackId="a" fill={c.loss} />
+                <Bar dataKey="Otras salidas"  stackId="a" fill={c.loss} fillOpacity={0.45} />
                 <Bar dataKey="Ingresos"       stackId="a" fill={c.warn} />
                 <Bar dataKey="Transferencias" stackId="a" fill={c.neutral} />
                 <Bar dataKey="Otros"          stackId="a" fill={c.neutralSoft} radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-            <div className="flex items-center gap-4 mt-2">
-              {[['Compras',c.gain],['Ventas',c.loss],['Ingresos',c.warn],['Transferencias',c.neutral],['Otros',c.neutralSoft]].map(([l,c]) => (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+              {([['Compras',c.gain,1],['Ventas',c.loss,1],['Otras salidas',c.loss,0.45],['Ingresos',c.warn,1],['Transferencias',c.neutral,1],['Otros',c.neutralSoft,1]] as const).map(([l,c,o]) => (
                 <div key={l} className="flex items-center gap-1.5 text-xs text-fg-subtle">
-                  <div className="w-2 h-2 rounded-lg" style={{ backgroundColor: c }} />{l}
+                  <div className="w-2 h-2 rounded-lg" style={{ backgroundColor: c, opacity: o }} />{l}
                 </div>
               ))}
             </div>

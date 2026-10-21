@@ -33,6 +33,10 @@ function tx(overrides: Partial<Transaction>): Transaction {
     linked_tx_operation_type: null,
     linked_tx_amount: null,
     linked_tx_asset: null,
+    value_eur: 100,
+    value_source: 'coste',
+    fee_value_eur: null,
+    fee_value_source: null,
     ...overrides,
   }
 }

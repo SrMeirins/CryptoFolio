@@ -14,18 +14,27 @@ export function StatsBar({ stats }: {
     // Moneda de los importes (#177); los campos *_eur la siguen aunque se llamen así.
     currency?: Currency
     totals: {
-      total_ops: number; unique_assets: number; total_invested: number
-      total_fee_ops: number; total_fees_eur: number; total_buys: number; total_sells: number; total_manual: number
+      total_ops: number; unique_assets: number; total_invested: number; total_fiat_buys: number
+      total_fee_ops: number; total_fees_eur: number; fees_sin_valor: number
+      total_sells: number; total_sold: number; total_manual: number
     }
   }
 }) {
   const { totals } = stats
   const money = (v: number) => formatMoney(v, stats.currency ?? 'EUR')
+  const count = (n: number, one: string, many: string) => `${formatNumber(n, 0)} ${n === 1 ? one : many}`
+  // Definiciones (#346): Invertido = fiat pagado en compras; Ventas = SELL*,
+  // sin pérdidas ni regalos; Comisiones = todas, valoradas con el FIFO.
   const cards = [
-    { ...CARD_META.invested, title: 'Invertido',    value: money(totals.total_invested),  sub: `${totals.total_buys} compras`        },
-    { ...CARD_META.ops,      title: 'Operaciones',  value: formatNumber(totals.total_ops, 0), sub: `${totals.unique_assets} activos únicos` },
-    { ...CARD_META.fees,     title: 'Comisiones',   value: money(totals.total_fees_eur),   sub: `${totals.total_fee_ops} ops con fee` },
-    { ...CARD_META.sells,    title: 'Ventas',       value: formatNumber(totals.total_sells, 0), sub: `${totals.total_manual} manuales`    },
+    { ...CARD_META.invested, title: 'Invertido',    value: money(totals.total_invested),
+      sub: count(totals.total_fiat_buys, 'compra con fiat', 'compras con fiat') },
+    { ...CARD_META.ops,      title: 'Operaciones',  value: formatNumber(totals.total_ops, 0),
+      sub: `${count(totals.unique_assets, 'activo', 'activos')} · ${count(totals.total_manual, 'manual', 'manuales')}` },
+    { ...CARD_META.fees,     title: 'Comisiones',   value: money(totals.total_fees_eur),
+      sub: count(totals.total_fee_ops, 'operación con comisión', 'operaciones con comisión')
+        + (totals.fees_sin_valor > 0 ? ` · ${formatNumber(totals.fees_sin_valor, 0)} sin precio` : '') },
+    { ...CARD_META.sells,    title: 'Ventas',       value: money(totals.total_sold),
+      sub: count(totals.total_sells, 'venta', 'ventas') },
   ]
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

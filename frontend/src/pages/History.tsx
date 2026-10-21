@@ -18,7 +18,7 @@ import { invalidateTransactionQueries } from '../utils/queryInvalidation'
 import { useWalletsQuery } from '../hooks/useWallets'
 import { OP_META } from '../constants/operations'
 import { buildHistoryCsv } from './history/buildHistoryCsv'
-import { fmtDateGroup, calcEurValue } from './history/helpers'
+import { fmtDateGroup, calcEurValue, localDayKey } from './history/helpers'
 import { TxRow } from './history/TxRow'
 import { StatsBar } from './history/StatsBar'
 import { AnalyticsPanel } from './history/AnalyticsPanel'
@@ -112,7 +112,8 @@ export function History() {
   // vez de solo cuando cambian los datos reales.
   const rawTransactions = useMemo(() => data?.transactions ?? [], [data])
   const total      = data?.total ?? 0
-  const totalAmount = (currency === 'EUR' ? data?.total_eur : data?.total_amount) ?? 0
+  // Entradas y salidas de valor de lo filtrado, en la moneda de visualización (#346).
+  const flows = data?.flows[currency] ?? null
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const currentPage = Math.floor(filters.offset / PAGE_SIZE)
 
@@ -133,7 +134,8 @@ export function History() {
   const grouped = useMemo(() => {
     const map = new Map<string, Transaction[]>()
     for (const tx of transactions) {
-      const day = tx.timestamp.slice(0, 10)
+      // Día local, el mismo de la hora que muestra la fila (no el día UTC).
+      const day = localDayKey(tx.timestamp)
       if (!map.has(day)) map.set(day, [])
       map.get(day)!.push(tx)
     }
@@ -190,7 +192,15 @@ export function History() {
   const hasActiveFilters = !!(filters.asset || filters.account || filters.type || filters.wallet_id ||
     filters.manualOnly || filters.date_from || filters.date_to || filters.search || filters.import_id)
 
-  const KNOWN_ACCOUNTS = ['Spot', 'Funding', 'Cross Margin', 'Isolated Margin', 'Futures', 'Manual']
+  // Cuentas presentes en los datos (#346); antes una lista fija sin, p. ej., Bitvavo.
+  const { data: facets } = useQuery({ queryKey: ['transactions', 'facets'], queryFn: portfolioApi.getTransactionFacets, staleTime: 60_000 })
+  const accounts = facets?.accounts ?? []
+
+  const subtitle = !data
+    ? 'Cargando…'
+    : total > 0
+      ? `${formatNumber(total, 0)} transacciones${hasActiveFilters ? ' filtradas' : ''}`
+      : hasActiveFilters ? 'Sin resultados para estos filtros' : 'Sin transacciones importadas'
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -201,11 +211,12 @@ export function History() {
           icon={navIcon('/history')}
           title="Historial"
           subtitle={<>
-              {total > 0
-                ? `${formatNumber(total, 0)} transacciones${hasActiveFilters ? ' filtradas' : ''}`
-                : 'Sin transacciones importadas'}
-              {hasActiveFilters && totalAmount > 0 && (
-                <span className="ml-2 text-brand font-semibold mono">· {formatMoney(totalAmount, currency)} total</span>
+              {subtitle}
+              {hasActiveFilters && flows && (flows.entradas > 0 || flows.salidas > 0) && (
+                <span className="ml-2 mono" title="Suma del valor de las operaciones de entrada y de salida; no incluye movimientos entre tus wallets">
+                  {flows.entradas > 0 && <> · <span className="text-positive font-semibold">+{formatMoney(flows.entradas, currency)}</span> entradas</>}
+                  {flows.salidas > 0 && <> · <span className="text-negative font-semibold">−{formatMoney(flows.salidas, currency)}</span> salidas</>}
+                </span>
               )}
             </>}
           actions={<>
@@ -267,7 +278,7 @@ export function History() {
 
           {/* Cuenta */}
           <Dropdown size="sm" label="Filtrar por cuenta" value={filters.account} onChange={v => setFilter('account', v)}
-            options={[{ value: '', label: 'Todas las cuentas' }, ...KNOWN_ACCOUNTS.map(a => ({ value: a, label: a }))]} />
+            options={[{ value: '', label: 'Todas las cuentas' }, ...accounts.map(a => ({ value: a, label: a }))]} />
 
           {/* Rango de fechas */}
           <DateRangePicker
@@ -342,11 +353,11 @@ export function History() {
                         <td colSpan={7} className="px-4 py-1.5">
                           <div className="flex items-center gap-2">
                             <Calendar size={9} className="text-fg-subtle" />
-                            <span className="text-xs text-fg-subtle font-semibold capitalize">
-                              {fmtDateGroup(day + 'T12:00:00')}
+                            <span className="text-xs text-fg-subtle font-semibold">
+                              {fmtDateGroup(day)}
                             </span>
                             <span className="text-xs text-fg-subtle">
-                              · {txs.length} operacion{txs.length !== 1 ? 'es' : ''}
+                              · {txs.length} {txs.length !== 1 ? 'operaciones' : 'operación'}
                             </span>
                           </div>
                         </td>

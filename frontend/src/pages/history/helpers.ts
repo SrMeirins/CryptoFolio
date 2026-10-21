@@ -1,19 +1,29 @@
-import type { Transaction } from '../../api/portfolio'
+import type { Transaction, ValuationSource } from '../../api/portfolio'
 import type { Currency } from '../../utils/format'
 import { formatNumber } from '../../utils/format'
+import { APP_TIMEZONE } from '../../constants/timezone'
+
+// Fechas en la zona de la aplicación, no en la del navegador ni en UTC (#346):
+// la hora de la fila y el día en que se agrupa salen del mismo instante local.
+const DATE_FMT = new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short', year: '2-digit', timeZone: APP_TIMEZONE })
+const TIME_FMT = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: APP_TIMEZONE })
+const DAY_KEY_FMT = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: APP_TIMEZONE })
+const DAY_LONG_FMT = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
 
 export function fmtDate(ts: string): { date: string; time: string } {
   const d = new Date(ts)
-  return {
-    date: d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' }),
-    time: d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-  }
+  return { date: DATE_FMT.format(d), time: TIME_FMT.format(d) }
 }
 
-export function fmtDateGroup(ts: string): string {
-  return new Date(ts).toLocaleDateString('es-ES', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  })
+/** Día local (AAAA-MM-DD) de un instante, para agrupar el listado. */
+export function localDayKey(ts: string): string {
+  return DAY_KEY_FMT.format(new Date(ts))
+}
+
+/** Cabecera de un día (AAAA-MM-DD): «Jueves, 3 de septiembre de 2026», solo la inicial en mayúscula. */
+export function fmtDateGroup(day: string): string {
+  const text = DAY_LONG_FMT.format(new Date(`${day}T12:00:00Z`))
+  return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
 export function fmtMonthLabel(mes: string): string {
@@ -22,15 +32,9 @@ export function fmtMonthLabel(mes: string): string {
     .toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
 }
 
-export function calcEurValue(tx: Transaction): number | null {
-  if (tx.cost_asset === 'EUR' && tx.cost_amount) return Math.abs(parseFloat(tx.cost_amount))
-  // price_per_unit solo está en EUR para ops sin cost_asset (income: staking, airdrop...)
-  // Para swaps cripto↔cripto price_per_unit es el ratio en units del cost_asset, no en EUR
-  if (!tx.cost_asset && tx.price_per_unit && tx.amount_net) {
-    const p = parseFloat(tx.price_per_unit), a = Math.abs(parseFloat(tx.amount_net))
-    if (!isNaN(p) && !isNaN(a) && p > 0 && a > 0) return p * a
-  }
-  return null
+/** Valor en EUR de la operación en su fecha, calculado por el backend (#346). */
+export function calcEurValue(tx: Pick<Transaction, 'value_eur'>): number | null {
+  return tx.value_eur ?? null
 }
 
 /**
@@ -44,15 +48,18 @@ export function toDisplayAmount(eur: number | null, tx: Pick<Transaction, 'usd_p
   return rate > 0 ? eur * rate : null
 }
 
-export function calcFeeEur(tx: Transaction): number | null {
-  if (!tx.fee_amount || !tx.fee_asset) return null
-  const amt = parseFloat(tx.fee_amount)
-  if (isNaN(amt) || amt <= 0) return null
-  if (tx.fee_asset === 'EUR') return amt
-  if (tx.fee_asset === tx.asset && tx.price_per_unit) {
-    const p = parseFloat(tx.price_per_unit)
-    if (!isNaN(p) && p > 0) return amt * p
-  }
+/** Valor en EUR de la comisión (#346); null si no hay comisión o no tiene precio. */
+export function calcFeeEur(tx: Pick<Transaction, 'fee_value_eur'>): number | null {
+  return tx.fee_value_eur ?? null
+}
+
+/**
+ * Texto de ayuda del origen de un valor (#346): visible como tooltip y como
+ * texto accesible. null cuando la cifra es exacta (coste o FIFO).
+ */
+export function valuationHint(source: ValuationSource | null): string | null {
+  if (source === 'estimado') return 'Estimado con el precio de cierre diario del activo'
+  if (source === 'sin_precio') return 'Sin precio disponible para esta fecha'
   return null
 }
 
@@ -71,4 +78,23 @@ export function formatPriceLine(tx: Transaction): string | null {
   if (p >= 100)   return `${formatNumber(p, 2, 2)} ${sym}`
   if (p >= 1)     return `${formatNumber(p, 4, 4)} ${sym}`
   return `${formatNumber(p, 6, 6)} ${sym}`
+}
+
+// Sentido de cada tipo, espejo de INFLOW_TYPES/OUTFLOW_TYPES del backend
+// (modules/history/operationGroups.ts). Un retiro lleva «−» porque sale de su
+// wallet de origen, aunque vaya a otra propia.
+const INFLOW = new Set([
+  'BUY', 'BUY_FIAT', 'BUY_CRYPTO', 'STAKING_REWARD', 'MINING_REWARD', 'LENDING_INTEREST',
+  'LENDING_INTEREST_LOCKED', 'CASHBACK', 'AIRDROP', 'FORK', 'DEPOSIT_FIAT', 'DEPOSIT_CRYPTO', 'MARGIN_BORROW',
+])
+const OUTFLOW = new Set([
+  'SELL', 'SELL_FIAT', 'SELL_CRYPTO', 'GIFT_SENT', 'LOST', 'FEE', 'FEE_NETWORK', 'FEE_EXCHANGE',
+  'WITHDRAW', 'WITHDRAW_FIAT', 'MARGIN_REPAY',
+])
+
+/** Signo de la cantidad: entrada, salida o neutra (transferencias, bloqueos). */
+export function flowSign(operationType: string): '+' | '−' | '' {
+  if (INFLOW.has(operationType)) return '+'
+  if (OUTFLOW.has(operationType)) return '−'
+  return ''
 }
