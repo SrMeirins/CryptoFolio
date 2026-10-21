@@ -87,15 +87,16 @@ describe('API — moneda de visualización USD (#175)', () => {
     expect(usd.body.eurSpentBuying).toBeCloseTo(50, 6);    // 40 € × 1,25 (fecha más cercana)
   });
 
-  it('GET /transactions incluye el tipo de cada fila y el total en la moneda pedida', async () => {
+  it('GET /transactions incluye el tipo de cada fila y los flujos en ambas monedas', async () => {
     const res = await request(app).get('/api/transactions?currency=USD');
     const rate = Object.fromEntries(res.body.transactions.map((t: { timestamp: string; usd_per_eur: string }) =>
       [new Date(t.timestamp).toISOString().slice(0, 10), Number(t.usd_per_eur)]));
     expect(rate['2026-01-01']).toBeCloseTo(1.25, 6);
     expect(rate['2026-01-10']).toBeCloseTo(2, 6);
     expect(res.body.currency).toBe('USD');
-    expect(res.body.total_eur).toBeCloseTo(40, 6);
-    expect(res.body.total_amount).toBeCloseTo(50, 6);
+    // Entradas (#346): dos depósitos de EUR y la compra, cada uno con el tipo de su fecha.
+    expect(res.body.flows.EUR.entradas).toBeCloseTo(150, 6);
+    expect(res.body.flows.USD.entradas).toBeCloseTo(125 + 50 + 20, 6);
   });
 
   it('GET /transactions/stats?currency=USD convierte lo invertido', async () => {

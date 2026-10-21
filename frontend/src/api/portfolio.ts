@@ -295,6 +295,30 @@ export interface Transaction {
   linked_tx_operation_type: string | null
   linked_tx_amount: string | null
   linked_tx_asset: string | null
+  /** Valor en EUR de la operación en su fecha (#346); null si no hay precio. */
+  value_eur: number | null
+  value_source: ValuationSource
+  /** Valor en EUR de la comisión; null si no hay comisión o no tiene precio. */
+  fee_value_eur: number | null
+  fee_value_source: ValuationSource | null
+}
+
+/**
+ * Origen del valor de una transacción (#346): coste explícito en EUR, motor
+ * FIFO (la cifra de Fiscal), estimación con el cierre diario, o sin precio.
+ */
+export type ValuationSource = 'coste' | 'fifo' | 'estimado' | 'sin_precio'
+
+/** Entradas y salidas de valor de lo filtrado; USD es null si falta algún tipo de cambio. */
+export interface TransactionFlows {
+  EUR: { entradas: number; salidas: number }
+  USD: { entradas: number; salidas: number } | null
+}
+
+export interface TransactionFacets {
+  accounts: string[]
+  assets: string[]
+  types: string[]
 }
 
 export interface SimulatedLot {
@@ -526,17 +550,22 @@ export const portfolioApi = {
     if (currency !== 'EUR') filtered.currency = currency
     const qs = Object.keys(filtered).length ? '?' + new URLSearchParams(filtered).toString() : ''
     return api.get<{
-      transactions: Transaction[]; total: number; total_eur: number; limit: number; offset: number
-      currency?: Currency; total_amount?: number
+      transactions: Transaction[]; total: number; flows: TransactionFlows; limit: number; offset: number
+      currency?: Currency
     }>(`/transactions${qs}`)
   },
+  getTransactionFacets: () => api.get<TransactionFacets>('/transactions/facets'),
   getTransactionStats: (currency: Currency = 'EUR') => api.get<{
     currency?: Currency
     totals: {
-      total_ops: number; unique_assets: number; total_invested: number
-      total_fee_ops: number; total_fees_eur: number; total_buys: number; total_sells: number; total_manual: number
+      total_ops: number; unique_assets: number; total_invested: number; total_fiat_buys: number
+      total_fee_ops: number; total_fees_eur: number; fees_sin_valor: number
+      total_buys: number; total_sells: number; total_sold: number; total_manual: number
     }
-    monthly: { mes: string; total_ops: number; compras: number; ventas: number; ingresos: number; transferencias: number; eur_invertido: number }[]
+    monthly: {
+      mes: string; total_ops: number; compras: number; ventas: number; otras_salidas: number
+      ingresos: number; transferencias: number; eur_invertido: number
+    }[]
     topAssets: { asset: string; ops: number; eur_volume: number }[]
     fees: { asset: string; ops: number; total_amount: number; total_eur: number }[]
   }>(`/transactions/stats?currency=${currency}`),

@@ -7,7 +7,8 @@ import { CopyButton } from '../../components/CopyButton'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { formatMoney, formatAmount, type Currency, formatNumber } from '../../utils/format'
 import { OP_META } from '../../constants/operations'
-import { fmtDate, calcEurValue, calcFeeEur, formatPriceLine, toDisplayAmount } from './helpers'
+import { fmtDate, calcEurValue, calcFeeEur, formatPriceLine, toDisplayAmount, valuationHint, flowSign } from './helpers'
+import { APP_TIMEZONE } from '../../constants/timezone'
 import { T, alpha, ink } from '../../utils/colors'
 import { iconButtonClasses } from '../../components/ui'
 
@@ -21,6 +22,27 @@ function Highlight({ text, query }: { text: string; query: string }) {
       <mark className="bg-warning/30 text-fg rounded-lg px-0.5">{text.slice(idx, idx + query.length)}</mark>
       {text.slice(idx + query.length)}
     </>
+  )
+}
+
+const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', year: 'numeric', timeZone: APP_TIMEZONE }
+
+/** Importe con su marca de estimación (≈) o «—» sin precio, con el motivo como texto accesible (#346). */
+function ValuedAmount({ value, hint, currency, className }: {
+  value: number | null; hint: string | null; currency: Currency; className: string
+}) {
+  if (value == null) {
+    return (
+      <span className="text-fg-subtle text-xs" title={hint ?? undefined}>
+        <span aria-hidden="true">—</span>{hint && <span className="sr-only">{hint}</span>}
+      </span>
+    )
+  }
+  return (
+    <span className={className} title={hint ?? undefined}>
+      {hint && <span aria-hidden="true">≈ </span>}{formatMoney(value, currency)}
+      {hint && <span className="sr-only"> ({hint})</span>}
+    </span>
   )
 }
 
@@ -54,16 +76,16 @@ export function TxRow({
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const meta   = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: T.muted, group: 'other', rowBg: 'transparent' }
-  const isBuy  = meta.group === 'buy' || meta.group === 'income'
-  const isSell = meta.group === 'sell'
+  const sign = flowSign(tx.operation_type)
+  const amountColor = sign === '+' ? 'text-positive' : sign === '−' && meta.group === 'sell' ? 'text-negative' : 'text-fg'
 
   const { date, time } = fmtDate(tx.timestamp)
   // Valor y comisión en la moneda de visualización, con el tipo de la fecha de la operación (#177).
   const eurValue = toDisplayAmount(calcEurValue(tx), tx, currency)
   const feeEur   = toDisplayAmount(calcFeeEur(tx), tx, currency)
   const priceLine = formatPriceLine(tx)
-
-  const hasCost  = tx.cost_asset && tx.cost_amount && parseFloat(tx.cost_amount) !== 0
+  const valueHint = valuationHint(tx.value_source)
+  const feeHint   = valuationHint(tx.fee_value_source)
 
   return (
     <>
@@ -98,8 +120,8 @@ export function TxRow({
                 <span className="font-bold mono text-sm text-fg">
                   <Highlight text={tx.asset} query={searchTerm} />
                 </span>
-                <span className={`text-xs mono font-semibold ${isBuy ? 'text-positive' : isSell ? 'text-negative' : 'text-fg'}`}>
-                  {isBuy ? '+' : isSell ? '−' : ''}{formatAmount(tx.amount_net, 6)}
+                <span className={`text-xs mono font-semibold ${amountColor}`}>
+                  {sign}{formatAmount(tx.amount_net, 6)}
                 </span>
               </div>
               {tx.notes && (
@@ -111,19 +133,11 @@ export function TxRow({
 
         {/* Valor en la moneda de visualización */}
         <td className="px-3 py-2.5 text-right align-middle">
-          {eurValue != null ? (
-            <>
-              <div className="text-sm mono font-semibold text-fg">{formatMoney(eurValue, currency)}</div>
-              {priceLine && <div className="text-xs text-fg-subtle mono mt-0.5">@ {priceLine}</div>}
-            </>
-          ) : hasCost ? (
-            <>
-              <div className="text-xs mono text-fg-muted">{formatAmount(tx.cost_amount, 4)}</div>
-              <div className="text-xs text-fg-subtle">{tx.cost_asset}</div>
-            </>
-          ) : (
-            <span className="text-fg-subtle text-xs">—</span>
-          )}
+          <div>
+            <ValuedAmount value={eurValue} hint={valueHint} currency={currency}
+              className={`text-sm mono font-semibold ${tx.value_source === 'estimado' ? 'text-fg-muted' : 'text-fg'}`} />
+          </div>
+          {eurValue != null && priceLine && <div className="text-xs text-fg-subtle mono mt-0.5">@ {priceLine}</div>}
         </td>
 
         {/* Fee */}
@@ -135,7 +149,9 @@ export function TxRow({
                 <div className="text-xs mono text-fg-muted">
                   {formatAmount(tx.fee_amount, 6)} <span className="text-fg-subtle text-xs">{tx.fee_asset}</span>
                 </div>
-                {feeEur != null && <div className="text-xs text-fg-subtle mono">{formatMoney(feeEur, currency)}</div>}
+                {feeEur != null && (
+                  <div><ValuedAmount value={feeEur} hint={feeHint} currency={currency} className="text-xs text-fg-subtle mono" /></div>
+                )}
               </div>
             </div>
           ) : (
@@ -234,17 +250,17 @@ export function TxRow({
               <div>
                 <div className="text-[11px] text-fg-subtle uppercase tracking-widest mb-1">Importado</div>
                 <div className="text-fg-subtle text-xs">
-                  {new Date(tx.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  {new Date(tx.created_at).toLocaleDateString('es-ES', SHORT_DATE)}
                   {tx.manually_added && <span className="ml-1.5 text-brand font-medium">· Manual</span>}
                 </div>
               </div>
               {tx.linked_tx_id && tx.linked_tx_timestamp && (
                 <div className="col-span-2">
                   <div className="text-[11px] text-fg-subtle uppercase tracking-widest mb-1">
-                    {tx.operation_type === 'STAKING_UNLOCK' ? 'Staking purchase vinculado' : 'Staking redemption vinculada'}
+                    {tx.operation_type === 'STAKING_UNLOCK' ? 'Bloqueo de staking vinculado' : 'Desbloqueo de staking vinculado'}
                   </div>
                   <div className="text-xs text-warning/80 mono">
-                    {new Date(tx.linked_tx_timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {new Date(tx.linked_tx_timestamp).toLocaleDateString('es-ES', SHORT_DATE)}
                     {' · '}
                     {tx.linked_tx_amount ? formatNumber(parseFloat(tx.linked_tx_amount), 6, 6) : ''} {tx.linked_tx_asset}
                   </div>

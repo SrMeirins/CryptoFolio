@@ -1,127 +1,50 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../../db/client';
-import { currencySchema, fxSql, usdPerEurSql } from '../../modules/fiat/displayCurrency';
+import { usdPerEurSql } from '../../modules/fiat/displayCurrency';
+import { MADRID_TZ } from '../../modules/fiscal/madridTime';
+import { buildHistoryWhere, historyQuerySchema } from '../../modules/history/listFilters';
+import { FLOW_DIRECTION, VALUATION_COLUMNS, VALUATION_CTES, valuationJoins } from '../../modules/history/valuationSql';
+import { sendZodError } from './transactionsShared';
 
 const router = Router();
 
-// ── GET /api/transactions/stats ───────────────────────────────────────────
-router.get('/stats', async (req: Request, res: Response) => {
-  // ?currency=USD: cada importe en EUR se convierte con el tipo de su fecha (#175).
-  const currency = currencySchema.safeParse(req.query.currency);
-  if (!currency.success) { res.status(400).json({ error: 'currency debe ser EUR o USD' }); return; }
-  const transactions = `(SELECT tx.*, ${fxSql(currency.data, 'tx.timestamp')} AS fx FROM transactions tx) transactions`;
-  const [totalsRes, monthlyRes, topAssetsRes, feesRes] = await Promise.all([
-    db.query(`
-      SELECT
-        COUNT(*)::int                                                                  AS total_ops,
-        COUNT(DISTINCT asset)::int                                                     AS unique_assets,
-        COALESCE(SUM(CASE WHEN cost_asset='EUR' AND operation_type='BUY' THEN cost_amount * fx ELSE 0 END), 0) AS total_invested,
-        COUNT(CASE WHEN operation_type IN ('FEE_EXCHANGE','FEE_NETWORK','FEE') THEN 1 END)::int           AS total_fee_ops,
-        COALESCE(SUM(
-          CASE
-            WHEN fee_asset = 'EUR'                                  THEN fee_amount * fx
-            WHEN fee_asset = asset AND price_per_unit IS NOT NULL   THEN fee_amount * price_per_unit * fx
-            ELSE 0
-          END
-        ), 0)::float                                                                   AS total_fees_eur,
-        COUNT(CASE WHEN operation_type = 'BUY' THEN 1 END)::int                       AS total_buys,
-        COUNT(CASE WHEN operation_type = 'SELL' THEN 1 END)::int                      AS total_sells,
-        COUNT(CASE WHEN manually_added = true THEN 1 END)::int                        AS total_manual
-      FROM ${transactions}
-    `),
-    db.query(`
-      SELECT
-        TO_CHAR(DATE_TRUNC('month', timestamp), 'YYYY-MM') AS mes,
-        COUNT(*)::int AS total_ops,
-        COUNT(CASE WHEN operation_type IN ('BUY','BUY_FIAT','BUY_CRYPTO')                                        THEN 1 END)::int AS compras,
-        COUNT(CASE WHEN operation_type IN ('SELL','SELL_FIAT','SELL_CRYPTO','GIFT_SENT','LOST')                   THEN 1 END)::int AS ventas,
-        COUNT(CASE WHEN operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP','FORK') THEN 1 END)::int AS ingresos,
-        COUNT(CASE WHEN operation_type IN ('TRANSFER_INTERNAL','WITHDRAW','WITHDRAW_FIAT','DEPOSIT_FIAT','DEPOSIT_CRYPTO') THEN 1 END)::int AS transferencias,
-        COALESCE(SUM(CASE WHEN cost_asset='EUR' AND operation_type IN ('BUY','BUY_FIAT','BUY_CRYPTO') THEN cost_amount * fx ELSE 0 END), 0)::float AS eur_invertido
-      FROM ${transactions}
-      WHERE timestamp >= NOW() - INTERVAL '18 months'
-      GROUP BY DATE_TRUNC('month', timestamp)
-      ORDER BY DATE_TRUNC('month', timestamp) ASC
-    `),
-    db.query(`
-      SELECT asset, COUNT(*)::int AS ops,
-        COALESCE(SUM(CASE WHEN cost_asset='EUR' THEN cost_amount * fx ELSE 0 END), 0)::float AS eur_volume
-      FROM ${transactions}
-      WHERE operation_type IN ('BUY','SELL','BUY_FIAT','SELL_FIAT','BUY_CRYPTO','SELL_CRYPTO')
-        AND timestamp >= NOW() - INTERVAL '1 year'
-      GROUP BY asset ORDER BY ops DESC LIMIT 10
-    `),
-    db.query(`
-      SELECT
-        fee_asset AS asset,
-        COUNT(*)::int AS ops,
-        COALESCE(SUM(fee_amount), 0)::float AS total_amount,
-        COALESCE(SUM(
-          CASE
-            WHEN fee_asset = 'EUR'                                THEN fee_amount * fx
-            WHEN fee_asset = asset AND price_per_unit IS NOT NULL THEN fee_amount * price_per_unit * fx
-            ELSE 0
-          END
-        ), 0)::float AS total_eur
-      FROM ${transactions}
-      WHERE fee_asset IS NOT NULL AND fee_amount > 0
-        AND timestamp >= NOW() - INTERVAL '1 year'
-      GROUP BY fee_asset ORDER BY total_eur DESC LIMIT 6
-    `),
+// Zona del día local de los filtros de fecha y de los cierres diarios. La
+// sustituirá la zona configurable de #347.
+const HISTORY_TZ = MADRID_TZ;
+
+// ── GET /api/transactions/facets ──────────────────────────────────────────
+// Valores presentes en los datos para los filtros (cuentas, activos, tipos):
+// antes la lista de cuentas era fija y faltaban cuentas reales (#346).
+router.get('/facets', async (_req: Request, res: Response) => {
+  const [accounts, assets, types] = await Promise.all([
+    db.query(`SELECT DISTINCT account AS v FROM transactions WHERE account IS NOT NULL AND account <> '' ORDER BY 1`),
+    db.query(`SELECT DISTINCT asset AS v FROM transactions ORDER BY 1`),
+    db.query(`SELECT DISTINCT operation_type::text AS v FROM transactions ORDER BY 1`),
   ]);
-
-  res.json({
-    currency:  currency.data,
-    totals:    totalsRes.rows[0],
-    monthly:   monthlyRes.rows,
-    topAssets: topAssetsRes.rows,
-    fees:      feesRes.rows,
-  });
+  const values = (r: { rows: { v: string }[] }) => r.rows.map(row => row.v);
+  res.json({ accounts: values(accounts), assets: values(assets), types: values(types) });
 });
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ── GET /api/transactions ──────────────────────────────────────────────────
 router.get('/', async (req: Request, res: Response) => {
-  const currency = currencySchema.safeParse(req.query.currency);
-  if (!currency.success) { res.status(400).json({ error: 'currency debe ser EUR o USD' }); return; }
-  const {
-    asset, type, wallet_id, account, manually_added, import_id,
-    date_from, date_to, search,
-    limit = '50', offset = '0',
-  } = req.query;
+  const parsed = historyQuerySchema.safeParse(req.query);
+  if (!parsed.success) { sendZodError(res, parsed.error); return; }
+  const filters = parsed.data;
 
-  let where = 'WHERE 1=1';
-  const params: unknown[] = [];
-  let paramIdx = 1;
+  const { where, params } = buildHistoryWhere(filters, HISTORY_TZ);
+  const tz = `$${params.length + 1}`;
+  const limit = `$${params.length + 2}`;
+  const offset = `$${params.length + 3}`;
 
-  // Transacciones de una importación concreta (#324), desde su resultado o la lista de importaciones.
-  if (import_id !== undefined) {
-    if (typeof import_id !== 'string' || !UUID_RE.test(import_id)) { res.status(400).json({ error: 'import_id debe ser un UUID válido' }); return; }
-    where += ` AND t.import_id = $${paramIdx++}`;
-    params.push(import_id);
-  }
-  if (asset)          { where += ` AND t.asset = $${paramIdx++}`;           params.push((asset as string).toUpperCase()); }
-  if (type)           { where += ` AND t.operation_type = $${paramIdx++}`;  params.push(type); }
-  if (wallet_id)      { where += ` AND t.wallet_id = $${paramIdx++}`;       params.push(wallet_id); }
-  if (account)        { where += ` AND t.account = $${paramIdx++}`;         params.push(account); }
-  if (date_from)      { where += ` AND t.timestamp >= $${paramIdx++}`;      params.push(date_from); }
-  if (date_to)        { where += ` AND t.timestamp <= $${paramIdx++}`;      params.push(`${date_to}T23:59:59Z`); }
-  if (search) {
-    where += ` AND (t.notes ILIKE $${paramIdx} OR t.asset ILIKE $${paramIdx})`;
-    params.push(`%${(search as string)}%`);
-    paramIdx++;
-  }
-  if (manually_added !== undefined) {
-    where += ` AND t.manually_added = $${paramIdx++}`;
-    params.push(manually_added === 'true');
-  }
-
-  params.push(parseInt(limit as string));
-  params.push(parseInt(offset as string));
-
+  // La valoración se aplica solo a la página pedida (las CTE agregan una vez).
   const result = await db.query(
-    `SELECT
+    `WITH ${VALUATION_CTES},
+     page AS (
+       SELECT t.* FROM transactions t ${where}
+       ORDER BY t.timestamp DESC, t.id
+       LIMIT ${limit} OFFSET ${offset}
+     )
+     SELECT
        t.id, t.operation_type, t.timestamp, t.asset, t.amount, t.amount_net,
        t.cost_asset, t.cost_amount, t.price_per_unit,
        t.fee_asset, t.fee_amount,
@@ -134,50 +57,51 @@ router.get('/', async (req: Request, res: Response) => {
        lt.operation_type AS linked_tx_operation_type,
        lt.amount AS linked_tx_amount,
        lt.asset AS linked_tx_asset,
+       ${VALUATION_COLUMNS},
        ${usdPerEurSql('t.timestamp')} AS usd_per_eur
-     FROM transactions t
+     FROM page t
      JOIN wallets w ON w.id = t.wallet_id
      LEFT JOIN wallets dw ON dw.id = t.destination_wallet_id
      LEFT JOIN transactions lt ON lt.id = t.linked_tx_id
-     ${where}
-     ORDER BY t.timestamp DESC
-     LIMIT $${paramIdx++} OFFSET $${paramIdx}`,
-    params
+     ${valuationJoins(tz)}
+     ORDER BY t.timestamp DESC, t.id`,
+    [...params, HISTORY_TZ, filters.limit, filters.offset]
   );
 
-  const filterParams = params.slice(0, -2);
-  const [totalRes, sumRes] = await Promise.all([
-    db.query(
-      `SELECT COUNT(*) FROM transactions t JOIN wallets w ON w.id = t.wallet_id ${where}`,
-      filterParams
-    ),
-    db.query(
-      `SELECT
-         COALESCE(SUM(value_eur), 0)::float      AS total_eur,
-         COALESCE(SUM(value_eur * fx), 0)::float AS total_amount
-       FROM (
-         SELECT
-           CASE
-             WHEN t.cost_asset = 'EUR' THEN ABS(t.cost_amount)
-             WHEN t.price_per_unit IS NOT NULL THEN ABS(t.amount_net) * t.price_per_unit
-             ELSE 0
-           END AS value_eur,
-           ${fxSql(currency.data, 't.timestamp')} AS fx
-         FROM transactions t JOIN wallets w ON w.id = t.wallet_id ${where}
-       ) v`,
-      filterParams
-    ),
-  ]);
+  // Total y flujos sobre todo lo filtrado: entradas y salidas por separado
+  // (antes una sola suma que mezclaba compras, ventas y precios en otro activo).
+  const sumRes = await db.query(
+    `WITH ${VALUATION_CTES},
+     v AS (
+       SELECT ${VALUATION_COLUMNS}, ${FLOW_DIRECTION}, t.timestamp
+       FROM transactions t ${valuationJoins(tz)}
+       ${where}
+     ),
+     fx AS (SELECT v.*, ${usdPerEurSql('v.timestamp')} AS usd_per_eur FROM v WHERE v.flow_direction IS NOT NULL AND v.value_eur IS NOT NULL)
+     SELECT
+       (SELECT COUNT(*) FROM v)::int AS total,
+       COALESCE(SUM(value_eur) FILTER (WHERE flow_direction = 'in'), 0)::float  AS in_eur,
+       COALESCE(SUM(value_eur) FILTER (WHERE flow_direction = 'out'), 0)::float AS out_eur,
+       COALESCE(SUM(value_eur * usd_per_eur) FILTER (WHERE flow_direction = 'in'), 0)::float  AS in_usd,
+       COALESCE(SUM(value_eur * usd_per_eur) FILTER (WHERE flow_direction = 'out'), 0)::float AS out_usd,
+       COUNT(*) FILTER (WHERE usd_per_eur IS NULL)::int AS sin_tipo_usd
+     FROM fx`,
+    [...params, HISTORY_TZ]
+  );
+  const s = sumRes.rows[0];
 
   res.json({
     transactions: result.rows,
-    total:     parseInt(totalRes.rows[0].count),
-    total_eur: sumRes.rows[0].total_eur,
-    // Total en la moneda pedida (?currency=EUR|USD, #175)
-    currency:  currency.data,
-    total_amount: sumRes.rows[0].total_amount,
-    limit:     parseInt(limit as string),
-    offset:    parseInt(offset as string),
+    total: s.total,
+    // Flujos de valor en ambas monedas: el cambio EUR ↔ USD no pide nada nuevo (#177).
+    // USD es null si a alguna operación le falta el tipo de su fecha.
+    flows: {
+      EUR: { entradas: s.in_eur, salidas: s.out_eur },
+      USD: s.sin_tipo_usd > 0 ? null : { entradas: s.in_usd, salidas: s.out_usd },
+    },
+    currency: filters.currency,
+    limit:  filters.limit,
+    offset: filters.offset,
   });
 });
 
