@@ -65,3 +65,28 @@ describe('TxRow (#346)', () => {
     expect(html).not.toContain('<img src=x')
   })
 })
+
+describe('TxRow — accesibilidad (#351)', () => {
+  it('el botón de detalle anuncia su estado (aria-expanded) y controla la fila de detalle', () => {
+    const cerrada = render(tx({}))
+    expect(cerrada).toMatch(/aria-expanded="false"[^>]*aria-label="Expandir detalle"/)
+    const abierta = renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}><table><tbody>
+        <TxRow tx={tx({})} currency="EUR" onDelete={() => {}} onEdit={() => {}} isDeleting={false} searchTerm="" defaultExpanded />
+      </tbody></table></QueryClientProvider>,
+    )
+    expect(abierta).toContain('aria-expanded="true" aria-controls="tx-detalle-00000000-0000-0000-0000-000000000001"')
+    expect(abierta).toContain('id="tx-detalle-00000000-0000-0000-0000-000000000001"')
+  })
+
+  it('la insignia «M» tiene nombre accesible', () => {
+    const html = render(tx({ manually_added: true }))
+    expect(html).toContain('<span class="sr-only">Añadida manualmente</span>')
+  })
+
+  it('las acciones se muestran con foco dentro de la fila y en pantallas táctiles', () => {
+    const html = render(tx({ manually_added: true }))
+    expect(html).toContain('group-focus-within:opacity-100')
+    expect(html).toContain('[@media(hover:none)]:opacity-100')
+  })
+})

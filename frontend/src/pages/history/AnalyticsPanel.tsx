@@ -3,7 +3,7 @@ import { BarChart2, ChevronDown, ChevronUp } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { formatMoney, formatAmount, type Currency } from '../../utils/format'
-import { fmtMonthLabel } from './helpers'
+import { fmtMonthLabel, monthlyTableRows } from './helpers'
 import { useChartColors } from '../../hooks/useChartColors'
 import { cardClasses } from '../../components/ui'
 
@@ -18,6 +18,26 @@ function ChartTooltip({ active, payload, label }: {
         <p key={i} className="text-fg mono">{p.name}: <span className="font-bold">{p.value}</span></p>
       ))}
     </div>
+  )
+}
+
+function MonthlyTable({ rows }: { rows: Parameters<typeof monthlyTableRows>[0] }) {
+  return (
+    <table className="sr-only">
+      <caption>Operaciones por mes y categoría</caption>
+      <thead>
+        <tr>{['Mes', 'Compras', 'Ventas', 'Otras salidas', 'Ingresos', 'Transferencias', 'Otros', 'Total'].map(h => <th key={h} scope="col">{h}</th>)}</tr>
+      </thead>
+      <tbody>
+        {monthlyTableRows(rows).map(r => (
+          <tr key={r.mes}>
+            <th scope="row">{r.mes}</th>
+            <td>{r.compras}</td><td>{r.ventas}</td><td>{r.otrasSalidas}</td><td>{r.ingresos}</td>
+            <td>{r.transferencias}</td><td>{r.otros}</td><td>{r.total}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 
@@ -49,21 +69,25 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-overlay/2 transition-colors"
+        aria-controls={open ? 'historial-analitica' : undefined}
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-overlay/2 transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
       >
         <div className="flex items-center gap-2">
-          <BarChart2 size={14} className="text-fg-subtle" />
+          <BarChart2 size={14} aria-hidden="true" className="text-fg-subtle" />
           <span className="text-sm font-medium">Analítica de actividad</span>
           <span className="text-xs text-fg-subtle">últimos 18 meses · top activos · fees</span>
         </div>
-        {open ? <ChevronUp size={14} className="text-fg-subtle" /> : <ChevronDown size={14} className="text-fg-subtle" />}
+        {open ? <ChevronUp size={14} aria-hidden="true" className="text-fg-subtle" /> : <ChevronDown size={14} aria-hidden="true" className="text-fg-subtle" />}
       </button>
 
       {open && (
-        <div className="border-t border-border p-5 space-y-5">
+        <div id="historial-analitica" className="border-t border-border p-5 space-y-5">
           {/* Gráfico — ancho completo */}
           <div>
             <p className="text-[11px] text-fg-subtle uppercase tracking-widest mb-3">Operaciones por mes</p>
+            {/* Alternativa en texto del gráfico (#351): el SVG no es accesible. */}
+            <MonthlyTable rows={stats.monthly} />
+            <div aria-hidden="true">
             <ResponsiveContainer width="100%" height={130}>
               <BarChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} barSize={10} barGap={1}>
                 <XAxis dataKey="name" tick={{ fontSize: 12, fill: c.axisMuted }} axisLine={false} tickLine={false} />
@@ -77,7 +101,8 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
                 <Bar dataKey="Otros"          stackId="a" fill={c.neutralSoft} radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+            </div>
+            <div aria-hidden="true" className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
               {([['Compras',c.gain,1],['Ventas',c.loss,1],['Otras salidas',c.loss,0.45],['Ingresos',c.warn,1],['Transferencias',c.neutral,1],['Otros',c.neutralSoft,1]] as const).map(([l,c,o]) => (
                 <div key={l} className="flex items-center gap-1.5 text-xs text-fg-subtle">
                   <div className="w-2 h-2 rounded-lg" style={{ backgroundColor: c, opacity: o }} />{l}
@@ -100,7 +125,8 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
                     type="button"
                     onClick={() => onAssetClick(row.asset)}
                     className="w-full flex items-center gap-2 group/asset hover:bg-background-tertiary/50 rounded-lg px-1 py-0.5 transition-colors"
-                    title={`Filtrar por ${row.asset}`}
+                    title={`Buscar ${row.asset}`}
+                    aria-label={`Buscar ${row.asset}: ${row.ops} operaciones en el último año`}
                   >
                     <CryptoIcon symbol={row.asset} size={16} />
                     <span className="text-xs mono font-bold text-fg w-12 shrink-0 group-hover/asset:text-fg transition-colors">{row.asset}</span>
@@ -112,7 +138,7 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-fg-subtle mt-1.5 pl-1">Click para filtrar</p>
+              <p className="text-xs text-fg-subtle mt-1.5 pl-1">Pulsa un activo para buscarlo</p>
             </div>
 
             {/* Fees por activo */}

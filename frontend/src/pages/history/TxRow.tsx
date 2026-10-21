@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import {
-  Trash2, AlertTriangle, PenLine, ChevronDown, ChevronUp, X, RefreshCw, ArrowRight,
-} from 'lucide-react'
+import { Trash2, PenLine, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react'
 import type { Transaction } from '../../api/portfolio'
 import { CopyButton } from '../../components/CopyButton'
 import { CryptoIcon } from '../../components/CryptoIcon'
@@ -11,6 +9,7 @@ import { fmtDate, calcEurValue, calcFeeEur, formatPriceLine, toDisplayAmount, va
 import { APP_TIMEZONE } from '../../constants/timezone'
 import { T, alpha, ink } from '../../utils/colors'
 import { iconButtonClasses } from '../../components/ui'
+import { DeleteConfirm } from './DeleteConfirm'
 
 function Highlight({ text, query }: { text: string; query: string }) {
   if (!query.trim()) return <>{text}</>
@@ -51,7 +50,8 @@ function OpChip({ type }: { type: string }) {
   return (
     <span
       className="inline-flex items-center font-semibold rounded-lg text-xs px-1.5 py-0.5 whitespace-nowrap shrink-0"
-      style={{ backgroundColor: `${alpha(meta.color, 13)}`, color: meta.color }}
+      // ink(): mismo tono con la luminosidad acotada para cumplir 4,5:1 en ambos temas (#351).
+      style={{ backgroundColor: `${alpha(meta.color, 13)}`, color: ink(meta.color) }}
     >
       {meta.label}
     </span>
@@ -74,6 +74,13 @@ export function TxRow({
   const rowRef = useRef<HTMLTableRowElement>(null)
   useEffect(() => { if (defaultExpanded) rowRef.current?.scrollIntoView({ block: 'center' }) }, [defaultExpanded])
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const deleteRef = useRef<HTMLButtonElement>(null)
+  const detailId = `tx-detalle-${tx.id}`
+  function cancelDelete() {
+    setConfirmDelete(false)
+    // Devuelve el foco al botón de origen cuando vuelve a existir.
+    requestAnimationFrame(() => deleteRef.current?.focus())
+  }
 
   const meta   = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: T.muted, group: 'other', rowBg: 'transparent' }
   const sign = flowSign(tx.operation_type)
@@ -106,7 +113,9 @@ export function TxRow({
           <div className="flex items-center gap-1.5">
             <OpChip type={tx.operation_type} />
             {tx.manually_added && (
-              <span className="text-xs px-1 py-0.5 rounded-lg bg-brand/15 text-brand font-bold shrink-0">M</span>
+              <span className="text-xs px-1 py-0.5 rounded-lg bg-brand/15 text-brand font-bold shrink-0" title="Añadida manualmente">
+                <span aria-hidden="true">M</span><span className="sr-only">Añadida manualmente</span>
+              </span>
             )}
           </div>
         </td>
@@ -167,7 +176,7 @@ export function TxRow({
                 style={{ backgroundColor: `${alpha(tx.wallet_color, 9)}`, color: ink(tx.wallet_color) }}>
                 {tx.wallet_name}
               </span>
-              <ArrowRight size={10} className="text-fg-subtle shrink-0" />
+              <ArrowRight size={10} aria-hidden="true" className="text-fg-subtle shrink-0" /><span className="sr-only">hacia</span>
               <span className="text-xs px-2 py-0.5 rounded-lg font-semibold"
                 style={{ backgroundColor: `${alpha(tx.destination_wallet_color ?? T.muted, 9)}`, color: ink(tx.destination_wallet_color ?? T.muted) }}>
                 {tx.destination_wallet_name}
@@ -188,33 +197,30 @@ export function TxRow({
         <td className="px-3 py-2.5 align-middle" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-end gap-0.5">
             {!confirmDelete && (
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
+              // Ocultas en reposo, pero visibles con hover, con foco dentro de la
+              // fila y siempre en pantallas táctiles, donde no hay hover (#351).
+              <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity flex gap-0.5">
                 <button type="button" onClick={() => onEdit(tx)}
                   className={iconButtonClasses('md', false, '', 'brand')}
                   title="Editar transacción" aria-label="Editar transacción">
-                  <PenLine size={12} />
+                  <PenLine size={12} aria-hidden="true" />
                 </button>
                 {tx.manually_added && (
-                  <button type="button" onClick={() => setConfirmDelete(true)}
+                  <button type="button" ref={deleteRef} onClick={() => setConfirmDelete(true)}
                     className={iconButtonClasses('md', false, '', 'danger')}
                     title="Eliminar transacción" aria-label="Eliminar transacción">
-                    <Trash2 size={12} />
+                    <Trash2 size={12} aria-hidden="true" />
                   </button>
                 )}
               </div>
             )}
             {tx.manually_added && confirmDelete && (
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-fg-subtle">¿Borrar?</span>
-                <button type="button" onClick={() => onDelete(tx.id)} disabled={isDeleting} className="text-negative p-0.5" aria-label="Confirmar borrado">
-                  {isDeleting ? <RefreshCw size={11} className="animate-spin" /> : <AlertTriangle size={11} />}
-                </button>
-                <button type="button" onClick={() => setConfirmDelete(false)} className={iconButtonClasses('sm')} aria-label="Cancelar borrado"><X size={11} /></button>
-              </div>
+              <DeleteConfirm onConfirm={() => onDelete(tx.id)} onCancel={cancelDelete} isDeleting={isDeleting} />
             )}
             <button type="button" onClick={() => setExpanded(e => !e)}
-              className="p-1 text-fg-subtle hover:text-fg-muted transition-colors" aria-label={expanded ? 'Contraer detalle' : 'Expandir detalle'}>
-              {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              aria-expanded={expanded} aria-controls={expanded ? detailId : undefined}
+              className={iconButtonClasses('sm')} aria-label={expanded ? 'Contraer detalle' : 'Expandir detalle'}>
+              {expanded ? <ChevronUp size={12} aria-hidden="true" /> : <ChevronDown size={12} aria-hidden="true" />}
             </button>
           </div>
         </td>
@@ -222,7 +228,7 @@ export function TxRow({
 
       {/* Fila expandida */}
       {expanded && (
-        <tr className="bg-background-tertiary/15">
+        <tr id={detailId} className="bg-background-tertiary/15">
           <td colSpan={7} className="px-6 py-3 border-b border-border">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
               <div>
