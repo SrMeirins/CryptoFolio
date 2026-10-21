@@ -1,99 +1,99 @@
 import { DISTINTIVO } from './exchangeColores'
 import { marcasAnio, segmento } from './coberturaVista'
-import { lineaCombinada, type TramoLinea, type Zona } from './lineaTiempo'
+import { lineaCombinada } from './lineaTiempo'
 import type { CoberturaExchange } from './types'
 import { formatFiscalDate } from '../../utils/fiscalTable'
+import { formatNumber } from '../../utils/format'
 
 const f = formatFiscalDate
-const B = DISTINTIVO.binance.color
-const V = DISTINTIVO.bitvavo.color
-const AMBOS = `linear-gradient(to bottom, ${B} 0 50%, ${V} 50% 100%)`
+const NOMBRE = { binance: 'Binance', bitvavo: 'Bitvavo' } as const
+const RAYADO = 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-warning) 55%, transparent) 0 3px, transparent 3px 7px)'
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic']
-const NOMBRE_ZONA: Record<Zona, string> = { binance: 'Solo Binance', bitvavo: 'Solo Bitvavo', ambos: 'Binance y Bitvavo', ninguno: 'Sin datos' }
 const dias = (n: number) => `${n} ${n === 1 ? 'día' : 'días'}`
-
-function fondo(z: Zona): React.CSSProperties {
-  if (z === 'binance') return { backgroundColor: B }
-  if (z === 'bitvavo') return { backgroundColor: V }
-  if (z === 'ambos') return { backgroundImage: AMBOS }
-  return {}
-}
-
-const textoTramo = (t: TramoLinea) =>
-  `${t.pendiente ? 'Pendiente de importar' : NOMBRE_ZONA[t.zona]}: ${f(t.desde)} – ${f(t.hasta)} (${dias(t.dias)})`
+const pos = (s: { left: number; width: number }) => ({ left: `${s.left}%`, width: `${s.width}%` })
 
 function Muestra({ estilo, clase = '', children }: { estilo?: React.CSSProperties; clase?: string; children: React.ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className={`w-4 h-3 rounded-sm shrink-0 ${clase}`} style={estilo} aria-hidden="true" />{children}
+      <span className={`w-4 h-2.5 rounded-sm shrink-0 ${clase}`} style={estilo} aria-hidden="true" />{children}
     </span>
   )
 }
 
-// Línea de tiempo única de las importaciones (#328): de la primera transacción a
-// hoy, qué exchanges tienen datos en cada periodo, los archivos nuevos del lote
-// (si los hay) en su propio carril y la actividad mensual sumada.
+// Línea de tiempo de las importaciones (#328, #332): un carril fino por exchange
+// sobre la misma escala y el mismo eje. Cuando dos exchanges coinciden, ambos
+// carriles están llenos en ese tramo. Debajo, archivos nuevos y actividad mensual.
 export function LineaTiempo({ coberturas }: { coberturas: CoberturaExchange[] }) {
   const l = lineaCombinada(coberturas)
   if (!l) return null
-  const zonas = new Set(l.tramos.map(t => (t.pendiente ? 'pendiente' : t.zona)))
-  const etiquetaFin = l.tramos.at(-1)?.pendiente ? 'hoy' : f(l.fin)
+  const hayHuecos = l.carriles.some(c => c.huecos.length > 0)
+  const hayPendiente = l.carriles.some(c => c.pendiente)
+  const etiquetaFin = hayPendiente ? 'hoy' : f(l.fin)
+  const seg = (desde: string, hasta: string) => segmento(desde, hasta, l.inicio, l.fin)
 
   return (
     <div className="space-y-2">
-      {/* Leyenda: solo lo que aparece */}
-      <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-[11px] text-fg-muted">
-        {zonas.has('binance') && <Muestra estilo={{ backgroundColor: B }}>Solo Binance</Muestra>}
-        {zonas.has('bitvavo') && <Muestra estilo={{ backgroundColor: V }}>Solo Bitvavo</Muestra>}
-        {zonas.has('ambos') && <Muestra estilo={{ backgroundImage: AMBOS }}>Ambos</Muestra>}
-        {zonas.has('ninguno') && <Muestra clase="bg-background-tertiary border border-border">Sin datos</Muestra>}
-        {zonas.has('pendiente') && <Muestra clase="border-2 border-dashed border-warning/70">Pendiente de importar</Muestra>}
-        {l.nuevos.length > 0 && <Muestra clase="bg-brand-solid">Archivos nuevos</Muestra>}
-      </div>
-
-      <div className="relative h-7 rounded-lg bg-background-tertiary overflow-hidden ring-1 ring-inset ring-border" role="img"
-        aria-label={`Cobertura de importaciones del ${f(l.inicio)} a ${etiquetaFin}`}>
-        {l.tramos.map(t => {
-          const s = segmento(t.desde, t.hasta, l.inicio, l.fin)
-          return (
-            <span key={t.desde} title={textoTramo(t)}
-              className={`absolute inset-y-0 ${t.pendiente ? 'border-2 border-dashed border-warning/70 rounded-r-lg' : ''}`}
-              style={{ left: `${s.left}%`, width: `${s.width}%`, ...fondo(t.zona) }} />
-          )
-        })}
-      </div>
-
-      {l.nuevos.length > 0 && (
-        <div className="relative h-2" aria-hidden="true">
-          {l.nuevos.map(n => {
-            const s = segmento(n.desde, n.hasta, l.inicio, l.fin)
-            return <span key={`${n.archivo}-${n.desde}`} className="absolute inset-y-0 rounded-full bg-brand-solid" style={{ left: `${s.left}%`, width: `${Math.max(s.width, 0.8)}%` }}
-              title={`${n.archivo}: ${f(n.desde)} – ${f(n.hasta)}`} />
-          })}
+      {(hayHuecos || hayPendiente || l.nuevos.length > 0) && (
+        <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-[11px] text-fg-muted">
+          {hayHuecos && <Muestra estilo={{ backgroundImage: RAYADO }} clase="ring-1 ring-inset ring-border">Hueco sin datos</Muestra>}
+          {hayPendiente && <Muestra clase="border border-dashed border-warning/80">Pendiente de importar</Muestra>}
+          {l.nuevos.length > 0 && <Muestra clase="bg-brand-solid">Archivos nuevos</Muestra>}
         </div>
       )}
 
-      {/* Actividad mensual (ambos exchanges sumados) */}
-      <div className="flex h-2.5 gap-px" aria-hidden="true">
-        {l.meses.map(m => (
-          <span key={m.mes} className="flex-1 rounded-[1px] bg-brand" style={{ opacity: m.nivel === 0 ? 0.08 : 0.2 + m.nivel * 0.2 }}
-            title={`${MESES[Number(m.mes.slice(5, 7)) - 1]} ${m.mes.slice(0, 4)}: ${m.total} transacciones${m.porExchange.binance && m.porExchange.bitvavo ? ` (Binance ${m.porExchange.binance}, Bitvavo ${m.porExchange.bitvavo})` : ''}`} />
+      <div className="grid grid-cols-[4.5rem_1fr] items-center gap-x-3 gap-y-1.5">
+        {l.carriles.map(c => (
+          <div key={c.exchange} className="contents">
+            <span className="text-[11px] font-medium text-fg-muted truncate">{NOMBRE[c.exchange]}</span>
+            <div className="relative h-3 rounded-full bg-background-tertiary overflow-hidden" role="img"
+              aria-label={`${NOMBRE[c.exchange]}: ${c.tramos.map(t => `${f(t.desde)} – ${f(t.hasta)}`).join('; ')}${c.pendiente ? `; pendiente desde ${f(c.pendiente.desde)}` : ''}`}>
+              {c.tramos.map(t => (
+                <span key={t.desde} className="absolute inset-y-0 rounded-full" style={{ ...pos(seg(t.desde, t.hasta)), backgroundColor: DISTINTIVO[c.exchange].color }}
+                  title={`${NOMBRE[c.exchange]}: ${f(t.desde)} – ${f(t.hasta)} · ${formatNumber(t.transacciones, 0)} transacciones`} />
+              ))}
+              {c.huecos.map(h => (
+                <span key={h.desde} className={`absolute inset-y-0 ${h.revisionId ? 'opacity-40' : ''}`} style={{ ...pos(seg(h.desde, h.hasta)), backgroundImage: RAYADO }}
+                  title={`${NOMBRE[c.exchange]} sin transacciones: ${f(h.desde)} – ${f(h.hasta)} (${dias(h.dias)})${h.revisionId ? ' · revisado' : ''}`} />
+              ))}
+              {c.pendiente && (
+                <span className={`absolute inset-y-0 rounded-full border border-dashed ${c.pendiente.revisionId ? 'border-border' : 'border-warning/80'}`}
+                  style={pos(seg(c.pendiente.desde, c.pendiente.hasta))}
+                  title={`${NOMBRE[c.exchange]} pendiente de importar: ${f(c.pendiente.desde)} – hoy (${dias(c.pendiente.dias)})`} />
+              )}
+            </div>
+          </div>
         ))}
-      </div>
 
-      <div className="relative h-4 text-[10px] text-fg-subtle" aria-hidden="true">
-        <span className="absolute left-0">{f(l.inicio)}</span>
-        {marcasAnio(l.inicio, l.fin).map(m => (
-          <span key={m.anio} className="absolute -translate-x-1/2 mono hidden sm:inline" style={{ left: `${m.left}%` }}>{m.anio}</span>
-        ))}
-        <span className="absolute right-0">{etiquetaFin}</span>
-      </div>
+        {l.nuevos.length > 0 && (
+          <>
+            <span className="text-[11px] text-fg-subtle">Nuevos</span>
+            <div className="relative h-1.5" aria-hidden="true">
+              {l.nuevos.map(n => {
+                const s = seg(n.desde, n.hasta)
+                return <span key={`${n.archivo}-${n.desde}`} className="absolute inset-y-0 rounded-full bg-brand-solid" style={{ left: `${s.left}%`, width: `${Math.max(s.width, 0.8)}%` }}
+                  title={`${n.archivo} (${NOMBRE[n.exchange]}): ${f(n.desde)} – ${f(n.hasta)}`} />
+              })}
+            </div>
+          </>
+        )}
 
-      {/* Para lectores de pantalla: los periodos como lista */}
-      <ul className="sr-only">
-        {l.tramos.map(t => <li key={t.desde}>{textoTramo(t)}</li>)}
-        {l.nuevos.map(n => <li key={`n-${n.archivo}-${n.desde}`}>Archivo nuevo {n.archivo}: {f(n.desde)} – {f(n.hasta)}</li>)}
-      </ul>
+        <span className="text-[11px] text-fg-subtle">Actividad</span>
+        <div className="flex h-2 gap-px" aria-hidden="true">
+          {l.meses.map(m => (
+            <span key={m.mes} className="flex-1 rounded-[1px] bg-brand" style={{ opacity: m.nivel === 0 ? 0.08 : 0.2 + m.nivel * 0.2 }}
+              title={`${MESES[Number(m.mes.slice(5, 7)) - 1]} ${m.mes.slice(0, 4)}: ${m.total} transacciones${m.porExchange.binance && m.porExchange.bitvavo ? ` (Binance ${m.porExchange.binance}, Bitvavo ${m.porExchange.bitvavo})` : ''}`} />
+          ))}
+        </div>
+
+        <span />
+        <div className="relative h-4 text-[10px] text-fg-subtle" aria-hidden="true">
+          <span className="absolute left-0">{f(l.inicio)}</span>
+          {marcasAnio(l.inicio, l.fin).map(m => (
+            <span key={m.anio} className="absolute -translate-x-1/2 mono hidden sm:inline" style={{ left: `${m.left}%` }}>{m.anio}</span>
+          ))}
+          <span className="absolute right-0">{etiquetaFin}</span>
+        </div>
+      </div>
     </div>
   )
 }
