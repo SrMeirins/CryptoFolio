@@ -61,7 +61,10 @@ export function RetirosExistentes({ existentes, onGuardar }: {
         <CheckCircle2 size={20} className="text-positive shrink-0" aria-hidden="true" />
         <div className="text-sm text-fg-muted">
           <p className="font-medium text-fg">Retiros ya importados actualizados</p>
-          <p>{resultado.direcciones} con dirección guardada · {resultado.destinos} con destino cambiado{resultado.fifo ? ' · FIFO recalculado' : ''}.</p>
+          <p>
+            {resultado.direcciones} con dirección guardada · {resultado.destinos} con destino cambiado
+            {resultado.comisiones > 0 ? ` · ${resultado.comisiones} con la comisión de red separada` : ''}{resultado.fifo ? ' · FIFO recalculado' : ''}.
+          </p>
         </div>
       </section>
     )
@@ -74,7 +77,7 @@ export function RetirosExistentes({ existentes, onGuardar }: {
         <div>
           <h2 id="existentes-titulo" className="text-sm font-medium text-fg">Retiros ya importados · {existentes.length}</h2>
           <p className="text-xs text-fg-muted">
-            Ya estaban en tu historial sin dirección. Guarda sus direcciones y, si alguno fue a una wallet tuya, cambia su destino; se recalculará el FIFO.
+            Ya estaban en tu historial sin dirección o sin la comisión de red separada. Al guardar se completan y, si alguno fue a una wallet tuya, puedes cambiar su destino; se recalculará el FIFO.
           </p>
         </div>
       </div>

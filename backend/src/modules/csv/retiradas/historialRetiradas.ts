@@ -14,6 +14,8 @@ export interface RetiradaBinance {
   network: string;
   /** Importe recibido + comisión: lo que descuenta el historial de transacciones. */
   bruto: number;
+  /** Comisión de red cobrada en el mismo activo (#335). */
+  fee: number;
   address: string | null;
   txHash: string | null;
 }
@@ -71,6 +73,7 @@ export function parseHistorialRetiradas(buffer: Buffer): RetiradaBinance[] {
       coin: (f.Coin ?? '').trim().toUpperCase(),
       network: (f.Network ?? '').trim().toUpperCase(),
       bruto: amount + fee,
+      fee,
       address: direccionValida(f.Address),
       txHash: txHashValido(f.TXID),
     });

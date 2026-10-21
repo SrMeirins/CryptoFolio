@@ -21,6 +21,11 @@ export interface DestinoRetiro {
   network: string | null;
   /** Solo hashes on-chain reales; el «Transaction ID» de Bitvavo es interno y no se usa. */
   txHash: string | null;
+  /**
+   * Comisión de red del historial de retiradas de Binance (#335): llega a destino
+   * el importe sin ella. En Bitvavo la separa ya el parser, así que aquí es null.
+   */
+  fee: number | null;
 }
 
 export interface ResumenRetiradas {
@@ -57,7 +62,7 @@ export function resolverDestinos(
       const address = direccionValida(recordPorHash.get(key)?.Address);
       if (!address) continue;
       const red = redDeActivo(tx.asset, redes);
-      destinos.set(key, { address, networkId: red?.id ?? null, network: red?.name ?? null, txHash: null });
+      destinos.set(key, { address, networkId: red?.id ?? null, network: red?.name ?? null, txHash: null, fee: null });
     }
     return { destinos, resumen: null };
   }
@@ -68,10 +73,10 @@ export function resolverDestinos(
     retiradas,
   );
   for (const [key, w] of pares) {
-    if (!w.address && !w.txHash) continue;
+    if (!w.address && !w.txHash && !(w.fee > 0)) continue;
     const nombre = redDeBinance(w.network);
     const red = nombre ? redes.find(r => r.name === nombre) ?? null : null;
-    destinos.set(key, { address: w.address, networkId: red?.id ?? null, network: red?.name ?? null, txHash: w.txHash });
+    destinos.set(key, { address: w.address, networkId: red?.id ?? null, network: red?.name ?? null, txHash: w.txHash, fee: w.fee > 0 ? w.fee : null });
   }
   return { destinos, resumen: { filas: retiradas.length, emparejadas: pares.size, retiros: retiros.length } };
 }

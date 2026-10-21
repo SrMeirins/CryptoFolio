@@ -25,10 +25,11 @@ export interface RetiroExistente {
 interface FilaRetiro {
   id: string; asset: string; amount: string; timestamp: Date; account: string; operation_type: string;
   destination_wallet_id: string | null; destination_pending: boolean; destino_nombre: string | null;
+  counterparty_address: string | null; fee_amount: string | null;
 }
 
 const COLUMNAS = `t.id, t.asset, t.amount, t.timestamp, t.account, t.operation_type::text AS operation_type,
-  t.destination_wallet_id, t.destination_pending, w.name AS destino_nombre`;
+  t.destination_wallet_id, t.destination_pending, w.name AS destino_nombre, t.counterparty_address, t.fee_amount`;
 
 function destinoActual(f: FilaRetiro): string {
   if (f.operation_type === 'LOST') return '__lost__';
@@ -49,14 +50,16 @@ export async function retirosExistentes(
   const out: RetiroExistente[] = [];
   const redes = await cargarRedes();
 
-  // Binance: retiros ya importados sin dirección ↔ historial de retiradas.
+  // Binance: retiros ya importados sin dirección, o sin la comisión de red separada
+  // (#335: importados antes de separarla) ↔ historial de retiradas. Sin comisión
+  // separada, el importe guardado es el bruto (|Change|), que es lo que se empareja.
   if (retiradasBuffers.length > 0) {
     const filas = (await db.query(
       `SELECT ${COLUMNAS} FROM transactions t
        JOIN csv_imports ci ON ci.id = t.import_id
        LEFT JOIN wallets w ON w.id = t.destination_wallet_id
        WHERE ci.exchange = 'binance' AND t.operation_type IN ('WITHDRAW', 'LOST', 'GIFT_SENT')
-         AND t.counterparty_address IS NULL`,
+         AND (t.counterparty_address IS NULL OR (t.operation_type = 'WITHDRAW' AND t.fee_amount IS NULL))`,
     )).rows as FilaRetiro[];
     const pares = emparejarRetiradas(
       filas.map(f => ({ key: f.id, asset: f.asset, amount: parseFloat(f.amount), timestamp: new Date(f.timestamp) })),
@@ -64,10 +67,13 @@ export async function retirosExistentes(
     );
     for (const f of filas) {
       const w = pares.get(f.id);
-      if (!w || (!w.address && !w.txHash)) continue;
+      if (!w) continue;
+      const completaDireccion = !f.counterparty_address && (w.address || w.txHash);
+      const completaComision = f.operation_type === 'WITHDRAW' && f.fee_amount === null && w.fee > 0;
+      if (!completaDireccion && !completaComision) continue;
       const nombre = redDeBinance(w.network);
       const red = nombre ? redes.find(r => r.name === nombre) ?? null : null;
-      out.push(aRetiro(f, 'binance', { address: w.address, networkId: red?.id ?? null, network: red?.name ?? null, txHash: w.txHash }));
+      out.push(aRetiro(f, 'binance', { address: w.address, networkId: red?.id ?? null, network: red?.name ?? null, txHash: w.txHash, fee: w.fee > 0 ? w.fee : null }));
     }
   }
 

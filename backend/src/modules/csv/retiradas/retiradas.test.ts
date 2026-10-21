@@ -54,6 +54,7 @@ describe('historial de retiradas de Binance', () => {
     expect(r).toHaveLength(2);
     expect(r[0]).toMatchObject({ coin: 'XRP', network: 'XRP', address: 'rSintetica1234', txHash: 'b'.repeat(64) });
     expect(r[0].bruto).toBeCloseTo(10.2, 10);
+    expect(r[0].fee).toBeCloseTo(0.2, 10);
     expect(r[0].timestamp.toISOString()).toBe('2024-03-01T10:00:00.000Z');
     expect(r[1]).toMatchObject({ address: null, txHash: null });
   });
@@ -126,14 +127,25 @@ describe('resolverDestinos', () => {
       REDES, null);
     expect(resumen).toBeNull();
     expect([...destinos.keys()]).toEqual(['h1']);
-    expect(destinos.get('h1')).toEqual({ address: EVM, networkId: 'n-eth', network: 'Ethereum', txHash: null });
+    expect(destinos.get('h1')).toEqual({ address: EVM, networkId: 'n-eth', network: 'Ethereum', txHash: null, fee: null });
   });
 
   it('Binance: sin historial de retiradas no hay destinos; con él, empareja y resume', () => {
     const txs = [tx('XRP', 10.2, '2024-03-01T10:05:00Z', 'h1'), tx('XRP', 3, '2024-03-02T10:05:00Z', 'h2')];
     expect(resolverDestinos('binance', txs, [], REDES, null).destinos.size).toBe(0);
     const { destinos, resumen } = resolverDestinos('binance', txs, [], REDES, [w('XRP', 10.2, '2024-03-01T10:00:00Z')]);
-    expect(destinos.get('h1')).toMatchObject({ address: 'rSintetica1234', networkId: 'n-xrp' });
+    expect(destinos.get('h1')).toMatchObject({ address: 'rSintetica1234', networkId: 'n-xrp', fee: null });
     expect(resumen).toEqual({ filas: 1, emparejadas: 1, retiros: 2 });
+  });
+});
+
+describe('comisión de red (#335)', () => {
+  it('separa la comisión del importe; sin comisión, ya separada o mayor que el retiro, no cambia', async () => {
+    const { conComision } = await import('./comision');
+    const base = tx('XRP', 10.2, '2024-03-01T10:00:00Z', 'h');
+    expect(conComision(base, 0.2)).toMatchObject({ amount: 10, amountNet: 10, feeAsset: 'XRP', feeAmount: 0.2 });
+    expect(conComision(base, null)).toBe(base);
+    expect(conComision({ ...base, feeAmount: 0.1, feeAsset: 'XRP' }, 0.2).feeAmount).toBe(0.1);
+    expect(conComision(base, 11)).toBe(base);
   });
 });

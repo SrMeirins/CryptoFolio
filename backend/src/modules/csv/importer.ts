@@ -9,6 +9,7 @@ import { getOrDetectPairInfo } from '../prices/pairDetector';
 import { enrichIncomeTransactionsWithPrices } from './importerEnrichment';
 import { buildTransferDestinationMap, resolveWalletId, resolveDestinationWalletId } from './importerTransferDestinations';
 import { destinosDeRetiros } from './retiradas/destinosDb';
+import { aplicarComisionRetiro, conComision } from './retiradas/comision';
 
 export { previewCsvFile } from './importerPreview';
 export type { UnknownOperationSample, DepositReview, PreviewResult } from './importerPreview';
@@ -190,7 +191,10 @@ export async function importCsvFile(
         ? (depositCosts[tx.rawRowHashes[0]] ?? null)
         : null;
 
-      const row: InsertRow = { id, tx, walletId, destinationWalletId, effectiveOpType, depositPriceOverride, linkedTxId: null };
+      // Comisión de red del historial de retiradas de Binance (#335): llega a destino
+      // el importe sin ella y la comisión es una disposición en el FIFO, como en Bitvavo.
+      const txFinal = effectiveOpType === 'WITHDRAW' ? conComision(tx, destinos.get(tx.rawRowHashes[0])?.fee ?? null) : tx;
+      const row: InsertRow = { id, tx: txFinal, walletId, destinationWalletId, effectiveOpType, depositPriceOverride, linkedTxId: null };
 
       if (tx.operationType === 'STAKING_UNLOCK' || tx.operationType === 'LAUNCHPOOL_UNLOCK') {
         unlockRows.push(row);
@@ -306,6 +310,7 @@ export async function importCsvFile(
     for (const { transactionId, key } of destinoRows) {
       const d = destinos.get(key);
       if (!d) continue;
+      await aplicarComisionRetiro(client, transactionId, d.fee);
       await client.query(
         `UPDATE transactions
          SET counterparty_address = COALESCE(counterparty_address, $1),
