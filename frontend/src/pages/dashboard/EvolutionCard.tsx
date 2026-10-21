@@ -15,6 +15,7 @@ import { evolutionQuery, fromDaily, fromIntraday } from '../../utils/evolutionSe
 import { applyLiveToday, periodSummary } from '../../utils/evolutionSummary'
 import { evolutionSubtitle } from '../../utils/panelSubtitles'
 import { LineChart } from 'lucide-react'
+import { formatPercent } from '../../utils/format'
 
 // Bloque de evolución del Dashboard (#166): pestaña P&L (rentabilidad
 // acumulada, por defecto) y pestaña Valor (valor de la cartera). Desde #215
@@ -59,6 +60,8 @@ export function EvolutionCard() {
   const summary = useMemo(() => periodSummary(points, query.intraday), [points, query.intraday])
   const valueChange = points.length >= 2 ? points[points.length - 1].value - points[0].value : null
   const labels = METRIC_LABELS[metric]
+  // TWR del periodo como dato técnico en la ayuda (#353).
+  const twrPct = active.data?.twrPct ?? null
   const approximate = query.intraday ? intraday.data?.approximate ?? [] : []
   const preparacion = usePreparacionHistoricos()
   const animationKey = `${period}-${range?.from ?? ''}-${range?.to ?? ''}-${tab}-${unit}`
@@ -117,6 +120,9 @@ export function EvolutionCard() {
           metricHelp={
             <>
               <p>{labels.help}</p>
+              {twrPct !== null && (
+                <p>Rentabilidad ponderada en el tiempo (TWR): <span className="mono">{formatPercent(twrPct)}</span>. Encadena la rentabilidad de cada día sin tener en cuenta cuánto dinero había; con aportaciones a lo largo del tiempo puede diferir mucho del % sobre lo aportado.</p>
+              )}
               {query.intraday && <p>Últimas 24 horas, un punto cada 15 minutos y el último con los precios en vivo.</p>}
               <p>Los puntos verdes y rojos sobre la curva son depósitos y retiradas de capital propio, agrupados por semana o mes en periodos largos. Pasa el cursor o usa Tab para ver el importe.</p>
               {approximate.length > 0 && (

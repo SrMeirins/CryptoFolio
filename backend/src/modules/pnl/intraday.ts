@@ -20,7 +20,7 @@ export interface IntradayPoint {
   value: number;  // valor de la cartera en la moneda pedida
   pnl: number;    // P&L acumulado desde el inicio de la ventana
   pct: number;    // rentabilidad acumulada (TWR) desde el inicio
-  stepPct: number | null; // rentabilidad del tramo de 15 min que termina aquí (null si la base es < 1)
+  stepPct: number | null; // rentabilidad del tramo de 15 min que termina aquí (null si la base no llega al umbral, ver minBaseFor)
   flow: number;   // flujo neto de capital propio del tramo (+ depósito, − retirada), sin margen
   capitalIn: number;   // depósitos de capital propio del tramo
   capitalOut: number;  // retiradas de capital propio del tramo (positivo)
@@ -33,7 +33,8 @@ export interface IntradayResponse {
   to: string;
   stepMinutes: 15;
   totalPnl: number;
-  twrPct: number;
+  twrPct: number;          // rentabilidad ponderada en el tiempo (dato técnico, #353)
+  peakCapitalPct: number;  // P&L sobre el máximo capital aportado: el % que se muestra
   // Activos sin serie de 15 min (sin par en Binance o descarga fallida):
   // se valoran con el precio en vivo en toda la ventana.
   approximate: string[];
@@ -74,7 +75,7 @@ export function buildIntradaySeries({ instants, holdings, flows, priceOf, fxAt }
   flows: readonly CapitalFlow[];
   priceOf: (asset: string, i: number) => number | null;   // en la moneda pedida
   fxAt: (i: number) => number;                            // unidades de la moneda por EUR
-}): { points: IntradayPoint[]; totalPnl: number; twrPct: number } {
+}): { points: IntradayPoint[]; totalPnl: number; twrPct: number; peakCapitalPct: number } {
   const valueAt = (i: number) => valueHoldings(holdings[i], a => priceOf(a, i), fxAt(i)).value;
   const inflow = new Array<number>(instants.length).fill(0);
   const outflow = new Array<number>(instants.length).fill(0);
@@ -100,19 +101,20 @@ export function buildIntradaySeries({ instants, holdings, flows, priceOf, fxAt }
     complete: true, live: k + 1 === instants.length - 1,
   }));
   const base = valueAt(0);
-  const { days, totalPnl, twrPct } = computeDailyPnl(base, valuations);
+  const { days, totalPnl, twrPct, peakCapitalPct } = computeDailyPnl(base, valuations);
   let cumulative = 0;
   const points: IntradayPoint[] = [
     { at: new Date(instants[0]).toISOString(), value: Math.round(base * 100) / 100, pnl: 0, pct: 0, stepPct: null, flow: 0, capitalIn: 0, capitalOut: 0, live: false },
     ...days.map(d => {
       cumulative += d.pnl;
       return {
-        at: d.date, value: d.value, pnl: Math.round(cumulative * 100) / 100, pct: d.cumulativePct,
+        // % sobre el capital aportado, como el resto de periodos (#353); el TWR va aparte.
+        at: d.date, value: d.value, pnl: Math.round(cumulative * 100) / 100, pct: d.cumulativePeakCapitalPct,
         stepPct: d.pct, flow: d.netCapitalFlow, capitalIn: d.capitalIn, capitalOut: d.capitalOut, live: d.live,
       };
     }),
   ];
-  return { points, totalPnl, twrPct };
+  return { points, totalPnl, twrPct, peakCapitalPct };
 }
 
 async function mapPool<T, R>(items: readonly T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -156,9 +158,9 @@ export async function getIntradayPnl(currency: DisplayCurrency = 'EUR', now = Da
     return eur === null ? null : eur * fxAt(i);
   };
 
-  const { points, totalPnl, twrPct } = buildIntradaySeries({ instants, holdings, flows, priceOf, fxAt });
+  const { points, totalPnl, twrPct, peakCapitalPct } = buildIntradaySeries({ instants, holdings, flows, priceOf, fxAt });
   return {
     currency, from: new Date(instants[0]).toISOString(), to: new Date(now).toISOString(), stepMinutes: 15,
-    totalPnl, twrPct, approximate: approximate.filter(a => a !== 'USDT' || currency === 'USD').sort(), points,
+    totalPnl, twrPct, peakCapitalPct, approximate: approximate.filter(a => a !== 'USDT' || currency === 'USD').sort(), points,
   };
 }

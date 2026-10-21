@@ -49,7 +49,7 @@ export const METRIC_LABELS: Record<PnlMetric, { short: string; help: string }> =
   },
   peakCapital: {
     short: 'Sobre capital aportado',
-    help: 'Ganancia o pérdida acumulada dividida entre el máximo capital que has llegado a tener aportado (depósitos menos retiradas, sin contar el margen).',
+    help: 'Ganancia o pérdida acumulada del periodo dividida entre el máximo capital que has llegado a tener aportado en él (lo que había al empezar más depósitos y menos retiradas, sin contar el margen).',
   },
 }
 
@@ -66,8 +66,14 @@ export function periodFrom(period: PnlPeriod, today: string): string | undefined
   return new Date(Date.UTC(y, m - 1, d - (PERIOD_DAYS[period as DayPeriod] - 1))).toISOString().slice(0, 10)
 }
 
-export function metricFor(period: PnlPeriod): PnlMetric {
-  return period === 'Todo' ? 'peakCapital' : 'twr'
+/**
+ * Métrica del % del titular y de la curva (#353): en todos los periodos, el
+ * P&L sobre el máximo capital aportado, que cuadra con los euros. El TWR solo
+ * se muestra como dato complementario: con aportaciones a lo largo del tiempo
+ * se separa mucho del P&L en euros.
+ */
+export function metricFor(_period: PnlPeriod): PnlMetric {
+  return 'peakCapital'
 }
 
 /** Puntos del gráfico con la métrica del periodo y el P&L acumulado en EUR. */
