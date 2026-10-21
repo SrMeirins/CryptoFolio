@@ -1,0 +1,38 @@
+# Dependabot (#355): solo actualizaciones de SEGURIDAD. Las de versión quedan
+# desactivadas (open-pull-requests-limit: 0); las de seguridad no cuentan para
+# ese límite y se abren en cuanto hay un aviso que afecta a una dependencia.
+# Requiere tener activados en el repositorio «Dependabot alerts» y «Dependabot
+# security updates». Cada PR se revisa y mergea como cualquier otra.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 0
+    groups:
+      seguridad-frontend: { applies-to: security-updates, patterns: ['*'] }
+    commit-message: { prefix: 'fix(deps)' }
+
+  - package-ecosystem: npm
+    directory: /backend
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 0
+    groups:
+      seguridad-backend: { applies-to: security-updates, patterns: ['*'] }
+    commit-message: { prefix: 'fix(deps)' }
+
+  - package-ecosystem: npm
+    directory: /electron
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 0
+    groups:
+      seguridad-electron: { applies-to: security-updates, patterns: ['*'] }
+    commit-message: { prefix: 'fix(deps)' }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 0
+    groups:
+      seguridad-actions: { applies-to: security-updates, patterns: ['*'] }
+    commit-message: { prefix: 'fix(ci)' }

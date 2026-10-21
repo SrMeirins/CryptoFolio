@@ -5,7 +5,7 @@ RUN apk add --no-cache wget
 WORKDIR /app
 
 COPY package*.json ./
-# Instalar todas las deps (incluyendo devDependencies para ts-node-dev en Docker dev)
+# Instalar todas las deps (incluidas las devDependencies necesarias para compilar)
 RUN npm ci --prefer-offline
 
 COPY . .
@@ -16,5 +16,5 @@ USER node
 EXPOSE 3001
 
 # Producción: node dist/index.js
-# En Docker dev se sobreescribe con ts-node-dev via docker-compose command
+# En Docker dev se sobreescribe con tsx watch vía el command de docker-compose
 CMD ["node", "dist/index.js"]

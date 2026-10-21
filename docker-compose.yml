@@ -126,7 +126,7 @@ services:
     cap_drop:
       - ALL
     # Rootfs de solo lectura — verificado con el stack real (build compilado,
-    # sin ts-node-dev ni bind-mounts de código): el único directorio en el
+    # sin tsx watch ni bind-mounts de código): el único directorio en el
     # que escribe de verdad es /app/uploads, ya cubierto por el volumen.
     read_only: true
     tmpfs:

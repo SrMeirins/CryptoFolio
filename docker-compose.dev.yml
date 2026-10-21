@@ -5,7 +5,7 @@
 # se recomienda a usuarios finales. El fichero que sí deben usar es
 # `docker-compose.yml` (producción, self-hosted real), documentado en el
 # README. Diferencias clave: aquí el backend corre con hot-reload
-# (ts-node-dev + bind-mount de src/), el frontend por defecto es el dev
+# (tsx watch + bind-mount de src/), el frontend por defecto es el dev
 # server de Vite (sin minificar), y los puertos están pensados para convivir
 # con otros stacks Docker en la misma máquina (no para exponerse a nadie).
 #
@@ -111,9 +111,9 @@ services:
       BLOCKFROST_API_KEY: ${BLOCKFROST_API_KEY:-}
       SUBSCAN_API_KEY: ${SUBSCAN_API_KEY:-}
       PRICE_REFRESH_INTERVAL_MS: ${PRICE_REFRESH_INTERVAL_MS:-60000}
-    command: ["npx", "ts-node-dev", "--respawn", "--transpile-only", "--poll", "src/index.ts"]
+    command: ["npx", "tsx", "watch", "--clear-screen=false", "src/index.ts"]
     volumes:
-      # Hot reload: ts-node-dev lee directamente src/ (no usa dist/)
+      # Hot reload: tsx watch lee directamente src/ (no usa dist/)
       - ./backend/src:/app/src
       # Carpeta para subida de CSVs (persiste entre reinicios)
       - csv_uploads:/app/uploads
