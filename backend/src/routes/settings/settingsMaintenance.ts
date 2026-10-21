@@ -10,6 +10,7 @@ import { sendInternalError } from '../../middleware/errorHandler';
 
 import { coberturaActual } from '../../modules/csv/coberturaDb';
 import { avisosCobertura } from '../../modules/csv/coberturaAvisos';
+import { avisosVerificacion } from '../../modules/walletSync/avisos';
 const router = Router();
 
 const bulkSetCostsSchema = z.object({
@@ -162,6 +163,19 @@ router.get('/notifications', async (_req: Request, res: Response) => {
   if (avisoFiscal) {
     notifications.push({ id: 'fiscal-calendar', type: avisoFiscal.type, category: 'Fiscal', message: avisoFiscal.message });
   }
+
+  // Verificación on-chain de las direcciones (#336): última comprobación de cada activo.
+  const verif = await db.query(
+    `SELECT DISTINCT ON (bsl.wallet_address_id, bsl.asset)
+            bsl.asset, bsl.status, bsl.error, bsl.onchain_balance, bsl.expected_balance,
+            w.name AS wallet, COALESCE(n.name, wa.custom_network) AS red
+     FROM balance_sync_log bsl
+     JOIN wallet_addresses wa ON wa.id = bsl.wallet_address_id
+     JOIN wallets w ON w.id = wa.wallet_id
+     LEFT JOIN networks n ON n.id = wa.network_id
+     ORDER BY bsl.wallet_address_id, bsl.asset, bsl.checked_at DESC`,
+  );
+  notifications.push(...avisosVerificacion(verif.rows));
 
   // Cobertura de importaciones (#328): exchanges sin importar hace más de 60 días y huecos sin revisar.
   const { despues: coberturas } = await coberturaActual();

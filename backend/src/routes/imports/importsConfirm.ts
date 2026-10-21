@@ -9,6 +9,8 @@ import { archivosDe, exchangesForzados, uploadCsv, parseWithdrawalDestinations, 
 import { cargarAniosFiscales } from '../../modules/fiscal/carryforward';
 import { madridYearMonth } from '../../modules/fiscal/madridTime';
 import { estadoPreparacion } from '../../modules/pnl/pnlService';
+import { enSegundoPlano } from '../../utils/enSegundoPlano';
+import { verificarEnSegundoPlano } from '../../modules/walletSync/walletSync';
 import { agruparAvisosFifo, impactoPorEjercicio, type ArchivoImportado } from '../../modules/csv/resumenImportacion';
 
 const router = Router();
@@ -122,7 +124,9 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
     const despues = await cargarAniosFiscales(anio);
 
     // Arranca ya la descarga de cierres para el dashboard (#334); no se espera.
-    void estadoPreparacion().catch(e => console.error('[IMPORT] Preparación de históricos fallida:', (e as Error).message));
+    enSegundoPlano('IMPORT', estadoPreparacion);
+    // Con los saldos ya recalculados, se verifican las direcciones on-chain (#336).
+    verificarEnSegundoPlano();
 
     send('done', 'Proceso completado correctamente', undefined, undefined, {
       resumen: {

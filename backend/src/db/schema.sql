@@ -182,7 +182,9 @@ CREATE TABLE balance_sync_log (
   onchain_balance    NUMERIC,
   expected_balance   NUMERIC,
   discrepancy_pct    NUMERIC,
-  status             TEXT NOT NULL CHECK (status IN ('ok', 'discrepancy', 'error'))
+  status             TEXT NOT NULL CHECK (status IN ('ok', 'discrepancy', 'error')),
+  -- Motivo del fallo de verificación (#336), para explicar qué hacer.
+  error              TEXT CHECK (char_length(error) <= 500)
 );
 
 CREATE INDEX idx_balance_sync_log_wallet_address ON balance_sync_log(wallet_address_id, checked_at DESC);

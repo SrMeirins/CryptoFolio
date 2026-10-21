@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../../db/client';
 import { longText, sendZodError, shortText, walletIdParamSchema, WALLET_KINDS } from './shared';
+import { diagnosticar } from '../../modules/walletSync/diagnostico';
 
 const router = Router();
 
@@ -17,6 +18,26 @@ const walletUpdateBodySchema = z.object({
   color: shortText('color').nullish(),
   notes: longText('notes').nullish(),
 });
+
+interface DetalleSync { asset: string; onchain_balance: string | number | null; expected_balance: string | number; status: 'ok' | 'discrepancy' | 'error'; error: string | null }
+interface DireccionFila { network_name: string | null; custom_network: string | null; sync_details: DetalleSync[] }
+
+function conDiagnosticos<T extends { addresses: DireccionFila[] }>(w: T): T {
+  return {
+    ...w,
+    addresses: w.addresses.map(a => ({
+      ...a,
+      sync_details: a.sync_details.map(d => ({
+        ...d,
+        diagnostico: diagnosticar({
+          asset: d.asset, status: d.status, error: d.error,
+          onchain: d.onchain_balance === null ? null : Number(d.onchain_balance),
+          expected: Number(d.expected_balance), network: a.network_name ?? a.custom_network,
+        }),
+      })),
+    })),
+  };
+}
 
 // ── GET /api/wallets ───────────────────────────────────────────────────────
 router.get('/', async (_req: Request, res: Response) => {
@@ -52,10 +73,10 @@ router.get('/', async (_req: Request, res: Response) => {
             'sync_details', (
               SELECT COALESCE(json_agg(json_build_object(
                 'asset', asset, 'onchain_balance', onchain_balance,
-                'expected_balance', expected_balance, 'checked_at', checked_at, 'status', status
+                'expected_balance', expected_balance, 'checked_at', checked_at, 'status', status, 'error', error
               )), '[]')
               FROM (
-                SELECT DISTINCT ON (asset) asset, onchain_balance, expected_balance, checked_at, status
+                SELECT DISTINCT ON (asset) asset, onchain_balance, expected_balance, checked_at, status, error
                 FROM balance_sync_log
                 WHERE wallet_address_id = wa.id
                 ORDER BY asset, checked_at DESC
@@ -76,7 +97,8 @@ router.get('/', async (_req: Request, res: Response) => {
     GROUP BY w.id
     ORDER BY w.is_system DESC, w.created_at ASC
   `);
-  res.json(wallets.rows);
+  // Cada comprobación con su diagnóstico: qué significa y qué hacer (#336).
+  res.json(wallets.rows.map(conDiagnosticos));
 });
 
 // ── POST /api/wallets ──────────────────────────────────────────────────────

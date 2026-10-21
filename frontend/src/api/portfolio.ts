@@ -360,6 +360,18 @@ export interface WalletAddressSyncDetail {
   expected_balance: number
   checked_at: string
   status: 'ok' | 'discrepancy' | 'error'
+  /** Motivo del fallo (#336). */
+  error?: string | null
+  /** Qué significa y qué hacer (#336). */
+  diagnostico?: DiagnosticoVerificacion
+}
+
+export interface DiagnosticoVerificacion {
+  tipo: 'ok' | 'discrepancia' | 'api_key' | 'contrato' | 'sin_proveedor' | 'red'
+  nivel: 'ok' | 'aviso' | 'error' | 'info'
+  mensaje: string
+  accion: string | null
+  enlace: string | null
 }
 
 export interface WalletAddress {

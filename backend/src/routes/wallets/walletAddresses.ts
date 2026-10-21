@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../../db/client';
-import { syncWalletAddress } from '../../modules/walletSync/walletSync';
+import { syncWalletAddress, verificarEnSegundoPlano } from '../../modules/walletSync/walletSync';
 import { MAX_LENGTH_LONG } from '../../modules/validation/textLength';
 import {
   sendZodError, shortText,
@@ -50,6 +50,8 @@ router.post('/:id/addresses', async (req: Request, res: Response) => {
     [id, network_id ?? null, custom_network ?? null, custom_explorer_url ?? null, address ?? null]
   );
   res.status(201).json(result.rows[0]);
+  // Se verifica sola en segundo plano (#336): ya no queda «Pendiente» hasta pulsar recargar.
+  if (result.rows[0].address) verificarEnSegundoPlano(result.rows[0].id);
 });
 
 // ── PUT /api/wallets/:id/addresses/:addressId ──────────────────────────────
@@ -82,6 +84,7 @@ router.put('/:id/addresses/:addressId', async (req: Request, res: Response) => {
     return;
   }
   res.json({ success: true });
+  if (address) verificarEnSegundoPlano(addressId);
 });
 
 // ── DELETE /api/wallets/:id/addresses/:addressId ───────────────────────────

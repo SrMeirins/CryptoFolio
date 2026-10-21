@@ -168,7 +168,7 @@ describe('walletSync', () => {
     expect(addr.rows[0].last_sync_at).not.toBeNull();
   });
 
-  it('token de network_assets sin contract_address: error explícito, nunca se confunde con el saldo nativo', async () => {
+  it('token de network_assets sin contract_address y con saldo: error explícito, nunca se confunde con el saldo nativo', async () => {
     const { syncWalletAddress } = await loadWalletSyncWithTestDb();
 
     const addrRes = await pool.query(
@@ -187,11 +187,18 @@ describe('walletSync', () => {
     const fake: BalanceProvider = { requiresApiKey: false, getBalance: async () => ({ ok: true, balance: 999 }) };
     registerProvider('XRP Ledger', fake);
 
+    // Sin saldo de ese token, no se verifica ni da error: generaría avisos falsos (#336).
+    expect((await syncWalletAddress(addressId)).some(r => r.asset === 'SINCONTRATO')).toBe(false);
+
+    await insertOpenLot('SINCONTRATO', 5, 5);
     const results = await syncWalletAddress(addressId);
     const tokenResult = results.find(r => r.asset === 'SINCONTRATO')!;
     expect(tokenResult.status).toBe('error');
     expect(tokenResult.onchainBalance).toBeNull();
     expect(tokenResult.error).toMatch(/contract_address/);
+    // Y el motivo queda guardado para explicarlo en la app (#336).
+    const log = await pool.query(`SELECT error FROM balance_sync_log WHERE wallet_address_id = $1 AND asset = 'SINCONTRATO' ORDER BY checked_at DESC LIMIT 1`, [addressId]);
+    expect(log.rows[0].error).toMatch(/contract_address/);
   });
 
   it('sin lotes abiertos (expected=0): cualquier saldo on-chain por encima del polvo cuenta como discrepancia', async () => {

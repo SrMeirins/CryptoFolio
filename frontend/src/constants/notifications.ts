@@ -15,6 +15,9 @@ export const NOTIFICATION_ROUTES: Record<string, string> = {
   'import-stale-binance': '/import',
   'import-stale-bitvavo': '/import',
   'import-huecos':        '/import',
+  // Verificación on-chain de direcciones (#336)
+  'wallet-discrepancia':  '/settings?tab=wallets',
+  'wallet-verificacion':  '/settings?tab=wallets',
 }
 
 // Metadata visual por tipo de aviso — antes TopBar.tsx y GeneralSection.tsx

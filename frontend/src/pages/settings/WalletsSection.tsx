@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { CopyButton } from '../../components/CopyButton'
-import { WALLET_TYPE_META, truncateAddress } from './wallets/helpers'
+import { WALLET_TYPE_META, truncateAddress, hayPendientes } from './wallets/helpers'
 import { ColorPicker } from './wallets/ColorPicker'
 import { SyncBadge } from './wallets/SyncBadge'
 import { AddAddressForm } from './wallets/AddAddressForm'
@@ -27,9 +27,11 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
   const [editColor, setEditColor]                 = useState('')
   const [syncingAddressId, setSyncingAddressId]   = useState<string | null>(null)
 
+  // Mientras alguna dirección esté pendiente de su verificación automática, se refresca sola (#336).
   const { data: wallets = [] } = useQuery({
     queryKey: ['wallets'],
     queryFn: portfolioApi.getWalletsFull,
+    refetchInterval: q => (hayPendientes(q.state.data ?? []) ? 5_000 : false),
   })
   const { data: networks = [] } = useQuery({
     queryKey: ['networks'],
