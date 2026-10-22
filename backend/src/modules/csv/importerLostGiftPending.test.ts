@@ -1,6 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
+
+// Sin precios externos (#359): este test no depende de ellos y no debe salir
+// a internet; con el modo sin red los proveedores fallan al instante.
+beforeAll(() => { vi.stubEnv('PRICE_SOURCES_OFFLINE', 'true'); });
+afterAll(() => { vi.unstubAllEnvs(); });
 
 // #257: una retirada clasificada en el asistente como perdida (LOST) o regalo
 // (GIFT_SENT) no tiene destino por definición; no debe quedar marcada con

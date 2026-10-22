@@ -21,7 +21,7 @@ export function truncateAddress(addr: string) {
 
 export const SYNC_BADGE: Record<'ok' | 'discrepancy' | 'error' | 'pending', { label: string; className: string }> = {
   ok:          { label: 'Verificado', className: 'bg-positive/15 text-positive-ink' },
-  discrepancy: { label: 'Revisar',    className: 'bg-warning/15 text-warning' },
+  discrepancy: { label: 'Revisar',    className: 'bg-warning/15 text-warning-ink' },
   error:       { label: 'Sin conexión', className: 'bg-negative/15 text-negative-ink' },
   pending:     { label: 'Pendiente',  className: 'bg-overlay/30 text-fg-subtle' },
 }
@@ -58,8 +58,8 @@ type EstadoSync = 'ok' | 'discrepancy' | 'error' | 'pending'
 export function etiquetaEstado(status: EstadoSync, detalles: readonly { diagnostico?: { tipo: string } }[]): { label: string; className: string } {
   if (status !== 'error') return SYNC_BADGE[status]
   const tipos = new Set(detalles.map(d => d.diagnostico?.tipo))
-  if (tipos.has('api_key')) return { label: 'Falta API key', className: 'bg-warning/15 text-warning' }
-  if (tipos.has('contrato')) return { label: 'Falta contrato', className: 'bg-warning/15 text-warning' }
+  if (tipos.has('api_key')) return { label: 'Falta API key', className: 'bg-warning/15 text-warning-ink' }
+  if (tipos.has('contrato')) return { label: 'Falta contrato', className: 'bg-warning/15 text-warning-ink' }
   if (tipos.has('red')) return SYNC_BADGE.error
   if (tipos.has('sin_proveedor')) return { label: 'No verificable', className: 'bg-overlay/30 text-fg-subtle' }
   return SYNC_BADGE.error

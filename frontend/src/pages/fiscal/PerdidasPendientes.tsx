@@ -9,8 +9,8 @@ import type { Carryforward } from './types'
 // queda y cuándo caduca cada una. Sustituye a «Compensación de pérdidas».
 
 const ESTADO: Record<OrigenView['estado'], { label: string; cls: string }> = {
-  'caduca-este-anio': { label: 'caduca este año', cls: 'bg-warning/15 text-warning' },
-  vigente: { label: 'vigente', cls: 'bg-info/10 text-info' },
+  'caduca-este-anio': { label: 'caduca este año', cls: 'bg-warning/15 text-warning-ink' },
+  vigente: { label: 'vigente', cls: 'bg-info/10 text-info-ink' },
   agotada: { label: 'compensada', cls: 'bg-positive/10 text-positive-ink' },
   caducada: { label: 'caducada', cls: 'bg-overlay/8 text-fg-subtle' },
 }

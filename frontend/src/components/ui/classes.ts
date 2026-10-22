@@ -58,10 +58,10 @@ const TONES: Record<BadgeTone, string> = {
   neutral: 'bg-overlay/8 text-fg-muted',
   // Texto con tinta de contraste AA sobre el fondo tenue de su tono (#356).
   brand: 'bg-brand/12 text-brand-ink',
-  info: 'bg-info/12 text-info',
+  info: 'bg-info/12 text-info-ink',
   positive: 'bg-positive/12 text-positive-ink',
   negative: 'bg-negative/12 text-negative-ink',
-  warning: 'bg-warning/12 text-warning',
+  warning: 'bg-warning/12 text-warning-ink',
   purple: 'bg-accent-purple/12 text-accent-purple',
 }
 export function badgeClasses(tone: BadgeTone = 'neutral', size: BadgeSize = 'sm', extra = ''): string {

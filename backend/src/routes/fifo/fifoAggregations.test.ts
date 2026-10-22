@@ -1,8 +1,13 @@
-import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
+
+// Sin precios externos (#359): este test no depende de ellos y no debe salir
+// a internet; con el modo sin red los proveedores fallan al instante.
+beforeAll(() => { vi.stubEnv('PRICE_SOURCES_OFFLINE', 'true'); });
+afterAll(() => { vi.unstubAllEnvs(); });
 
 // Ninguno de los 6 endpoints de agregación tenía test propio. Se ejecuta el
 // motor FIFO real (sin red, no hace falta mockear nada) sobre datos

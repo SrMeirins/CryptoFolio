@@ -43,6 +43,8 @@
   --cf-brand-ink: #aa96ff;
   --cf-positive-ink: #0ecb81;
   --cf-negative-ink: #f9798a;
+  --cf-warning-ink: #f59e0b;
+  --cf-info-ink: #73a5f9;
   --cf-warning: #f59e0b;
   --cf-info: #4b8cf7;
   /* Translúcidos: bg-overlay/5 aclara en oscuro y oscurece en claro */
@@ -100,6 +102,8 @@
   --cf-brand-ink: #542bc7;
   --cf-positive-ink: #026744;
   --cf-negative-ink: #a7273c;
+  --cf-warning-ink: #924308;
+  --cf-info-ink: #1c4bcf;
   --cf-warning: #ae5009;
   --cf-info: #1d4ed8;
   --cf-overlay: #000000;
@@ -154,6 +158,8 @@
   --color-brand-ink: var(--cf-brand-ink);
   --color-positive-ink: var(--cf-positive-ink);
   --color-negative-ink: var(--cf-negative-ink);
+  --color-warning-ink: var(--cf-warning-ink);
+  --color-info-ink: var(--cf-info-ink);
   --color-warning: var(--cf-warning);
   --color-info: var(--cf-info);
   --color-overlay: var(--cf-overlay);

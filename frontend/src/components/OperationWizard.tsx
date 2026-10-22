@@ -54,7 +54,7 @@ const BADGE_COLORS: Record<string, string> = {
   red:   'bg-negative/12 text-negative-ink',
   blue:  'bg-brand/12 text-brand-ink',
   gray:  'bg-overlay/8 text-fg-muted',
-  amber: 'bg-warning/12 text-warning',
+  amber: 'bg-warning/12 text-warning-ink',
 }
 
 const CATEGORIES_ORDER = ['ACQUISITION', 'DISPOSITION', 'INCOME', 'MOVEMENT', 'FEE', 'SPECIAL']

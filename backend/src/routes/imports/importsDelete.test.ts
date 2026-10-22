@@ -4,6 +4,11 @@ import express from 'express';
 import { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
 
+// Sin precios externos (#359): este test no depende de ellos y no debe salir
+// a internet; con el modo sin red los proveedores fallan al instante.
+beforeAll(() => { vi.stubEnv('PRICE_SOURCES_OFFLINE', 'true'); });
+afterAll(() => { vi.unstubAllEnvs(); });
+
 // Borrado de importaciones y subida de CSV (#316). El motor FIFO se sustituye
 // por un espía: lo que se prueba es cuándo se relanza, no su resultado.
 const runFifoEngine = vi.fn(async () => undefined);

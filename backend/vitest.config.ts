@@ -7,5 +7,7 @@ export default defineConfig({
       '**/node_modules/**',
       '**/dist/**',
     ],
+    // Ningún test sale a internet (#359): ver src/test/blockExternalNetwork.ts.
+    setupFiles: ['./src/test/blockExternalNetwork.ts'],
   },
 });

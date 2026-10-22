@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAssetIcons } from '../hooks/useAssetIcons'
 import { assetHue, assetInitials } from '../utils/assetInitials'
-import { alpha } from '../utils/colors'
+import { alpha, ink } from '../utils/colors'
 
 /**
  * Logo de un activo, servido por el propio backend (#201); si no hay logo,
@@ -26,7 +26,9 @@ export function CryptoIcon({ symbol, size = 28, ring }: { symbol: string; size?:
         className="rounded-full flex items-center justify-center shrink-0 font-bold"
         style={{
           width: size, height: size, fontSize: Math.max(10, size * 0.36),
-          background: `hsl(${hue} 60% 50% / 0.18)`, color: `hsl(${hue} 65% 62%)`, ...ringStyle,
+          // Iniciales con ink() (#359): mismo tono con contraste AA sobre el tema y su
+          // tinte; antes la tinta fija no llegaba a 4,5:1 sin logotipo (p. ej. sin red).
+          background: `hsl(${hue} 60% 50% / 0.12)`, color: ink(`hsl(${hue} 65% 50%)`), ...ringStyle,
         }}
       >
         <span aria-hidden="true">{assetInitials(symbol)}</span>

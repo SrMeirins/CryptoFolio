@@ -8,7 +8,7 @@ import type { ArchivoLote } from './types'
 const ESTADO = {
   listo: { icon: CheckCircle2, texto: 'Listo', clase: 'text-positive-ink bg-positive/10' },
   sin_novedades: { icon: MinusCircle, texto: 'Sin novedades', clase: 'text-fg-muted bg-overlay/5' },
-  no_reconocido: { icon: AlertTriangle, texto: 'No reconocido', clase: 'text-warning bg-warning/10' },
+  no_reconocido: { icon: AlertTriangle, texto: 'No reconocido', clase: 'text-warning-ink bg-warning/10' },
 } as const
 
 // Archivos del lote en la revisión (#326): estado y cifras de cada uno, «Leer como…» y quitar.

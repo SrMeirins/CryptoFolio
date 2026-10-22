@@ -112,7 +112,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
                     <time dateTime={r.fechaHora ?? r.fecha} title={fiscalDateDetail(r.fechaHora)}>{formatFiscalDate(r.fecha)}</time>
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className="text-xs bg-warning/10 text-warning px-1.5 py-0.5 rounded-lg">{r.tipo}</span>
+                    <span className="text-xs bg-warning/10 text-warning-ink px-1.5 py-0.5 rounded-lg">{r.tipo}</span>
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5">

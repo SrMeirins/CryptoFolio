@@ -18,3 +18,13 @@ FROM w, (VALUES
 INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, cost_asset, cost_amount, wallet_id, account, manually_added, notes)
 SELECT 'BUY', '2025-05-01T10:00:00Z', 'XRP', 10, 10, 'EUR', 5, id, 'Spot', TRUE, 'Compra manual de prueba'
 FROM wallets WHERE name = 'Binance Spot';
+
+-- Cierres diarios sintéticos (#359): la CI arranca el backend con
+-- PRICE_SOURCES_OFFLINE=true, así que no descarga precios. Con estos cierres el
+-- Dashboard muestra la evolución y el P&L (no se queda en «Preparando») y la
+-- auditoría de accesibilidad cubre esos paneles. Precios inventados.
+INSERT INTO price_close_madrid (asset, close_date, price_eur, source)
+SELECT a.asset, d::date, a.base + a.step * (d::date - DATE '2024-01-05'), 'okx_1d'
+FROM (VALUES ('BTC', 40000::numeric, 20::numeric), ('XRP', 0.5, 0.001)) AS a(asset, base, step),
+     generate_series(DATE '2024-01-05', (NOW() AT TIME ZONE 'Europe/Madrid')::date, INTERVAL '1 day') AS d
+ON CONFLICT (asset, close_date) DO NOTHING;

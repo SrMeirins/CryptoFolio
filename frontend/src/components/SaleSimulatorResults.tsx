@@ -98,7 +98,7 @@ export function SaleSimulatorResults({ result, loading }: {
             {/* Sin anchos fijos: rango y base a la izquierda (pueden encoger), cuota a la derecha */}
             {result.irpf.desglose.map((t, i) => (
               <div key={i} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-2 tabular-nums">
-                <span className="text-xs font-bold text-warning bg-warning/15 px-1.5 py-0.5 rounded-lg mono">{t.tipo}%</span>
+                <span className="text-xs font-bold text-warning-ink bg-warning/15 px-1.5 py-0.5 rounded-lg mono">{t.tipo}%</span>
                 <div className="min-w-0 text-xs leading-tight">
                   <p className="text-fg-subtle truncate">{formatEur(t.desde)} – {Number.isFinite(t.hasta) ? formatEur(t.hasta) : '…'}</p>
                   <p className="text-fg-muted mono break-words">base {formatEur(t.base)}</p>

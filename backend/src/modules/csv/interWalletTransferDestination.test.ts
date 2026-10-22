@@ -1,7 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Pool } from 'pg';
 import { randomUUID } from 'crypto';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
+
+// Sin precios externos (#359): este test no depende de ellos y no debe salir
+// a internet; con el modo sin red los proveedores fallan al instante.
+beforeAll(() => { vi.stubEnv('PRICE_SOURCES_OFFLINE', 'true'); });
+afterAll(() => { vi.unstubAllEnvs(); });
 
 let testDb: TestDatabase;
 let pool: Pool;

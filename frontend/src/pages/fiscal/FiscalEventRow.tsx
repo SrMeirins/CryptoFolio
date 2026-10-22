@@ -10,7 +10,7 @@ import { tableRowClasses } from '../../components/ui'
 const TONE_CLASS: Record<FiscalTone, string> = {
   sale:   'bg-brand/10 text-brand-ink',
   swap:   'bg-accent-purple/10 text-accent-purple',
-  fee:    'bg-warning/10 text-warning',
+  fee:    'bg-warning/10 text-warning-ink',
   loss:   'bg-negative/10 text-negative-ink',
   margin: 'bg-overlay/8 text-fg-muted',
   other:  'bg-background-tertiary text-fg-muted',

@@ -1,8 +1,13 @@
-import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../test/setup-test-db';
 import { MAX_LENGTH_LONG, MAX_LENGTH_SHORT } from '../modules/validation/textLength';
+
+// Sin precios externos (#359): este test no depende de ellos y no debe salir
+// a internet; con el modo sin red los proveedores fallan al instante.
+beforeAll(() => { vi.stubEnv('PRICE_SOURCES_OFFLINE', 'true'); });
+afterAll(() => { vi.unstubAllEnvs(); });
 
 // Verifica que los endpoints de escritura de campos de texto libre rechacen
 // con 400 un valor que exceda el límite de longitud, y que ese valor NUNCA
