@@ -4,12 +4,20 @@ import { db } from '../../db/client';
 import { MAX_LENGTH_SHORT } from '../../modules/validation/textLength';
 import { DISPLAY_CURRENCIES } from '../../modules/fiat/displayCurrency';
 import { sendZodError } from './settingsShared';
+import { VIEWS_KEY } from '../../modules/history/savedViews';
 
 const router = Router();
 
+// Tamaño máximo de un valor de configuración (#369): las claves actuales usan
+// valores cortos; un límite evita cargas enormes en app_config.
+export const MAX_CONFIG_VALUE = 2000;
+// Claves con API propia: no se escriben con el PUT genérico.
+const PROTECTED_KEYS = new Set([VIEWS_KEY]);
+
 const configSchema = z.object({
-  key:   z.string().min(1, 'key es requerido').max(MAX_LENGTH_SHORT, `key no puede superar ${MAX_LENGTH_SHORT} caracteres`),
-  value: z.union([z.string(), z.number(), z.boolean()], { message: 'value es requerido' }),
+  key:   z.string().min(1, 'key es requerido').max(MAX_LENGTH_SHORT, `key no puede superar ${MAX_LENGTH_SHORT} caracteres`)
+    .refine(k => !PROTECTED_KEYS.has(k), 'esta clave se gestiona con su propia API'),
+  value: z.union([z.string().max(MAX_CONFIG_VALUE, `value no puede superar ${MAX_CONFIG_VALUE} caracteres`), z.number(), z.boolean()], { message: 'value es requerido' }),
 });
 
 // Claves con un conjunto cerrado de valores: se valida el valor antes de

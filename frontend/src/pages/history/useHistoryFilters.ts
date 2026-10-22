@@ -26,6 +26,8 @@ export function useHistoryFilters() {
   // ?tx=<id> (enlace desde el Dashboard, #237) se conserva hasta el primer cambio.
   const [focusTx, setFocusTx] = useState<string | null>(params.get('tx'))
   const lastWritten = useRef(params.toString())
+  // Abierto sin parámetros: solo entonces se aplica la vista predeterminada (#369).
+  const [startedEmpty] = useState(() => params.toString() === '')
 
   // Búsqueda con debounce: una sola petición al dejar de teclear.
   useEffect(() => {
@@ -82,14 +84,18 @@ export function useHistoryFilters() {
   const clearFilters = useCallback(() => {
     setFilters(EMPTY_FILTERS); setSearchInput(''); setSort(DEFAULT_SORT); setPage(1); setFocusTx(null)
   }, [])
+  /** Sustituye filtros y orden de golpe (aplicar una vista guardada, #369). */
+  const applyState = useCallback((next: { filters: HistoryFilterState; sort: SortState }) => {
+    setFilters(next.filters); setSearchInput(next.filters.search); setSort(next.sort); setPage(1); setFocusTx(null)
+  }, [])
   const toggleSort = useCallback((col: SortKey) => { setSort(s => nextSort(s, col)); setPage(1); setFocusTx(null) }, [])
 
   const offset = (page - 1) * PAGE_SIZE
   const queryParams = useMemo(() => toApiParams(filters, sort, offset, PAGE_SIZE, currency), [filters, sort, offset, currency])
 
   return {
-    filters, searchInput, sort, page, offset, queryParams, focusTx,
+    filters, searchInput, sort, page, offset, queryParams, focusTx, startedEmpty,
     hasActiveFilters: anyFilter(filters),
-    setFilter, patchFilters, setSearchInput, setDateRange, setOffset, clearImport, clearFilters, toggleSort,
+    setFilter, patchFilters, setSearchInput, setDateRange, setOffset, clearImport, clearFilters, toggleSort, applyState,
   }
 }
