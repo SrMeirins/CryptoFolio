@@ -125,23 +125,23 @@ export function TopMovers({ lots }: { lots: FifoLot[] }) {
             <span className={badgeClasses('positive')}>{summary.gains} {mode === '24h' ? (summary.gains === 1 ? 'sube' : 'suben') : 'en ganancia'}</span>
             <span className={badgeClasses('negative')}>{summary.losses} {mode === '24h' ? (summary.losses === 1 ? 'baja' : 'bajan') : 'en pérdida'}</span>
             {summary.best && (
-              <span className={badgeClasses('neutral')}>Mejor <span className="text-fg font-semibold">{summary.best.asset}</span> <span className="mono text-positive">{formatPercent(summary.best.pct, 1, true)}</span></span>
+              <span className={badgeClasses('neutral')}>Mejor <span className="text-fg font-semibold">{summary.best.asset}</span> <span className="mono text-positive-ink">{formatPercent(summary.best.pct, 1, true)}</span></span>
             )}
             {summary.worst && (
-              <span className={badgeClasses('neutral')}>Peor <span className="text-fg font-semibold">{summary.worst.asset}</span> <span className="mono text-negative">{formatPercent(summary.worst.pct, 1, true)}</span></span>
+              <span className={badgeClasses('neutral')}>Peor <span className="text-fg font-semibold">{summary.worst.asset}</span> <span className="mono text-negative-ink">{formatPercent(summary.worst.pct, 1, true)}</span></span>
             )}
           </div>
           <MoversHeatmap cells={cells} mode={mode} currency={currency} onOpen={asset => navigate(`/portfolio?activo=${encodeURIComponent(asset)}`)} />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-border">
           <div>
-            {header(labels.first, 'bg-positive', T.positive, 'text-positive/80')}
+            {header(labels.first, 'bg-positive', T.positive, 'text-positive-ink')}
             <div className="divide-y divide-border/30">
               {top.map(item => <MoverRow key={`${item.asset}-${currency}`} {...item} mode={mode} />)}
             </div>
           </div>
           <div>
-            {header(labels.second, 'bg-negative', T.negative, 'text-negative/80')}
+            {header(labels.second, 'bg-negative', T.negative, 'text-negative-ink')}
             <div className="divide-y divide-border/30">
               {bottom.map(item => <MoverRow key={`${item.asset}-${currency}`} {...item} mode={mode} />)}
             </div>

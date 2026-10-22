@@ -99,3 +99,36 @@ describe('ink(): texto de categoría legible en ambos temas (#199)', () => {
     }
   }
 })
+
+// Tintas de texto de tono (#356): --cf-{brand,positive,negative}-ink sobre las
+// superficies del tema y sobre los fondos tenues de su propio tono (insignias
+// bg-*/10–12, indicador del selector bg-brand/15), en ambos temas.
+describe('tintas de tono: ≥ 4,5:1 sobre superficies y tintes de su tono (#356)', () => {
+  const TONES = ['brand', 'positive', 'negative'] as const
+  for (const [theme, block] of Object.entries(THEMES)) {
+    for (const tone of TONES) {
+      it(`tema ${theme}: --cf-${tone}-ink`, () => {
+        const ink = hexVar(block, `${tone}-ink`)
+        const base = hexVar(block, tone)
+        expect(ink).toMatch(/^#/)
+        const fallos: string[] = []
+        for (const bg of BACKGROUNDS) {
+          const surface = hexVar(block, bg)
+          for (const fondo of [surface, mix(base, surface, 10), mix(base, surface, 12), mix(base, surface, 15)]) {
+            const ratio = contrastRatio(ink, fondo)
+            if (ratio < 4.5) fallos.push(`${ink} sobre ${fondo}: ${ratio.toFixed(2)}`)
+          }
+        }
+        expect(fallos).toEqual([])
+      })
+    }
+
+    it(`tema ${theme}: ítem activo de la barra lateral (fg sobre brand/12) y opciones inactivas del selector (fg-muted)`, () => {
+      for (const bg of BACKGROUNDS) {
+        const surface = hexVar(block, bg)
+        expect(contrastRatio(hexVar(block, 'fg'), mix(hexVar(block, 'brand'), surface, 12))).toBeGreaterThanOrEqual(4.5)
+        expect(contrastRatio(hexVar(block, 'fg-muted'), surface)).toBeGreaterThanOrEqual(4.5)
+      }
+    })
+  }
+})

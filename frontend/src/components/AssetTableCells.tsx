@@ -4,7 +4,7 @@ import { formatPercent } from '../utils/format'
 
 /** P&L % como pastilla con signo, no solo color. */
 export function PnlPill({ pct }: { pct: number }) {
-  const tone = pct > 0.005 ? 'bg-positive/10 text-positive' : pct < -0.005 ? 'bg-negative/10 text-negative' : 'bg-overlay/6 text-fg-muted'
+  const tone = pct > 0.005 ? 'bg-positive/10 text-positive-ink' : pct < -0.005 ? 'bg-negative/10 text-negative-ink' : 'bg-overlay/6 text-fg-muted'
   return <span className={`inline-block px-1.5 py-0.5 rounded-md text-[11px] leading-none font-semibold ${tone}`}>{formatPercent(pct, 2, true)}</span>
 }
 

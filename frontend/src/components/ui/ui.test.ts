@@ -167,11 +167,12 @@ describe('estados', () => {
 })
 
 describe('selector segmentado, variante accent (#200)', () => {
-  it('la opción activa usa el color de acento y queda sobre el indicador deslizante', () => {
-    expect(segmentClasses(true, 'sm', 'accent')).toContain('text-brand')
+  it('la opción activa usa la tinta de acento (AA, #356) y queda sobre el indicador deslizante', () => {
+    expect(segmentClasses(true, 'sm', 'accent')).toContain('text-brand-ink')
     expect(segmentClasses(true, 'sm', 'accent')).toContain('z-10')
     expect(segmentClasses(true, 'sm', 'accent')).not.toContain('bg-background-card')
-    expect(segmentClasses(false, 'sm', 'accent')).toContain('text-fg-subtle')
+    // Inactivas en fg-muted: fg-subtle no llegaba a 4,5:1 sobre la cabecera (#356).
+    expect(segmentClasses(false, 'sm', 'accent')).toContain('text-fg-muted')
   })
   it('el indicador se anima y respeta «reducir movimiento»', () => {
     expect(segmentThumbClasses()).toContain('transition-[transform,width]')

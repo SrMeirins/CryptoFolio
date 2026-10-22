@@ -77,7 +77,7 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
             <span className="text-fg">{hasPrice ? formatPrice(price, currency) : 'Sin precio'}</span>
             {change24h !== null && (
               <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md border ${change24h >= 0 ? 'text-positive bg-positive/8 border-positive/25' : 'text-negative bg-negative/8 border-negative/25'}`}>
-                <span className="font-medium opacity-75">24 h</span> {change24h >= 0 ? '▲' : '▼'} {formatPercent(change24h, 2, true)}
+                <span className="font-medium">24 h</span> {change24h >= 0 ? '▲' : '▼'} {formatPercent(change24h, 2, true)}
               </span>
             )}
           </p>

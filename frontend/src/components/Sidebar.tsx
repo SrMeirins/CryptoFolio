@@ -23,7 +23,8 @@ function SidebarNavItem({ to, icon: Icon, label, collapsed }: SidebarNavItemProp
         transition-all duration-200 overflow-hidden select-none cursor-pointer
         ${collapsed ? 'justify-center px-0 py-[10px]' : 'gap-3 px-3 py-[10px]'}
         ${isActive
-          ? 'bg-brand/12 text-brand'
+          // Texto en fg (contraste > 7:1); el acento lo llevan el icono y la barra (#356).
+          ? 'bg-brand/12 text-fg'
           : 'text-fg-subtle hover:text-fg hover:bg-overlay/4'
         }
       `}
@@ -39,8 +40,9 @@ function SidebarNavItem({ to, icon: Icon, label, collapsed }: SidebarNavItemProp
 
           <Icon
             size={18}
+            aria-hidden="true"
             className={`shrink-0 transition-transform duration-200 ${
-              isActive ? '' : 'group-hover:scale-110'
+              isActive ? 'text-brand' : 'group-hover:scale-110'
             }`}
           />
 

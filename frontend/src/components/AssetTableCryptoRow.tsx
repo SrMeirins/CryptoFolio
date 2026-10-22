@@ -159,7 +159,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                     ? 'text-positive bg-positive/8 border-positive/25'
                     : 'text-negative bg-negative/8 border-negative/25'
                 }`}>
-                  <span className="font-medium opacity-75">24 h</span>
+                  <span className="font-medium">24 h</span>
                   <span aria-hidden="true">{change24h >= 0 ? '▲' : '▼'}</span>
                   {formatPercent(change24h, 2, true)}
                 </span>

@@ -48,7 +48,7 @@ function Tramo({ c, h, tipo, onVerGuia }: { c: CoberturaExchange; h: HuecoCobert
     : <>Sin transacciones del {formatFiscalDate(h.desde)} al {formatFiscalDate(h.hasta)} <span className="text-fg-subtle">({h.dias} días)</span></>
 
   return (
-    <li className={`flex items-start gap-2 text-xs ${h.revisionId ? 'opacity-70' : ''}`}>
+    <li className="flex items-start gap-2 text-xs">
       {tipo === 'pendiente'
         ? <CalendarClock size={13} className={`shrink-0 mt-0.5 ${h.revisionId ? 'text-fg-subtle' : 'text-warning'}`} aria-hidden="true" />
         : <CalendarRange size={13} className={`shrink-0 mt-0.5 ${h.revisionId ? 'text-fg-subtle' : 'text-warning'}`} aria-hidden="true" />}

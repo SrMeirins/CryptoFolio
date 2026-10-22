@@ -94,7 +94,7 @@ function Cell({ cell, rect, width, cap, currency, dimmed, onActive, onOpen }: {
 /** Leyenda de la escala de color, de −tope a +tope. */
 function HeatLegend({ cap }: { cap: number }) {
   return (
-    <div className="flex items-center justify-end gap-2 text-[11px] text-fg-subtle mono" aria-label={`Escala de color: de −${cap} % a +${cap} %`}>
+    <div role="img" className="flex items-center justify-end gap-2 text-[11px] text-fg-subtle mono" aria-label={`Escala de color: de −${cap} % a +${cap} %`}>
       <span aria-hidden="true">−{cap}%</span>
       <span aria-hidden="true" className="w-40 h-2 rounded-full"
         style={{ background: `linear-gradient(90deg, ${heatBackground(-cap, cap)}, ${heatBackground(-cap / 4, cap)}, var(--cf-bg-tertiary), ${heatBackground(cap / 4, cap)}, ${heatBackground(cap, cap)})` }} />

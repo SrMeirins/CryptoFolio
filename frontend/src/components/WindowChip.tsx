@@ -34,7 +34,7 @@ export function WindowChip({ window, tone, triggerLabel, children, tooltip }: {
       trigger={
         <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg border text-xs leading-none whitespace-nowrap ${FRAMES[tone]}`}>
           <Icon size={11} strokeWidth={2.25} aria-hidden="true" className="shrink-0 opacity-80" />
-          <span className="font-medium opacity-80">{label}</span>
+          <span className="font-medium">{label}</span>
           <span className="mono font-semibold">{children}</span>
         </span>
       }>

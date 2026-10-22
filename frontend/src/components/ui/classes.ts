@@ -56,10 +56,11 @@ export type BadgeTone = 'neutral' | 'brand' | 'info' | 'positive' | 'negative' |
 export type BadgeSize = 'sm' | 'md'
 const TONES: Record<BadgeTone, string> = {
   neutral: 'bg-overlay/8 text-fg-muted',
-  brand: 'bg-brand/12 text-brand',
+  // Texto con tinta de contraste AA sobre el fondo tenue de su tono (#356).
+  brand: 'bg-brand/12 text-brand-ink',
   info: 'bg-info/12 text-info',
-  positive: 'bg-positive/12 text-positive',
-  negative: 'bg-negative/12 text-negative',
+  positive: 'bg-positive/12 text-positive-ink',
+  negative: 'bg-negative/12 text-negative-ink',
   warning: 'bg-warning/12 text-warning',
   purple: 'bg-accent-purple/12 text-accent-purple',
 }
@@ -77,7 +78,8 @@ export type SegmentedSize = 'sm' | 'md'
 export type SegmentedVariant = 'default' | 'accent'
 export function segmentClasses(active: boolean, size: SegmentedSize = 'sm', variant: SegmentedVariant = 'default'): string {
   const state = variant === 'accent'
-    ? (active ? 'relative z-10 text-brand' : 'relative z-10 text-fg-subtle hover:text-fg')
+    // Activa con tinta de marca y las inactivas en fg-muted: ambas con ≥ 4,5:1 (#356).
+    ? (active ? 'relative z-10 text-brand-ink' : 'relative z-10 text-fg-muted hover:text-fg')
     : (active ? 'bg-background-card text-fg shadow-xs' : 'text-fg-subtle hover:text-fg')
   return [
     'whitespace-nowrap rounded-md font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',

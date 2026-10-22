@@ -56,7 +56,7 @@ export function YearTabs({ years, activeYear, overview, onSelect }: {
               <span className={badgeClasses('brand', 'sm')}>EN CURSO</span>
             )}
             {ov && (
-              <span className={`text-xs mono font-bold ${neto >= 0 ? 'text-positive' : 'text-negative'}`}>
+              <span className={`text-xs mono font-bold ${neto >= 0 ? 'text-positive-ink' : 'text-negative-ink'}`}>
                 {neto >= 0 ? '+' : ''}{formatEur(neto)}
               </span>
             )}
