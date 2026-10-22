@@ -21,6 +21,8 @@ import { StatsBar } from './history/StatsBar'
 import { AnalyticsPanel } from './history/AnalyticsPanel'
 import { Button, EmptyState, LoadingState } from '../components/ui'
 import { HistoryHeader } from './history/HistoryHeader'
+import { TransactionDetailPanel } from './history/detail/TransactionDetailPanel'
+import { useDetailNavigation } from './history/detail/useDetailNavigation'
 
 // Pestaña Historial: orquesta el estado de filtros (useHistoryFilters), los
 // datos (useHistoryData) y los bloques de UI de pages/history/ (#351).
@@ -39,6 +41,13 @@ export function History() {
   const { data: stats } = useCurrencyQuery(txStatsQuery)
 
   const { total } = d
+  // Panel de detalle (#373): ?tx=<id>, con Anterior/Siguiente en el orden de la lista.
+  const ids = useMemo(() => d.transactions.map(t => t.id), [d.transactions])
+  const nav = useDetailNavigation({
+    ids, current: f.focusTx, offset: f.offset, total, open: f.openTx, setOffset: f.setOffset, pageIds: d.pageIds,
+  })
+  const { openTx } = f
+  const closeDetail = useCallback(() => openTx(null), [openTx])
   // Entradas y salidas de valor de lo filtrado, en la moneda de visualización (#346).
   const flows = d.data?.flows[currency] ?? null
   const totalPages = Math.ceil(total / PAGE_SIZE)
@@ -113,14 +122,21 @@ export function History() {
             />
           ) : (
             <HistoryTable transactions={d.transactions} sort={f.sort} onSort={f.toggleSort} currency={currency}
-              searchTerm={f.filters.search} focusTx={f.focusTx} deletingId={d.deletingId}
-              onDelete={d.deleteTx} onEdit={setEditingTx}
+              searchTerm={f.filters.search} selectedId={f.focusTx} deletingId={d.deletingId}
+              onOpen={f.openTx} onPrefetch={nav.prefetch} onDelete={id => { void d.deleteTx(id) }} onEdit={setEditingTx}
               skipLink={total > PAGE_SIZE ? { href: `#${PAGINATION_ID}`, onActivate: () => paginationRef.current?.focus() } : undefined} />
           )}
         </div>
       </div>
 
       <HistoryPagination ref={paginationRef} offset={f.offset} total={total} onOffset={f.setOffset} />
+
+      {/* Oculto mientras se edita: dos diálogos con trampa de foco no se apilan. */}
+      {f.focusTx && !editingTx && !showNewTx && (
+        <TransactionDetailPanel id={f.focusTx} currency={currency} onClose={closeDetail} onOpen={f.openTx}
+          prev={nav.prev} next={nav.next} onEdit={setEditingTx} isDeleting={d.deletingId === f.focusTx}
+          onDelete={id => { void d.deleteTx(id).then(ok => { if (ok) closeDetail() }) }} />
+      )}
 
       {(showNewTx || editingTx) && (
         <ManualTxModal

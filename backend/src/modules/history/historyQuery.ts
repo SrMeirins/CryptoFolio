@@ -43,10 +43,13 @@ export function groupingEnabled(f: Filters): boolean {
  * con rango, las filas sin precio quedan fuera. Lo usan la página, los totales
  * y el CSV, así que todos respetan los mismos filtros.
  */
-export function filteredValuedCtes(f: Filters, tz: string, grouped = false): { ctes: string; params: unknown[] } {
-  const { where, params } = buildHistoryWhere(f, tz);
-  const all = [...params, tz];
+export function filteredValuedCtes(f: Filters, tz: string, grouped = false, onlyId?: string): { ctes: string; params: unknown[] } {
+  const built = buildHistoryWhere(f, tz);
+  const all = [...built.params, tz];
   const tzParam = `$${all.length}`;
+  // Filtro interno por id (detalle de una transacción, #373); no está en la API pública.
+  let where = built.where;
+  if (onlyId) { all.push(onlyId); where = `${where ? `${where} AND` : 'WHERE'} t.id = $${all.length}`; }
   const ranged = f.value_min !== undefined || f.value_max !== undefined;
   const display = f.currency === 'USD' ? `t.value_eur * (${usdPerEurSql('t.timestamp')})` : 't.value_eur';
   const range: string[] = [];
@@ -80,9 +83,9 @@ export function filteredValuedCtes(f: Filters, tz: string, grouped = false): { c
  * LIMIT/OFFSET como parámetros; sin él devuelve todas (para un cursor).
  */
 export function historyRowsSql(
-  f: Filters, tz: string, page?: { limit: number; offset: number }, grouped = false,
+  f: Filters, tz: string, page?: { limit: number; offset: number }, grouped = false, onlyId?: string,
 ): { sql: string; params: unknown[] } {
-  const { ctes, params } = filteredValuedCtes(f, tz, grouped);
+  const { ctes, params } = filteredValuedCtes(f, tz, grouped, onlyId);
   const all = [...params];
   let paging = '';
   if (page) {
