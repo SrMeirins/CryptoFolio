@@ -181,14 +181,17 @@ jobs:
 
       - name: Start backend
         # El backend aplica schema.sql y las migraciones sobre la base vacía al
-        # arrancar. Sin acceso a Binance/CoinGecko desde el runner, el feed y
-        # los logos fallan de forma controlada (no afecta a la consola).
+        # arrancar. Modo sin red (#359): no consulta APIs de precios (los
+        # cierres sintéticos vienen en el seed) y la prueba no depende de
+        # terceros. tsx es la devDependency pinada (antes `npx ts-node`, que se
+        # descargaba sin versión fija).
         working-directory: backend
         env:
           BACKEND_PORT: '3001'
           BACKEND_HOST: 127.0.0.1
+          PRICE_SOURCES_OFFLINE: 'true'
         run: |
-          nohup npx ts-node --transpile-only src/index.ts > backend.log 2>&1 &
+          nohup npx tsx src/index.ts > backend.log 2>&1 &
           for i in $(seq 1 60); do curl -sf http://127.0.0.1:3001/health && exit 0; sleep 2; done
           cat backend.log; exit 1
 

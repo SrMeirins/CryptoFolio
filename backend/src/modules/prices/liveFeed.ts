@@ -1,4 +1,5 @@
 import { db } from '../../db/client';
+import { priceSourcesOffline } from './offlineMode';
 import { precioActualRespaldo } from './respaldo/cascada';
 import { PRICE_ALIASES } from './priceAliases';
 import { WebSocket } from 'ws';
@@ -252,6 +253,13 @@ export function getAllOpen24Prices(): Map<string, number> {
 }
 
 export function startLivePrices(): void {
+  // Modo sin red (#359): solo la carga inicial (que sin red se queda con la
+  // caché); ni refrescos periódicos ni WebSocket de Binance.
+  if (priceSourcesOffline()) {
+    console.info('[PRICES] PRICE_SOURCES_OFFLINE activo: sin precios externos ni feed en vivo');
+    void loadInitialPrices().catch(() => undefined);
+    return;
+  }
   loadInitialPrices().then(refreshCoinGeckoOnlyPrices);
 
   coinGeckoRefreshTimer = setInterval(refreshCoinGeckoOnlyPrices, COINGECKO_REFRESH_MS);

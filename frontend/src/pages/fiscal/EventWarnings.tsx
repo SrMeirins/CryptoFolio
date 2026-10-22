@@ -13,7 +13,7 @@ export function EventWarnings({ e }: { e: FiscalEvent }) {
       {list.map(w => (
         <Tooltip key={w.key} label={w.label} direction="up"
           trigger={<w.icon size={12} aria-hidden="true" />}
-          triggerClassName="inline-grid place-items-center size-5 rounded-md text-warning hover:bg-warning/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-warning/60">
+          triggerClassName="inline-grid place-items-center size-5 rounded-md text-warning-ink hover:bg-warning/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-warning/60">
           <p>{w.detail}</p>
         </Tooltip>
       ))}

@@ -56,7 +56,7 @@ export function ImportsList({ imports, onDelete }: {
         const tagCounts = [
           buyCount > 0      && { label: `${buyCount} compras`,    color: 'text-positive-ink bg-positive/10' },
           sellCount > 0     && { label: `${sellCount} ventas`,    color: 'text-negative-ink bg-negative/10' },
-          withdrawCount > 0 && { label: `${withdrawCount} retiros`, color: 'text-warning bg-warning/10' },
+          withdrawCount > 0 && { label: `${withdrawCount} retiros`, color: 'text-warning-ink bg-warning/10' },
           depositCount > 0  && { label: `${depositCount} depósitos`, color: 'text-brand-ink bg-brand/10' },
         ].filter(Boolean) as { label: string; color: string }[]
 

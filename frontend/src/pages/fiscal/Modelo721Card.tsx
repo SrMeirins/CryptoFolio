@@ -20,7 +20,7 @@ import type { Modelo721 } from './types'
 
 const STATUS_CLASS = {
   obligatorio: 'bg-negative/10 border-negative/25 text-negative-ink',
-  incompleto: 'bg-warning/10 border-warning/25 text-warning',
+  incompleto: 'bg-warning/10 border-warning/25 text-warning-ink',
   'sin-obligacion': 'bg-positive/10 border-positive/25 text-positive-ink',
 } as const
 

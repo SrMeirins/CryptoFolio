@@ -210,7 +210,7 @@ export function Portfolio() {
       {/* Activos sin precio: un único aviso para toda la cartera */}
       {all.unpriced.length > 0 && (
         <div role="status" className="flex items-center justify-between gap-3 px-4 py-2.5 bg-warning/5 border border-warning/20 rounded-xl text-xs">
-          <span className="text-warning/90">
+          <span className="text-warning">
             <span className="mono font-semibold">{all.unpriced.join(', ')}</span>{' '}
             {all.unpriced.length === 1 ? 'no tiene precio configurado' : 'no tienen precio configurado'}: valor y P&L no disponibles.
           </span>

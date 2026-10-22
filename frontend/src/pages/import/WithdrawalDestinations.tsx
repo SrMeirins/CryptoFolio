@@ -149,7 +149,7 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
             <h2 id="revision-titulo" className={`text-sm font-semibold ${allDone ? 'text-positive' : 'text-warning'}`}>
               {allDone ? 'Revisión completada' : 'Revisión obligatoria antes de importar'}
             </h2>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium mono ${allDone ? 'bg-positive/20 text-positive-ink' : 'bg-warning/20 text-warning'}`}>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium mono ${allDone ? 'bg-positive/20 text-positive-ink' : 'bg-warning/20 text-warning-ink'}`}>
               {doneItems}/{totalItems}
             </span>
           </div>
@@ -177,7 +177,7 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
         <p className="text-xs text-fg-subtle">Asigna el destino de cada retiro y el coste de cada depósito externo.</p>
 
         {coldWallets.length === 0 && withdrawals.length > 0 && (
-          <div className="flex items-center gap-2 text-xs text-warning bg-warning/10 rounded-xl px-4 py-2.5 border border-warning/20">
+          <div className="flex items-center gap-2 text-xs text-warning-ink bg-warning/10 rounded-xl px-4 py-2.5 border border-warning/20">
             <AlertTriangle size={12} className="shrink-0" aria-hidden="true" />
             {grupos.length > 0
               ? 'Aún no tienes wallets propias: usa «¿Es tuya? Guardar en mi wallet» en una dirección para crear la primera.'

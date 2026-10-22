@@ -59,7 +59,7 @@ export function FiscalHero({ summary, cuota, tipoMedio, comparison, aviso, decla
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-[11px] font-semibold uppercase tracking-widest text-fg-subtle">Neto a declarar {summary.year}</h2>
             {summary.esAnioEnCurso
-              ? <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-info/10 text-info"><Calendar size={10} aria-hidden="true" />En curso · hasta hoy</span>
+              ? <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-info/10 text-info-ink"><Calendar size={10} aria-hidden="true" />En curso · hasta hoy</span>
               : declarada
                 ? <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-positive/10 text-positive-ink"><CheckCircle2 size={10} aria-hidden="true" />Declarado</span>
                 : <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-overlay/8 text-fg-muted"><CheckCircle2 size={10} aria-hidden="true" />Cerrado</span>}

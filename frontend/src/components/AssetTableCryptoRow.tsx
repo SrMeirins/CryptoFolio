@@ -113,7 +113,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                 {lockedAmounts.length > 0 && (() => {
                   const onlyLaunchpool = lockedAmounts.every(l => l.lock_kind === 'launchpool')
                   return (
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium flex items-center gap-0.5 ${onlyLaunchpool ? 'bg-accent-purple/10 text-accent-purple' : 'bg-warning/10 text-warning'}`}>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium flex items-center gap-0.5 ${onlyLaunchpool ? 'bg-accent-purple/10 text-accent-purple' : 'bg-warning/10 text-warning-ink'}`}>
                       <Lock size={8} />
                       {formatAmount(lockedAmounts.reduce((s, l) => s + parseFloat(l.locked_amount), 0))}
                     </span>
@@ -167,7 +167,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
             </div>
           ) : (
             <Link to="/settings?tab=assets" onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1 text-xs text-warning/80 hover:text-warning bg-warning/8 border border-warning/20 px-2 py-0.5 rounded-lg transition-colors"
+              className="inline-flex items-center gap-1 text-xs text-warning/80 hover:text-warning-ink bg-warning/8 border border-warning/20 px-2 py-0.5 rounded-lg transition-colors"
               title="Configura el par de precio en Ajustes → Activos"
             >
               <Settings size={10} aria-hidden="true" />Sin precio

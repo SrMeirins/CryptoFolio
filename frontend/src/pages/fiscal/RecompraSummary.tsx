@@ -23,7 +23,7 @@ export function RecompraSummary({ data, active, onToggle }: { data: Summary; act
         </p>
       </div>
       <button type="button" onClick={onToggle} aria-pressed={active}
-        className={`text-xs px-2.5 py-1 rounded-lg border transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-warning/60 ${active ? 'border-warning/50 bg-warning/15 text-warning' : 'border-border text-fg-muted hover:text-fg'}`}>
+        className={`text-xs px-2.5 py-1 rounded-lg border transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-warning/60 ${active ? 'border-warning/50 bg-warning/15 text-warning-ink' : 'border-border text-fg-muted hover:text-fg'}`}>
         {active ? 'Ver todas' : 'Ver solo estas'}
       </button>
     </div>

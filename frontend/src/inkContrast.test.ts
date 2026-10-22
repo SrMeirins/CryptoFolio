@@ -104,7 +104,7 @@ describe('ink(): texto de categoría legible en ambos temas (#199)', () => {
 // superficies del tema y sobre los fondos tenues de su propio tono (insignias
 // bg-*/8–20, indicador del selector bg-brand/15), en ambos temas.
 describe('tintas de tono: ≥ 4,5:1 sobre superficies y tintes de su tono (#356)', () => {
-  const TONES = ['brand', 'positive', 'negative'] as const
+  const TONES = ['brand', 'positive', 'negative', 'warning', 'info'] as const
   for (const [theme, block] of Object.entries(THEMES)) {
     for (const tone of TONES) {
       it(`tema ${theme}: --cf-${tone}-ink`, () => {

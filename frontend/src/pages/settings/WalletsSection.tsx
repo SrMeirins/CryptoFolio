@@ -153,7 +153,7 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm">{wallet.name}</span>
                         {wallet.is_default && (
-                          <span className="text-xs px-1.5 py-0.5 rounded-lg bg-warning/15 text-warning font-bold">DEFAULT</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded-lg bg-warning/15 text-warning-ink font-bold">DEFAULT</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5">

@@ -29,7 +29,7 @@ function Fila({ s, nota, onSimular }: { s: Sugerencia; nota: React.ReactNode; on
             <span className="mono font-semibold text-sm text-fg">{s.asset}</span>
             <span className="text-[11px] truncate" style={{ color: ink(s.walletColor) }}>{s.walletName}</span>
             {s.recompra && (
-              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-warning/10 text-warning"
+              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-warning/10 text-warning-ink"
                 title="Compraste este activo en los últimos 2 meses: la pérdida podría no computar este año (art. 33.5 LIRPF)">
                 <Repeat size={10} aria-hidden="true" />recompra
               </span>
