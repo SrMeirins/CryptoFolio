@@ -33,6 +33,7 @@ export function stateFromView(filtros: Record<string, string>): { filters: Histo
       import_id: f.import_id ?? '',
       value_min: f.value_min ?? '',
       value_max: f.value_max ?? '',
+      groupFees: f.group_fees !== 'false',
     },
     sort: sortKey && ['fecha', 'valor', 'activo', 'tipo'].includes(sortKey)
       ? { key: sortKey, dir: f.dir === 'asc' ? 'asc' : 'desc' }

@@ -27,3 +27,13 @@ describe('vistas guardadas (#369)', () => {
     expect(activeView([v], EMPTY_FILTERS, DEFAULT_SORT)?.id).toBe('b')
   })
 })
+
+describe('vistas y comisiones agrupadas (#371)', () => {
+  it('la vista guarda el conmutador desactivado y lo restaura', () => {
+    const off = { ...EMPTY_FILTERS, groupFees: false }
+    const filtros = viewFiltersFromState(off, DEFAULT_SORT)
+    expect(filtros.group_fees).toBe('false')
+    expect(stateFromView(filtros).filters.groupFees).toBe(false)
+    expect(stateFromView({}).filters.groupFees).toBe(true)
+  })
+})

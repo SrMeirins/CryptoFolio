@@ -1,5 +1,5 @@
 import { forwardRef } from 'react'
-import { Search, X, RefreshCw, PenLine, Link2 } from 'lucide-react'
+import { Search, X, RefreshCw, PenLine, Link2, Layers } from 'lucide-react'
 import { DateRangePicker } from '../../components/DateRangePicker'
 import { Dropdown, MultiDropdown, fieldClasses, iconButtonClasses } from '../../components/ui'
 import { fmtShort } from '../../utils/date'
@@ -75,6 +75,16 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
             : 'bg-background-tertiary border-border text-fg-muted hover:border-brand/30'
         }`}>
         <PenLine size={11} aria-hidden="true" /> Manuales
+      </button>
+
+      <button type="button" onClick={() => setFilter('groupFees', !filters.groupFees)} aria-pressed={filters.groupFees}
+        title="Mostrar cada comisión dentro de su compra o venta"
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
+          filters.groupFees
+            ? 'bg-brand/10 border-brand/40 text-brand-ink'
+            : 'bg-background-tertiary border-border text-fg-muted hover:border-brand/30'
+        }`}>
+        <Layers size={11} aria-hidden="true" /> Agrupar comisiones
       </button>
 
       <button type="button" onClick={onCopyLink} title="Copiar el enlace de esta vista"

@@ -56,3 +56,16 @@ test('la búsqueda espera a que dejes de teclear: una sola petición', async ({ 
   expect(searches.filter(s => s !== 'BTC')).toEqual([])
   expect(searches.filter(s => s === 'BTC').length).toBeGreaterThanOrEqual(1)
 })
+
+test('agrupar comisiones: conmutador con teclado y estado en la URL (#371)', async ({ page }) => {
+  await page.goto('/history')
+  await expect(page.getByRole('table')).toBeVisible()
+  const toggle = page.getByRole('button', { name: 'Agrupar comisiones' })
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  await toggle.focus()
+  await page.keyboard.press('Enter')
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+  await expect(page).toHaveURL(/[?&]comisiones=sueltas/)
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Agrupar comisiones' })).toHaveAttribute('aria-pressed', 'false')
+})

@@ -109,3 +109,24 @@ export function monthlyTableRows(monthly: { mes: string; total_ops: number; comp
     total: m.total_ops,
   }))
 }
+
+/**
+ * Comisión total de una fila (#371): la suya más las agrupadas, en la moneda de
+ * visualización. `total` suma las que tienen precio; `missing` cuenta las que
+ * no (o no tienen tipo USD) y `estimated` indica si alguna es estimada.
+ */
+export function feeSummary(
+  tx: Pick<Transaction, 'fee_value_eur' | 'fee_value_source' | 'fee_amount' | 'grouped_fees' | 'usd_per_eur'>,
+  currency: Currency,
+): { count: number; total: number | null; missing: number; estimated: boolean } {
+  const items: { eur: number | null; source: ValuationSource | null }[] = []
+  if (tx.fee_amount && Number(tx.fee_amount) > 0) items.push({ eur: tx.fee_value_eur, source: tx.fee_value_source })
+  for (const f of tx.grouped_fees ?? []) items.push({ eur: f.value_eur, source: f.value_source })
+  let total = 0, known = 0, missing = 0
+  for (const it of items) {
+    const v = toDisplayAmount(it.eur, tx, currency)
+    if (v === null) missing++
+    else { total += v; known++ }
+  }
+  return { count: items.length, total: known ? total : null, missing, estimated: items.some(i => i.source === 'estimado') }
+}

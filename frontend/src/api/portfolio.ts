@@ -296,6 +296,10 @@ export interface Transaction {
   linked_tx_operation_type: string | null
   linked_tx_amount: string | null
   linked_tx_asset: string | null
+  /** Comisiones agrupadas con esta compra o venta (#371); vacío si no hay o no se agrupa. */
+  grouped_fees: GroupedFee[]
+  /** En una comisión: la compra o venta a la que pertenece, si se pudo emparejar (#371). */
+  fee_parent_id: string | null
   /** Importación de origen y hash on-chain, para la trazabilidad (#349). */
   import_id: string | null
   import_filename: string | null
@@ -318,6 +322,15 @@ export type ValuationSource = 'coste' | 'fifo' | 'estimado' | 'sin_precio'
 export interface TransactionFlows {
   EUR: { entradas: number; salidas: number }
   USD: { entradas: number; salidas: number } | null
+}
+
+/** Comisión agrupada dentro de su compra o venta (#371). */
+export interface GroupedFee {
+  id: string
+  asset: string
+  amount: string
+  value_eur: number | null
+  value_source: ValuationSource
 }
 
 /** Vista guardada del Historial (#369): filtros y orden con los nombres de la API. */
@@ -564,6 +577,8 @@ export const portfolioApi = {
     const qs = Object.keys(filtered).length ? '?' + new URLSearchParams(filtered).toString() : ''
     return api.get<{
       transactions: Transaction[]; total: number; flows: TransactionFlows; limit: number; offset: number
+      /** Si las comisiones van agrupadas con su operación (#371). */
+      grouped_fees?: boolean
       currency?: Currency
     }>(`/transactions${qs}`)
   },

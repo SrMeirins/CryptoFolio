@@ -53,6 +53,8 @@ const filtersShape = {
   date_to:        isoDay.optional(),
   search:         z.string().max(100, 'no puede superar 100 caracteres').optional(),
   manually_added: z.enum(['true', 'false'], { message: 'debe ser true o false' }).transform(v => v === 'true').optional(),
+  // Comisiones agrupadas con su operación (#371): «false» las muestra como filas.
+  group_fees:     z.enum(['true', 'false'], { message: 'debe ser true o false' }).transform(v => v === 'true').optional(),
   sort:           z.enum(SORT_KEYS, { message: `debe ser uno de: ${SORT_KEYS.join(', ')}` }).default('fecha'),
   dir:            z.enum(['asc', 'desc'], { message: 'debe ser asc o desc' }).default('desc'),
 };

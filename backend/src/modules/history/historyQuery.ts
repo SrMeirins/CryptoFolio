@@ -1,6 +1,8 @@
 import { usdPerEurSql } from '../fiat/displayCurrency';
 import { buildHistoryOrderBy, buildHistoryWhere, HistoryFilters } from './listFilters';
 import { FLOW_DIRECTION, VALUATION_COLUMNS, VALUATION_CTES, valuationJoins } from './valuationSql';
+import { FEE_PARENT_CTES, GROUPED_FEES_COLUMN, feeValuedCte } from './feeGrouping';
+import { FEE_TYPES } from './operationGroups';
 
 // Consulta de filas del Historial (#346/#349), común al listado paginado y a
 // la exportación CSV: filtra, valora todo lo filtrado (para poder ordenar por
@@ -20,9 +22,19 @@ const ROW_COLUMNS = `
   lt.amount AS linked_tx_amount,
   lt.asset AS linked_tx_asset,
   t.import_id, ci.filename AS import_filename, t.tx_hash,
-  t.value_eur, t.value_source, t.fee_value_eur, t.fee_value_source`;
+  t.value_eur, t.value_source, t.fee_value_eur, t.fee_value_source,
+  fps.parent_id AS fee_parent_id`;
 
 type Filters = HistoryFilters & { sort: HistoryFilters['sort']; dir: HistoryFilters['dir'] };
+
+/**
+ * ¿Se agrupan las comisiones con su operación (#371)? Por defecto sí, salvo
+ * con group_fees=false o si se filtra por algún tipo de comisión (entonces se
+ * quieren ver como filas).
+ */
+export function groupingEnabled(f: Filters): boolean {
+  return f.group_fees !== false && !f.type?.some(t => (FEE_TYPES as readonly string[]).includes(t));
+}
 
 /**
  * CTEs con lo filtrado y valorado (#366): `filtered` trae cada transacción con
@@ -31,7 +43,7 @@ type Filters = HistoryFilters & { sort: HistoryFilters['sort']; dir: HistoryFilt
  * con rango, las filas sin precio quedan fuera. Lo usan la página, los totales
  * y el CSV, así que todos respetan los mismos filtros.
  */
-export function filteredValuedCtes(f: Filters, tz: string): { ctes: string; params: unknown[] } {
+export function filteredValuedCtes(f: Filters, tz: string, grouped = false): { ctes: string; params: unknown[] } {
   const { where, params } = buildHistoryWhere(f, tz);
   const all = [...params, tz];
   const tzParam = `$${all.length}`;
@@ -50,6 +62,15 @@ export function filteredValuedCtes(f: Filters, tz: string): { ctes: string; para
     filtered AS (
       SELECT t.* FROM valued t
       ${ranged ? `WHERE ${range.join(' AND ')}` : ''}
+    ),
+    ${FEE_PARENT_CTES},
+    ${feeValuedCte(tzParam)},
+    -- Filas que se ven (#371): agrupando, sin las comisiones cuya operación
+    -- también está en la vista (van dentro de ella).
+    visible AS (
+      SELECT t.* FROM filtered t
+      ${grouped ? `WHERE NOT EXISTS (
+        SELECT 1 FROM fee_parent fp JOIN filtered p ON p.id = fp.parent_id WHERE fp.fee_id = t.id)` : ''}
     )`;
   return { ctes, params: all };
 }
@@ -58,8 +79,10 @@ export function filteredValuedCtes(f: Filters, tz: string): { ctes: string; para
  * SQL y parámetros de las filas filtradas y ordenadas. Con `page`, añade
  * LIMIT/OFFSET como parámetros; sin él devuelve todas (para un cursor).
  */
-export function historyRowsSql(f: Filters, tz: string, page?: { limit: number; offset: number }): { sql: string; params: unknown[] } {
-  const { ctes, params } = filteredValuedCtes(f, tz);
+export function historyRowsSql(
+  f: Filters, tz: string, page?: { limit: number; offset: number }, grouped = false,
+): { sql: string; params: unknown[] } {
+  const { ctes, params } = filteredValuedCtes(f, tz, grouped);
   const all = [...params];
   let paging = '';
   if (page) {
@@ -69,17 +92,19 @@ export function historyRowsSql(f: Filters, tz: string, page?: { limit: number; o
   const sql = `
     WITH ${ctes},
     ordered AS (
-      SELECT t.* FROM filtered t
+      SELECT t.* FROM visible t
       ${buildHistoryOrderBy(f.sort, f.dir)}
       ${paging}
     )
     SELECT ${ROW_COLUMNS},
+      ${grouped ? GROUPED_FEES_COLUMN : `'[]'::json AS grouped_fees`},
       ${usdPerEurSql('t.timestamp')} AS usd_per_eur
     FROM ordered t
     JOIN wallets w ON w.id = t.wallet_id
     LEFT JOIN wallets dw ON dw.id = t.destination_wallet_id
     LEFT JOIN transactions lt ON lt.id = t.linked_tx_id
     LEFT JOIN csv_imports ci ON ci.id = t.import_id
+    LEFT JOIN fee_parent fps ON fps.fee_id = t.id
     ${buildHistoryOrderBy(f.sort, f.dir)}`;
   return { sql, params: all };
 }
