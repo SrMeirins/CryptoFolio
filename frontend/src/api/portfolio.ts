@@ -320,6 +320,14 @@ export interface TransactionFlows {
   USD: { entradas: number; salidas: number } | null
 }
 
+/** Vista guardada del Historial (#369): filtros y orden con los nombres de la API. */
+export interface SavedView {
+  id: string
+  nombre: string
+  predeterminada: boolean
+  filtros: Record<string, string>
+}
+
 export interface TransactionFacets {
   accounts: string[]
   assets: string[]
@@ -560,6 +568,13 @@ export const portfolioApi = {
     }>(`/transactions${qs}`)
   },
   getTransactionFacets: () => api.get<TransactionFacets>('/transactions/facets'),
+  // Vistas guardadas del Historial (#369).
+  getSavedViews: () => api.get<{ vistas: SavedView[] }>('/v1/historial/vistas'),
+  createSavedView: (body: { nombre: string; predeterminada: boolean; filtros: Record<string, string>; sustituir?: boolean }) =>
+    api.post<{ vista: SavedView; sustituida: boolean }>('/v1/historial/vistas', body),
+  updateSavedView: (id: string, body: { nombre?: string; predeterminada?: boolean; filtros?: Record<string, string> }) =>
+    api.put<{ vista: SavedView }>(`/v1/historial/vistas/${encodeURIComponent(id)}`, body),
+  deleteSavedView: (id: string) => api.delete<void>(`/v1/historial/vistas/${encodeURIComponent(id)}`),
   getTransactionStats: (currency: Currency = 'EUR') => api.get<{
     currency?: Currency
     totals: {
