@@ -365,6 +365,31 @@ export interface TransactionDetail {
   fiscal_years: number[]
 }
 
+/** Importe en ambas monedas (#376): el cambio EUR ↔ USD no pide nada nuevo. */
+export interface Money { EUR: number; USD: number }
+export const STATS_CATEGORIES = ['compras', 'ventas', 'otras_salidas', 'ingresos', 'transferencias', 'otros'] as const
+export type StatsCategory = typeof STATS_CATEGORIES[number]
+export type ByCategory = Record<StatsCategory, number>
+
+/** Estadísticas del Historial sobre lo filtrado (#376). */
+export interface HistoryStats {
+  totals: {
+    ops: number; unique_assets: number; manual: number
+    fiat_buys: number; invested: Money
+    sells: number; sold: Money
+    income_ops: number; income: Money; income_sin_valor: number
+    fee_ops: number; fees: Money; fees_sin_valor: number
+  }
+  chart: {
+    granularity: 'month' | 'year'; from: string; to: string
+    buckets: { periodo: string; ops: ByCategory; valor: { EUR: ByCategory; USD: ByCategory } }[]
+  }
+  /** Rankings: sobre lo filtrado con fechas; sin ellas, el último año. */
+  rankings_periodo: 'filtrado' | 'ultimo_anio'
+  top_assets: { asset: string; ops: number; volume: Money }[]
+  fees_by_asset: { asset: string; ops: number; amount: number; value: Money }[]
+}
+
 /** Vista guardada del Historial (#369): filtros y orden con los nombres de la API. */
 export interface SavedView {
   id: string
@@ -624,20 +649,9 @@ export const portfolioApi = {
   updateSavedView: (id: string, body: { nombre?: string; predeterminada?: boolean; filtros?: Record<string, string> }) =>
     api.put<{ vista: SavedView }>(`/v1/historial/vistas/${encodeURIComponent(id)}`, body),
   deleteSavedView: (id: string) => api.delete<void>(`/v1/historial/vistas/${encodeURIComponent(id)}`),
-  getTransactionStats: (currency: Currency = 'EUR') => api.get<{
-    currency?: Currency
-    totals: {
-      total_ops: number; unique_assets: number; total_invested: number; total_fiat_buys: number
-      total_fee_ops: number; total_fees_eur: number; fees_sin_valor: number
-      total_buys: number; total_sells: number; total_sold: number; total_manual: number
-    }
-    monthly: {
-      mes: string; total_ops: number; compras: number; ventas: number; otras_salidas: number
-      ingresos: number; transferencias: number; eur_invertido: number
-    }[]
-    topAssets: { asset: string; ops: number; eur_volume: number }[]
-    fees: { asset: string; ops: number; total_amount: number; total_eur: number }[]
-  }>(`/transactions/stats?currency=${currency}`),
+  /** Estadísticas del Historial sobre lo filtrado (#376): mismos parámetros que la lista, sin paginación. */
+  getHistoryStats: (params: Record<string, string>) =>
+    api.get<HistoryStats>(`/v1/historial/estadisticas?${new URLSearchParams(params).toString()}`),
   getWallets: () => api.get<Wallet[]>('/wallets'),
   getWalletsFull: () => api.get<WalletFull[]>('/wallets'),
   getCatalog: () => api.get<CatalogData>('/catalog'),

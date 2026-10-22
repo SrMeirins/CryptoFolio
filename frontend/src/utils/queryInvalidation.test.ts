@@ -11,7 +11,7 @@ describe('invalidateTransactionQueries', () => {
   it('invalida también las consultas por moneda (#177), por prefijo para ambas monedas', () => {
     const { client, invalidated } = fakeClient()
     invalidateTransactionQueries(client)
-    expect(invalidated()).toEqual(expect.arrayContaining(['transactions', 'tx-stats', 'eur-flow', 'daily-pnl', 'intraday-pnl']))
+    expect(invalidated()).toEqual(expect.arrayContaining(['transactions', 'eur-flow', 'daily-pnl', 'intraday-pnl']))
     expect(invalidated()).not.toContain('imports')
   })
 

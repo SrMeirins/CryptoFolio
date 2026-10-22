@@ -4,8 +4,8 @@ import express from 'express';
 import type { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
 
-// GET /, /stats y /facets del Historial (#346): validación, valoración con el
-// FIFO (y su respaldo estimado), flujos de entradas/salidas y estadísticas.
+// GET /, /facets y /api/v1/historial/estadisticas (#346, #376): validación,
+// valoración con el FIFO (y su respaldo estimado), flujos y estadísticas.
 // Datos sintéticos: cada transacción cubre una vía de valoración distinta.
 let testDb: TestDatabase;
 let pool: Pool;
@@ -44,7 +44,7 @@ async function consume(lotId: string, consumingTx: string, qty: number, proceeds
 }
 const byId = (rows: { id: string }[], key: string) => rows.find(r => r.id === ids[key]) as Record<string, unknown>;
 
-describe('routes/transactions — listado, stats y facetas', () => {
+describe('routes/transactions — listado, estadísticas y facetas', () => {
   beforeAll(async () => {
     testDb = await createTestDatabase();
     process.env.DATABASE_URL = testDb.connectionString;
@@ -93,8 +93,10 @@ describe('routes/transactions — listado, stats y facetas', () => {
       `INSERT INTO price_cache (asset, price_eur, source, price_date) VALUES ('ADA', 0.3, 'binance', $1), ('USDT', 0.8, 'binance', $1)`, [DAY]);
 
     const { default: router } = await import('./index');
+    const { default: stats } = await import('../historial/estadisticas');
     app = express();
     app.use('/api/transactions', router);
+    app.use('/api/v1/historial/estadisticas', stats);
   });
 
   afterAll(async () => {
@@ -118,8 +120,14 @@ describe('routes/transactions — listado, stats y facetas', () => {
       expect(res.body.error).toContain(campo);
     });
 
-    it('/stats valida la moneda', async () => {
-      expect((await request(app).get('/api/transactions/stats?currency=GBP')).status).toBe(400);
+    it.each([
+      ['currency=GBP', 'currency'],
+      ['type=NOPE', 'type'],
+      ['limit=10', 'Unrecognized'],
+    ])('estadísticas: %s → 400 legible', async (qs, campo) => {
+      const res = await request(app).get(`/api/v1/historial/estadisticas?${qs}`);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain(campo);
     });
   });
 
@@ -306,34 +314,79 @@ describe('routes/transactions — listado, stats y facetas', () => {
     });
   });
 
-  describe('GET /stats', () => {
-    it('definiciones coherentes de Invertido, Ventas y Comisiones', async () => {
-      const res = await request(app).get('/api/transactions/stats');
+  describe('GET /api/v1/historial/estadisticas (#376)', () => {
+    const STATS = '/api/v1/historial/estadisticas';
+    const get = async (qs = '') => (await request(app).get(`${STATS}${qs ? `?${qs}` : ''}`)).body;
+
+    it('definiciones coherentes de Invertido, Ventas y Comisiones, en EUR y USD', async () => {
+      const res = await request(app).get(STATS);
       expect(res.status).toBe(200);
-      expect(res.body.totals).toMatchObject({
-        total_ops: 11,
-        total_invested: 100,   // solo compras pagadas con fiat
-        total_fiat_buys: 1,
-        total_buys: 2,         // incluye el swap
-        total_sells: 2,        // la pérdida no es una venta
-        total_sold: 58,
-        total_manual: 1,
-        total_fee_ops: 4,      // 3 comisiones en columna + 1 fila FEE_EXCHANGE
-        fees_sin_valor: 0,
+      const t = res.body.totals;
+      expect(t).toMatchObject({
+        ops: 11, unique_assets: 8, manual: 1,
+        fiat_buys: 1, invested: { EUR: 100 },   // solo compras pagadas con fiat
+        sells: 2, sold: { EUR: 58 },             // la pérdida no es una venta
+        income_ops: 0, income: { EUR: 0, USD: 0 },
+        fee_ops: 4, fees_sin_valor: 0,           // 3 comisiones en columna + 1 fila FEE_EXCHANGE
       });
-      expect(res.body.totals.total_fees_eur).toBeCloseTo(1 + 4 + 0.09 + 5, 8);
+      expect(t.fees.EUR).toBeCloseTo(1 + 4 + 0.09 + 5, 8);
+      // USD con el tipo de la fecha (USDT a 0,8 EUR en price_cache).
+      expect(t.invested.USD).toBeCloseTo(100 / 0.8, 6);
     });
 
-    it('el gráfico mensual separa ventas y otras salidas y cuadra con las tarjetas', async () => {
-      const { monthly } = (await request(app).get('/api/transactions/stats')).body;
-      const mes = monthly.find((m: { mes: string }) => m.mes === DAY.slice(0, 7));
-      expect(mes).toMatchObject({ compras: 2, ventas: 2, otras_salidas: 1, eur_invertido: 100 });
+    it.each(['', 'type=SELL', 'asset=BTC', 'value_min=50', 'wallet_id=00000000-0000-0000-0000-000000000000', 'group_fees=false'])(
+      '«Operaciones» coincide con el total de la lista (%s)', async qs => {
+        const list = (await request(app).get(`/api/transactions${qs ? `?${qs}` : ''}`)).body;
+        expect((await get(qs)).totals.ops).toBe(list.total);
+      });
+
+    it('las tarjetas siguen a los filtros', async () => {
+      expect((await get('type=SELL')).totals).toMatchObject({ ops: 2, sells: 2, sold: { EUR: 58 }, fiat_buys: 0, invested: { EUR: 0 } });
+      expect((await get('asset=BTC')).totals).toMatchObject({ ops: 2, fiat_buys: 1, invested: { EUR: 100 } });
+      expect((await get('date_from=2024-03-11&date_to=2024-03-11')).totals).toMatchObject({ ops: 1, sells: 0 });
     });
 
-    it('comisiones por activo valoradas', async () => {
-      const { fees } = (await request(app).get('/api/transactions/stats')).body;
-      const bnb = fees.find((f: { asset: string }) => f.asset === 'BNB');
-      expect(bnb).toMatchObject({ ops: 2, total_eur: 9 });
+    it('gráfico: últimos 18 meses por defecto, con todas las categorías y ventas separadas de otras salidas', async () => {
+      const { chart } = await get();
+      expect(chart.granularity).toBe('month');
+      expect(chart.buckets).toHaveLength(18);
+      const mes = chart.buckets.find((b: { periodo: string }) => b.periodo === DAY.slice(0, 7));
+      expect(mes.ops).toMatchObject({ compras: 2, ventas: 2, otras_salidas: 1, ingresos: 0 });
+      expect(mes.valor.EUR.ventas).toBe(58);
+      const total = chart.buckets.reduce((n: number, b: { ops: Record<string, number> }) => n + Object.values(b.ops).reduce((x, y) => x + y, 0), 0);
+      expect(total).toBe(10); // el depósito de 2024 queda fuera de los 18 meses
+    });
+
+    it('gráfico: el rango filtrado, por años si pasa de 36 meses', async () => {
+      const marzo = (await get('date_from=2024-03-01&date_to=2024-03-31')).chart;
+      expect(marzo).toMatchObject({ granularity: 'month', from: '2024-03-01', to: '2024-03-01' });
+      expect(marzo.buckets[0].ops.transferencias).toBe(1); // el depósito de 2024
+      const largo = (await get(`date_from=2023-01-01&date_to=${DAY}`)).chart;
+      expect(largo.granularity).toBe('year');
+      expect(largo.buckets[0].periodo).toBe('2023');
+    });
+
+    it('rankings: último año sin fechas; lo filtrado con ellas', async () => {
+      const sin = await get();
+      expect(sin.rankings_periodo).toBe('ultimo_anio');
+      expect(sin.top_assets[0]).toMatchObject({ asset: 'BTC', ops: 2 });
+      expect(sin.fees_by_asset.find((f: { asset: string }) => f.asset === 'BNB')).toMatchObject({ ops: 2, value: { EUR: 9 } });
+      const con = await get('date_from=2024-01-01&date_to=2024-12-31');
+      expect(con.rankings_periodo).toBe('filtrado');
+      expect(con.top_assets).toEqual([]);
+    });
+
+    it('ingresos: valor y número con la misma valoración que la lista', async () => {
+      const id = await tx('reward', { wallet_id: (await pool.query(`SELECT id FROM wallets WHERE name = 'Exchange test'`)).rows[0].id,
+        operation_type: 'STAKING_REWARD', timestamp: at(10), asset: 'XRP', amount: 4, amount_net: 4 });
+      try {
+        const t = (await get('type=STAKING_REWARD')).totals;
+        const fila = (await request(app).get('/api/transactions?type=STAKING_REWARD')).body.transactions[0];
+        expect(t).toMatchObject({ ops: 1, income_ops: 1, income: { EUR: Number(fila.value_eur) }, income_sin_valor: 0 });
+        expect(t.income.EUR).toBeCloseTo(2, 8); // cierre de XRP a 0,5
+      } finally {
+        await pool.query('DELETE FROM transactions WHERE id = $1', [id]);
+      }
     });
   });
 

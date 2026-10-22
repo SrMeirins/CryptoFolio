@@ -1,10 +1,10 @@
 import { useState, useRef, useCallback, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Package } from 'lucide-react'
-import type { Transaction } from '../api/portfolio'
+import { portfolioApi, type Transaction } from '../api/portfolio'
 import { ManualTxModal } from '../components/ManualTxModal'
 import { useCurrency } from '../hooks/useDisplayCurrency'
-import { useCurrencyQuery } from '../hooks/useCurrencyQuery'
-import { txStatsQuery } from '../queries/currencyQueries'
+import { statsParams } from './history/stats/statsChart'
 import { useWalletsQuery } from '../hooks/useWallets'
 import { exportCsvUrl } from './history/sorting'
 import { activeChips } from './history/filterChips'
@@ -37,8 +37,14 @@ export function History() {
   const toast = useToast()
   const wallets = useWalletsQuery()
   const currency = useCurrency()
-  // Estadísticas en la moneda de visualización; la otra se precarga (#177).
-  const { data: stats } = useCurrencyQuery(txStatsQuery)
+  // Estadísticas sobre lo filtrado (#376), en paralelo con la lista; conservan
+  // las cifras previas mientras recalculan. Traen ambas monedas.
+  const statsQueryParams = useMemo(() => statsParams(f.queryParams), [f.queryParams])
+  const { data: stats } = useQuery({
+    queryKey: ['transactions', 'estadisticas', statsQueryParams],
+    queryFn: () => portfolioApi.getHistoryStats(statsQueryParams),
+    placeholderData: prev => prev,
+  })
 
   const { total } = d
   // Panel de detalle (#373): ?tx=<id>, con Anterior/Siguiente en el orden de la lista.
@@ -106,10 +112,11 @@ export function History() {
 
       <div className="flex-1 overflow-y-auto">
         <div className="px-6 pt-4 pb-4 space-y-4">
-          {!f.hasActiveFilters && stats && (
+          {stats && (
             <>
-              <StatsBar stats={stats} />
-              <AnalyticsPanel stats={stats} onAssetClick={handleAssetClick} />
+              <StatsBar totals={stats.totals} currency={currency} filtered={f.hasActiveFilters} />
+              <AnalyticsPanel stats={stats} currency={currency} onAssetClick={handleAssetClick}
+                datesFiltered={!!(f.filters.date_from || f.filters.date_to)} />
             </>
           )}
           {d.isLoading ? (
