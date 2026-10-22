@@ -82,3 +82,32 @@ test('panel de detalle (#373): una operación relacionada se abre en el mismo pa
   await expect(page).not.toHaveURL(antes)
   await expect(dialog).toBeVisible()
 })
+
+test('estadísticas (#376): siguen a los filtros y el gráfico alterna número y valor sin pedir nada', async ({ page }) => {
+  await openHistory(page, 'dark')
+  const resumen = page.getByRole('region', { name: /Resumen/ })
+  await expect(resumen).toBeVisible()
+  await expect(resumen).not.toContainText('según los filtros')
+  const opsCard = resumen.getByText('Operaciones', { exact: true }).locator('..')
+  const total = await opsCard.locator('.mono').textContent()
+
+  // Con un filtro, las tarjetas se rotulan y cambian.
+  await page.goto('/history?tipo=SELL')
+  await expect(resumen).toContainText('según los filtros')
+  await expect(opsCard.locator('.mono')).not.toHaveText(total ?? '')
+
+  // Abrir la analítica y cambiar de modo no lanza peticiones de estadísticas.
+  const analitica = page.getByRole('button', { name: /Analítica de actividad/ })
+  if (await analitica.getAttribute('aria-expanded') === 'false') await analitica.click()
+  const peticiones: string[] = []
+  page.on('request', r => { if (r.url().includes('/historial/estadisticas')) peticiones.push(r.url()) })
+  const grupo = page.getByRole('group', { name: 'Medida del gráfico' })
+  const valor = grupo.getByRole('button', { name: 'Valor' })
+  await valor.focus()
+  await page.keyboard.press('Enter')
+  await expect(valor).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('table', { name: /Valor en (EUR|USD) por/ })).toBeAttached()
+  await grupo.getByRole('button', { name: 'Número' }).click()
+  await expect(page.getByRole('table', { name: /Operaciones por/ })).toBeAttached()
+  expect(peticiones).toEqual([])
+})

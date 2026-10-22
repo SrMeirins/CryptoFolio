@@ -5,13 +5,11 @@ import type { QueryClient } from '@tanstack/react-query'
 // página invalidaba su propio subconjunto copiado a mano, con huecos reales:
 // History.tsx no invalidaba 'fiscal-summary' (el Dashboard y la página
 // Fiscal podían quedarse con datos obsoletos tras borrar una tx desde
-// Historial) e Import.tsx no invalidaba 'tx-stats' (la barra de
-// estadísticas de Historial podía quedarse obsoleta hasta 5 min tras
-// importar, su staleTime).
+// Historial). Las estadísticas del Historial (#376) cuelgan de 'transactions'.
 // Las consultas por moneda (#177) se cachean 5 min: también se invalidan aquí
 // (el prefijo cubre las dos monedas).
 const TRANSACTION_AFFECTED_KEYS = [
-  'transactions', 'tx-stats', 'fifo-lots', 'fiscal-summary', 'eur-flow', 'daily-pnl', 'intraday-pnl', 'pnl-day', 'recent-transactions',
+  'transactions', 'fifo-lots', 'fiscal-summary', 'eur-flow', 'daily-pnl', 'intraday-pnl', 'pnl-day', 'recent-transactions',
   // Tras cambiar transacciones pueden faltar cierres nuevos (#334).
   'pnl-preparacion',
 ] as const

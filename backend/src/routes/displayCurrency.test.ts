@@ -38,9 +38,11 @@ describe('API — moneda de visualización USD (#175)', () => {
 
     const { default: fifoRouter } = await import('./fifo');
     const { default: txRouter } = await import('./transactions');
+    const { default: statsRouter } = await import('./historial/estadisticas');
     app = express();
     app.use('/api/fifo', fifoRouter);
     app.use('/api/transactions', txRouter);
+    app.use('/api/v1/historial/estadisticas', statsRouter);
   });
 
   afterAll(async () => {
@@ -99,13 +101,13 @@ describe('API — moneda de visualización USD (#175)', () => {
     expect(res.body.flows.USD.entradas).toBeCloseTo(125 + 50 + 20, 6);
   });
 
-  it('GET /transactions/stats?currency=USD convierte lo invertido', async () => {
-    const res = await request(app).get('/api/transactions/stats?currency=USD');
-    expect(res.body.currency).toBe('USD');
-    expect(Number(res.body.totals.total_invested)).toBeCloseTo(50, 6);
+  it('GET /v1/historial/estadisticas convierte lo invertido a USD con el tipo de su fecha (#376)', async () => {
+    const res = await request(app).get('/api/v1/historial/estadisticas');
+    expect(res.status).toBe(200);
+    expect(res.body.totals.invested.USD).toBeCloseTo(50, 6);
   });
 
-  it.each(['/api/fifo/eur-flow', '/api/transactions', '/api/transactions/stats'])('%s rechaza una moneda no soportada', async (path) => {
+  it.each(['/api/fifo/eur-flow', '/api/transactions', '/api/v1/historial/estadisticas'])('%s rechaza una moneda no soportada', async (path) => {
     const res = await request(app).get(`${path}?currency=GBP`);
     expect(res.status).toBe(400);
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toDisplayAmount, localDayKey, fmtDate, fmtDateGroup, calcEurValue, calcFeeEur, valuationHint, flowSign, monthlyTableRows, feeSummary } from './helpers'
+import { toDisplayAmount, localDayKey, fmtDate, fmtDateGroup, calcEurValue, calcFeeEur, valuationHint, flowSign, feeSummary } from './helpers'
 
 describe('toDisplayAmount (#177)', () => {
   it('EUR: el importe tal cual', () => {
@@ -62,14 +62,6 @@ describe('flowSign (#346)', () => {
     expect(flowSign('FEE_EXCHANGE')).toBe('−')
     expect(flowSign('TRANSFER_INTERNAL')).toBe('')
     expect(flowSign('STAKING_LOCK')).toBe('')
-  })
-})
-
-describe('monthlyTableRows (#351)', () => {
-  it('cada mes con sus categorías y «Otros» como resto del total', () => {
-    const [r] = monthlyTableRows([{ mes: '2026-09', total_ops: 10, compras: 3, ventas: 2, otras_salidas: 1, ingresos: 1, transferencias: 2 }])
-    expect(r).toMatchObject({ compras: 3, ventas: 2, otrasSalidas: 1, ingresos: 1, transferencias: 2, otros: 1, total: 10 })
-    expect(r.mes).toMatch(/sept/)
   })
 })
 
