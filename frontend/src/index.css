@@ -40,9 +40,9 @@
   --cf-negative: #f75369;
   /* Tintas de texto (#356): mismo tono, con ≥ 4,5:1 sobre las superficies y
      los fondos tenues de su propio tono (insignias, selector, fila marcada). */
-  --cf-brand-ink: #a690ff;
+  --cf-brand-ink: #aa96ff;
   --cf-positive-ink: #0ecb81;
-  --cf-negative-ink: #f96f81;
+  --cf-negative-ink: #f9798a;
   --cf-warning: #f59e0b;
   --cf-info: #4b8cf7;
   /* Translúcidos: bg-overlay/5 aclara en oscuro y oscurece en claro */

@@ -30,9 +30,9 @@ export type IconButtonSize = 'sm' | 'md'
 export type IconButtonTone = 'neutral' | 'danger' | 'positive' | 'brand'
 const ICON_TONES: Record<IconButtonTone, string> = {
   neutral: 'text-fg-subtle hover:text-fg hover:bg-overlay/5',
-  danger: 'text-fg-subtle hover:text-negative hover:bg-negative/10',
-  positive: 'text-positive hover:bg-positive/10',
-  brand: 'text-fg-subtle hover:text-brand hover:bg-brand/10',
+  danger: 'text-fg-subtle hover:text-negative-ink hover:bg-negative/10',
+  positive: 'text-positive-ink hover:bg-positive/10',
+  brand: 'text-fg-subtle hover:text-brand-ink hover:bg-brand/10',
 }
 export function iconButtonClasses(size: IconButtonSize = 'md', active = false, extra = '', tone: IconButtonTone = 'neutral'): string {
   return twMerge([
@@ -101,7 +101,7 @@ export function tabClasses(active: boolean, variant: TabsVariant = 'pill'): stri
   if (variant === 'underline') {
     return `${base} px-5 py-2.5 text-sm border-b-2 -mb-px ${active ? 'border-brand text-fg' : 'border-transparent text-fg-subtle hover:text-fg'}`
   }
-  return `${base} px-2.5 py-1 text-xs rounded-lg ${active ? 'bg-brand/15 text-brand' : 'text-fg-subtle hover:text-fg'}`
+  return `${base} px-2.5 py-1 text-xs rounded-lg ${active ? 'bg-brand/15 text-brand-ink' : 'text-fg-subtle hover:text-fg'}`
 }
 export const tabId = (idBase: string, value: string) => `${idBase}-tab-${value}`
 export const tabPanelId = (idBase: string) => `${idBase}-panel`

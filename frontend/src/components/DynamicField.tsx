@@ -19,7 +19,7 @@ export function DynamicField({ field, value, onChange }: {
         {field.required
           ? <span className="text-negative text-xs">requerido</span>
           : field.auto
-          ? <span className="flex items-center gap-0.5 text-brand bg-brand/10 px-1.5 py-0.5 rounded-lg text-xs">
+          ? <span className="flex items-center gap-0.5 text-brand-ink bg-brand/10 px-1.5 py-0.5 rounded-lg text-xs">
               <Zap size={8} /> auto
             </span>
           : <span className="text-fg-subtle text-xs">opcional</span>

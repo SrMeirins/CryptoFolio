@@ -10,8 +10,8 @@ import { WINDOW_LABELS, type ChipTone, type ChipWindow } from '../utils/windowCh
 const ICONS: Record<ChipWindow, typeof Sun> = { today: Sun, '24h': Clock }
 
 const FRAMES: Record<ChipTone, string> = {
-  positive: 'bg-positive/8 border-positive/25 text-positive',
-  negative: 'bg-negative/8 border-negative/25 text-negative',
+  positive: 'bg-positive/8 border-positive/25 text-positive-ink',
+  negative: 'bg-negative/8 border-negative/25 text-negative-ink',
   neutral: 'border-border text-fg-subtle',
 }
 

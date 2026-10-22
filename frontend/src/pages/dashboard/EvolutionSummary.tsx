@@ -16,8 +16,8 @@ const signedMoney = (n: number, currency: Currency) => `${n >= 0 ? '+' : ''}${fo
 const ICONS: Record<TileId, typeof TrendingUp> = { best: TrendingUp, worst: TrendingDown, drawdown: ArrowDownRight }
 
 const TONES: Record<TileTone, { text: string; icon: string; badge: string }> = {
-  positive: { text: 'text-positive', icon: 'bg-positive/12 text-positive', badge: 'bg-positive/10 text-positive' },
-  negative: { text: 'text-negative', icon: 'bg-negative/12 text-negative', badge: 'bg-negative/10 text-negative' },
+  positive: { text: 'text-positive', icon: 'bg-positive/12 text-positive-ink', badge: 'bg-positive/10 text-positive-ink' },
+  negative: { text: 'text-negative', icon: 'bg-negative/12 text-negative-ink', badge: 'bg-negative/10 text-negative-ink' },
   neutral: { text: 'text-fg-subtle', icon: 'bg-overlay/6 text-fg-subtle', badge: 'bg-overlay/6 text-fg-subtle' },
 }
 
@@ -83,7 +83,7 @@ export function EvolutionSummary({ summary, currency, intraday, mode, valueChang
         <div className="flex items-center gap-x-3 gap-y-1 flex-wrap" aria-live="polite">
           {summary && headline !== null && (
             <p className="flex items-baseline gap-2 flex-wrap">
-              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg mono text-sm font-bold leading-none ${positive ? 'bg-positive/12 text-positive' : 'bg-negative/12 text-negative'}`}>
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg mono text-sm font-bold leading-none ${positive ? 'bg-positive/12 text-positive-ink' : 'bg-negative/12 text-negative-ink'}`}>
                 <span aria-hidden="true">{positive ? '▲' : '▼'}</span>
                 {mode === 'value' ? signedMoney(valueChange ?? 0, currency) : formatPercent(summary.pct, 2, true)}
               </span>

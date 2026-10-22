@@ -20,9 +20,9 @@ export function truncateAddress(addr: string) {
 }
 
 export const SYNC_BADGE: Record<'ok' | 'discrepancy' | 'error' | 'pending', { label: string; className: string }> = {
-  ok:          { label: 'Verificado', className: 'bg-positive/15 text-positive' },
+  ok:          { label: 'Verificado', className: 'bg-positive/15 text-positive-ink' },
   discrepancy: { label: 'Revisar',    className: 'bg-warning/15 text-warning' },
-  error:       { label: 'Sin conexión', className: 'bg-negative/15 text-negative' },
+  error:       { label: 'Sin conexión', className: 'bg-negative/15 text-negative-ink' },
   pending:     { label: 'Pendiente',  className: 'bg-overlay/30 text-fg-subtle' },
 }
 

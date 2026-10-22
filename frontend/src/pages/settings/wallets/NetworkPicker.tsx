@@ -31,7 +31,7 @@ export function NetworkPicker({ networks, value, onChange }: {
           ? <span className="flex-1 text-sm font-medium text-fg">Añadir manualmente</span>
           : <>
               <span className="flex-1 text-sm font-medium text-fg">{selectedNetwork?.name}</span>
-              <span className="text-xs mono px-2 py-0.5 rounded-lg bg-brand/15 text-brand">{selectedNetwork?.native_asset}</span>
+              <span className="text-xs mono px-2 py-0.5 rounded-lg bg-brand/15 text-brand-ink">{selectedNetwork?.native_asset}</span>
             </>
         }
         <span className="text-xs text-fg-subtle group-hover:text-fg-muted">Cambiar</span>
@@ -65,7 +65,7 @@ export function NetworkPicker({ networks, value, onChange }: {
                     isSelected ? 'border-brand bg-brand/8' : 'border-transparent hover:border-border hover:bg-overlay/4'
                   }`}>
                   <span className={`flex-1 text-sm ${isSelected ? 'text-fg font-medium' : 'text-fg group-hover:text-fg'}`}>{n.name}</span>
-                  <span className={`text-xs mono px-2 py-0.5 rounded-lg ${isSelected ? 'bg-brand/20 text-brand' : 'bg-background-tertiary text-fg-subtle'}`}>
+                  <span className={`text-xs mono px-2 py-0.5 rounded-lg ${isSelected ? 'bg-brand/20 text-brand-ink' : 'bg-background-tertiary text-fg-subtle'}`}>
                     {n.native_asset}
                   </span>
                   {isSelected && <Check size={13} className="text-brand shrink-0" />}
@@ -77,7 +77,7 @@ export function NetworkPicker({ networks, value, onChange }: {
       <div className="p-2 border-t border-border bg-background-tertiary/40">
         <button type="button" onClick={() => select(OTHER_NETWORK)}
           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all text-left ${
-            isCustom ? 'border-brand/50 bg-brand/10 text-brand'
+            isCustom ? 'border-brand/50 bg-brand/10 text-brand-ink'
                      : 'border-dashed border-border text-fg-subtle hover:border-fg-subtle hover:text-fg hover:bg-overlay/4'
           }`}>
           <div className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 ${isCustom ? 'border-brand text-brand' : 'border-border text-fg-subtle'}`}>

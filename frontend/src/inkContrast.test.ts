@@ -102,7 +102,7 @@ describe('ink(): texto de categoría legible en ambos temas (#199)', () => {
 
 // Tintas de texto de tono (#356): --cf-{brand,positive,negative}-ink sobre las
 // superficies del tema y sobre los fondos tenues de su propio tono (insignias
-// bg-*/10–12, indicador del selector bg-brand/15), en ambos temas.
+// bg-*/8–20, indicador del selector bg-brand/15), en ambos temas.
 describe('tintas de tono: ≥ 4,5:1 sobre superficies y tintes de su tono (#356)', () => {
   const TONES = ['brand', 'positive', 'negative'] as const
   for (const [theme, block] of Object.entries(THEMES)) {
@@ -114,7 +114,7 @@ describe('tintas de tono: ≥ 4,5:1 sobre superficies y tintes de su tono (#356)
         const fallos: string[] = []
         for (const bg of BACKGROUNDS) {
           const surface = hexVar(block, bg)
-          for (const fondo of [surface, mix(base, surface, 10), mix(base, surface, 12), mix(base, surface, 15)]) {
+          for (const fondo of [surface, mix(base, surface, 10), mix(base, surface, 12), mix(base, surface, 15), mix(base, surface, 20)]) {
             const ratio = contrastRatio(ink, fondo)
             if (ratio < 4.5) fallos.push(`${ink} sobre ${fondo}: ${ratio.toFixed(2)}`)
           }

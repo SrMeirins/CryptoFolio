@@ -160,9 +160,9 @@ export function AssetsSection() {
               <button key={f.value} type="button" aria-pressed={activo} title={f.title}
                 onClick={() => { setFiltro(f.value); setPage(0) }}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
-                  activo ? 'border-brand bg-brand/10 text-brand' : 'border-border text-fg-muted hover:text-fg'}`}>
+                  activo ? 'border-brand bg-brand/10 text-brand-ink' : 'border-border text-fg-muted hover:text-fg'}`}>
                 {f.label}
-                <span className={`mono text-[10px] px-1 rounded ${f.value === 'sin_precio' && n > 0 ? 'bg-negative/15 text-negative' : 'bg-overlay/10'}`}>{n}</span>
+                <span className={`mono text-[10px] px-1 rounded ${f.value === 'sin_precio' && n > 0 ? 'bg-negative/15 text-negative-ink' : 'bg-overlay/10'}`}>{n}</span>
               </button>
             )
           })}

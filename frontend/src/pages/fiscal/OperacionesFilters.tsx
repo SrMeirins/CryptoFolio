@@ -8,8 +8,8 @@ import type { FiscalTone } from '../../utils/fiscalTable'
 
 const RESULTS: { value: ResultFilter; label: string; on: string }[] = [
   { value: 'all', label: 'Todos', on: 'bg-overlay/10 text-fg' },
-  { value: 'gain', label: '▲ Ganancias', on: 'bg-positive/20 text-positive' },
-  { value: 'loss', label: '▼ Pérdidas', on: 'bg-negative/20 text-negative' },
+  { value: 'gain', label: '▲ Ganancias', on: 'bg-positive/20 text-positive-ink' },
+  { value: 'loss', label: '▼ Pérdidas', on: 'bg-negative/20 text-negative-ink' },
 ]
 
 const chip = (on: boolean) =>

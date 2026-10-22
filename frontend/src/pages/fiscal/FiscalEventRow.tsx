@@ -8,10 +8,10 @@ import { tableRowClasses } from '../../components/ui'
 
 // Color del tipo de operación (#295): el texto también lo dice, el color solo refuerza.
 const TONE_CLASS: Record<FiscalTone, string> = {
-  sale:   'bg-brand/10 text-brand',
+  sale:   'bg-brand/10 text-brand-ink',
   swap:   'bg-accent-purple/10 text-accent-purple',
   fee:    'bg-warning/10 text-warning',
-  loss:   'bg-negative/10 text-negative',
+  loss:   'bg-negative/10 text-negative-ink',
   margin: 'bg-overlay/8 text-fg-muted',
   other:  'bg-background-tertiary text-fg-muted',
 }

@@ -89,7 +89,7 @@ export function Tooltip({ label, children, direction = 'down', trigger, triggerL
       ) : (
         <button {...triggerProps}
           className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[11px] font-semibold cursor-default select-none transition-all duration-150 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
-            open ? 'bg-brand/20 text-brand border border-brand/50' : 'bg-overlay/5 text-fg-subtle border border-overlay/10 hover:border-overlay/20 hover:text-fg-muted'
+            open ? 'bg-brand/20 text-brand-ink border border-brand/50' : 'bg-overlay/5 text-fg-subtle border border-overlay/10 hover:border-overlay/20 hover:text-fg-muted'
           }`}>
           ?
         </button>

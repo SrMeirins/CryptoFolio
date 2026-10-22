@@ -113,7 +113,7 @@ export function TxRow({
           <div className="flex items-center gap-1.5">
             <OpChip type={tx.operation_type} />
             {tx.manually_added && (
-              <span className="text-xs px-1 py-0.5 rounded-lg bg-brand/15 text-brand font-bold shrink-0" title="Añadida manualmente">
+              <span className="text-xs px-1 py-0.5 rounded-lg bg-brand/15 text-brand-ink font-bold shrink-0" title="Añadida manualmente">
                 <span aria-hidden="true">M</span><span className="sr-only">Añadida manualmente</span>
               </span>
             )}

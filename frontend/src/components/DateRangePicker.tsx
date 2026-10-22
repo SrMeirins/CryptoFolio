@@ -166,7 +166,7 @@ export function DateRangePicker({ from, to, onChange, placeholder = 'Rango de fe
           del disparador (un botón dentro de otro no es HTML válido). */}
       <div className={`flex items-center rounded-lg text-xs border transition-all ${
         hasRange
-          ? 'bg-brand/10 border-brand/40 text-brand'
+          ? 'bg-brand/10 border-brand/40 text-brand-ink'
           : 'bg-background-tertiary border-border text-fg-muted hover:border-fg-subtle hover:text-fg'
       }`}>
         <button
@@ -213,7 +213,7 @@ export function DateRangePicker({ from, to, onChange, placeholder = 'Rango de fe
                   onClick={s.f}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     isActive
-                      ? 'bg-brand/20 text-brand border border-brand/30'
+                      ? 'bg-brand/20 text-brand-ink border border-brand/30'
                       : 'bg-overlay/5 text-fg-muted hover:bg-overlay/8 hover:text-fg border border-transparent'
                   }`}
                 >

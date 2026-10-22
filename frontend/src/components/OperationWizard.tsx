@@ -50,9 +50,9 @@ const CATEGORY_COLORS: Record<string, string> = {
 // Mismos tonos que badgeClasses (#199); antes el gris era bg-overlay/50 y
 // quedaba casi blanco con texto claro en el tema oscuro.
 const BADGE_COLORS: Record<string, string> = {
-  green: 'bg-positive/12 text-positive',
-  red:   'bg-negative/12 text-negative',
-  blue:  'bg-brand/12 text-brand',
+  green: 'bg-positive/12 text-positive-ink',
+  red:   'bg-negative/12 text-negative-ink',
+  blue:  'bg-brand/12 text-brand-ink',
   gray:  'bg-overlay/8 text-fg-muted',
   amber: 'bg-warning/12 text-warning',
 }

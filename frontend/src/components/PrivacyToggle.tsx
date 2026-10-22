@@ -13,7 +13,7 @@ export function PrivacyToggle() {
       triggerLabel={hidden ? 'Mostrar importes' : 'Ocultar importes'}
       onActivate={toggle}
       triggerClassName={`inline-flex items-center justify-center size-8 rounded-lg border transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
-        hidden ? 'border-brand/40 bg-brand/12 text-brand' : 'border-border text-fg-subtle hover:text-fg hover:bg-background-tertiary'
+        hidden ? 'border-brand/40 bg-brand/12 text-brand-ink' : 'border-border text-fg-subtle hover:text-fg hover:bg-background-tertiary'
       }`}
       trigger={hidden ? <EyeOff size={15} aria-hidden="true" /> : <Eye size={15} aria-hidden="true" />}>
       <p>{hidden ? 'Importes y cantidades ocultos.' : 'Oculta importes y cantidades para compartir pantalla.'}</p>

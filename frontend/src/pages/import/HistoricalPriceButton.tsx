@@ -41,7 +41,7 @@ export function HistoricalPriceButton({ asset, timestamp, onPrice, label = 'Prec
       onClick={fetch_}
       disabled={state === 'loading'}
       title="Precio de mercado en esa fecha — puede no coincidir con lo que pagaste realmente en el exchange de origen. Corrígelo si sabes tu coste real."
-      className="text-xs px-2 py-1 rounded-lg border border-brand/30 text-brand bg-brand/5 hover:bg-brand/15 transition-colors disabled:opacity-50 flex items-center gap-1"
+      className="text-xs px-2 py-1 rounded-lg border border-brand/30 text-brand-ink bg-brand/5 hover:bg-brand/15 transition-colors disabled:opacity-50 flex items-center gap-1"
     >
       {state === 'loading' ? <RefreshCw size={9} className="animate-spin" /> : <Zap size={9} />}
       {label}

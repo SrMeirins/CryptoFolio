@@ -76,7 +76,7 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
           <p className="flex items-center gap-2 mt-0.5 mono tabular-nums text-sm">
             <span className="text-fg">{hasPrice ? formatPrice(price, currency) : 'Sin precio'}</span>
             {change24h !== null && (
-              <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md border ${change24h >= 0 ? 'text-positive bg-positive/8 border-positive/25' : 'text-negative bg-negative/8 border-negative/25'}`}>
+              <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md border ${change24h >= 0 ? 'text-positive-ink bg-positive/8 border-positive/25' : 'text-negative-ink bg-negative/8 border-negative/25'}`}>
                 <span className="font-medium">24 h</span> {change24h >= 0 ? '▲' : '▼'} {formatPercent(change24h, 2, true)}
               </span>
             )}
@@ -209,7 +209,7 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
                   </time>
                   <span className="truncate max-w-full" style={{ color: ink(l.walletColor) }}>{l.walletName}</span>
                   {l.next && (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-brand/12 text-brand shrink-0"
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-brand/12 text-brand-ink shrink-0"
                       title="Es el primero que se vendería en esta wallet (FIFO)">Siguiente</span>
                   )}
                 </div>

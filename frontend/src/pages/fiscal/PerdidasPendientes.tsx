@@ -11,7 +11,7 @@ import type { Carryforward } from './types'
 const ESTADO: Record<OrigenView['estado'], { label: string; cls: string }> = {
   'caduca-este-anio': { label: 'caduca este año', cls: 'bg-warning/15 text-warning' },
   vigente: { label: 'vigente', cls: 'bg-info/10 text-info' },
-  agotada: { label: 'compensada', cls: 'bg-positive/10 text-positive' },
+  agotada: { label: 'compensada', cls: 'bg-positive/10 text-positive-ink' },
   caducada: { label: 'caducada', cls: 'bg-overlay/8 text-fg-subtle' },
 }
 

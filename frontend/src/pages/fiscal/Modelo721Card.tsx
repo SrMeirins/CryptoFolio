@@ -19,9 +19,9 @@ import type { Modelo721 } from './types'
 // exchange desplegable, autocustodia resumida (no computa) y exportación.
 
 const STATUS_CLASS = {
-  obligatorio: 'bg-negative/10 border-negative/25 text-negative',
+  obligatorio: 'bg-negative/10 border-negative/25 text-negative-ink',
   incompleto: 'bg-warning/10 border-warning/25 text-warning',
-  'sin-obligacion': 'bg-positive/10 border-positive/25 text-positive',
+  'sin-obligacion': 'bg-positive/10 border-positive/25 text-positive-ink',
 } as const
 
 function ExchangeRow({ g, total }: { g: ExchangeGroup; total: number }) {

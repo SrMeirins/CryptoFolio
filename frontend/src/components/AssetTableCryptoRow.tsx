@@ -156,8 +156,8 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                 <span title="Variación respecto al precio de hace 24 horas"
                   className={`inline-flex items-center gap-1 text-[11px] leading-none font-semibold px-1.5 py-0.5 rounded-md border ${
                   change24h >= 0
-                    ? 'text-positive bg-positive/8 border-positive/25'
-                    : 'text-negative bg-negative/8 border-negative/25'
+                    ? 'text-positive-ink bg-positive/8 border-positive/25'
+                    : 'text-negative-ink bg-negative/8 border-negative/25'
                 }`}>
                   <span className="font-medium">24 h</span>
                   <span aria-hidden="true">{change24h >= 0 ? '▲' : '▼'}</span>
