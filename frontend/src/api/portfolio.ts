@@ -333,6 +333,38 @@ export interface GroupedFee {
   value_source: ValuationSource
 }
 
+/** Detalle con trazabilidad de una transacción (#373). */
+export interface TransactionDetail {
+  transaction: Transaction
+  fifo: {
+    /** De dónde salen sus unidades: lotes que consume. */
+    consumed: {
+      id: string; lot_id: string; asset: string; wallet_name: string; opened_at: string
+      origin: { id: string; operation_type: string; timestamp: string }
+      quantity: number | null; cost_eur: number | null; proceeds_eur: number | null; gain_loss_eur: number | null
+      fiscal_event_type: 'GAIN' | 'LOSS' | 'NONE'
+    }[]
+    /** Totales de los consumos con efecto fiscal. */
+    totals: { cost_eur: number; proceeds_eur: number; gain_loss_eur: number }
+    /** Adónde van: lotes que abre y quién los consumió después. */
+    opened: {
+      id: string; asset: string; wallet_name: string; opened_at: string; is_closed: boolean
+      quantity_original: number | null; quantity_remaining: number | null; price_per_unit_eur: number | null; fee_eur: number | null
+      consumed_by: {
+        transaction_id: string; operation_type: string; timestamp: string
+        quantity: number | null; proceeds_eur: number | null; gain_loss_eur: number | null; fiscal_event_type: 'GAIN' | 'LOSS' | 'NONE'
+      }[]
+    }[]
+  }
+  origin: {
+    import: { id: string; filename: string; exchange: string; imported_at: string } | null
+    /** Filas del archivo que agrupa la transacción (p. ej. fills parciales). */
+    source_rows: number
+  }
+  onchain: { tx_hash: string | null; address: string | null; network: string | null; tx_url: string | null; address_url: string | null }
+  fiscal_years: number[]
+}
+
 /** Vista guardada del Historial (#369): filtros y orden con los nombres de la API. */
 export interface SavedView {
   id: string
@@ -583,6 +615,8 @@ export const portfolioApi = {
     }>(`/transactions${qs}`)
   },
   getTransactionFacets: () => api.get<TransactionFacets>('/transactions/facets'),
+  // Detalle con trazabilidad de una transacción (#373).
+  getTransactionDetail: (id: string) => api.get<TransactionDetail>(`/v1/transactions/${encodeURIComponent(id)}/detalle`),
   // Vistas guardadas del Historial (#369).
   getSavedViews: () => api.get<{ vistas: SavedView[] }>('/v1/historial/vistas'),
   createSavedView: (body: { nombre: string; predeterminada: boolean; filtros: Record<string, string>; sustituir?: boolean }) =>

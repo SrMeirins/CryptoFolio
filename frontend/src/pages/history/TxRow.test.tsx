@@ -2,34 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Transaction } from '../../api/portfolio'
+import { makeTx } from '../../test/fixtures/transaction'
 import { TxRow } from './TxRow'
 
 // Render estático (sin DOM ni efectos) de una fila del Historial (#346).
-function tx(overrides: Partial<Transaction>): Transaction {
-  return {
-    id: '00000000-0000-0000-0000-000000000001',
-    operation_type: 'WITHDRAW',
-    timestamp: '2026-01-15T10:30:00.000Z',
-    asset: 'XRP', amount: '10', amount_net: '10',
-    cost_asset: null, cost_amount: null, price_per_unit: null,
-    fee_asset: null, fee_amount: null,
-    wallet_id: '00000000-0000-0000-0000-000000000002', wallet_name: 'Exchange', wallet_color: '#000000', wallet_kind: 'exchange',
-    account: null, notes: null, manually_added: false, created_at: '2026-01-15T10:30:00.000Z',
-    destination_wallet_id: null, destination_wallet_name: null, destination_wallet_color: null,
-    linked_tx_id: null, linked_tx_timestamp: null, linked_tx_operation_type: null, linked_tx_amount: null, linked_tx_asset: null,
-    import_id: null, import_filename: null, tx_hash: null, grouped_fees: [], fee_parent_id: null,
-    value_eur: 5, value_source: 'estimado', fee_value_eur: null, fee_value_source: null,
-    usd_per_eur: 1.1,
-    ...overrides,
-  }
-}
+const tx = makeTx
 
-function render(t: Transaction, currency: 'EUR' | 'USD' = 'EUR'): string {
+function render(t: Transaction, currency: 'EUR' | 'USD' = 'EUR', selected = false): string {
   const client = new QueryClient()
   return renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <table><tbody>
-        <TxRow tx={t} currency={currency} onDelete={() => {}} onEdit={() => {}} isDeleting={false} searchTerm="" />
+        <TxRow tx={t} currency={currency} onDelete={() => {}} onEdit={() => {}} onOpen={() => {}} onPrefetch={() => {}}
+          isDeleting={false} searchTerm="" selected={selected} />
       </tbody></table>
     </QueryClientProvider>,
   )
@@ -67,16 +52,15 @@ describe('TxRow (#346)', () => {
 })
 
 describe('TxRow — accesibilidad (#351)', () => {
-  it('el botón de detalle anuncia su estado (aria-expanded) y controla la fila de detalle', () => {
-    const cerrada = render(tx({}))
-    expect(cerrada).toMatch(/aria-expanded="false"[^>]*aria-label="Expandir detalle"/)
-    const abierta = renderToStaticMarkup(
-      <QueryClientProvider client={new QueryClient()}><table><tbody>
-        <TxRow tx={tx({})} currency="EUR" onDelete={() => {}} onEdit={() => {}} isDeleting={false} searchTerm="" defaultExpanded />
-      </tbody></table></QueryClientProvider>,
-    )
-    expect(abierta).toContain('aria-expanded="true" aria-controls="tx-detalle-00000000-0000-0000-0000-000000000001"')
-    expect(abierta).toContain('id="tx-detalle-00000000-0000-0000-0000-000000000001"')
+  it('el botón «Ver detalle» anuncia que abre un diálogo (#373)', () => {
+    const html = render(tx({}))
+    expect(html).toMatch(/aria-haspopup="dialog"[^>]*aria-label="Ver detalle"/)
+    expect(html).not.toContain('aria-expanded')
+  })
+
+  it('la fila con el detalle abierto se marca con aria-current (#373)', () => {
+    expect(render(tx({}), 'EUR', true)).toContain('aria-current="true"')
+    expect(render(tx({}))).not.toContain('aria-current')
   })
 
   it('la insignia «M» tiene nombre accesible', () => {
@@ -101,25 +85,5 @@ describe('TxRow — comisiones agrupadas (#371)', () => {
     const html = render(tx({ operation_type: 'SELL', value_source: 'fifo', grouped_fees: fees }))
     expect(html).toContain('3,50')
     expect(html).toContain('+2 comisiones')
-  })
-
-  it('el detalle desglosa cada comisión', () => {
-    const html = renderToStaticMarkup(
-      <QueryClientProvider client={new QueryClient()}><table><tbody>
-        <TxRow tx={tx({ operation_type: 'SELL', grouped_fees: fees })} currency="EUR" onDelete={() => {}} onEdit={() => {}} isDeleting={false} searchTerm="" defaultExpanded />
-      </tbody></table></QueryClientProvider>,
-    )
-    expect(html).toContain('Comisiones de esta operación')
-    expect(html).toContain('0,01 BNB')
-  })
-
-  it('una comisión suelta indica su operación', () => {
-    const html = renderToStaticMarkup(
-      <QueryClientProvider client={new QueryClient()}><table><tbody>
-        <TxRow tx={tx({ operation_type: 'FEE_EXCHANGE', fee_parent_id: 'abc-123' })} currency="EUR" onDelete={() => {}} onEdit={() => {}} isDeleting={false} searchTerm="" defaultExpanded />
-      </tbody></table></QueryClientProvider>,
-    )
-    expect(html).toContain('Comisión de')
-    expect(html).toContain('abc-123')
   })
 })

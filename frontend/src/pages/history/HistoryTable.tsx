@@ -11,14 +11,17 @@ import { TxRow } from './TxRow'
 // Tabla del Historial (#351): cabeceras ordenables, grupos por día local
 // (solo ordenando por fecha) y filas de transacción.
 
-export function HistoryTable({ transactions, sort, onSort, currency, searchTerm, focusTx, deletingId, onDelete, onEdit, skipLink }: {
+export function HistoryTable({ transactions, sort, onSort, currency, searchTerm, selectedId, deletingId, onOpen, onPrefetch, onDelete, onEdit, skipLink }: {
   transactions: Transaction[]
   sort: SortState
   onSort: (col: SortKey) => void
   currency: Currency
   searchTerm: string
-  focusTx: string | null
+  /** Transacción con el panel de detalle abierto (#373). */
+  selectedId: string | null
   deletingId: string | null
+  onOpen: (id: string) => void
+  onPrefetch: (id: string) => void
   onDelete: (id: string) => void
   onEdit: (tx: Transaction) => void
   /** Enlace «Saltar a la paginación», si hay más de una página. */
@@ -73,8 +76,8 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
                 </tr>
               )}
               {txs.map(tx => (
-                <TxRow key={tx.id} tx={tx} onDelete={onDelete} onEdit={onEdit} isDeleting={deletingId === tx.id}
-                  searchTerm={searchTerm} currency={currency} defaultExpanded={tx.id === focusTx} />
+                <TxRow key={tx.id} tx={tx} onDelete={onDelete} onEdit={onEdit} onOpen={onOpen} onPrefetch={onPrefetch}
+                  isDeleting={deletingId === tx.id} searchTerm={searchTerm} currency={currency} selected={tx.id === selectedId} />
               ))}
             </Fragment>
           ))}

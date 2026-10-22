@@ -23,7 +23,8 @@ export function useHistoryFilters() {
   const [searchInput, setSearchInput] = useState(initial.filters.search)
   const [sort, setSort] = useState<SortState>(initial.sort)
   const [page, setPage] = useState(initial.page)
-  // ?tx=<id> (enlace desde el Dashboard, #237) se conserva hasta el primer cambio.
+  // ?tx=<id>: transacción con el panel de detalle abierto (#373; enlace desde el
+  // Dashboard, #237). Se cierra al cambiar filtros, orden o página.
   const [focusTx, setFocusTx] = useState<string | null>(params.get('tx'))
   const lastWritten = useRef(params.toString())
   // Abierto sin parámetros: solo entonces se aplica la vista predeterminada (#369).
@@ -79,7 +80,8 @@ export function useHistoryFilters() {
     setFocusTx(null)
   }, [])
   const setDateRange = useCallback((from: string, to: string) => patchFilters({ date_from: from, date_to: to }), [patchFilters])
-  const setOffset = useCallback((offset: number) => { setPage(Math.floor(offset / PAGE_SIZE) + 1); setFocusTx(null) }, [])
+  /** Cambia de página; `tx` mantiene abierto el detalle de esa transacción (Anterior/Siguiente, #373). */
+  const setOffset = useCallback((offset: number, tx: string | null = null) => { setPage(Math.floor(offset / PAGE_SIZE) + 1); setFocusTx(tx) }, [])
   const clearImport = useCallback(() => patchFilters({ import_id: '' }), [patchFilters])
   const clearFilters = useCallback(() => {
     setFilters(EMPTY_FILTERS); setSearchInput(''); setSort(DEFAULT_SORT); setPage(1); setFocusTx(null)
@@ -97,5 +99,6 @@ export function useHistoryFilters() {
     filters, searchInput, sort, page, offset, queryParams, focusTx, startedEmpty,
     hasActiveFilters: anyFilter(filters),
     setFilter, patchFilters, setSearchInput, setDateRange, setOffset, clearImport, clearFilters, toggleSort, applyState,
+    openTx: setFocusTx,
   }
 }
