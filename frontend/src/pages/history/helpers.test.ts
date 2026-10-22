@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toDisplayAmount, localDayKey, fmtDate, fmtDateGroup, calcEurValue, calcFeeEur, valuationHint, flowSign, monthlyTableRows } from './helpers'
+import { toDisplayAmount, localDayKey, fmtDate, fmtDateGroup, calcEurValue, calcFeeEur, valuationHint, flowSign, monthlyTableRows, feeSummary } from './helpers'
 
 describe('toDisplayAmount (#177)', () => {
   it('EUR: el importe tal cual', () => {
@@ -70,5 +70,25 @@ describe('monthlyTableRows (#351)', () => {
     const [r] = monthlyTableRows([{ mes: '2026-09', total_ops: 10, compras: 3, ventas: 2, otras_salidas: 1, ingresos: 1, transferencias: 2 }])
     expect(r).toMatchObject({ compras: 3, ventas: 2, otrasSalidas: 1, ingresos: 1, transferencias: 2, otros: 1, total: 10 })
     expect(r.mes).toMatch(/sept/)
+  })
+})
+
+describe('feeSummary (#371)', () => {
+  const base = { fee_amount: '0.1', fee_value_eur: 2, fee_value_source: 'fifo' as const, usd_per_eur: 1.1, grouped_fees: [] }
+  const g = (value_eur: number | null, value_source: 'fifo' | 'estimado' | 'sin_precio' = 'fifo') =>
+    ({ id: String(Math.random()), asset: 'BNB', amount: '0.01', value_eur, value_source })
+
+  it('suma la comisión propia y las agrupadas', () => {
+    expect(feeSummary({ ...base, grouped_fees: [g(3), g(5)] }, 'EUR')).toEqual({ count: 3, total: 10, missing: 0, estimated: false })
+  })
+
+  it('en USD con el tipo de la fecha; sin tipo, cuentan como sin precio', () => {
+    expect(feeSummary({ ...base, grouped_fees: [g(3)] }, 'USD').total).toBeCloseTo(5.5, 10)
+    expect(feeSummary({ ...base, usd_per_eur: null, grouped_fees: [g(3)] }, 'USD')).toMatchObject({ total: null, missing: 2 })
+  })
+
+  it('sin comisión propia, solo las agrupadas; marca estimadas y sin precio', () => {
+    const s = feeSummary({ ...base, fee_amount: null, fee_value_eur: null, grouped_fees: [g(1, 'estimado'), g(null, 'sin_precio')] }, 'EUR')
+    expect(s).toEqual({ count: 2, total: 1, missing: 1, estimated: true })
   })
 })

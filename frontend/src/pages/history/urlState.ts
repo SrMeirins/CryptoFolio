@@ -18,6 +18,8 @@ export interface HistoryFilterState {
   /** Importes en la moneda de visualización, como texto con punto decimal. */
   value_min: string
   value_max: string
+  /** Comisiones agrupadas con su compra o venta (#371); preferencia de vista, no un filtro. */
+  groupFees: boolean
 }
 
 export interface HistoryUrlState {
@@ -29,7 +31,7 @@ export interface HistoryUrlState {
 
 export const EMPTY_FILTERS: HistoryFilterState = {
   search: '', types: [], assets: [], wallet_id: '', account: '', date_from: '', date_to: '',
-  manualOnly: false, import_id: '', value_min: '', value_max: '',
+  manualOnly: false, import_id: '', value_min: '', value_max: '', groupFees: true,
 }
 
 export const MAX_LIST = 30
@@ -73,6 +75,7 @@ export function parseHistoryUrl(params: URLSearchParams): HistoryUrlState {
     import_id: [g('importacion'), g('import')].find(v => UUID_RE.test(v ?? '')) ?? '',
     value_min: min,
     value_max: max,
+    groupFees: g('comisiones') !== 'sueltas',
   }
   // Rangos invertidos: se descarta el extremo «hasta» antes que romper la consulta.
   if (filters.date_from && filters.date_to && filters.date_from > filters.date_to) filters.date_to = ''
@@ -101,6 +104,7 @@ export function toHistoryUrl({ filters: f, sort, page }: HistoryUrlState): URLSe
   if (f.import_id) p.set('importacion', f.import_id)
   if (f.value_min) p.set('min', f.value_min)
   if (f.value_max) p.set('max', f.value_max)
+  if (!f.groupFees) p.set('comisiones', 'sueltas')
   if (sort.key !== DEFAULT_SORT.key || sort.dir !== DEFAULT_SORT.dir) { p.set('orden', sort.key); p.set('dir', sort.dir) }
   if (page > 1) p.set('pagina', String(page))
   return p
@@ -132,6 +136,7 @@ export function toApiParams(f: HistoryFilterState, sort: SortState, offset: numb
     ...(f.import_id ? { import_id: f.import_id } : {}),
     ...(f.value_min ? { value_min: f.value_min } : {}),
     ...(f.value_max ? { value_max: f.value_max } : {}),
+    ...(f.groupFees ? {} : { group_fees: 'false' }),
     sort: sort.key,
     dir: sort.dir,
     currency: ranged ? currency : 'USD',

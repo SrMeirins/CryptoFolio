@@ -9,7 +9,7 @@ export const HISTORY_CSV_HEADER = [
   'Fecha', 'Tipo', 'Activo', 'Importe', 'Coste', 'Activo coste', 'Precio unitario',
   'Comisión', 'Activo comisión', 'Valor EUR', 'Comisión EUR', 'Valor USD', 'Comisión USD',
   'Origen del valor', 'Wallet', 'Wallet destino', 'Cuenta', 'Manual', 'Notas',
-  'ID', 'Archivo de origen', 'Hash',
+  'ID', 'Archivo de origen', 'Hash', 'Operación asociada',
 ].join(';');
 
 /** Fila tal como la devuelve historyRowsSql (solo los campos que se exportan). */
@@ -35,6 +35,8 @@ export interface HistoryCsvRow {
   notes: string | null;
   import_filename: string | null;
   tx_hash: string | null;
+  /** Compra o venta a la que pertenece una comisión (#371). */
+  fee_parent_id: string | null;
 }
 
 const partsCache = new Map<string, Intl.DateTimeFormat>();
@@ -109,6 +111,7 @@ export function historyCsvLine(r: HistoryCsvRow, tz: string): string {
     r.id,
     text(r.import_filename),
     text(r.tx_hash),
+    r.fee_parent_id ?? '',
   ].join(';');
 }
 

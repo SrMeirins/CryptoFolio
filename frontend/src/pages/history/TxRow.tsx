@@ -5,11 +5,13 @@ import { CopyButton } from '../../components/CopyButton'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { formatMoney, formatAmount, type Currency, formatNumber } from '../../utils/format'
 import { OP_META } from '../../constants/operations'
-import { fmtDate, calcEurValue, calcFeeEur, formatPriceLine, toDisplayAmount, valuationHint, flowSign } from './helpers'
+import { fmtDate, calcEurValue, formatPriceLine, toDisplayAmount, valuationHint, flowSign } from './helpers'
 import { APP_TIMEZONE } from '../../constants/timezone'
 import { T, alpha, ink } from '../../utils/colors'
 import { iconButtonClasses } from '../../components/ui'
 import { DeleteConfirm } from './DeleteConfirm'
+import { FeeCell } from './FeeCell'
+import { GroupedFeesDetail } from './GroupedFeesDetail'
 
 function Highlight({ text, query }: { text: string; query: string }) {
   if (!query.trim()) return <>{text}</>
@@ -87,12 +89,10 @@ export function TxRow({
   const amountColor = sign === '+' ? 'text-positive' : sign === '−' && meta.group === 'sell' ? 'text-negative' : 'text-fg'
 
   const { date, time } = fmtDate(tx.timestamp)
-  // Valor y comisión en la moneda de visualización, con el tipo de la fecha de la operación (#177).
+  // Valor en la moneda de visualización, con el tipo de la fecha de la operación (#177).
   const eurValue = toDisplayAmount(calcEurValue(tx), tx, currency)
-  const feeEur   = toDisplayAmount(calcFeeEur(tx), tx, currency)
   const priceLine = formatPriceLine(tx)
   const valueHint = valuationHint(tx.value_source)
-  const feeHint   = valuationHint(tx.fee_value_source)
 
   return (
     <>
@@ -149,23 +149,9 @@ export function TxRow({
           {eurValue != null && priceLine && <div className="text-xs text-fg-subtle mono mt-0.5">@ {priceLine}</div>}
         </td>
 
-        {/* Fee */}
+        {/* Fee: propia y agrupadas (#371) */}
         <td className="px-3 py-2.5 align-middle">
-          {tx.fee_asset && tx.fee_amount ? (
-            <div className="flex items-center gap-1.5">
-              <CryptoIcon symbol={tx.fee_asset} size={14} />
-              <div>
-                <div className="text-xs mono text-fg-muted">
-                  {formatAmount(tx.fee_amount, 6)} <span className="text-fg-subtle text-xs">{tx.fee_asset}</span>
-                </div>
-                {feeEur != null && (
-                  <div><ValuedAmount value={feeEur} hint={feeHint} currency={currency} className="text-xs text-fg-subtle mono" /></div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <span className="text-fg-subtle text-xs">—</span>
-          )}
+          <FeeCell tx={tx} currency={currency} />
         </td>
 
         {/* Wallet */}
@@ -272,6 +258,7 @@ export function TxRow({
                   </div>
                 </div>
               )}
+              <GroupedFeesDetail tx={tx} currency={currency} />
               {tx.notes && (
                 <div className="col-span-2">
                   <div className="text-[11px] text-fg-subtle uppercase tracking-widest mb-1">Notas</div>

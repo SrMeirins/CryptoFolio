@@ -47,3 +47,14 @@ describe('estado del Historial en la URL (#366)', () => {
     expect(ranged).toMatchObject({ currency: 'EUR', value_min: '10', type: 'BUY,SELL', offset: '50' })
   })
 })
+
+describe('agrupar comisiones (#371)', () => {
+  it('activado por defecto; desactivado viaja en la URL y en la API', () => {
+    expect(parse('').filters.groupFees).toBe(true)
+    const off = { filters: { ...EMPTY_FILTERS, groupFees: false }, sort: DEFAULT_SORT, page: 1 }
+    expect(toHistoryUrl(off).toString()).toBe('comisiones=sueltas')
+    expect(parse('comisiones=sueltas').filters.groupFees).toBe(false)
+    expect(toApiParams(off.filters, DEFAULT_SORT, 0, 50, 'EUR').group_fees).toBe('false')
+    expect(toApiParams(EMPTY_FILTERS, DEFAULT_SORT, 0, 50, 'EUR')).not.toHaveProperty('group_fees')
+  })
+})

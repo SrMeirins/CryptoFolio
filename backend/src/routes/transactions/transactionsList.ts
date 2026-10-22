@@ -3,7 +3,7 @@ import { db } from '../../db/client';
 import { usdPerEurSql } from '../../modules/fiat/displayCurrency';
 import { MADRID_TZ } from '../../modules/fiscal/madridTime';
 import { historyQuerySchema } from '../../modules/history/listFilters';
-import { filteredValuedCtes, historyRowsSql } from '../../modules/history/historyQuery';
+import { filteredValuedCtes, groupingEnabled, historyRowsSql } from '../../modules/history/historyQuery';
 import { sendZodError } from './transactionsShared';
 
 const router = Router();
@@ -33,17 +33,19 @@ router.get('/', async (req: Request, res: Response) => {
 
   // Orden en el servidor (#349): se valora todo lo filtrado antes de paginar,
   // así «ordenar por valor» abarca todas las páginas.
-  const rows = historyRowsSql(filters, HISTORY_TZ, { limit: filters.limit, offset: filters.offset });
+  const grouped = groupingEnabled(filters);
+  const rows = historyRowsSql(filters, HISTORY_TZ, { limit: filters.limit, offset: filters.offset }, grouped);
   const result = await db.query(rows.sql, rows.params);
 
   // Total y flujos sobre todo lo filtrado (los mismos CTEs que la página, #366):
   // entradas y salidas por separado, en ambas monedas.
-  const { ctes, params } = filteredValuedCtes(filters, HISTORY_TZ);
+  // El recuento es de filas visibles (#371); los flujos, de todo lo filtrado.
+  const { ctes, params } = filteredValuedCtes(filters, HISTORY_TZ, grouped);
   const sumRes = await db.query(
     `WITH ${ctes},
      fx AS (SELECT f.*, ${usdPerEurSql('f.timestamp')} AS usd_per_eur FROM filtered f WHERE f.flow_direction IS NOT NULL AND f.value_eur IS NOT NULL)
      SELECT
-       (SELECT COUNT(*) FROM filtered)::int AS total,
+       (SELECT COUNT(*) FROM visible)::int AS total,
        COALESCE(SUM(value_eur) FILTER (WHERE flow_direction = 'in'), 0)::float  AS in_eur,
        COALESCE(SUM(value_eur) FILTER (WHERE flow_direction = 'out'), 0)::float AS out_eur,
        COALESCE(SUM(value_eur * usd_per_eur) FILTER (WHERE flow_direction = 'in'), 0)::float  AS in_usd,
@@ -64,6 +66,7 @@ router.get('/', async (req: Request, res: Response) => {
       USD: s.sin_tipo_usd > 0 ? null : { entradas: s.in_usd, salidas: s.out_usd },
     },
     currency: filters.currency,
+    grouped_fees: grouped,
     limit:  filters.limit,
     offset: filters.offset,
   });
