@@ -17,24 +17,25 @@ export function useHistoryData(queryParams: Record<string, string>, offset: numb
     queryKey: ['transactions', queryParams],
     // Siempre en USD: la respuesta trae los flujos en ambas monedas y el tipo
     // de cada fila, así que el cambio EUR ↔ USD no necesita otra petición (#177).
-    queryFn:  () => portfolioApi.getTransactions(queryParams, 'USD'),
+    // La moneda va en los parámetros (#366): USD salvo con rango de importe.
+    queryFn:  () => portfolioApi.getTransactions(queryParams, queryParams.currency === 'EUR' ? 'EUR' : 'USD'),
     placeholderData: prev => prev,
   })
 
   // Precarga de la página siguiente con los mismos filtros y orden (#349).
   useEffect(() => {
     if (!data || offset + PAGE_SIZE >= data.total) return
-    const next = { ...queryParams, offset: String(offset + PAGE_SIZE) }
+    const next: Record<string, string> = { ...queryParams, offset: String(offset + PAGE_SIZE) }
     void queryClient.prefetchQuery({
       queryKey: ['transactions', next],
-      queryFn:  () => portfolioApi.getTransactions(next, 'USD'),
+      queryFn:  () => portfolioApi.getTransactions(next, next.currency === 'EUR' ? 'EUR' : 'USD'),
     })
   }, [data, queryParams, offset, queryClient])
 
   // Cuentas presentes en los datos (#346).
   const { data: facets } = useQuery({ queryKey: ['transactions', 'facets'], queryFn: portfolioApi.getTransactionFacets, staleTime: 60_000 })
-  // Nombre del archivo de la importación filtrada, para la etiqueta.
-  const { data: imports = [] } = useQuery({ queryKey: ['imports'], queryFn: portfolioApi.getImports, enabled: !!importId })
+  // Archivos importados: opciones del filtro por archivo y nombre del chip (#366).
+  const { data: imports = [] } = useQuery({ queryKey: ['imports'], queryFn: portfolioApi.getImports, staleTime: 60_000 })
 
   async function deleteTx(id: string) {
     setDeletingId(id)
@@ -57,6 +58,9 @@ export function useHistoryData(queryParams: Record<string, string>, offset: numb
   return {
     data, transactions, total, isLoading, isFetching,
     accounts: facets?.accounts ?? [],
+    assets: facets?.assets ?? [],
+    presentTypes: facets?.types ?? [],
+    imports,
     importFilename: imports.find(i => i.id === importId)?.filename ?? null,
     deletingId, deleteTx,
     refresh: () => invalidateTransactionQueries(queryClient),

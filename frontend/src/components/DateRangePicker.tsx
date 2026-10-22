@@ -1,10 +1,11 @@
 import { useState, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react'
 import {
-  DAYS_ES, MONTHS_ES, today, startOfMonth, startOfYear,
+  DAYS_ES, MONTHS_ES,
   parseDate, fmtShort, getDaysInGrid, inDateRange,
 } from '../utils/date'
 import { Popover, iconButtonClasses } from './ui'
+import { appToday, datePresets } from '../utils/datePresets'
 
 interface Props {
   from:     string   // 'YYYY-MM-DD' o ''
@@ -135,7 +136,8 @@ export function DateRangePicker({ from, to, onChange, placeholder = 'Rango de fe
   }
 
   const cells    = getDaysInGrid(viewY, viewM)
-  const todayStr = today()
+  // Hoy y los atajos en días locales de la app (#366), no en la zona del navegador.
+  const todayStr = appToday()
 
   // Rango activo para preview (tmpFrom + hover mientras picking === 'to')
   const previewFrom = tmpFrom
@@ -152,12 +154,8 @@ export function DateRangePicker({ from, to, onChange, placeholder = 'Rango de fe
 
   const hasRange = !!(from || to)
 
-  const SHORTCUTS = [
-    { label: 'Hoy',    f: () => { const t = today(); applyShortcut(t, t) } },
-    { label: 'Mes',    f: () => { const n = new Date(); applyShortcut(startOfMonth(n), today()) } },
-    { label: 'Año',    f: () => { applyShortcut(startOfYear(new Date()), today()) } },
-    { label: 'Todo',   f: () => { onChange('', ''); close() } },
-  ]
+  // Atajos (#366): hoy, últimos 30 días, este mes, mes pasado, este año, año pasado y todo.
+  const presets = datePresets(todayStr).filter(p => !max || p.from <= max)
 
   return (
     <div ref={ref} className="relative">
@@ -195,29 +193,22 @@ export function DateRangePicker({ from, to, onChange, placeholder = 'Rango de fe
         ariaProps={{ role: 'dialog', 'aria-label': 'Elegir rango de fechas' }}>
         <div style={{ minWidth: 280 }}>
           {/* Atajos */}
-          <div className="flex items-center gap-1 px-3 pt-3 pb-2">
-            {SHORTCUTS.map(s => {
-              const isActive = s.label === 'Todo'
-                ? !from && !to
-                : s.label === 'Hoy'
-                  ? from === todayStr && to === todayStr
-                  : s.label === 'Mes'
-                    ? from === startOfMonth(new Date()) && to === todayStr
-                    : s.label === 'Año'
-                      ? from === startOfYear(new Date()) && to === todayStr
-                      : false
+          <div className="grid grid-cols-4 gap-1 px-3 pt-3 pb-2" role="group" aria-label="Atajos de fechas">
+            {[...presets, { id: 'todo', label: 'Todo', from: '', to: '' }].map(p => {
+              const isActive = from === p.from && to === p.to
               return (
                 <button
                   type="button"
-                  key={s.label}
-                  onClick={s.f}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  key={p.id}
+                  aria-pressed={isActive}
+                  onClick={() => { if (p.id === 'todo') { onChange('', ''); close() } else applyShortcut(p.from, max && p.to > max ? max : p.to) }}
+                  className={`py-1.5 px-1 rounded-lg text-xs font-medium transition-all focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
                     isActive
                       ? 'bg-brand/20 text-brand-ink border border-brand/30'
                       : 'bg-overlay/5 text-fg-muted hover:bg-overlay/8 hover:text-fg border border-transparent'
                   }`}
                 >
-                  {s.label}
+                  {p.label}
                 </button>
               )
             })}

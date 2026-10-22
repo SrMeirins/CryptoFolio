@@ -1,6 +1,6 @@
 import { usdPerEurSql } from '../fiat/displayCurrency';
 import { buildHistoryOrderBy, buildHistoryWhere, HistoryFilters } from './listFilters';
-import { VALUATION_COLUMNS, VALUATION_CTES, valuationJoins } from './valuationSql';
+import { FLOW_DIRECTION, VALUATION_COLUMNS, VALUATION_CTES, valuationJoins } from './valuationSql';
 
 // Consulta de filas del Historial (#346/#349), común al listado paginado y a
 // la exportación CSV: filtra, valora todo lo filtrado (para poder ordenar por
@@ -22,30 +22,52 @@ const ROW_COLUMNS = `
   t.import_id, ci.filename AS import_filename, t.tx_hash,
   t.value_eur, t.value_source, t.fee_value_eur, t.fee_value_source`;
 
+type Filters = HistoryFilters & { sort: HistoryFilters['sort']; dir: HistoryFilters['dir'] };
+
+/**
+ * CTEs con lo filtrado y valorado (#366): `filtered` trae cada transacción con
+ * su valoración y su sentido (entrada/salida). El rango de importe se aplica
+ * después de valorar, en la moneda pedida (en USD, con el tipo de su fecha);
+ * con rango, las filas sin precio quedan fuera. Lo usan la página, los totales
+ * y el CSV, así que todos respetan los mismos filtros.
+ */
+export function filteredValuedCtes(f: Filters, tz: string): { ctes: string; params: unknown[] } {
+  const { where, params } = buildHistoryWhere(f, tz);
+  const all = [...params, tz];
+  const tzParam = `$${all.length}`;
+  const ranged = f.value_min !== undefined || f.value_max !== undefined;
+  const display = f.currency === 'USD' ? `t.value_eur * (${usdPerEurSql('t.timestamp')})` : 't.value_eur';
+  const range: string[] = [];
+  if (f.value_min !== undefined) { all.push(f.value_min); range.push(`${display} >= $${all.length}`); }
+  if (f.value_max !== undefined) { all.push(f.value_max); range.push(`${display} <= $${all.length}`); }
+  const ctes = `
+    ${VALUATION_CTES},
+    valued AS (
+      SELECT t.*, ${VALUATION_COLUMNS}, ${FLOW_DIRECTION}
+      FROM transactions t ${valuationJoins(tzParam)}
+      ${where}
+    ),
+    filtered AS (
+      SELECT t.* FROM valued t
+      ${ranged ? `WHERE ${range.join(' AND ')}` : ''}
+    )`;
+  return { ctes, params: all };
+}
+
 /**
  * SQL y parámetros de las filas filtradas y ordenadas. Con `page`, añade
  * LIMIT/OFFSET como parámetros; sin él devuelve todas (para un cursor).
  */
-export function historyRowsSql(
-  f: HistoryFilters & { sort: HistoryFilters['sort']; dir: HistoryFilters['dir'] },
-  tz: string,
-  page?: { limit: number; offset: number },
-): { sql: string; params: unknown[] } {
-  const { where, params } = buildHistoryWhere(f, tz);
-  const all = [...params, tz];
-  const tzParam = `$${all.length}`;
+export function historyRowsSql(f: Filters, tz: string, page?: { limit: number; offset: number }): { sql: string; params: unknown[] } {
+  const { ctes, params } = filteredValuedCtes(f, tz);
+  const all = [...params];
   let paging = '';
   if (page) {
     all.push(page.limit, page.offset);
     paging = `LIMIT $${all.length - 1} OFFSET $${all.length}`;
   }
   const sql = `
-    WITH ${VALUATION_CTES},
-    filtered AS (
-      SELECT t.*, ${VALUATION_COLUMNS}
-      FROM transactions t ${valuationJoins(tzParam)}
-      ${where}
-    ),
+    WITH ${ctes},
     ordered AS (
       SELECT t.* FROM filtered t
       ${buildHistoryOrderBy(f.sort, f.dir)}

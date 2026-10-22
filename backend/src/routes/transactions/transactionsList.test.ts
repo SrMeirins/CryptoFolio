@@ -250,6 +250,45 @@ describe('routes/transactions — listado, stats y facetas', () => {
     });
   });
 
+  describe('GET / — filtros avanzados (#366)', () => {
+    const totalDe = async (qs: string) => (await request(app).get(`/api/transactions?${qs}`)).body.total as number;
+
+    it('varios tipos y varios activos a la vez', async () => {
+      expect(await totalDe('type=SELL,LOST')).toBe(3);        // venta, venta con faltante y pérdida
+      expect(await totalDe('asset=btc,eth')).toBe(3);         // compra y venta de BTC, swap a ETH
+    });
+
+    it('rango de importe en EUR: excluye las filas sin precio', async () => {
+      expect(await totalDe('value_min=50')).toBe(3);          // 100, 56 y 250
+      expect(await totalDe('value_max=5')).toBe(2);           // las dos de 5 €; las sin precio no entran
+    });
+
+    it('rango de importe en USD con el tipo de cada fecha (1 / 0,8)', async () => {
+      expect(await totalDe('currency=USD&value_min=125')).toBe(2);   // 100 € = 125 $ y 250 €
+    });
+
+    it('los flujos respetan el rango de importe', async () => {
+      const { flows } = (await request(app).get('/api/transactions?value_min=100')).body;
+      expect(flows.EUR).toEqual({ entradas: 350, salidas: 0 });
+    });
+
+    it('la búsqueda encuentra por hash on-chain y por nombre del archivo de origen', async () => {
+      await pool.query(`UPDATE transactions SET tx_hash = 'abcd1234ffee99' WHERE id = $1`, [ids.withdrawOwn]);
+      const imp = (await pool.query(
+        `INSERT INTO csv_imports (filename, file_hash, exchange) VALUES ('export_sintetico_2026.csv', 'hash-sintetico-366', 'binance') RETURNING id`)).rows[0].id;
+      await pool.query(`UPDATE transactions SET import_id = $1 WHERE id = $2`, [imp, ids.lost]);
+      const porHash = (await request(app).get('/api/transactions?search=FFEE99')).body.transactions;
+      expect(porHash.map((t: { id: string }) => t.id)).toEqual([ids.withdrawOwn]);
+      const porArchivo = (await request(app).get('/api/transactions?search=sintetico_2026')).body.transactions;
+      expect(porArchivo.map((t: { id: string }) => t.id)).toEqual([ids.lost]);
+    });
+
+    it('listas manipuladas → 400 sin llegar a SQL', async () => {
+      expect((await request(app).get("/api/transactions?type=BUY,'%20OR%201=1--")).status).toBe(400);
+      expect((await request(app).get('/api/transactions?value_min=1;DROP')).status).toBe(400);
+    });
+  });
+
   describe('GET / — flujos', () => {
     it('separa entradas y salidas; los movimientos entre wallets propias no cuentan', async () => {
       const { flows } = (await request(app).get('/api/transactions')).body;

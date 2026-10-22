@@ -75,6 +75,11 @@ describe('routes/transactions — exportación CSV', () => {
     expect(res.headers['content-disposition']).not.toContain('xrp');
   });
 
+  it('respeta los filtros avanzados (#366): tipos y rango de importe', async () => {
+    // Compras con importe g = 1…N: entre 100 y 199 € hay 100.
+    expect(lines((await csv('?type=BUY,SELL&value_min=100&value_max=199.99')).body)).toHaveLength(101);
+  });
+
   it('fechas ISO 8601 locales con desfase y punto decimal', async () => {
     const fila = lines((await csv('?asset=XRP')).body)[1].split(';');
     expect(fila[0]).toBe('2024-06-01T12:00:00+02:00');

@@ -2,9 +2,8 @@ import { Router, Request, Response } from 'express';
 import { db } from '../../db/client';
 import { usdPerEurSql } from '../../modules/fiat/displayCurrency';
 import { MADRID_TZ } from '../../modules/fiscal/madridTime';
-import { buildHistoryWhere, historyQuerySchema } from '../../modules/history/listFilters';
-import { FLOW_DIRECTION, VALUATION_COLUMNS, VALUATION_CTES, valuationJoins } from '../../modules/history/valuationSql';
-import { historyRowsSql } from '../../modules/history/historyQuery';
+import { historyQuerySchema } from '../../modules/history/listFilters';
+import { filteredValuedCtes, historyRowsSql } from '../../modules/history/historyQuery';
 import { sendZodError } from './transactionsShared';
 
 const router = Router();
@@ -32,33 +31,26 @@ router.get('/', async (req: Request, res: Response) => {
   if (!parsed.success) { sendZodError(res, parsed.error); return; }
   const filters = parsed.data;
 
-  const { where, params } = buildHistoryWhere(filters, HISTORY_TZ);
-  const tz = `$${params.length + 1}`;
-
   // Orden en el servidor (#349): se valora todo lo filtrado antes de paginar,
   // así «ordenar por valor» abarca todas las páginas.
   const rows = historyRowsSql(filters, HISTORY_TZ, { limit: filters.limit, offset: filters.offset });
   const result = await db.query(rows.sql, rows.params);
 
-  // Total y flujos sobre todo lo filtrado: entradas y salidas por separado
-  // (antes una sola suma que mezclaba compras, ventas y precios en otro activo).
+  // Total y flujos sobre todo lo filtrado (los mismos CTEs que la página, #366):
+  // entradas y salidas por separado, en ambas monedas.
+  const { ctes, params } = filteredValuedCtes(filters, HISTORY_TZ);
   const sumRes = await db.query(
-    `WITH ${VALUATION_CTES},
-     v AS (
-       SELECT ${VALUATION_COLUMNS}, ${FLOW_DIRECTION}, t.timestamp
-       FROM transactions t ${valuationJoins(tz)}
-       ${where}
-     ),
-     fx AS (SELECT v.*, ${usdPerEurSql('v.timestamp')} AS usd_per_eur FROM v WHERE v.flow_direction IS NOT NULL AND v.value_eur IS NOT NULL)
+    `WITH ${ctes},
+     fx AS (SELECT f.*, ${usdPerEurSql('f.timestamp')} AS usd_per_eur FROM filtered f WHERE f.flow_direction IS NOT NULL AND f.value_eur IS NOT NULL)
      SELECT
-       (SELECT COUNT(*) FROM v)::int AS total,
+       (SELECT COUNT(*) FROM filtered)::int AS total,
        COALESCE(SUM(value_eur) FILTER (WHERE flow_direction = 'in'), 0)::float  AS in_eur,
        COALESCE(SUM(value_eur) FILTER (WHERE flow_direction = 'out'), 0)::float AS out_eur,
        COALESCE(SUM(value_eur * usd_per_eur) FILTER (WHERE flow_direction = 'in'), 0)::float  AS in_usd,
        COALESCE(SUM(value_eur * usd_per_eur) FILTER (WHERE flow_direction = 'out'), 0)::float AS out_usd,
        COUNT(*) FILTER (WHERE usd_per_eur IS NULL)::int AS sin_tipo_usd
      FROM fx`,
-    [...params, HISTORY_TZ]
+    params
   );
   const s = sumRes.rows[0];
 
