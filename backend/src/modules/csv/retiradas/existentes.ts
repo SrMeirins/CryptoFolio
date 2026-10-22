@@ -59,7 +59,9 @@ export async function retirosExistentes(
        JOIN csv_imports ci ON ci.id = t.import_id
        LEFT JOIN wallets w ON w.id = t.destination_wallet_id
        WHERE ci.exchange = 'binance' AND t.operation_type IN ('WITHDRAW', 'LOST', 'GIFT_SENT')
-         AND (t.counterparty_address IS NULL OR (t.operation_type = 'WITHDRAW' AND t.fee_amount IS NULL))`,
+         AND (t.counterparty_address IS NULL OR (t.operation_type = 'WITHDRAW' AND t.fee_amount IS NULL))
+         AND t.original_import IS NULL  -- las editadas a mano no se tocan (#378)
+      `,
     )).rows as FilaRetiro[];
     const pares = emparejarRetiradas(
       filas.map(f => ({ key: f.id, asset: f.asset, amount: parseFloat(f.amount), timestamp: new Date(f.timestamp) })),
@@ -86,7 +88,7 @@ export async function retirosExistentes(
       `SELECT ${COLUMNAS}, rt.row_hash FROM raw_transactions rt
        JOIN transactions t ON t.id = rt.transaction_id
        LEFT JOIN wallets w ON w.id = t.destination_wallet_id
-       WHERE rt.row_hash = ANY($1) AND t.counterparty_address IS NULL
+       WHERE rt.row_hash = ANY($1) AND t.counterparty_address IS NULL AND t.original_import IS NULL
          AND t.operation_type IN ('WITHDRAW', 'LOST', 'GIFT_SENT')`,
       [[...destinos.keys()]],
     )).rows as (FilaRetiro & { row_hash: string })[];

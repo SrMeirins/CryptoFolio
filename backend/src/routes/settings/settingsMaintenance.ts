@@ -38,6 +38,7 @@ router.post('/transactions/fix-stale-withdrawals', async (_req: Request, res: Re
        WHERE rt.transaction_id = t.id
          AND t.operation_type = 'WITHDRAW'
          AND t.destination_pending = TRUE
+         AND t.original_import IS NULL  -- las editadas a mano no se tocan (#378)
          AND rt.operation IN ('Asset Recovery', 'Token Swap - Distribution')
          AND rt.change < 0
        RETURNING t.id, t.asset, t.timestamp`

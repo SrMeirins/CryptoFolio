@@ -270,6 +270,8 @@ CREATE TABLE transactions (
   counterparty_address    TEXT CHECK (char_length(counterparty_address) <= 128),
   counterparty_network_id UUID REFERENCES networks(id) ON DELETE SET NULL,
   tx_hash                 TEXT CHECK (char_length(tx_hash) <= 128),
+  -- Importada editada (#378): campos tal como se importaron; NULL = no modificada.
+  original_import         JSONB,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -279,6 +281,9 @@ CREATE INDEX idx_transactions_asset     ON transactions(asset);
 CREATE INDEX idx_transactions_type      ON transactions(operation_type);
 CREATE INDEX idx_transactions_wallet    ON transactions(wallet_id);
 CREATE INDEX idx_transactions_dest      ON transactions(destination_wallet_id);
+CREATE INDEX idx_transactions_editadas  ON transactions(timestamp) WHERE original_import IS NOT NULL;
+ALTER TABLE transactions ADD CONSTRAINT chk_transactions_original_import
+  CHECK (original_import IS NULL OR (jsonb_typeof(original_import) = 'object' AND NOT manually_added));
 
 -- FK pendiente desde raw_transactions (creada antes que esta tabla más arriba)
 ALTER TABLE raw_transactions

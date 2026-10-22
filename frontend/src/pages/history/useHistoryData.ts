@@ -20,6 +20,7 @@ export function useHistoryData(queryParams: Record<string, string>, offset: numb
   const queryClient = useQueryClient()
   const toast = useToast()
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [restoringId, setRestoringId] = useState<string | null>(null)
 
   const { data, isLoading, isFetching } = useQuery({ ...pageQuery(queryParams), placeholderData: prev => prev })
 
@@ -57,6 +58,23 @@ export function useHistoryData(queryParams: Record<string, string>, offset: numb
     }
   }
 
+  /** Devuelve una importada editada a sus valores importados (#378); true si se restauró. */
+  async function restoreTx(id: string): Promise<boolean> {
+    setRestoringId(id)
+    try {
+      const result = await portfolioApi.restoreTransaction(id)
+      invalidateTransactionQueries(queryClient)
+      if (result.fifoError) toast.warning('Valores importados restaurados', `Restaurada, pero el recálculo FIFO falló: ${result.fifoError}`)
+      else toast.success('Valores importados restaurados', 'FIFO recalculado')
+      return true
+    } catch (e) {
+      toast.error('Error al restaurar', (e as Error).message)
+      return false
+    } finally {
+      setRestoringId(null)
+    }
+  }
+
   // Memo propio: `data?.transactions ?? []` crearía un array nuevo en cada render.
   const transactions = useMemo(() => data?.transactions ?? [], [data])
   const total = data?.total ?? 0
@@ -68,7 +86,7 @@ export function useHistoryData(queryParams: Record<string, string>, offset: numb
     presentTypes: facets?.types ?? [],
     imports,
     importFilename: imports.find(i => i.id === importId)?.filename ?? null,
-    deletingId, deleteTx, pageIds,
+    deletingId, deleteTx, restoringId, restoreTx, pageIds,
     refresh: () => invalidateTransactionQueries(queryClient),
   }
 }

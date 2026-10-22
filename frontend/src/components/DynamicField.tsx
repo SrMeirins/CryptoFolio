@@ -1,8 +1,11 @@
+import { useId } from 'react'
 import { Zap } from 'lucide-react'
 import { type FieldDefinition } from '../api/portfolio'
 import { WalletPicker } from './WalletPicker'
 import { useWalletsQuery } from '../hooks/useWallets'
 import { fieldClasses, Dropdown } from './ui'
+import { APP_TIMEZONE } from '../constants/timezone'
+import { fromZonedInput, toZonedInput } from '../utils/zonedDateTime'
 
 const baseInput = fieldClasses()
 
@@ -11,16 +14,19 @@ export function DynamicField({ field, value, onChange }: {
   field: FieldDefinition; value: unknown; onChange: (val: unknown) => void
 }) {
   const wallets = useWalletsQuery()
+  // Etiqueta asociada a su campo (#378): antes no lo estaba y el lector de
+  // pantalla anunciaba campos sin nombre.
+  const id = useId()
 
   return (
     <div className="space-y-1">
-      <label className="flex items-center gap-1.5 text-xs font-medium text-fg-muted">
+      <label htmlFor={id} className="flex items-center gap-1.5 text-xs font-medium text-fg-muted">
         {field.label}
         {field.required
           ? <span className="text-negative text-xs">requerido</span>
           : field.auto
           ? <span className="flex items-center gap-0.5 text-brand-ink bg-brand/10 px-1.5 py-0.5 rounded-lg text-xs">
-              <Zap size={8} /> auto
+              <Zap size={8} aria-hidden="true" /> auto
             </span>
           : <span className="text-fg-subtle text-xs">opcional</span>
         }
@@ -28,6 +34,7 @@ export function DynamicField({ field, value, onChange }: {
 
       {field.type === 'number' && (
         <input
+          id={id}
           type="number" step="any"
           placeholder={field.placeholder ?? '0'}
           value={(value as number) ?? ''}
@@ -38,6 +45,7 @@ export function DynamicField({ field, value, onChange }: {
 
       {field.type === 'text' && (
         <input
+          id={id}
           type="text"
           placeholder={field.placeholder ?? ''}
           value={(value as string) ?? ''}
@@ -47,16 +55,20 @@ export function DynamicField({ field, value, onChange }: {
       )}
 
       {field.type === 'datetime' && (
+        // Hora local de la app, no UTC ni la del navegador; con segundos (#378).
         <input
+          id={id}
           type="datetime-local"
-          value={value ? new Date(value as string).toISOString().slice(0, 16) : ''}
-          onChange={e => onChange(e.target.value ? new Date(e.target.value).toISOString() : '')}
+          step={1}
+          value={value ? toZonedInput(value as string, APP_TIMEZONE) : ''}
+          onChange={e => onChange(e.target.value ? fromZonedInput(e.target.value, APP_TIMEZONE) : '')}
           className={`${baseInput} scheme-dark`}
         />
       )}
 
       {field.type === 'asset' && (
         <input
+          id={id}
           type="text"
           placeholder={field.placeholder ?? 'BTC, ETH, XRP...'}
           value={(value as string) ?? ''}
@@ -66,11 +78,11 @@ export function DynamicField({ field, value, onChange }: {
       )}
 
       {field.type === 'wallet' && (
-        <WalletPicker wallets={wallets} value={value as string} onChange={onChange} />
+        <WalletPicker id={id} label={field.label} wallets={wallets} value={value as string} onChange={onChange} />
       )}
 
       {field.type === 'select' && field.options && (
-        <Dropdown label={field.label} value={(value as string) ?? ''} onChange={onChange} className="w-full"
+        <Dropdown id={id} label={field.label} value={(value as string) ?? ''} onChange={onChange} className="w-full"
           options={[{ value: '', label: 'Seleccionar...' }, ...field.options.map(opt => ({ value: opt.value, label: opt.label }))]} />
       )}
 

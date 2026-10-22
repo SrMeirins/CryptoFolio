@@ -3,8 +3,9 @@ import { db } from '../../db/client';
 import {
   transactionFieldsSchema, transactionUpdateSchema, sendZodError,
   isFeeOperation, resolveFinalAssetAmount, resolveFinalPricePerUnit,
-  resolveCostAsset, resolveFinalCostAmount, respondWithFifoRecalc,
+  resolveCostAsset, resolveFinalCostAmount, respondWithFifoRecalc, transactionIdSchema,
 } from './transactionsShared';
+import { updateTrackingOriginal } from '../../modules/history/importEdits';
 import { requestLivePriceResync } from '../../modules/prices/liveFeed';
 
 const router = Router();
@@ -118,9 +119,12 @@ router.post('/manual', async (req: Request, res: Response) => {
   await respondWithFifoRecalc(res, 'POST /api/transactions/manual');
 });
 
-// ── PUT /api/transactions/:id (editar transacción manual) ─────────────────
+// ── PUT /api/transactions/:id (editar una transacción) ────────────────────
+// Una importada guarda su original en la primera edición (#378).
 router.put('/:id', async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const idCheck = transactionIdSchema.safeParse(req.params.id);
+  if (!idCheck.success) { sendZodError(res, idCheck.error); return; }
+  const id = idCheck.data;
 
   const validation = transactionUpdateSchema.safeParse(req.body);
   if (!validation.success) {
@@ -166,39 +170,42 @@ router.put('/:id', async (req: Request, res: Response) => {
   // Si el tipo editado ya no es WITHDRAW, limpiar destination_pending
   const shouldClearPending = operationType !== 'WITHDRAW';
 
-  await db.query(
-    `UPDATE transactions SET
-       operation_type        = $1::operation_type,
-       timestamp             = $2,
-       asset                 = $3,
-       amount                = $4,
-       amount_net            = $5,
-       cost_asset            = $6,
-       cost_amount           = $7,
-       price_per_unit        = $8,
-       fee_asset             = $9,
-       fee_amount            = $10,
-       wallet_id             = $11,
-       destination_wallet_id = $12,
-       destination_pending   = CASE WHEN $15 THEN FALSE ELSE destination_pending END,
-       notes                 = $13,
-       updated_at            = NOW()
-     WHERE id = $14`,
-    [
-      operationType, new Date(timestamp),
-      finalAsset ? finalAsset.toUpperCase() : null,
-      finalAmount ?? null,
-      finalAmount ? (amountNet ?? finalAmount) : null,
-      resolvedCostAsset, finalCostAmount, finalPricePerUnit,
-      feeAsset  ?? null,
-      feeAmount ?? null,
-      wallet_id,
-      destinationWalletId ?? null,
-      notes ?? null,
-      id,
-      shouldClearPending,
-    ]
-  );
+  const found = await db.transaction(client => updateTrackingOriginal(client, id, async () => {
+    await client.query(
+      `UPDATE transactions SET
+         operation_type        = $1::operation_type,
+         timestamp             = $2,
+         asset                 = $3,
+         amount                = $4,
+         amount_net            = $5,
+         cost_asset            = $6,
+         cost_amount           = $7,
+         price_per_unit        = $8,
+         fee_asset             = $9,
+         fee_amount            = $10,
+         wallet_id             = $11,
+         destination_wallet_id = $12,
+         destination_pending   = CASE WHEN $15 THEN FALSE ELSE destination_pending END,
+         notes                 = $13,
+         updated_at            = NOW()
+       WHERE id = $14`,
+      [
+        operationType, new Date(timestamp),
+        finalAsset ? finalAsset.toUpperCase() : null,
+        finalAmount ?? null,
+        finalAmount ? (amountNet ?? finalAmount) : null,
+        resolvedCostAsset, finalCostAmount, finalPricePerUnit,
+        feeAsset  ?? null,
+        feeAmount ?? null,
+        wallet_id,
+        destinationWalletId ?? null,
+        notes ?? null,
+        id,
+        shouldClearPending,
+      ]
+    );
+  }));
+  if (!found) { res.status(404).json({ error: 'Transacción no encontrada' }); return; }
 
   requestLivePriceResync();
   await respondWithFifoRecalc(res, 'PUT /api/transactions/:id');
@@ -206,7 +213,9 @@ router.put('/:id', async (req: Request, res: Response) => {
 
 // ── DELETE /api/transactions/:id ──────────────────────────────────────────
 router.delete('/:id', async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const idCheck = transactionIdSchema.safeParse(req.params.id);
+  if (!idCheck.success) { sendZodError(res, idCheck.error); return; }
+  const id = idCheck.data;
 
   const tx = await db.query('SELECT manually_added FROM transactions WHERE id = $1', [id]);
   if (tx.rows.length === 0) {

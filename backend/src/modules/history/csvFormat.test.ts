@@ -24,14 +24,19 @@ describe('csvFormat (#349)', () => {
     operation_type: 'BUY', asset: 'ETH', amount_net: '2.000000000000000000',
     cost_amount: '0.5', cost_asset: 'BTC', price_per_unit: '0.25', fee_amount: '0.01', fee_asset: 'BNB',
     value_eur: 56, fee_value_eur: 4, value_source: 'fifo', usd_per_eur: '1.1',
-    wallet_name: 'Exchange', destination_wallet_name: null, account: 'Spot', manually_added: false,
+    wallet_name: 'Exchange', destination_wallet_name: null, account: 'Spot', manually_added: false, original_import: null,
     notes: null, import_filename: 'export.csv', tx_hash: null, fee_parent_id: null,
   };
 
   it('una línea por fila con tantas columnas como la cabecera', () => {
     const line = historyCsvLine(row, TZ);
     expect(line.split(';')).toHaveLength(HISTORY_CSV_HEADER.split(';').length);
-    expect(line).toBe('2026-01-15T11:30:00+01:00;BUY;ETH;2;0.5;BTC;0.25;0.01;BNB;56.00;4.00;61.60;4.40;fifo;Exchange;;Spot;No;;00000000-0000-0000-0000-000000000001;export.csv;;');
+    expect(line).toBe('2026-01-15T11:30:00+01:00;BUY;ETH;2;0.5;BTC;0.25;0.01;BNB;56.00;4.00;61.60;4.40;fifo;Exchange;;Spot;No;No;;00000000-0000-0000-0000-000000000001;export.csv;;');
+  });
+
+  it('una importada editada se marca en la columna «Editada» (#378)', () => {
+    const cols = historyCsvLine({ ...row, original_import: { amount: '1' } }, TZ).split(';');
+    expect(cols[HISTORY_CSV_HEADER.split(';').indexOf('Editada')]).toBe('Sí');
   });
 
   it('sin tipo de cambio, las columnas USD quedan vacías (nunca euros como dólares)', () => {

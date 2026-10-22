@@ -28,3 +28,10 @@ describe('opciones de tipo agrupadas (#366)', () => {
     expect(typeOptions().length).toBeGreaterThan(20)
   })
 })
+
+describe('chip «Solo editadas» (#378)', () => {
+  it('aparece con el filtro y sabe quitarse', () => {
+    const [chip] = activeChips({ ...EMPTY_FILTERS, editedOnly: true }, names)
+    expect(chip).toMatchObject({ id: 'editadas', label: 'Solo editadas', clear: { editedOnly: false } })
+  })
+})

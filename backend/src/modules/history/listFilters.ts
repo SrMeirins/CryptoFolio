@@ -53,6 +53,8 @@ const filtersShape = {
   date_to:        isoDay.optional(),
   search:         z.string().max(100, 'no puede superar 100 caracteres').optional(),
   manually_added: z.enum(['true', 'false'], { message: 'debe ser true o false' }).transform(v => v === 'true').optional(),
+  // Importadas editadas (#378): «true» solo las editadas, «false» sin ellas.
+  edited:         z.enum(['true', 'false'], { message: 'debe ser true o false' }).transform(v => v === 'true').optional(),
   // Comisiones agrupadas con su operación (#371): «false» las muestra como filas.
   group_fees:     z.enum(['true', 'false'], { message: 'debe ser true o false' }).transform(v => v === 'true').optional(),
   sort:           z.enum(SORT_KEYS, { message: `debe ser uno de: ${SORT_KEYS.join(', ')}` }).default('fecha'),
@@ -79,7 +81,7 @@ export type HistoryFilters = z.infer<typeof historyExportSchema>;
 /** ¿Hay algún filtro aplicado (no cuentan orden ni moneda)? */
 export function hasFilters(f: HistoryFilters): boolean {
   return !!(f.asset?.length || f.type?.length || f.wallet_id || f.import_id || f.account || f.date_from || f.date_to
-    || f.search || f.manually_added !== undefined || f.value_min !== undefined || f.value_max !== undefined);
+    || f.search || f.manually_added !== undefined || f.edited !== undefined || f.value_min !== undefined || f.value_max !== undefined);
 }
 
 /**
@@ -129,6 +131,7 @@ export function buildHistoryWhere(f: HistoryFilters, tz: string): { where: strin
       + ` OR t.import_id IN (SELECT ci.id FROM csv_imports ci WHERE ci.filename ILIKE ${s} ESCAPE '\\'))`);
   }
   if (f.manually_added !== undefined) conds.push(`t.manually_added = ${p(f.manually_added)}`);
+  if (f.edited !== undefined) conds.push(`t.original_import IS ${f.edited ? 'NOT ' : ''}NULL`);
 
   return { where: conds.length ? `WHERE ${conds.join(' AND ')}` : '', params };
 }

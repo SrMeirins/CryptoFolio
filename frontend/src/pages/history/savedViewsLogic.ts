@@ -30,6 +30,7 @@ export function stateFromView(filtros: Record<string, string>): { filters: Histo
       date_from: f.date_from ?? '',
       date_to: f.date_to ?? '',
       manualOnly: f.manually_added === 'true',
+      editedOnly: f.edited === 'true',
       import_id: f.import_id ?? '',
       value_min: f.value_min ?? '',
       value_max: f.value_max ?? '',

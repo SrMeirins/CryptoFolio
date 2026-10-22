@@ -138,6 +138,7 @@ export async function importTransactionsPhase(
   );
 
   emit('importing', `✓ ${importResult.newTransactions} transacciones nuevas importadas (${importResult.duplicateRows} duplicadas ignoradas)`);
+  if (importResult.editedKept > 0) emit('importing', `${importResult.editedKept} transacciones editadas a mano se han respetado`);
   if (importResult.errors.length > 0) {
     emit(
       'importing',

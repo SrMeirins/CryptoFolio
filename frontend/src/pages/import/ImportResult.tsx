@@ -90,7 +90,8 @@ export function ImportResult({ resumen, duracion, log, onGoToDashboard, onReset,
                 <li key={a.importId} className="flex items-center gap-3 flex-wrap rounded-xl border border-border px-3 py-2 text-sm">
                   <ExchangeBadge exchange={a.exchange} size={18} />
                   <span className="min-w-0 flex-1 truncate text-fg">{a.archivo}</span>
-                  <span className="text-xs text-fg-subtle mono">{fmt.format(a.nuevas)} nueva{a.nuevas !== 1 ? 's' : ''} · {fmt.format(a.duplicadas)} ya estaba{a.duplicadas !== 1 ? 'n' : ''}</span>
+                  <span className="text-xs text-fg-subtle mono">{fmt.format(a.nuevas)} nueva{a.nuevas !== 1 ? 's' : ''} · {fmt.format(a.duplicadas)} ya estaba{a.duplicadas !== 1 ? 'n' : ''}
+                    {!!a.editadas_respetadas && <> · {fmt.format(a.editadas_respetadas)} editada{a.editadas_respetadas !== 1 ? 's' : ''} a mano sin tocar</>}</span>
                   {a.nuevas > 0 && (
                     <button type="button" onClick={() => onVerHistorial(a.importId)} className="text-xs text-brand hover:underline">Ver en Historial</button>
                   )}

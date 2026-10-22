@@ -57,7 +57,7 @@ describe('routes/transactions — exportación CSV', () => {
     const ls = lines(res.body);
     expect(ls[0]).toBe(HISTORY_CSV_HEADER);
     expect(ls).toHaveLength(N + 2);
-    expect(new Set(ls.slice(1).map(l => l.split(';')[19])).size).toBe(N + 1); // IDs únicos
+    expect(new Set(ls.slice(1).map(l => l.split(';')[20])).size).toBe(N + 1); // IDs únicos
   });
 
   it('respeta el orden del listado: por defecto fecha desc; por valor asc', async () => {

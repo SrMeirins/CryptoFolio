@@ -105,3 +105,24 @@ describe('DetailBody — comisiones (#371, #373)', () => {
     expect(html).toContain('La compra o venta del mismo instante')
   })
 })
+
+describe('DetailBody — importada editada (#378)', () => {
+  const original = {
+    operation_type: 'SELL', timestamp: '2026-01-15T10:30:00.000Z', asset: '<b>BTC</b>', amount: 10, amount_net: 10,
+    cost_asset: null, cost_amount: null, price_per_unit: null, fee_asset: null, fee_amount: null,
+    wallet_id: '00000000-0000-0000-0000-000000000002', destination_wallet_id: null, destination_pending: false,
+  }
+
+  it('muestra los cambios y «Restaurar original», con los valores como texto literal', () => {
+    const html = render(detail({ transaction: makeTx({ operation_type: 'SELL', asset: 'BTC', amount: '12', amount_net: '12', original_import: original }) }))
+    expect(html).toContain('Editada a mano')
+    expect(html).toContain('Cambios respecto a los valores importados')
+    expect(html).toContain('Restaurar original')
+    expect(html).toContain('&lt;b&gt;BTC&lt;/b&gt;')
+    expect(html).not.toContain('<b>BTC</b>')
+  })
+
+  it('sin edición no hay sección', () => {
+    expect(render(detail())).not.toContain('Editada a mano')
+  })
+})

@@ -95,7 +95,7 @@ describe('comisiones agrupadas (#371)', () => {
     const lines = (res.body as string).replace(/^\uFEFF/, '').trimEnd().split('\n');
     expect(lines[0].endsWith(';Operación asociada')).toBe(true);
     expect(lines).toHaveLength(1 + 11);
-    const fila = lines.find(l => l.split(';')[19] === ids.feeEth)!;
+    const fila = lines.find(l => l.split(';')[20] === ids.feeEth)!;
     expect(fila.split(';').at(-1)).toBe(ids.buyEth);
   });
 

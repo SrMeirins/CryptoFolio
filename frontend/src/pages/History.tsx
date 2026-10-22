@@ -68,6 +68,7 @@ export function History() {
     searchRef.current?.focus()
   }, [setFilter])
 
+  const walletName = useCallback((id: string) => wallets.find(w => w.id === id)?.name, [wallets])
   const currencySymbol = currency === 'USD' ? '$' : '€'
   const chips = useMemo(() => activeChips(f.filters, {
     wallet: id => wallets.find(w => w.id === id)?.name,
@@ -142,7 +143,8 @@ export function History() {
       {f.focusTx && !editingTx && !showNewTx && (
         <TransactionDetailPanel id={f.focusTx} currency={currency} onClose={closeDetail} onOpen={f.openTx}
           prev={nav.prev} next={nav.next} onEdit={setEditingTx} isDeleting={d.deletingId === f.focusTx}
-          onDelete={id => { void d.deleteTx(id).then(ok => { if (ok) closeDetail() }) }} />
+          onDelete={id => { void d.deleteTx(id).then(ok => { if (ok) closeDetail() }) }}
+          walletName={walletName} onRestore={id => { void d.restoreTx(id) }} restoring={d.restoringId === f.focusTx} />
       )}
 
       {(showNewTx || editingTx) && (

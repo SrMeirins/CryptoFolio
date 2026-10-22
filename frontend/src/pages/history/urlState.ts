@@ -14,6 +14,8 @@ export interface HistoryFilterState {
   date_from: string
   date_to: string
   manualOnly: boolean
+  /** Solo importadas editadas a mano (#378). */
+  editedOnly: boolean
   import_id: string
   /** Importes en la moneda de visualización, como texto con punto decimal. */
   value_min: string
@@ -31,7 +33,7 @@ export interface HistoryUrlState {
 
 export const EMPTY_FILTERS: HistoryFilterState = {
   search: '', types: [], assets: [], wallet_id: '', account: '', date_from: '', date_to: '',
-  manualOnly: false, import_id: '', value_min: '', value_max: '', groupFees: true,
+  manualOnly: false, editedOnly: false, import_id: '', value_min: '', value_max: '', groupFees: true,
 }
 
 export const MAX_LIST = 30
@@ -71,6 +73,7 @@ export function parseHistoryUrl(params: URLSearchParams): HistoryUrlState {
     date_from: isDay(desde) ? desde : '',
     date_to: isDay(hasta) ? hasta : '',
     manualOnly: g('manuales') === '1',
+    editedOnly: g('editadas') === '1',
     // «import» es el nombre antiguo (#324): los enlaces existentes siguen funcionando.
     import_id: [g('importacion'), g('import')].find(v => UUID_RE.test(v ?? '')) ?? '',
     value_min: min,
@@ -101,6 +104,7 @@ export function toHistoryUrl({ filters: f, sort, page }: HistoryUrlState): URLSe
   if (f.date_from) p.set('desde', f.date_from)
   if (f.date_to) p.set('hasta', f.date_to)
   if (f.manualOnly) p.set('manuales', '1')
+  if (f.editedOnly) p.set('editadas', '1')
   if (f.import_id) p.set('importacion', f.import_id)
   if (f.value_min) p.set('min', f.value_min)
   if (f.value_max) p.set('max', f.value_max)
@@ -112,7 +116,7 @@ export function toHistoryUrl({ filters: f, sort, page }: HistoryUrlState): URLSe
 
 export function hasActiveFilters(f: HistoryFilterState): boolean {
   return !!(f.search || f.types.length || f.assets.length || f.wallet_id || f.account || f.date_from || f.date_to
-    || f.manualOnly || f.import_id || f.value_min || f.value_max)
+    || f.manualOnly || f.editedOnly || f.import_id || f.value_min || f.value_max)
 }
 
 /**
@@ -133,6 +137,7 @@ export function toApiParams(f: HistoryFilterState, sort: SortState, offset: numb
     ...(f.date_from ? { date_from: f.date_from } : {}),
     ...(f.date_to ? { date_to: f.date_to } : {}),
     ...(f.manualOnly ? { manually_added: 'true' } : {}),
+    ...(f.editedOnly ? { edited: 'true' } : {}),
     ...(f.import_id ? { import_id: f.import_id } : {}),
     ...(f.value_min ? { value_min: f.value_min } : {}),
     ...(f.value_max ? { value_max: f.value_max } : {}),

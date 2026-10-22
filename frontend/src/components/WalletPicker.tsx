@@ -14,8 +14,10 @@ export function WalletLabel({ walletId }: { walletId: string }) {
 }
 
 /** Selector de wallet con color y tipo, dropdown con click-fuera. */
-export function WalletPicker({ wallets, value, onChange }: {
+export function WalletPicker({ wallets, value, onChange, id, label }: {
   wallets: Wallet[]; value: string; onChange: (val: unknown) => void
+  /** id del disparador y nombre del campo, para la etiqueta que lo acompaña (#378). */
+  id?: string; label?: string
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -26,8 +28,11 @@ export function WalletPicker({ wallets, value, onChange }: {
   return (
     <div ref={ref} className="relative">
       <button
+        id={id}
         type="button"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-label={label ? `${label}: ${selected?.name ?? 'sin seleccionar'}` : undefined}
         className={buttonClasses('secondary', 'md', 'w-full flex justify-between text-left')}
       >
         {selected ? (

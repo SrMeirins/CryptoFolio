@@ -266,6 +266,15 @@ export interface ManualTxPreview {
   }[]
 }
 
+/** Campos de una importada tal como se importaron (#378), en el formato de la API. */
+export interface ImportOriginal {
+  operation_type: string; timestamp: string; asset: string | null
+  amount: string | number | null; amount_net: string | number | null
+  cost_asset: string | null; cost_amount: string | number | null; price_per_unit: string | number | null
+  fee_asset: string | null; fee_amount: string | number | null
+  wallet_id: string; destination_wallet_id: string | null; destination_pending: boolean
+}
+
 export interface Transaction {
   id: string
   operation_type: string
@@ -287,6 +296,8 @@ export interface Transaction {
   account: string | null
   notes: string | null
   manually_added: boolean
+  /** Importada editada a mano (#378): campos tal como se importaron; null si no se ha editado. */
+  original_import: ImportOriginal | null
   created_at: string
   destination_wallet_id: string | null
   destination_wallet_name: string | null
@@ -626,6 +637,9 @@ export const portfolioApi = {
     api.put<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>(`/transactions/${id}`, data),
   deleteManualTx: (id: string) =>
     api.delete<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>(`/transactions/${id}`),
+  /** Devuelve una importada editada a sus valores importados (#378). */
+  restoreTransaction: (id: string) =>
+    api.post<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>(`/v1/transactions/${encodeURIComponent(id)}/restaurar`, {}),
   getTransactions: (params?: Record<string, string | undefined>, currency: Currency = 'EUR') => {
     const filtered = params
       ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][])
