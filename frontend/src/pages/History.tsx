@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react'
-import { Download, Package, X } from 'lucide-react'
+import { useState, useRef, useCallback, useMemo } from 'react'
+import { Download, Package } from 'lucide-react'
 import type { Transaction } from '../api/portfolio'
 import { ManualTxModal } from '../components/ManualTxModal'
 import { formatMoney, formatNumber } from '../utils/format'
@@ -8,6 +8,9 @@ import { useCurrencyQuery } from '../hooks/useCurrencyQuery'
 import { txStatsQuery } from '../queries/currencyQueries'
 import { useWalletsQuery } from '../hooks/useWallets'
 import { exportCsvUrl } from './history/sorting'
+import { activeChips } from './history/filterChips'
+import { ActiveFilterChips } from './history/ActiveFilterChips'
+import { useToast } from '../hooks/useToast'
 import { resultAnnouncement } from './history/announce'
 import { PAGE_SIZE, useHistoryFilters } from './history/useHistoryFilters'
 import { useHistoryData } from './history/useHistoryData'
@@ -28,7 +31,8 @@ export function History() {
   const [showNewTx, setShowNewTx] = useState(false)
 
   const f = useHistoryFilters()
-  const d = useHistoryData(f.queryParams, f.filters.offset, f.filters.import_id)
+  const d = useHistoryData(f.queryParams, f.offset, f.filters.import_id)
+  const toast = useToast()
   const wallets = useWalletsQuery()
   const currency = useCurrency()
   // Estadísticas en la moneda de visualización; la otra se precarga (#177).
@@ -40,18 +44,35 @@ export function History() {
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const announcement = resultAnnouncement({
     loading: !d.data || d.isFetching, total, filtered: f.hasActiveFilters,
-    page: Math.floor(f.filters.offset / PAGE_SIZE) + 1, totalPages, sort: f.sort,
+    page: f.page, totalPages, sort: f.sort,
   })
   const subtitle = !d.data ? 'Cargando…'
     : total > 0 ? `${formatNumber(total, 0)} transacciones${f.hasActiveFilters ? ' filtradas' : ''}`
       : f.hasActiveFilters ? 'Sin resultados para estos filtros' : 'Sin transacciones importadas'
 
-  // Clic en un activo de la analítica → lo busca.
+  // Clic en un activo de la analítica → lo filtra (#366: filtro de activo, no búsqueda).
   const { setFilter } = f
   const handleAssetClick = useCallback((asset: string) => {
-    setFilter('search', asset)
+    setFilter('assets', [asset])
     searchRef.current?.focus()
   }, [setFilter])
+
+  const currencySymbol = currency === 'USD' ? '$' : '€'
+  const chips = useMemo(() => activeChips(f.filters, {
+    wallet: id => wallets.find(w => w.id === id)?.name,
+    importFile: id => d.imports.find(i => i.id === id)?.filename,
+    currencySymbol,
+  }), [f.filters, wallets, d.imports, currencySymbol])
+
+  // Copia el enlace de esta vista (#366): la URL ya refleja filtros, orden y página.
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      toast.success('Enlace copiado', 'Abre esta misma vista del Historial')
+    } catch {
+      toast.error('No se pudo copiar el enlace', 'El navegador no permite acceder al portapapeles')
+    }
+  }
 
   // Todo lo filtrado, en el orden elegido, lo genera el backend en streaming (#349).
   function exportCsv() {
@@ -80,12 +101,6 @@ export function History() {
             )}
           </>}
           actions={<>
-            {f.hasActiveFilters && (
-              <button type="button" onClick={f.clearFilters}
-                className={buttonClasses('ghost', 'sm', 'flex gap-1.5 border border-border')}>
-                <X size={11} aria-hidden="true" /> Limpiar
-              </button>
-            )}
             <button type="button" onClick={exportCsv} disabled={total === 0}
               title={total > 0 ? `Exporta las ${formatNumber(total, 0)} transacciones${f.hasActiveFilters ? ' filtradas' : ''}` : 'No hay transacciones que exportar'}
               aria-label={`Exportar a CSV ${formatNumber(total, 0)} transacciones`}
@@ -93,14 +108,17 @@ export function History() {
               <Download size={13} aria-hidden="true" /> CSV{total > 0 && <span className="mono text-fg-subtle">({formatNumber(total, 0)})</span>}
             </button>
             <button type="button" onClick={() => setShowNewTx(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand/15 border border-brand/30 rounded-lg text-xs text-brand hover:bg-brand/25 transition-colors font-medium focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand/15 border border-brand/30 rounded-lg text-xs text-brand-ink hover:bg-brand/25 transition-colors font-medium focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
               + Nueva
             </button>
           </>}
         />
-        <HistoryToolbar ref={searchRef} filters={f.filters} wallets={wallets} accounts={d.accounts}
-          importFilename={d.importFilename} isFetching={d.isFetching}
-          setFilter={f.setFilter} setDateRange={f.setDateRange} clearImport={f.clearImport} />
+        <HistoryToolbar ref={searchRef} filters={f.filters} searchInput={f.searchInput} wallets={wallets}
+          accounts={d.accounts} assets={d.assets} presentTypes={d.presentTypes} imports={d.imports}
+          currencySymbol={currencySymbol} isFetching={d.isFetching}
+          setSearchInput={f.setSearchInput} setFilter={f.setFilter} patchFilters={f.patchFilters}
+          setDateRange={f.setDateRange} onCopyLink={() => { void copyLink() }} />
+        <ActiveFilterChips chips={chips} onRemove={f.patchFilters} onClearAll={f.clearFilters} />
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -128,7 +146,7 @@ export function History() {
         </div>
       </div>
 
-      <HistoryPagination ref={paginationRef} offset={f.filters.offset} total={total} onOffset={f.setOffset} />
+      <HistoryPagination ref={paginationRef} offset={f.offset} total={total} onOffset={f.setOffset} />
 
       {(showNewTx || editingTx) && (
         <ManualTxModal

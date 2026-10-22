@@ -24,11 +24,28 @@ const intParam = (min: number, max: number, def: number) =>
 export const SORT_KEYS = ['fecha', 'valor', 'activo', 'tipo'] as const;
 export type SortKey = typeof SORT_KEYS[number];
 
+export const MAX_LIST_VALUES = 30;
+const MAX_AMOUNT = 1e12;
+
+/** Lista separada por comas (#366): sin vacíos ni repetidos, como mucho MAX_LIST_VALUES. */
+const csvList = <T extends z.ZodTypeAny>(item: T, what: string) =>
+  z.string()
+    .transform(v => [...new Set(v.split(',').map(x => x.trim()).filter(Boolean))])
+    .pipe(z.array(item, { message: `${what} no válido` }).min(1, `indica al menos un ${what}`).max(MAX_LIST_VALUES, `como mucho ${MAX_LIST_VALUES} valores`));
+
+/** Importe ≥ 0 con hasta 8 decimales y punto decimal. */
+const amount = z.string().regex(/^\d{1,13}(\.\d{1,8})?$/, 'debe ser un importe positivo con punto decimal')
+  .transform(Number).pipe(z.number().min(0).max(MAX_AMOUNT));
+
 // Filtros y orden comunes al listado y a la exportación CSV (#349).
 const filtersShape = {
   currency:       currencySchema,
-  asset:          z.string().trim().regex(/^[A-Za-z0-9._-]{1,32}$/, 'activo no válido').transform(v => v.toUpperCase()).optional(),
-  type:           z.enum(DB_OPERATION_TYPES, { message: 'tipo de operación no válido' }).optional(),
+  // Listas separadas por comas (#366): varios activos o tipos a la vez.
+  asset:          csvList(z.string().regex(/^[A-Za-z0-9._-]{1,32}$/, 'activo no válido').transform(v => v.toUpperCase()), 'activo').optional(),
+  type:           csvList(z.enum(DB_OPERATION_TYPES, { message: 'tipo de operación no válido' }), 'tipo de operación').optional(),
+  // Rango del valor de la operación en la moneda pedida (currency).
+  value_min:      amount.optional(),
+  value_max:      amount.optional(),
   wallet_id:      z.string().uuid('debe ser un UUID válido').optional(),
   import_id:      z.string().uuid('debe ser un UUID válido').optional(),
   account:        z.string().trim().min(1).max(64, 'no puede superar 64 caracteres').optional(),
@@ -41,22 +58,26 @@ const filtersShape = {
 };
 const datesInOrder = (f: { date_from?: string; date_to?: string }) => !f.date_from || !f.date_to || f.date_from <= f.date_to;
 const datesMessage = { message: 'date_from no puede ser posterior a date_to', path: ['date_from'] };
+const amountsInOrder = (f: { value_min?: number; value_max?: number }) =>
+  f.value_min === undefined || f.value_max === undefined || f.value_min <= f.value_max;
+const amountsMessage = { message: 'value_min no puede ser mayor que value_max', path: ['value_min'] };
 
 export const historyQuerySchema = z.object({
   ...filtersShape,
   limit:  intParam(1, MAX_PAGE_SIZE, 50),
   offset: intParam(0, MAX_OFFSET, 0),
-}).strict().refine(datesInOrder, datesMessage);
+}).strict().refine(datesInOrder, datesMessage).refine(amountsInOrder, amountsMessage);
 export type HistoryQuery = z.infer<typeof historyQuerySchema>;
 
 /** Exportación CSV: los mismos filtros y orden, sin paginación. */
-export const historyExportSchema = z.object(filtersShape).strict().refine(datesInOrder, datesMessage);
+export const historyExportSchema = z.object(filtersShape).strict()
+  .refine(datesInOrder, datesMessage).refine(amountsInOrder, amountsMessage);
 export type HistoryFilters = z.infer<typeof historyExportSchema>;
 
 /** ¿Hay algún filtro aplicado (no cuentan orden ni moneda)? */
 export function hasFilters(f: HistoryFilters): boolean {
-  return !!(f.asset || f.type || f.wallet_id || f.import_id || f.account || f.date_from || f.date_to
-    || f.search || f.manually_added !== undefined);
+  return !!(f.asset?.length || f.type?.length || f.wallet_id || f.import_id || f.account || f.date_from || f.date_to
+    || f.search || f.manually_added !== undefined || f.value_min !== undefined || f.value_max !== undefined);
 }
 
 /**
@@ -90,8 +111,8 @@ export function buildHistoryWhere(f: HistoryFilters, tz: string): { where: strin
   const p = (v: unknown) => { params.push(v); return `$${params.length}`; };
 
   if (f.import_id)      conds.push(`t.import_id = ${p(f.import_id)}`);
-  if (f.asset)          conds.push(`t.asset = ${p(f.asset)}`);
-  if (f.type)           conds.push(`t.operation_type = ${p(f.type)}`);
+  if (f.asset?.length)  conds.push(`t.asset = ANY(${p(f.asset)}::text[])`);
+  if (f.type?.length)   conds.push(`t.operation_type::text = ANY(${p(f.type)}::text[])`);
   if (f.wallet_id)      conds.push(`t.wallet_id = ${p(f.wallet_id)}`);
   if (f.account)        conds.push(`t.account = ${p(f.account)}`);
   if (f.date_from || f.date_to) {
@@ -101,7 +122,9 @@ export function buildHistoryWhere(f: HistoryFilters, tz: string): { where: strin
   }
   if (f.search) {
     const s = p(`%${escapeLike(f.search)}%`);
-    conds.push(`(t.notes ILIKE ${s} ESCAPE '\\' OR t.asset ILIKE ${s} ESCAPE '\\')`);
+    // Activo, nota, hash on-chain y nombre del archivo de origen (#366).
+    conds.push(`(t.notes ILIKE ${s} ESCAPE '\\' OR t.asset ILIKE ${s} ESCAPE '\\' OR t.tx_hash ILIKE ${s} ESCAPE '\\'`
+      + ` OR t.import_id IN (SELECT ci.id FROM csv_imports ci WHERE ci.filename ILIKE ${s} ESCAPE '\\'))`);
   }
   if (f.manually_added !== undefined) conds.push(`t.manually_added = ${p(f.manually_added)}`);
 
