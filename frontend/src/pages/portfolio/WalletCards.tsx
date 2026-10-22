@@ -108,7 +108,7 @@ export function WalletCards({ wallets, selected, onSelect }: {
               {w.pnl !== null && (
                 <span className={`block mono tabular-nums text-xs ${pnlColor(w.pnl)}`}>
                   {w.pnl >= 0 ? '+' : ''}{formatMoney(w.pnl, currency)}
-                  {w.pnlPct !== null && <span className="opacity-80"> ({formatPercent(w.pnlPct, 1, true)})</span>}
+                  {w.pnlPct !== null && <span> ({formatPercent(w.pnlPct, 1, true)})</span>}
                   <span className="text-fg-subtle font-sans"> no realizado</span>
                 </span>
               )}

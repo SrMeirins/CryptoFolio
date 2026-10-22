@@ -100,7 +100,7 @@ export function FiscalSection() {
             <button key={preset} type="button" onClick={() => setThresholdInput(String(preset))}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                 thresholdInput === String(preset)
-                  ? 'border-brand bg-brand/10 text-brand'
+                  ? 'border-brand bg-brand/10 text-brand-ink'
                   : 'border-border bg-background-tertiary text-fg-muted hover:border-fg-subtle hover:text-fg'
               }`}>
               €{formatNumber(preset, 0)}

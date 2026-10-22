@@ -59,6 +59,8 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
       <div className="grid gap-6 md:grid-cols-[220px_1fr] items-center">
         {/* Anillo */}
         <div className="relative mx-auto" style={{ width: 220, height: 220 }} onMouseLeave={() => setActive(null)}>
+          {/* Decorativo para lectores de pantalla (#356): la lista de al lado tiene los mismos datos. */}
+          <div aria-hidden="true" className="h-full w-full">
           <ResponsiveContainer width="100%" height="100%">
             <RPieChart>
               <defs>
@@ -67,7 +69,7 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
                   <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(255,255,255,0.35)" strokeWidth="3" />
                 </pattern>
               </defs>
-              <Pie data={items} dataKey="value" nameKey="label" cx="50%" cy="50%" innerRadius={70} outerRadius={104}
+              <Pie rootTabIndex={-1} data={items} dataKey="value" nameKey="label" cx="50%" cy="50%" innerRadius={70} outerRadius={104}
                 paddingAngle={items.length > 1 ? 2 : 0} cornerRadius={items.length > 1 ? 4 : 0} strokeWidth={0} isAnimationActive={!reduceMotion} animationDuration={700}
                 onMouseEnter={(_, index) => setActive(items[index]?.key ?? null)}>
                 {items.map(i => (
@@ -78,6 +80,7 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
               </Pie>
             </RPieChart>
           </ResponsiveContainer>
+          </div>
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center" aria-live="polite">
             {activeItem ? (
               <>

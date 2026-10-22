@@ -10,8 +10,8 @@ import { WINDOW_LABELS, type ChipTone, type ChipWindow } from '../utils/windowCh
 const ICONS: Record<ChipWindow, typeof Sun> = { today: Sun, '24h': Clock }
 
 const FRAMES: Record<ChipTone, string> = {
-  positive: 'bg-positive/8 border-positive/25 text-positive',
-  negative: 'bg-negative/8 border-negative/25 text-negative',
+  positive: 'bg-positive/8 border-positive/25 text-positive-ink',
+  negative: 'bg-negative/8 border-negative/25 text-negative-ink',
   neutral: 'border-border text-fg-subtle',
 }
 
@@ -34,7 +34,7 @@ export function WindowChip({ window, tone, triggerLabel, children, tooltip }: {
       trigger={
         <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg border text-xs leading-none whitespace-nowrap ${FRAMES[tone]}`}>
           <Icon size={11} strokeWidth={2.25} aria-hidden="true" className="shrink-0 opacity-80" />
-          <span className="font-medium opacity-80">{label}</span>
+          <span className="font-medium">{label}</span>
           <span className="mono font-semibold">{children}</span>
         </span>
       }>

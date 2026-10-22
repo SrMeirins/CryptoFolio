@@ -28,7 +28,7 @@ export function DepositSection({ deposits, depositCosts, onSetCost, allReviewed,
             <h3 className={`text-sm font-semibold ${allReviewed ? 'text-positive' : 'text-warning'}`}>
               {allReviewed ? 'Depósitos revisados' : 'Depósitos externos — coste de adquisición'}
             </h3>
-            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium mono ${allReviewed ? 'bg-positive/20 text-positive' : 'bg-warning/20 text-warning'}`}>
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium mono ${allReviewed ? 'bg-positive/20 text-positive-ink' : 'bg-warning/20 text-warning'}`}>
               {reviewedCount}/{deposits.length}
             </span>
           </div>

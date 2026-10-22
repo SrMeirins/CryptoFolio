@@ -22,7 +22,7 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
     <>
       {filters.import_id && (
         <div className="flex items-center gap-2 text-xs">
-          <span className="inline-flex items-center gap-1.5 rounded-lg border border-brand/30 bg-brand/8 px-2.5 py-1 text-brand">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-brand/30 bg-brand/8 px-2.5 py-1 text-brand-ink">
             <FileText size={12} aria-hidden="true" />
             De la importación <span className="font-medium">{importFilename ?? '…'}</span>
             <button type="button" onClick={clearImport} aria-label="Quitar el filtro de importación"
@@ -62,7 +62,7 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
         <button type="button" onClick={() => setFilter('manualOnly', !filters.manualOnly)} aria-pressed={filters.manualOnly}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
             filters.manualOnly
-              ? 'bg-brand/10 border-brand/40 text-brand'
+              ? 'bg-brand/10 border-brand/40 text-brand-ink'
               : 'bg-background-tertiary border-border text-fg-muted hover:border-brand/30'
           }`}>
           <PenLine size={11} aria-hidden="true" /> Manuales

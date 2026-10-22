@@ -38,6 +38,11 @@
   --cf-heat-down: #b52b45;
   --cf-heat-max: 100;
   --cf-negative: #f75369;
+  /* Tintas de texto (#356): mismo tono, con ≥ 4,5:1 sobre las superficies y
+     los fondos tenues de su propio tono (insignias, selector, fila marcada). */
+  --cf-brand-ink: #aa96ff;
+  --cf-positive-ink: #0ecb81;
+  --cf-negative-ink: #f9798a;
   --cf-warning: #f59e0b;
   --cf-info: #4b8cf7;
   /* Translúcidos: bg-overlay/5 aclara en oscuro y oscurece en claro */
@@ -92,6 +97,9 @@
   --cf-heat-down: #e0485f;
   --cf-heat-max: 88;
   --cf-negative: #c92f48;
+  --cf-brand-ink: #542bc7;
+  --cf-positive-ink: #026744;
+  --cf-negative-ink: #a7273c;
   --cf-warning: #ae5009;
   --cf-info: #1d4ed8;
   --cf-overlay: #000000;
@@ -143,6 +151,9 @@
   --color-on-negative: var(--cf-on-negative);
   --color-positive: var(--cf-positive);
   --color-negative: var(--cf-negative);
+  --color-brand-ink: var(--cf-brand-ink);
+  --color-positive-ink: var(--cf-positive-ink);
+  --color-negative-ink: var(--cf-negative-ink);
   --color-warning: var(--cf-warning);
   --color-info: var(--cf-info);
   --color-overlay: var(--cf-overlay);
@@ -259,8 +270,10 @@
 }
 
 /* ── Destello al actualizarse un valor en vivo (#153) ─────────────────────── */
-@keyframes flashUp   { from { background-color: color-mix(in srgb, var(--cf-positive) 28%, transparent); } to { background-color: transparent; } }
-@keyframes flashDown { from { background-color: color-mix(in srgb, var(--cf-negative) 28%, transparent); } to { background-color: transparent; } }
+/* Destello de precio en vivo (#356): un contorno que se desvanece, sin tocar el
+   fondo, para que la cifra no pierda contraste (con fondo tintado bajaba de 4,5:1). */
+@keyframes flashUp   { from { box-shadow: 0 0 0 2px color-mix(in srgb, var(--cf-positive) 70%, transparent); } to { box-shadow: 0 0 0 2px transparent; } }
+@keyframes flashDown { from { box-shadow: 0 0 0 2px color-mix(in srgb, var(--cf-negative) 70%, transparent); } to { box-shadow: 0 0 0 2px transparent; } }
 .flash-up   { animation: flashUp 0.7s ease-out; }
 .flash-down { animation: flashDown 0.7s ease-out; }
 @media (prefers-reduced-motion: reduce) {

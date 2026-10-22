@@ -104,7 +104,7 @@ export function UploadZone({ dragOver, loading, error, fileRef, onDragOver, onFi
           </div>
         ) : (
           <>
-            <span className={`mx-auto mb-4 grid place-items-center size-14 rounded-2xl transition-colors ${dragOver ? 'bg-brand text-white' : 'bg-brand/10 text-brand'}`} aria-hidden="true">
+            <span className={`mx-auto mb-4 grid place-items-center size-14 rounded-2xl transition-colors ${dragOver ? 'bg-brand text-white' : 'bg-brand/10 text-brand-ink'}`} aria-hidden="true">
               <Upload size={26} />
             </span>
             <p className="text-fg font-semibold text-base">{dragOver ? 'Suelta los archivos' : seleccion.length > 0 ? 'Arrastra más archivos aquí' : 'Arrastra tus CSV aquí'}</p>

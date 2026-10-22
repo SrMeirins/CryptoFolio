@@ -23,7 +23,7 @@ export function FiatRowComponent({ row, totalPortfolioValue, compact = false, ro
           <CryptoIcon symbol={row.asset} size={compact ? 22 : 28} />
           <div className="flex items-center gap-2">
             <span className="font-medium">{row.asset}</span>
-            <span className="text-[11px] font-semibold tracking-widest text-positive bg-positive/10 border border-positive/20 px-1.5 py-0.5 rounded-lg uppercase">
+            <span className="text-[11px] font-semibold tracking-widest text-positive-ink bg-positive/10 border border-positive/20 px-1.5 py-0.5 rounded-lg uppercase">
               FIAT
             </span>
           </div>

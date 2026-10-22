@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import express from 'express';
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
 import { HISTORY_CSV_HEADER } from '../../modules/history/csvFormat';
 
@@ -25,7 +25,9 @@ describe('routes/transactions — exportación CSV', () => {
   beforeAll(async () => {
     testDb = await createTestDatabase();
     process.env.DATABASE_URL = testDb.connectionString;
-    pool = new Pool({ connectionString: testDb.connectionString });
+    // Pool de la app (con su manejador de errores): uno propio sin manejador
+    // provocaba un error no capturado al cortar el teardown sus conexiones.
+    pool = (await import('../../db/client')).pool;
     const w = (await pool.query(`INSERT INTO wallets (name, type) VALUES ('Exchange test', 'exchange') RETURNING id`)).rows[0].id;
     // N compras en EUR, una por hora, con importes crecientes.
     await pool.query(
@@ -42,7 +44,6 @@ describe('routes/transactions — exportación CSV', () => {
   });
 
   afterAll(async () => {
-    await pool.end();
     if (testDb) await testDb.teardown();
   });
 

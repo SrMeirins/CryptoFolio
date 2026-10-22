@@ -6,7 +6,7 @@ import { EXCHANGE_LABEL } from './wizard'
 import type { ArchivoLote } from './types'
 
 const ESTADO = {
-  listo: { icon: CheckCircle2, texto: 'Listo', clase: 'text-positive bg-positive/10' },
+  listo: { icon: CheckCircle2, texto: 'Listo', clase: 'text-positive-ink bg-positive/10' },
   sin_novedades: { icon: MinusCircle, texto: 'Sin novedades', clase: 'text-fg-muted bg-overlay/5' },
   no_reconocido: { icon: AlertTriangle, texto: 'No reconocido', clase: 'text-warning bg-warning/10' },
 } as const

@@ -113,7 +113,7 @@ export function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSa
       </div>
 
       {status === 'found_binance' && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-positive/8 border border-positive/20 text-xs text-positive">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-positive/8 border border-positive/20 text-xs text-positive-ink">
           <CheckCircle size={12} /> Encontrado en Binance — pares configurados automáticamente
         </div>
       )}

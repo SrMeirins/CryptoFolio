@@ -65,7 +65,7 @@ export function GuardarDireccionModal({ grupo, wallets, redes, preseleccion, res
   return (
     <Modal onClose={onClose} labelledBy={titleId} size="md" closeOnOverlay={false}>
       <ModalHeader titleId={titleId} onClose={onClose}
-        icon={<span className="grid place-items-center size-9 rounded-xl bg-brand/10 text-brand" aria-hidden="true">{primera ? <Sparkles size={17} /> : <Wallet size={17} />}</span>}
+        icon={<span className="grid place-items-center size-9 rounded-xl bg-brand/10 text-brand-ink" aria-hidden="true">{primera ? <Sparkles size={17} /> : <Wallet size={17} />}</span>}
         title={primera ? 'Crea tu primera wallet' : 'Guardar en mi wallet'}
         subtitle="La próxima importación reconocerá esta dirección y asignará sus retiros solos" />
       <ModalBody className="space-y-5">

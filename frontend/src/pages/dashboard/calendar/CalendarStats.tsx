@@ -10,7 +10,7 @@ import { signedMoney, signedPct, toneOf } from './format'
 function StatCard({ icon, label, children, detail }: { icon: ReactNode; label: string; children: ReactNode; detail?: ReactNode }) {
   return (
     <div className="flex items-center gap-2.5 rounded-xl border border-border bg-overlay/2 px-3 py-2 min-w-0">
-      <span aria-hidden="true" className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center bg-brand/10 text-brand">{icon}</span>
+      <span aria-hidden="true" className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center bg-brand/10 text-brand-ink">{icon}</span>
       <div className="min-w-0">
         <p className="text-[10px] uppercase tracking-wider text-fg-subtle leading-tight">{label}</p>
         <p className="text-sm font-semibold mono leading-tight truncate">{children}</p>

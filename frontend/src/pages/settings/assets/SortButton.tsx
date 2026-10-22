@@ -8,7 +8,7 @@ export function SortButton({ label, sortKey, active, dir, onClick }: {
   return (
     <button type="button" onClick={() => onClick(sortKey)}
       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-        isActive ? 'bg-brand/15 text-brand' : 'text-fg-subtle hover:text-fg hover:bg-background-tertiary'
+        isActive ? 'bg-brand/15 text-brand-ink' : 'text-fg-subtle hover:text-fg hover:bg-background-tertiary'
       }`}>
       {label}
       {isActive

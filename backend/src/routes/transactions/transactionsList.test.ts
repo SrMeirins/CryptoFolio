@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import express from 'express';
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
 
 // GET /, /stats y /facets del Historial (#346): validación, valoración con el
@@ -48,7 +48,9 @@ describe('routes/transactions — listado, stats y facetas', () => {
   beforeAll(async () => {
     testDb = await createTestDatabase();
     process.env.DATABASE_URL = testDb.connectionString;
-    pool = new Pool({ connectionString: testDb.connectionString });
+    // Pool de la app (con su manejador de errores): uno propio sin manejador
+    // provocaba un error no capturado al cortar el teardown sus conexiones.
+    pool = (await import('../../db/client')).pool;
 
     const a = (await pool.query(`INSERT INTO wallets (name, type) VALUES ('Exchange test', 'exchange') RETURNING id`)).rows[0].id;
     const b = (await pool.query(`INSERT INTO wallets (name, type) VALUES ('Fría test', 'hardware') RETURNING id`)).rows[0].id;
@@ -96,7 +98,6 @@ describe('routes/transactions — listado, stats y facetas', () => {
   });
 
   afterAll(async () => {
-    await pool.end();
     if (testDb) await testDb.teardown();
   });
 

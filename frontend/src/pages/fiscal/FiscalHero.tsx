@@ -61,7 +61,7 @@ export function FiscalHero({ summary, cuota, tipoMedio, comparison, aviso, decla
             {summary.esAnioEnCurso
               ? <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-info/10 text-info"><Calendar size={10} aria-hidden="true" />En curso · hasta hoy</span>
               : declarada
-                ? <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-positive/10 text-positive"><CheckCircle2 size={10} aria-hidden="true" />Declarado</span>
+                ? <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-positive/10 text-positive-ink"><CheckCircle2 size={10} aria-hidden="true" />Declarado</span>
                 : <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-overlay/8 text-fg-muted"><CheckCircle2 size={10} aria-hidden="true" />Cerrado</span>}
           </div>
           <AnimatedNumber value={neto} format={signed} className={`block text-4xl font-bold mono tabular-nums mt-2 break-words ${pnlColor(neto)}`} />

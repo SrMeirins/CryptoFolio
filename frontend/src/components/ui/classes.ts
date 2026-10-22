@@ -30,9 +30,9 @@ export type IconButtonSize = 'sm' | 'md'
 export type IconButtonTone = 'neutral' | 'danger' | 'positive' | 'brand'
 const ICON_TONES: Record<IconButtonTone, string> = {
   neutral: 'text-fg-subtle hover:text-fg hover:bg-overlay/5',
-  danger: 'text-fg-subtle hover:text-negative hover:bg-negative/10',
-  positive: 'text-positive hover:bg-positive/10',
-  brand: 'text-fg-subtle hover:text-brand hover:bg-brand/10',
+  danger: 'text-fg-subtle hover:text-negative-ink hover:bg-negative/10',
+  positive: 'text-positive-ink hover:bg-positive/10',
+  brand: 'text-fg-subtle hover:text-brand-ink hover:bg-brand/10',
 }
 export function iconButtonClasses(size: IconButtonSize = 'md', active = false, extra = '', tone: IconButtonTone = 'neutral'): string {
   return twMerge([
@@ -56,10 +56,11 @@ export type BadgeTone = 'neutral' | 'brand' | 'info' | 'positive' | 'negative' |
 export type BadgeSize = 'sm' | 'md'
 const TONES: Record<BadgeTone, string> = {
   neutral: 'bg-overlay/8 text-fg-muted',
-  brand: 'bg-brand/12 text-brand',
+  // Texto con tinta de contraste AA sobre el fondo tenue de su tono (#356).
+  brand: 'bg-brand/12 text-brand-ink',
   info: 'bg-info/12 text-info',
-  positive: 'bg-positive/12 text-positive',
-  negative: 'bg-negative/12 text-negative',
+  positive: 'bg-positive/12 text-positive-ink',
+  negative: 'bg-negative/12 text-negative-ink',
   warning: 'bg-warning/12 text-warning',
   purple: 'bg-accent-purple/12 text-accent-purple',
 }
@@ -77,7 +78,8 @@ export type SegmentedSize = 'sm' | 'md'
 export type SegmentedVariant = 'default' | 'accent'
 export function segmentClasses(active: boolean, size: SegmentedSize = 'sm', variant: SegmentedVariant = 'default'): string {
   const state = variant === 'accent'
-    ? (active ? 'relative z-10 text-brand' : 'relative z-10 text-fg-subtle hover:text-fg')
+    // Activa con tinta de marca y las inactivas en fg-muted: ambas con ≥ 4,5:1 (#356).
+    ? (active ? 'relative z-10 text-brand-ink' : 'relative z-10 text-fg-muted hover:text-fg')
     : (active ? 'bg-background-card text-fg shadow-xs' : 'text-fg-subtle hover:text-fg')
   return [
     'whitespace-nowrap rounded-md font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
@@ -99,7 +101,7 @@ export function tabClasses(active: boolean, variant: TabsVariant = 'pill'): stri
   if (variant === 'underline') {
     return `${base} px-5 py-2.5 text-sm border-b-2 -mb-px ${active ? 'border-brand text-fg' : 'border-transparent text-fg-subtle hover:text-fg'}`
   }
-  return `${base} px-2.5 py-1 text-xs rounded-lg ${active ? 'bg-brand/15 text-brand' : 'text-fg-subtle hover:text-fg'}`
+  return `${base} px-2.5 py-1 text-xs rounded-lg ${active ? 'bg-brand/15 text-brand-ink' : 'text-fg-subtle hover:text-fg'}`
 }
 export const tabId = (idBase: string, value: string) => `${idBase}-tab-${value}`
 export const tabPanelId = (idBase: string) => `${idBase}-panel`

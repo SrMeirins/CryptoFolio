@@ -79,7 +79,7 @@ export function DepositRow({ dep, cost, reviewed, onSetCost, resaltado }: {
         {dep.historicalPrice != null && dep.historicalPrice > 0 ? (
           <button type="button" onClick={() => { setInputVal(String(dep.historicalPrice)); onSetCost(dep.txKey, dep.historicalPrice as number) }}
             className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
-              reviewed && cost === dep.historicalPrice ? 'border-positive/40 bg-positive/10 text-positive' : 'border-border text-fg-subtle hover:text-fg hover:border-fg-subtle bg-background-card'}`}>
+              reviewed && cost === dep.historicalPrice ? 'border-positive/40 bg-positive/10 text-positive-ink' : 'border-border text-fg-subtle hover:text-fg hover:border-fg-subtle bg-background-card'}`}>
             Usar mercado
           </button>
         ) : (
@@ -95,7 +95,7 @@ export function DepositRow({ dep, cost, reviewed, onSetCost, resaltado }: {
           onClick={() => { setInputVal('0'); onSetCost(dep.txKey, 0) }}
           className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
             cost === 0 && reviewed
-              ? 'border-positive/40 bg-positive/10 text-positive'
+              ? 'border-positive/40 bg-positive/10 text-positive-ink'
               : 'border-border text-fg-subtle hover:text-fg hover:border-fg-subtle bg-background-card'
           }`}
           title="Coste 0€ — airdrop, regalo, minería, etc."

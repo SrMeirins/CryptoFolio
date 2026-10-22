@@ -63,7 +63,7 @@ export function PendingDepositRow({ dep, cost, isReviewed, onChangeCost, onUseHi
                 type="button"
                 onClick={onUseHistorical}
                 title="Precio de mercado en esa fecha — puede no coincidir con lo que pagaste realmente. Corrígelo si sabes tu coste real."
-                className="text-xs px-3 py-1.5 bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand rounded-lg transition-colors whitespace-nowrap"
+                className="text-xs px-3 py-1.5 bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand-ink rounded-lg transition-colors whitespace-nowrap"
               >
                 {formatNumber(dep.historicalPrice, 4)} € (mercado, estimación)
               </button>

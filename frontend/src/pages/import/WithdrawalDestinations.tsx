@@ -149,7 +149,7 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
             <h2 id="revision-titulo" className={`text-sm font-semibold ${allDone ? 'text-positive' : 'text-warning'}`}>
               {allDone ? 'Revisión completada' : 'Revisión obligatoria antes de importar'}
             </h2>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium mono ${allDone ? 'bg-positive/20 text-positive' : 'bg-warning/20 text-warning'}`}>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium mono ${allDone ? 'bg-positive/20 text-positive-ink' : 'bg-warning/20 text-warning'}`}>
               {doneItems}/{totalItems}
             </span>
           </div>

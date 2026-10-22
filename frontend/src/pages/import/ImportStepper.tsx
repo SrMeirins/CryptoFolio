@@ -16,7 +16,7 @@ export function ImportStepper({ actual, onIr }: { actual: Paso; onIr: (p: Paso) 
           const clicable = puedeIrA(p.id, actual)
           const circulo = (
             <span className={`grid place-items-center size-7 rounded-full text-xs font-semibold shrink-0 transition-colors ${
-              activo ? 'bg-brand text-white ring-4 ring-brand/20' : hecho ? 'bg-positive/15 text-positive' : 'bg-overlay/8 text-fg-subtle'}`}>
+              activo ? 'bg-brand text-white ring-4 ring-brand/20' : hecho ? 'bg-positive/15 text-positive-ink' : 'bg-overlay/8 text-fg-subtle'}`}>
               {hecho ? <Check size={14} aria-hidden="true" /> : i + 1}
             </span>
           )

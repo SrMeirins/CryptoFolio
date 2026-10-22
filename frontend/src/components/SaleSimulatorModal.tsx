@@ -44,7 +44,7 @@ const wrapCls = `
   focus-within:border-brand/60 transition-all
 `
 const chipCls = (on: boolean) => `px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
-  on ? 'border-brand/50 bg-brand/12 text-brand' : 'border-border text-fg-muted hover:text-fg hover:bg-overlay/5'}`
+  on ? 'border-brand/50 bg-brand/12 text-brand-ink' : 'border-border text-fg-muted hover:text-fg hover:bg-overlay/5'}`
 
 // Simulador de venta (#279, #280): FIFO de la wallet elegida, comisión e IRPF
 // marginal; en dos columnas, con atajos de cantidad y precio, modo «importe a

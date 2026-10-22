@@ -61,7 +61,7 @@ export function CalendarioFiscal({ data, netoPorAnio, onGo }: {
                 className={`rounded-xl border p-3 space-y-1.5 text-xs ${actual ? 'border-brand/40 bg-brand/5' : 'border-border'}`}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-sm text-fg">{h.titulo}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${h.estado === 'en-curso' ? 'bg-positive/10 text-positive' : 'bg-overlay/8 text-fg-subtle'}`}>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${h.estado === 'en-curso' ? 'bg-positive/10 text-positive-ink' : 'bg-overlay/8 text-fg-subtle'}`}>
                     {h.estado === 'en-curso' ? 'abierto' : 'próximo'}
                   </span>
                 </div>

@@ -43,7 +43,7 @@ export function ProgressStage({ log, done, inicio, onGoToDashboard, onReset, onV
     <div className={cardClasses('md', 'space-y-5')}>
       {/* Paso actual */}
       <div className="flex items-start gap-4">
-        <span className={`grid place-items-center size-11 rounded-2xl shrink-0 ${error ? 'bg-negative/10 text-negative' : estado.espera !== null ? 'bg-warning/10 text-warning' : 'bg-brand/10 text-brand'}`} aria-hidden="true">
+        <span className={`grid place-items-center size-11 rounded-2xl shrink-0 ${error ? 'bg-negative/10 text-negative-ink' : estado.espera !== null ? 'bg-warning/10 text-warning' : 'bg-brand/10 text-brand-ink'}`} aria-hidden="true">
           {error ? <AlertTriangle size={20} /> : estado.espera !== null ? <Hourglass size={20} /> : <RefreshCw size={20} className="animate-spin motion-reduce:animate-none" />}
         </span>
         <div className="flex-1 min-w-0">
