@@ -401,6 +401,18 @@ export interface HistoryStats {
   fees_by_asset: { asset: string; ops: number; amount: number; value: Money }[]
 }
 
+/** Saldo corrido de un activo en el Historial (#380). */
+export interface RunningBalance {
+  asset: string
+  wallet_id: string | null
+  /** Saldo actual: cuadra con Portfolio. */
+  current: number
+  /** Saldo tras cada fila pedida; `missing`: lo que faltaba en lotes (hueco). */
+  rows: { id: string; balance: number; missing: number | null }[]
+  /** Operaciones con hueco en todo el historial del activo y la más antigua. */
+  shortfalls: { count: number; first_id: string | null }
+}
+
 /** Vista guardada del Historial (#369): filtros y orden con los nombres de la API. */
 export interface SavedView {
   id: string
@@ -637,6 +649,12 @@ export const portfolioApi = {
     api.put<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>(`/transactions/${id}`, data),
   deleteManualTx: (id: string) =>
     api.delete<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>(`/transactions/${id}`),
+  /** Saldo corrido de un activo (#380) para las filas `ids` de la página. */
+  getRunningBalance: (params: { asset: string; wallet_id?: string; ids: string[]; group_fees: boolean }) => {
+    const qs = new URLSearchParams({ asset: params.asset, ids: params.ids.join(','), group_fees: String(params.group_fees) })
+    if (params.wallet_id) qs.set('wallet_id', params.wallet_id)
+    return api.get<RunningBalance>(`/v1/historial/saldos?${qs.toString()}`)
+  },
   /** Devuelve una importada editada a sus valores importados (#378). */
   restoreTransaction: (id: string) =>
     api.post<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>(`/v1/transactions/${encodeURIComponent(id)}/restaurar`, {}),

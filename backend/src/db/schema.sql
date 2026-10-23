@@ -351,6 +351,21 @@ CREATE INDEX idx_consumptions_lot         ON fifo_lot_consumptions(lot_id);
 CREATE INDEX idx_consumptions_transaction ON fifo_lot_consumptions(consuming_transaction_id);
 CREATE INDEX idx_consumptions_date        ON fifo_lot_consumptions(consumed_at);
 
+-- Déficits del motor FIFO (#380): operaciones que pidieron más de lo que había
+-- en lotes. Se vacía y se rehace en cada ejecución del motor.
+CREATE TABLE fifo_shortfalls (
+  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+  asset          TEXT NOT NULL CHECK (char_length(asset) <= 32),
+  wallet_id      UUID NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  requested      NUMERIC(38, 18) NOT NULL CHECK (requested > 0),
+  missing        NUMERIC(38, 18) NOT NULL CHECK (missing > 0 AND missing <= requested),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_fifo_shortfalls_tx    ON fifo_shortfalls(transaction_id);
+CREATE INDEX idx_fifo_shortfalls_asset ON fifo_shortfalls(asset);
+
 -- ============================================================
 -- TABLA: price_cache
 -- ============================================================

@@ -4,12 +4,13 @@ import type { TransactionFlows } from '../../api/portfolio'
 import { PageHeader, buttonClasses } from '../../components/ui'
 import { navIcon } from '../../constants/navigation'
 import { formatMoney, formatNumber, type Currency } from '../../utils/format'
+import { formatBalance } from './balance/balanceFormat'
 
 /**
  * Cabecera del Historial: título con recuento y flujos de lo filtrado (#346),
  * y acciones (vistas guardadas, CSV de todo lo filtrado y nueva transacción).
  */
-export function HistoryHeader({ loaded, total, filtered, flows, currency, views, onExport, onNew }: {
+export function HistoryHeader({ loaded, total, filtered, flows, currency, views, onExport, onNew, currentBalance }: {
   loaded: boolean
   total: number
   filtered: boolean
@@ -19,6 +20,8 @@ export function HistoryHeader({ loaded, total, filtered, flows, currency, views,
   views: ReactNode
   onExport: () => void
   onNew: () => void
+  /** Saldo actual del activo filtrado (#380); de la wallet si se filtra una. */
+  currentBalance?: { amount: number; asset: string; wallet: boolean } | null
 }) {
   const subtitle = !loaded ? 'Cargando…'
     : total > 0 ? `${formatNumber(total, 0)} transacciones${filtered ? ' filtradas' : ''}`
@@ -34,6 +37,9 @@ export function HistoryHeader({ loaded, total, filtered, flows, currency, views,
             {flows.entradas > 0 && <> · <span className="text-positive font-semibold">+{formatMoney(flows.entradas, currency)}</span> entradas</>}
             {flows.salidas > 0 && <> · <span className="text-negative font-semibold">−{formatMoney(flows.salidas, currency)}</span> salidas</>}
           </span>
+        )}
+        {currentBalance && (
+          <span className="ml-2"> · Saldo actual{currentBalance.wallet ? ' en la wallet' : ''}: <span className="mono font-semibold text-fg">{formatBalance(currentBalance.amount, currentBalance.asset)}</span></span>
         )}
       </>}
       actions={<>

@@ -23,6 +23,8 @@ import { Button, EmptyState, LoadingState } from '../components/ui'
 import { HistoryHeader } from './history/HistoryHeader'
 import { TransactionDetailPanel } from './history/detail/TransactionDetailPanel'
 import { useDetailNavigation } from './history/detail/useDetailNavigation'
+import { useRunningBalance } from './history/balance/useRunningBalance'
+import { ShortfallBanner } from './history/balance/ShortfallBanner'
 
 // Pestaña Historial: orquesta el estado de filtros (useHistoryFilters), los
 // datos (useHistoryData) y los bloques de UI de pages/history/ (#351).
@@ -53,6 +55,8 @@ export function History() {
     ids, current: f.focusTx, offset: f.offset, total, open: f.openTx, setOffset: f.setOffset, pageIds: d.pageIds,
   })
   const { openTx } = f
+  // Saldo corrido con un único activo filtrado (#380).
+  const balance = useRunningBalance(f.filters, ids)
   const closeDetail = useCallback(() => openTx(null), [openTx])
   // Entradas y salidas de valor de lo filtrado, en la moneda de visualización (#346).
   const flows = d.data?.flows[currency] ?? null
@@ -102,7 +106,8 @@ export function History() {
       <div className="shrink-0 px-6 pt-6 pb-4 space-y-4 border-b border-border">
         <HistoryHeader loaded={!!d.data} total={total} filtered={f.hasActiveFilters} flows={flows} currency={currency}
           views={<HistorySavedViews filters={f.filters} sort={f.sort} applyState={f.applyState} startedEmpty={f.startedEmpty} />}
-          onExport={exportCsv} onNew={() => setShowNewTx(true)} />
+          onExport={exportCsv} onNew={() => setShowNewTx(true)}
+          currentBalance={balance?.data ? { amount: balance.data.current, asset: balance.asset, wallet: balance.walletFiltered } : null} />
         <HistoryToolbar ref={searchRef} filters={f.filters} searchInput={f.searchInput} wallets={wallets}
           accounts={d.accounts} assets={d.assets} presentTypes={d.presentTypes} imports={d.imports}
           currencySymbol={currencySymbol} isFetching={d.isFetching}
@@ -120,6 +125,10 @@ export function History() {
                 datesFiltered={!!(f.filters.date_from || f.filters.date_to)} />
             </>
           )}
+          {balance?.data && (
+            <ShortfallBanner count={balance.data.shortfalls.count} asset={balance.asset} walletFiltered={balance.walletFiltered}
+              onOpenFirst={balance.data.shortfalls.first_id ? () => openTx(balance.data!.shortfalls.first_id) : null} />
+          )}
           {d.isLoading ? (
             <LoadingState />
           ) : d.transactions.length === 0 ? (
@@ -132,6 +141,7 @@ export function History() {
             <HistoryTable transactions={d.transactions} sort={f.sort} onSort={f.toggleSort} currency={currency}
               searchTerm={f.filters.search} selectedId={f.focusTx} deletingId={d.deletingId}
               onOpen={f.openTx} onPrefetch={nav.prefetch} onDelete={id => { void d.deleteTx(id) }} onEdit={setEditingTx}
+              balance={balance}
               skipLink={total > PAGE_SIZE ? { href: `#${PAGINATION_ID}`, onActivate: () => paginationRef.current?.focus() } : undefined} />
           )}
         </div>
