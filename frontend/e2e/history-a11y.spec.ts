@@ -211,9 +211,10 @@ test.describe('hora del asistente en la zona de la app (#378)', () => {
 
 test('saldo corrido (#380): con un activo filtrado, columna «Saldo», saldo actual y axe', async ({ page }) => {
   await openHistory(page, 'dark')
-  // El activo de la primera fila (datos locales o semilla de CI).
-  const activo = (await page.locator('tbody tr').filter({ has: page.getByRole('button', { name: 'Ver detalle' }) }).first()
-    .locator('td').nth(2).locator('.font-bold').first().textContent())?.trim() ?? ''
+  // Un activo con transacciones (datos locales o semilla de CI), leído de la API:
+  // en la interfaz, sin iconos, el icono pinta sus iniciales con el mismo estilo.
+  const lista = await (await page.request.get('/api/transactions?limit=1')).json() as { transactions: { asset: string }[] }
+  const activo = lista.transactions[0]?.asset ?? ''
   expect(activo).toMatch(/^[A-Z0-9]+$/)
   await page.goto(`/history?activo=${activo}`)
   await expect(page.getByRole('columnheader', { name: `Saldo ${activo}` })).toBeVisible()
