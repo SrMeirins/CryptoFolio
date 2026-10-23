@@ -202,7 +202,8 @@ test.describe('hora del asistente en la zona de la app (#378)', () => {
     await fila.getByRole('button', { name: 'Editar transacción' }).focus()
     await page.keyboard.press('Enter')
     const dialog = page.getByRole('dialog', { name: 'Editar transacción' })
-    await expect(dialog.locator('input[type="datetime-local"]')).toHaveValue(new RegExp(`T${hora}:\\d{2}$`))
+    // Con segundos «:00» el navegador los omite del valor del campo.
+    await expect(dialog.locator('input[type="datetime-local"]')).toHaveValue(new RegExp(`T${hora}(:\\d{2})?$`))
     await page.keyboard.press('Escape')
     expect(escrituras).toEqual([])
   })
