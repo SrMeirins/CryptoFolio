@@ -97,3 +97,27 @@ describe('TxRow — importadas editadas (#378)', () => {
     expect(render(tx({}))).not.toContain('editada a mano')
   })
 })
+
+describe('TxRow — saldo corrido (#380)', () => {
+  const conSaldo = (value: { balance: number; missing: number | null } | undefined) => renderToStaticMarkup(
+    <QueryClientProvider client={new QueryClient()}><table><tbody>
+      <TxRow tx={tx({})} currency="EUR" onDelete={() => {}} onEdit={() => {}} onOpen={() => {}} onPrefetch={() => {}}
+        isDeleting={false} searchTerm="" balance={{ asset: 'XRP', value }} />
+    </tbody></table></QueryClientProvider>,
+  )
+
+  it('muestra el saldo tras la operación', () => {
+    expect(conSaldo({ balance: 40, missing: null })).toContain('40 XRP')
+  })
+
+  it('un hueco se marca con icono y texto, también para lectores de pantalla', () => {
+    const html = conSaldo({ balance: 0, missing: 62 })
+    expect(html).toContain('hueco')
+    expect(html).toContain('Faltaban 62 XRP: posible importación incompleta')
+  })
+
+  it('sin dato, «—» con texto accesible; sin activo filtrado, no hay celda', () => {
+    expect(conSaldo(undefined)).toContain('<span class="sr-only">Sin saldo</span>')
+    expect(render(tx({}))).not.toContain('Sin saldo')
+  })
+})

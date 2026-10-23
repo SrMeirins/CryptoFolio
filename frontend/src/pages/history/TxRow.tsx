@@ -9,6 +9,7 @@ import { T, alpha, ink } from '../../utils/colors'
 import { iconButtonClasses } from '../../components/ui'
 import { DeleteConfirm } from './DeleteConfirm'
 import { FeeCell } from './FeeCell'
+import { BalanceCell } from './balance/BalanceCell'
 
 function Highlight({ text, query }: { text: string; query: string }) {
   if (!query.trim()) return <>{text}</>
@@ -56,12 +57,14 @@ function OpChip({ type }: { type: string }) {
 }
 
 export function TxRow({
-  tx, onDelete, onEdit, onOpen, onPrefetch, isDeleting, searchTerm, currency, selected = false,
+  tx, onDelete, onEdit, onOpen, onPrefetch, isDeleting, searchTerm, currency, selected = false, balance,
 }: {
   tx: Transaction
   currency: Currency
   /** Su detalle está abierto en el panel (#373); visible al cargar si viene de un enlace (#237). */
   selected?: boolean
+  /** Saldo del activo filtrado tras la operación (#380); sin él no hay columna. */
+  balance?: { asset: string; value: { balance: number; missing: number | null } | undefined }
   /** Abre el panel de detalle (#373). */
   onOpen: (id: string) => void
   /** Precarga el detalle al pasar el ratón o el foco (#373). */
@@ -184,6 +187,9 @@ export function TxRow({
             </>
           )}
         </td>
+
+        {/* Saldo del activo filtrado (#380) */}
+        {balance && <BalanceCell value={balance.value} asset={balance.asset} />}
 
         {/* Acciones */}
         <td className="px-3 py-2.5 align-middle" onClick={e => e.stopPropagation()}>

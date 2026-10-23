@@ -208,3 +208,29 @@ test.describe('hora del asistente en la zona de la app (#378)', () => {
     expect(escrituras).toEqual([])
   })
 })
+
+test('saldo corrido (#380): con un activo filtrado, columna «Saldo», saldo actual y axe', async ({ page }) => {
+  await openHistory(page, 'dark')
+  // El activo de la primera fila (datos locales o semilla de CI).
+  const activo = (await page.locator('tbody tr').filter({ has: page.getByRole('button', { name: 'Ver detalle' }) }).first()
+    .locator('td').nth(2).locator('.font-bold').first().textContent())?.trim() ?? ''
+  expect(activo).toMatch(/^[A-Z0-9]+$/)
+  await page.goto(`/history?activo=${activo}`)
+  await expect(page.getByRole('columnheader', { name: `Saldo ${activo}` })).toBeVisible()
+  await expect(page.getByText(/Saldo actual:/)).toBeVisible()
+  await expect(page.locator('tbody td').filter({ hasText: new RegExp(` ${activo}$`) }).first()).toBeVisible()
+
+  // Sin activo filtrado no hay columna.
+  await page.goto('/history')
+  await expect(page.getByRole('table')).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: /^Saldo / })).toHaveCount(0)
+
+  await page.goto(`/history?activo=${activo}`)
+  await expect(page.getByRole('columnheader', { name: `Saldo ${activo}` })).toBeVisible()
+  for (const theme of ['dark', 'light'] as const) {
+    await page.emulateMedia({ colorScheme: theme })
+    await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
+    const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).include('main').analyze()
+    expect(violations.map(v => `${theme}: ${v.id}`)).toEqual([])
+  }
+})

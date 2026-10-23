@@ -28,6 +28,18 @@ export interface Transaction {
   destination_pending: boolean;
 }
 
+/**
+ * Déficit de una operación (#380): pidió `requested` de un activo en una wallet
+ * y faltaban `missing` en lotes. Se guarda en fifo_shortfalls.
+ */
+export interface FifoShortfall {
+  txId: string;
+  asset: string;
+  walletId: string;
+  requested: number;
+  missing: number;
+}
+
 export interface FifoRunResult {
   lotsCreated: number;
   lotsConsumed: number;
@@ -42,6 +54,8 @@ export interface FifoRunResult {
   // turno (Nivel 10) — este cambio solo corrige el modelo de datos en origen.
   warnings: string[];
   pendingWithdrawals: number;
+  /** Déficits de esta ejecución (#380), además del texto en `errors`. */
+  shortfalls: FifoShortfall[];
 }
 
 // Umbrales de tolerancia unificados (antes: 0.0001 / 1e-10 / 1e-6 repartidos por
