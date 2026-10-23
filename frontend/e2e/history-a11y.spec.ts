@@ -187,9 +187,16 @@ test.describe('hora del asistente en la zona de la app (#378)', () => {
 
   test('al editar, la fecha muestra la hora de la fila (no UTC ni la del navegador) y cancelar no guarda', async ({ page }) => {
     await openHistory(page, 'dark')
+    // Un tipo del catálogo del asistente (BUY/SELL genéricos no lo están y
+    // abren en «Tipo»): así abre directamente en los detalles, con la fecha.
+    const tipos = ['STAKING_REWARD', 'DEPOSIT_FIAT', 'WITHDRAW', 'DEPOSIT_CRYPTO', 'TRANSFER_INTERNAL']
+    const respuesta = page.waitForResponse(r => r.url().includes('/api/transactions?') && r.url().includes('STAKING_REWARD'))
+    await page.goto(`/history?tipo=${tipos.join(',')}`)
+    await respuesta
+    await page.waitForLoadState('networkidle').catch(() => { /* WebSocket abierto */ })
+    const fila = page.locator('tbody tr').filter({ has: page.getByRole('button', { name: 'Editar transacción' }) }).first()
     const escrituras: string[] = []
     page.on('request', r => { if (r.method() !== 'GET' && r.url().includes('/transactions')) escrituras.push(r.url()) })
-    const fila = page.locator('tbody tr').filter({ has: page.getByRole('button', { name: 'Editar transacción' }) }).first()
     const hora = (await fila.locator('td').first().locator('.mono').textContent())?.trim() ?? ''
     expect(hora).toMatch(/^\d{2}:\d{2}$/)
     await fila.getByRole('button', { name: 'Editar transacción' }).focus()
