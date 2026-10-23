@@ -1,5 +1,5 @@
 import { forwardRef } from 'react'
-import { Search, X, RefreshCw, PenLine, Link2, Layers } from 'lucide-react'
+import { Search, X, RefreshCw, PenLine, Link2, Layers, FilePen } from 'lucide-react'
 import { DateRangePicker } from '../../components/DateRangePicker'
 import { Dropdown, MultiDropdown, fieldClasses, iconButtonClasses } from '../../components/ui'
 import { fmtShort } from '../../utils/date'
@@ -9,7 +9,7 @@ import type { HistoryFilterState } from './urlState'
 
 // Barra de filtros del Historial (#351, #366): búsqueda, tipos (varios, por
 // grupos), activos (varios), wallet, cuenta, archivo de importación, fechas,
-// rango de importe, «solo manuales» y copiar el enlace de la vista.
+// rango de importe, «solo manuales», «editadas» (#378) y copiar el enlace de la vista.
 
 export const HistoryToolbar = forwardRef<HTMLInputElement, {
   filters: HistoryFilterState
@@ -75,6 +75,16 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
             : 'bg-background-tertiary border-border text-fg-muted hover:border-brand/30'
         }`}>
         <PenLine size={11} aria-hidden="true" /> Manuales
+      </button>
+
+      <button type="button" onClick={() => setFilter('editedOnly', !filters.editedOnly)} aria-pressed={filters.editedOnly}
+        title="Solo transacciones importadas que has editado a mano"
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
+          filters.editedOnly
+            ? 'bg-warning/10 border-warning/40 text-warning-ink'
+            : 'bg-background-tertiary border-border text-fg-muted hover:border-warning/30'
+        }`}>
+        <FilePen size={11} aria-hidden="true" /> Editadas
       </button>
 
       <button type="button" onClick={() => setFilter('groupFees', !filters.groupFees)} aria-pressed={filters.groupFees}

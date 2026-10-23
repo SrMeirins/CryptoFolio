@@ -19,6 +19,8 @@ export interface ImportResult {
   totalRows: number;
   newTransactions: number;
   duplicateRows: number;
+  /** Importadas editadas a mano que se han respetado (#378). */
+  editedKept: number;
   ignoredRows: number;
   errors: string[];
   warnings: string[];
@@ -105,13 +107,14 @@ export async function importCsvFile(
     const allTxHashes = parseResult.transactions.flatMap(tx => tx.rawRowHashes);
     const existingInDb = allTxHashes.length > 0
       ? await client.query(
-          `SELECT rt.row_hash, t.id AS transaction_id, t.operation_type, t.destination_pending
+          `SELECT rt.row_hash, t.id AS transaction_id, t.operation_type, t.destination_pending,
+                  t.original_import IS NOT NULL AS editada
            FROM raw_transactions rt
            JOIN transactions t ON t.id = rt.transaction_id
            WHERE rt.row_hash = ANY($1)`,
           [allTxHashes]
         )
-      : { rows: [] as { row_hash: string; transaction_id: string; operation_type: string; destination_pending: boolean }[] };
+      : { rows: [] as { row_hash: string; transaction_id: string; operation_type: string; destination_pending: boolean; editada: boolean }[] };
     const existingHashSet = new Set(existingInDb.rows.map((r) => r.row_hash));
     // Mapa hash → {transaction_id, operation_type} para detectar cambios de clasificación
     const existingHashMeta = new Map(existingInDb.rows.map((r) => [r.row_hash, r]));
@@ -119,6 +122,8 @@ export async function importCsvFile(
 
     let newTransactions = 0;
     let duplicateRows = 0;
+    // Importadas editadas a mano que el importador habría cambiado y respeta (#378).
+    let editedKept = 0;
     const totalTx = parseResult.transactions.length;
     let processed = 0;
 
@@ -151,14 +156,15 @@ export async function importCsvFile(
         const existingHash = tx.rawRowHashes.find(h => existingHashSet.has(h));
         if (existingHash) {
           const meta = existingHashMeta.get(existingHash);
-          if (meta && destinos.has(existingHash)) destinoRows.push({ transactionId: meta.transaction_id, key: existingHash });
-          if (
-            meta &&
-            meta.destination_pending &&
-            meta.operation_type === 'WITHDRAW' &&
-            (tx.operationType === 'LOST' || tx.operationType === 'GIFT_SENT')
-          ) {
-            upgradeRows.push({ transactionId: meta.transaction_id, newOpType: tx.operationType });
+          const completaDestino = !!meta && destinos.has(existingHash);
+          const reclasifica = !!meta && meta.destination_pending && meta.operation_type === 'WITHDRAW'
+            && (tx.operationType === 'LOST' || tx.operationType === 'GIFT_SENT');
+          // Una importada editada a mano no se toca (#378).
+          if (meta?.editada) {
+            if (completaDestino || reclasifica) editedKept++;
+          } else if (meta) {
+            if (completaDestino) destinoRows.push({ transactionId: meta.transaction_id, key: existingHash });
+            if (reclasifica) upgradeRows.push({ transactionId: meta.transaction_id, newOpType: tx.operationType });
           }
         }
         onProgress?.(processed, totalTx, tx.asset, tx.operationType);
@@ -363,6 +369,7 @@ export async function importCsvFile(
       totalRows: parseResult.stats.totalRows,
       newTransactions,
       duplicateRows,
+      editedKept,
       ignoredRows: parseResult.stats.ignoredRows,
       errors: parseResult.errors.map((e) => e.message),
       warnings: validation.warnings,

@@ -58,3 +58,18 @@ describe('agrupar comisiones (#371)', () => {
     expect(toApiParams(EMPTY_FILTERS, DEFAULT_SORT, 0, 50, 'EUR')).not.toHaveProperty('group_fees')
   })
 })
+
+describe('filtro «Editadas» (#378)', () => {
+  it('se guarda en la URL como editadas=1 y llega a la API como edited=true', () => {
+    const f = { ...EMPTY_FILTERS, editedOnly: true }
+    const url = toHistoryUrl({ filters: f, sort: DEFAULT_SORT, page: 1 })
+    expect(url.get('editadas')).toBe('1')
+    expect(parseHistoryUrl(url).filters.editedOnly).toBe(true)
+    expect(toApiParams(f, DEFAULT_SORT, 0, 50, 'EUR').edited).toBe('true')
+  })
+
+  it('un valor distinto de 1 no activa el filtro', () => {
+    expect(parseHistoryUrl(new URLSearchParams('editadas=si')).filters.editedOnly).toBe(false)
+    expect(toApiParams(EMPTY_FILTERS, DEFAULT_SORT, 0, 50, 'EUR').edited).toBeUndefined()
+  })
+})

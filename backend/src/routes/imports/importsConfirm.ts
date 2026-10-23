@@ -91,7 +91,7 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
       if (lote) send('importing', `Archivo ${i + 1} de ${archivos.length}: ${f.originalname}`);
       try {
         const r = await importTransactionsPhase(f.buffer, f.originalname, withdrawalDestinations, newDepositCosts, exchangeDe(i), send, retiradas);
-        importados.push({ importId: r.importId, archivo: f.originalname, exchange: exchangeDe(i), nuevas: r.newTransactions, duplicadas: r.duplicateRows });
+        importados.push({ importId: r.importId, archivo: f.originalname, exchange: exchangeDe(i), nuevas: r.newTransactions, duplicadas: r.duplicateRows, editadas_respetadas: r.editedKept });
       } catch (e) {
         // En un lote, un archivo idéntico a uno ya importado se salta sin abortar el resto.
         if (lote && (e as Error).message.startsWith('Este CSV exacto ya fue importado')) {

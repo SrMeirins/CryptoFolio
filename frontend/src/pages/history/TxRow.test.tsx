@@ -87,3 +87,13 @@ describe('TxRow — comisiones agrupadas (#371)', () => {
     expect(html).toContain('+2 comisiones')
   })
 })
+
+describe('TxRow — importadas editadas (#378)', () => {
+  it('la insignia «E» tiene nombre accesible y solo aparece si está editada', () => {
+    expect(render(tx({ original_import: { operation_type: 'WITHDRAW', timestamp: '2026-01-15T10:30:00Z', asset: 'XRP', amount: 9, amount_net: 9,
+      cost_asset: null, cost_amount: null, price_per_unit: null, fee_asset: null, fee_amount: null,
+      wallet_id: '00000000-0000-0000-0000-000000000002', destination_wallet_id: null, destination_pending: false } })))
+      .toContain('<span class="sr-only">Importada y editada a mano</span>')
+    expect(render(tx({}))).not.toContain('editada a mano')
+  })
+})

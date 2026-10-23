@@ -7,6 +7,7 @@ import { calcEurValue, flowSign, fmtDate, formatPriceLine, toDisplayAmount, valu
 import { FeeCell } from '../FeeCell'
 import { GroupedFeesDetail } from '../GroupedFeesDetail'
 import { FifoTrace } from './FifoTrace'
+import { ImportEditsSection } from './ImportEditsSection'
 import { OriginSection } from './OriginSection'
 import { OnchainSection } from './OnchainSection'
 import { fiscalLink, portfolioLink } from './detailLinks'
@@ -24,11 +25,16 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-export function DetailBody({ data, currency, onOpen }: {
+export function DetailBody({ data, currency, onOpen, walletName = () => undefined, onRestore = () => {}, restoring = false }: {
   data: TransactionDetail
   currency: Currency
   /** Abre otra transacción en el mismo panel (operaciones relacionadas). */
   onOpen: (id: string) => void
+  /** Nombre de una wallet por su id, para las diferencias de una editada (#378). */
+  walletName?: (id: string) => string | undefined
+  /** Restaura los valores importados de una editada (#378). */
+  onRestore?: (id: string) => void
+  restoring?: boolean
 }) {
   const tx = data.transaction
   const value = toDisplayAmount(calcEurValue(tx), tx, currency)
@@ -61,6 +67,11 @@ export function DetailBody({ data, currency, onOpen }: {
           <GroupedFeesDetail tx={tx} currency={currency} onOpen={onOpen} />
         </dl>
       </Section>
+      {tx.original_import && (
+        <Section title="Editada a mano">
+          <ImportEditsSection tx={tx} walletName={walletName} onRestore={onRestore} restoring={restoring} />
+        </Section>
+      )}
       <Section title="Trazabilidad FIFO (EUR, como Fiscal)"><FifoTrace fifo={data.fifo} onOpen={onOpen} /></Section>
       <Section title="Origen"><OriginSection origin={data.origin} manual={tx.manually_added} /></Section>
       {(data.onchain.tx_hash || data.onchain.address) && <Section title="On-chain"><OnchainSection onchain={data.onchain} /></Section>}

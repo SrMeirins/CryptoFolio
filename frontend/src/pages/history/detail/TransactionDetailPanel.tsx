@@ -15,7 +15,7 @@ import { detailQuery } from './detailQuery'
 // Anterior/Siguiente, editar, borrar y cerrar; el contenido va en DetailBody.
 // Cambiar de transacción no remonta el Drawer: el foco sigue en su sitio.
 
-export function TransactionDetailPanel({ id, currency, onClose, onOpen, prev, next, onEdit, onDelete, isDeleting }: {
+export function TransactionDetailPanel({ id, currency, onClose, onOpen, prev, next, onEdit, onDelete, isDeleting, walletName, onRestore, restoring }: {
   id: string
   currency: Currency
   onClose: () => void
@@ -26,6 +26,9 @@ export function TransactionDetailPanel({ id, currency, onClose, onOpen, prev, ne
   onEdit: (tx: Transaction) => void
   onDelete: (id: string) => void
   isDeleting: boolean
+  walletName: (id: string) => string | undefined
+  onRestore: (id: string) => void
+  restoring: boolean
 }) {
   const titleId = useId()
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -62,7 +65,7 @@ export function TransactionDetailPanel({ id, currency, onClose, onOpen, prev, ne
       <div className="flex-1 overflow-y-auto">
         {isLoading && <LoadingState />}
         {error && <p role="alert" className="px-5 py-4 text-sm text-negative-ink">No se pudo cargar el detalle: {(error as Error).message}</p>}
-        {data && <DetailBody data={data} currency={currency} onOpen={onOpen} />}
+        {data && <DetailBody data={data} currency={currency} onOpen={onOpen} walletName={walletName} onRestore={onRestore} restoring={restoring} />}
       </div>
     </Drawer>
   )

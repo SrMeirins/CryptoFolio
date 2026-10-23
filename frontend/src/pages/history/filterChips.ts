@@ -55,6 +55,7 @@ export function activeChips(
     chips.push({ id: 'importe', label: `Importe: ${label}`, clear: { value_min: '', value_max: '' } })
   }
   if (f.manualOnly) chips.push({ id: 'manuales', label: 'Solo manuales', clear: { manualOnly: false } })
+  if (f.editedOnly) chips.push({ id: 'editadas', label: 'Solo editadas', clear: { editedOnly: false } })
   if (f.import_id) chips.push({ id: 'importacion', label: `Archivo: ${names.importFile(f.import_id) ?? '…'}`, clear: { import_id: '' } })
   return chips
 }

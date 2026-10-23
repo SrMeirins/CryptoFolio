@@ -113,7 +113,7 @@ export interface ProgressEvent {
 export interface ResumenImportacion {
   importId: string
   /** Desglose del lote (#326): una importación por archivo. */
-  archivos?: { importId: string; archivo: string; exchange: string; nuevas: number; duplicadas: number }[]
+  archivos?: { importId: string; archivo: string; exchange: string; nuevas: number; duplicadas: number; editadas_respetadas?: number }[]
   archivo: string
   nuevas: number
   duplicadas: number

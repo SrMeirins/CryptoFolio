@@ -8,7 +8,7 @@ export const CSV_BOM = '﻿';
 export const HISTORY_CSV_HEADER = [
   'Fecha', 'Tipo', 'Activo', 'Importe', 'Coste', 'Activo coste', 'Precio unitario',
   'Comisión', 'Activo comisión', 'Valor EUR', 'Comisión EUR', 'Valor USD', 'Comisión USD',
-  'Origen del valor', 'Wallet', 'Wallet destino', 'Cuenta', 'Manual', 'Notas',
+  'Origen del valor', 'Wallet', 'Wallet destino', 'Cuenta', 'Manual', 'Editada', 'Notas',
   'ID', 'Archivo de origen', 'Hash', 'Operación asociada',
 ].join(';');
 
@@ -32,6 +32,8 @@ export interface HistoryCsvRow {
   destination_wallet_name: string | null;
   account: string | null;
   manually_added: boolean;
+  /** Importada editada (#378): copia del original o null. */
+  original_import: unknown;
   notes: string | null;
   import_filename: string | null;
   tx_hash: string | null;
@@ -107,6 +109,7 @@ export function historyCsvLine(r: HistoryCsvRow, tz: string): string {
     text(r.destination_wallet_name),
     text(r.account),
     r.manually_added ? 'Sí' : 'No',
+    r.original_import ? 'Sí' : 'No',
     text(r.notes),
     r.id,
     text(r.import_filename),

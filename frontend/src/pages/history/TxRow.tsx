@@ -118,6 +118,11 @@ export function TxRow({
                 <span aria-hidden="true">M</span><span className="sr-only">Añadida manualmente</span>
               </span>
             )}
+            {tx.original_import && (
+              <span className="text-xs px-1 py-0.5 rounded-lg bg-warning/15 text-warning-ink font-bold shrink-0" title="Importada y editada a mano">
+                <span aria-hidden="true">E</span><span className="sr-only">Importada y editada a mano</span>
+              </span>
+            )}
           </div>
         </td>
 
