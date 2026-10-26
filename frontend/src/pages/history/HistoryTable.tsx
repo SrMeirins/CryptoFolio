@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from 'react'
+import { Fragment, useMemo, useState, type KeyboardEvent } from 'react'
 import { Calendar } from 'lucide-react'
 import type { Transaction } from '../../api/portfolio'
 import { cardClasses, tableHeadRowClasses } from '../../components/ui'
@@ -8,6 +8,7 @@ import { groupsByDay, type SortKey, type SortState } from './sorting'
 import { SortHeader } from './SortHeader'
 import { TxRow } from './TxRow'
 import type { RunningBalanceView } from './balance/useRunningBalance'
+import { nextRowIndex } from './keyboard/shortcutKeys'
 
 // Tabla del Historial (#351): cabeceras ordenables, grupos por día local
 // (solo ordenando por fecha) y filas de transacción.
@@ -31,6 +32,21 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
   balance?: RunningBalanceView | null
 }) {
   const columns = balance ? 8 : 7
+  // Foco itinerante (#382): la tabla es una sola parada de Tab (la fila activa);
+  // flechas arriba/abajo e Inicio/Fin mueven entre filas, Intro abre el detalle.
+  const [activeState, setActiveState] = useState<string | null>(null)
+  const ids = useMemo(() => transactions.map(t => t.id), [transactions])
+  const activeId = activeState && ids.includes(activeState) ? activeState
+    : selectedId && ids.includes(selectedId) ? selectedId : ids[0] ?? null
+  function onRowsKeyDown(e: KeyboardEvent<HTMLTableSectionElement>) {
+    const row = (e.target as HTMLElement)
+    if (row.tagName !== 'TR' || row.dataset.rowIndex === undefined) return
+    const next = nextRowIndex(e.key, Number(row.dataset.rowIndex), ids.length)
+    if (next === null) return
+    e.preventDefault()
+    setActiveState(ids[next])
+    e.currentTarget.querySelector<HTMLElement>(`tr[data-row-index="${next}"]`)?.focus()
+  }
   const byDay = groupsByDay(sort)
   const grouped = useMemo(() => {
     if (!byDay) return [['', transactions] as [string, Transaction[]]]
@@ -66,7 +82,7 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
             <th scope="col" className="px-3 py-2.5 w-16"><span className="sr-only">Acciones</span></th>
           </tr>
         </thead>
-        <tbody>
+        <tbody onKeyDown={onRowsKeyDown}>
           {grouped.map(([day, txs]) => (
             <Fragment key={day || 'todas'}>
               {byDay && (
@@ -83,7 +99,8 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
               {txs.map(tx => (
                 <TxRow key={tx.id} tx={tx} onDelete={onDelete} onEdit={onEdit} onOpen={onOpen} onPrefetch={onPrefetch}
                   isDeleting={deletingId === tx.id} searchTerm={searchTerm} currency={currency} selected={tx.id === selectedId}
-                  balance={balance ? { asset: balance.asset, value: balance.byId.get(tx.id) } : undefined} />
+                  balance={balance ? { asset: balance.asset, value: balance.byId.get(tx.id) } : undefined}
+                  rowIndex={ids.indexOf(tx.id)} tabbable={tx.id === activeId} onActivate={setActiveState} />
               ))}
             </Fragment>
           ))}

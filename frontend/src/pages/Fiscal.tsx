@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { FileText, Info } from 'lucide-react'
 import { portfolioApi } from '../api/portfolio'
 import { FISCAL_STALE_TIME } from './fiscal/constants'
@@ -20,6 +20,7 @@ import { TablaEventos } from './fiscal/TablaEventos'
 import { TablaRendimientos } from './fiscal/TablaRendimientos'
 import { ExportPanel } from './fiscal/ExportPanel'
 import { YearTabs } from './fiscal/YearTabs'
+import { historyYearLink } from './history/keyboard/yearNav'
 import { FiscalHero, FiscalHeroSkeleton } from './fiscal/FiscalHero'
 import { PlanificadorTab } from './fiscal/PlanificadorTab'
 import { CalendarioFiscal } from './fiscal/CalendarioFiscal'
@@ -201,6 +202,13 @@ export function Fiscal() {
       />
 
       <YearTabs years={years} activeYear={activeYear} overview={overview} onSelect={setSelectedYear} />
+      {activeYear && (
+        <p className="text-xs text-right -mt-2">
+          <Link to={historyYearLink(activeYear)} className="text-brand-ink hover:underline rounded focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
+            Ver las operaciones de {activeYear} en Historial
+          </Link>
+        </p>
+      )}
 
       <Tabs items={TAB_ITEMS} value={vista} onChange={setVista} label="Secciones de Fiscal" idBase={ID_BASE} variant="underline"
         className="overflow-x-auto [scrollbar-width:none] [&>button]:shrink-0 max-sm:[&>button]:px-3" />

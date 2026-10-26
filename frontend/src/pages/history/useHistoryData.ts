@@ -84,6 +84,7 @@ export function useHistoryData(queryParams: Record<string, string>, offset: numb
     accounts: facets?.accounts ?? [],
     assets: facets?.assets ?? [],
     presentTypes: facets?.types ?? [],
+    years: facets?.years ?? [],
     imports,
     importFilename: imports.find(i => i.id === importId)?.filename ?? null,
     deletingId, deleteTx, restoringId, restoreTx, pageIds,

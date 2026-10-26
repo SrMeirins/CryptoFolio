@@ -1,5 +1,6 @@
 import { forwardRef } from 'react'
-import { Search, X, RefreshCw, PenLine, Link2, Layers, FilePen } from 'lucide-react'
+import { YearSelector } from './keyboard/YearSelector'
+import { Search, X, RefreshCw, PenLine, Link2, Layers, FilePen, Keyboard } from 'lucide-react'
 import { DateRangePicker } from '../../components/DateRangePicker'
 import { Dropdown, MultiDropdown, fieldClasses, iconButtonClasses } from '../../components/ui'
 import { fmtShort } from '../../utils/date'
@@ -9,7 +10,8 @@ import type { HistoryFilterState } from './urlState'
 
 // Barra de filtros del Historial (#351, #366): búsqueda, tipos (varios, por
 // grupos), activos (varios), wallet, cuenta, archivo de importación, fechas,
-// rango de importe, «solo manuales», «editadas» (#378) y copiar el enlace de la vista.
+// rango de importe, «solo manuales», «editadas» (#378), selector «Año» y ayuda de
+// atajos (#382) y copiar el enlace de la vista.
 
 export const HistoryToolbar = forwardRef<HTMLInputElement, {
   filters: HistoryFilterState
@@ -26,9 +28,12 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
   patchFilters: (patch: Partial<HistoryFilterState>) => void
   setDateRange: (from: string, to: string) => void
   onCopyLink: () => void
+  /** Selector «Año» (#382). */
+  year: { years: readonly number[]; value: number | null; onChange: (y: number | null) => void; onStep: (s: -1 | 1) => void; canPrev: boolean; canNext: boolean }
+  onHelp: () => void
 }>(function HistoryToolbar({
   filters, searchInput, wallets, accounts, assets, presentTypes, imports, currencySymbol, isFetching,
-  setSearchInput, setFilter, patchFilters, setDateRange, onCopyLink,
+  setSearchInput, setFilter, patchFilters, setDateRange, onCopyLink, year, onHelp,
 }, searchRef) {
   return (
     <div className="flex items-center gap-2 flex-wrap" role="search" aria-label="Filtros del historial">
@@ -37,7 +42,8 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
         <input
           ref={searchRef}
           type="search"
-          aria-label="Buscar por activo, nota, hash o archivo"
+          aria-label="Buscar por activo, nota, hash o archivo (atajo: /)"
+          aria-keyshortcuts="/"
           placeholder="Buscar activo, nota, hash…"
           value={searchInput}
           maxLength={100}
@@ -65,6 +71,7 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
           options={[{ value: '', label: 'Todos los archivos' },
             ...imports.map(i => ({ value: i.id, label: i.filename, description: `Importado el ${fmtShort(i.imported_at.slice(0, 10))}` }))]} />
       )}
+      <YearSelector years={year.years} value={year.value} onChange={year.onChange} onStep={year.onStep} canPrev={year.canPrev} canNext={year.canNext} />
       <DateRangePicker from={filters.date_from} to={filters.date_to} onChange={setDateRange} />
       <AmountRange min={filters.value_min} max={filters.value_max} symbol={currencySymbol} onChange={patchFilters} />
 
@@ -97,8 +104,12 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
         <Layers size={11} aria-hidden="true" /> Agrupar comisiones
       </button>
 
+      <button type="button" onClick={onHelp} title="Atajos de teclado (?)" aria-keyshortcuts="?"
+        className={iconButtonClasses('md', false, 'ml-auto')} aria-label="Atajos de teclado">
+        <Keyboard size={13} aria-hidden="true" />
+      </button>
       <button type="button" onClick={onCopyLink} title="Copiar el enlace de esta vista"
-        className={iconButtonClasses('md', false, 'ml-auto')} aria-label="Copiar el enlace de esta vista">
+        className={iconButtonClasses('md')} aria-label="Copiar el enlace de esta vista">
         <Link2 size={13} aria-hidden="true" />
       </button>
 

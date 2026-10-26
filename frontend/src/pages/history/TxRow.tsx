@@ -57,7 +57,7 @@ function OpChip({ type }: { type: string }) {
 }
 
 export function TxRow({
-  tx, onDelete, onEdit, onOpen, onPrefetch, isDeleting, searchTerm, currency, selected = false, balance,
+  tx, onDelete, onEdit, onOpen, onPrefetch, isDeleting, searchTerm, currency, selected = false, balance, rowIndex, tabbable = true, onActivate,
 }: {
   tx: Transaction
   currency: Currency
@@ -65,6 +65,10 @@ export function TxRow({
   selected?: boolean
   /** Saldo del activo filtrado tras la operación (#380); sin él no hay columna. */
   balance?: { asset: string; value: { balance: number; missing: number | null } | undefined }
+  /** Foco itinerante de la tabla (#382): posición, si es la fila activa y aviso al enfocarla. */
+  rowIndex?: number
+  tabbable?: boolean
+  onActivate?: (id: string) => void
   /** Abre el panel de detalle (#373). */
   onOpen: (id: string) => void
   /** Precarga el detalle al pasar el ratón o el foco (#373). */
@@ -99,12 +103,15 @@ export function TxRow({
     <>
       <tr
         ref={rowRef}
-        className={`group border-b border-border/40 transition-colors cursor-pointer ${selected ? 'bg-background-tertiary/50' : ''}`}
+        className={`group border-b border-border/40 transition-colors cursor-pointer focus:outline-hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand ${selected ? 'bg-background-tertiary/50' : ''}`}
         style={{ backgroundColor: selected ? undefined : meta.rowBg }}
         aria-current={selected ? 'true' : undefined}
+        data-row-index={rowIndex}
+        tabIndex={rowIndex === undefined ? undefined : tabbable ? 0 : -1}
         onClick={() => onOpen(tx.id)}
         onMouseEnter={() => onPrefetch(tx.id)}
-        onFocus={() => onPrefetch(tx.id)}
+        onFocus={() => { onPrefetch(tx.id); onActivate?.(tx.id) }}
+        onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) { e.preventDefault(); onOpen(tx.id) } }}
       >
         {/* Fecha */}
         <td className="px-4 py-2.5 whitespace-nowrap align-middle">
@@ -198,13 +205,13 @@ export function TxRow({
               // Ocultas en reposo, pero visibles con hover, con foco dentro de la
               // fila y siempre en pantallas táctiles, donde no hay hover (#351).
               <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity flex gap-0.5">
-                <button type="button" onClick={() => onEdit(tx)}
+                <button type="button" onClick={() => onEdit(tx)} tabIndex={tabbable ? undefined : -1}
                   className={iconButtonClasses('md', false, '', 'brand')}
                   title="Editar transacción" aria-label="Editar transacción">
                   <PenLine size={12} aria-hidden="true" />
                 </button>
                 {tx.manually_added && (
-                  <button type="button" ref={deleteRef} onClick={() => setConfirmDelete(true)}
+                  <button type="button" ref={deleteRef} onClick={() => setConfirmDelete(true)} tabIndex={tabbable ? undefined : -1}
                     className={iconButtonClasses('md', false, '', 'danger')}
                     title="Eliminar transacción" aria-label="Eliminar transacción">
                     <Trash2 size={12} aria-hidden="true" />
@@ -215,7 +222,7 @@ export function TxRow({
             {tx.manually_added && confirmDelete && (
               <DeleteConfirm onConfirm={() => onDelete(tx.id)} onCancel={cancelDelete} isDeleting={isDeleting} />
             )}
-            <button type="button" onClick={() => onOpen(tx.id)} aria-haspopup="dialog"
+            <button type="button" onClick={() => onOpen(tx.id)} aria-haspopup="dialog" tabIndex={tabbable ? undefined : -1}
               className={iconButtonClasses('sm')} title="Ver detalle" aria-label="Ver detalle">
               <PanelRightOpen size={12} aria-hidden="true" />
             </button>

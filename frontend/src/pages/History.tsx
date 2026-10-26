@@ -25,6 +25,9 @@ import { TransactionDetailPanel } from './history/detail/TransactionDetailPanel'
 import { useDetailNavigation } from './history/detail/useDetailNavigation'
 import { useRunningBalance } from './history/balance/useRunningBalance'
 import { ShortfallBanner } from './history/balance/ShortfallBanner'
+import { selectedYear, stepYear, yearRange } from './history/keyboard/yearNav'
+import { useHistoryShortcuts } from './history/keyboard/useHistoryShortcuts'
+import { ShortcutsHelp } from './history/keyboard/ShortcutsHelp'
 
 // Pestaña Historial: orquesta el estado de filtros (useHistoryFilters), los
 // datos (useHistoryData) y los bloques de UI de pages/history/ (#351).
@@ -33,6 +36,7 @@ export function History() {
   const paginationRef = useRef<HTMLElement>(null)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [showNewTx, setShowNewTx] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
 
   const f = useHistoryFilters()
   const d = useHistoryData(f.queryParams, f.offset, f.filters.import_id)
@@ -71,6 +75,19 @@ export function History() {
     setFilter('assets', [asset])
     searchRef.current?.focus()
   }, [setFilter])
+
+  // Año fiscal (#382): un año es el rango de fechas del año completo.
+  const year = selectedYear(f.filters.date_from, f.filters.date_to)
+  const goYear = (y: number | null) => { if (y === null) f.setDateRange('', ''); else { const r = yearRange(y); f.setDateRange(r.from, r.to) } }
+  const prevYear = stepYear(d.years, year, f.filters.date_from, -1)
+  const nextYear = stepYear(d.years, year, f.filters.date_from, 1)
+  const stepTo = (step: -1 | 1) => { const y = step === -1 ? prevYear : nextYear; if (y !== null) goYear(y) }
+  useHistoryShortcuts({
+    search: () => searchRef.current?.focus(),
+    help: () => setShowHelp(true),
+    yearPrev: () => stepTo(-1),
+    yearNext: () => stepTo(1),
+  })
 
   const walletName = useCallback((id: string) => wallets.find(w => w.id === id)?.name, [wallets])
   const currencySymbol = currency === 'USD' ? '$' : '€'
@@ -112,7 +129,8 @@ export function History() {
           accounts={d.accounts} assets={d.assets} presentTypes={d.presentTypes} imports={d.imports}
           currencySymbol={currencySymbol} isFetching={d.isFetching}
           setSearchInput={f.setSearchInput} setFilter={f.setFilter} patchFilters={f.patchFilters}
-          setDateRange={f.setDateRange} onCopyLink={() => { void copyLink() }} />
+          setDateRange={f.setDateRange} onCopyLink={() => { void copyLink() }} onHelp={() => setShowHelp(true)}
+          year={{ years: d.years, value: year, onChange: goYear, onStep: stepTo, canPrev: prevYear !== null, canNext: nextYear !== null }} />
         <ActiveFilterChips chips={chips} onRemove={f.patchFilters} onClearAll={f.clearFilters} />
       </div>
 
@@ -156,6 +174,8 @@ export function History() {
           onDelete={id => { void d.deleteTx(id).then(ok => { if (ok) closeDetail() }) }}
           walletName={walletName} onRestore={id => { void d.restoreTx(id) }} restoring={d.restoringId === f.focusTx} />
       )}
+
+      {showHelp && <ShortcutsHelp onClose={() => setShowHelp(false)} />}
 
       {(showNewTx || editingTx) && (
         <ManualTxModal
