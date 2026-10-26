@@ -2,6 +2,7 @@ import { usdPerEurSql } from '../fiat/displayCurrency';
 import { buildHistoryOrderBy, buildHistoryWhere, HistoryFilters } from './listFilters';
 import { FLOW_DIRECTION, VALUATION_COLUMNS, VALUATION_CTES, valuationJoins } from './valuationSql';
 import { FEE_PARENT_CTES, GROUPED_FEES_COLUMN, feeValuedCte } from './feeGrouping';
+import { CLOSES_TIMEZONE } from '../prices/closePrices';
 import { FEE_TYPES } from './operationGroups';
 
 // Consulta de filas del Historial (#346/#349), común al listado paginado y a
@@ -45,8 +46,10 @@ export function groupingEnabled(f: Filters): boolean {
  */
 export function filteredValuedCtes(f: Filters, tz: string, grouped = false, onlyId?: string): { ctes: string; params: unknown[] } {
   const built = buildHistoryWhere(f, tz);
-  const all = [...built.params, tz];
-  const tzParam = `$${all.length}`;
+  // Día local de los filtros: la zona de la aplicación (#388, ya en built.params).
+  // Cruce con los cierres diarios: la zona en que están guardados (hasta #389, Madrid).
+  const all = [...built.params, CLOSES_TIMEZONE];
+  const closesTzParam = `$${all.length}`;
   // Filtro interno por id (detalle de una transacción, #373); no está en la API pública.
   let where = built.where;
   if (onlyId) { all.push(onlyId); where = `${where ? `${where} AND` : 'WHERE'} t.id = $${all.length}`; }
@@ -59,7 +62,7 @@ export function filteredValuedCtes(f: Filters, tz: string, grouped = false, only
     ${VALUATION_CTES},
     valued AS (
       SELECT t.*, ${VALUATION_COLUMNS}, ${FLOW_DIRECTION}
-      FROM transactions t ${valuationJoins(tzParam)}
+      FROM transactions t ${valuationJoins(closesTzParam)}
       ${where}
     ),
     filtered AS (
@@ -67,7 +70,7 @@ export function filteredValuedCtes(f: Filters, tz: string, grouped = false, only
       ${ranged ? `WHERE ${range.join(' AND ')}` : ''}
     ),
     ${FEE_PARENT_CTES},
-    ${feeValuedCte(tzParam)},
+    ${feeValuedCte(closesTzParam)},
     -- Filas que se ven (#371): agrupando, sin las comisiones cuya operación
     -- también está en la vista (van dentro de ella).
     visible AS (

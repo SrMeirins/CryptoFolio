@@ -2,7 +2,8 @@ import { db } from '../../db/client';
 import { calcularIrpfAhorro, desgloseMarginal, parseTiposConfig, type TramoMarginal } from './irpf';
 import { baseAhorro, cargarAniosFiscales, compensarPerdidas, type AnioFiscal } from './carryforward';
 import { consumirFifo, type ConsumoFifo, type LoteAbierto } from './simularVenta';
-import { madridYearMonth } from './madridTime';
+import { localYearMonth } from '../time/localTime';
+import { getAppTimezone } from '../time/appTimezone';
 
 // Contexto de una venta simulada (#279, #280): se carga una vez (lotes de la
 // wallet, años fiscales y tipos del IRPF) y permite evaluar cualquier
@@ -66,7 +67,7 @@ export async function cargarContextoVenta(asset: string, walletId?: string): Pro
     pricePerUnit: r.price_per_unit as number,
   }));
 
-  const year = madridYearMonth().year;
+  const year = localYearMonth(await getAppTimezone(db)).year;
   const anios = await cargarAniosFiscales(year);
   const tipos = parseTiposConfig((await db.query("SELECT value FROM app_config WHERE key = 'irpf_tramos_tipos'")).rows[0]?.value);
   const baseAntes = baseAhorro(compensarPerdidas(anios).detalle.at(-1)!);

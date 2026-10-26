@@ -6,6 +6,7 @@ import { avisoCalendario } from '../../modules/fiscal/calendarioFiscal';
 import { obligaciones721 } from '../../modules/fiscal/obligacion721';
 import { getHistoricalPriceEur } from '../../modules/prices/binance';
 import { requireConfirm, sendZodError } from './settingsShared';
+import { getAppTimezone } from '../../modules/time/appTimezone';
 import { sendInternalError } from '../../middleware/errorHandler';
 
 import { coberturaActual } from '../../modules/csv/coberturaDb';
@@ -166,7 +167,7 @@ router.get('/notifications', async (_req: Request, res: Response) => {
   // Recordatorio del calendario fiscal (#309): a 30 días del próximo hito, información; a 7, aviso.
   // Sin la obligación del 721 (p. ej. si falla la valoración) el aviso no se pierde: se asume desconocida.
   const obligado = await obligaciones721().catch(() => () => null);
-  const avisoFiscal = avisoCalendario(new Date(), obligado);
+  const avisoFiscal = avisoCalendario(new Date(), obligado, await getAppTimezone(db));
   if (avisoFiscal) {
     notifications.push({ id: 'fiscal-calendar', type: avisoFiscal.type, category: 'Fiscal', message: avisoFiscal.message });
   }

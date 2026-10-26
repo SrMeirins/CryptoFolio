@@ -2,7 +2,7 @@ import { loadPositionEvents, holdingsAtInstants } from './positions';
 import { loadCapitalFlows } from './capitalFlows';
 import { computeDailyPnl, valueHoldings, type DayPnl, type DayValuation } from './dailyPnl';
 import {
-  daysBetween, getCachedCloses, madridCloseInstant, madridDateOf, prefetchCloseRange,
+  CLOSES_TIMEZONE, daysBetween, getCachedCloses, madridCloseInstant, madridDateOf, prefetchCloseRange,
 } from '../prices/closePrices';
 import { PRICE_ALIASES } from '../prices/priceAliases';
 import { getAllLivePrices } from '../prices/liveFeed';
@@ -17,7 +17,8 @@ export interface PnlResponse {
   currency: DisplayCurrency;
   from: string;
   to: string;
-  timezone: 'Europe/Madrid';
+  /** Zona de los días del P&L: la de los cierres diarios (Madrid hasta #389). */
+  timezone: string;
   refreshing: boolean;
   totalPnl: number;
   twrPct: number;    // rentabilidad ponderada en el tiempo del rango
@@ -62,7 +63,7 @@ export async function getDailyPnl(
   const to = query.to ?? today;
   const firstActivity = events.length > 0 ? madridDateOf(events.reduce((min, e) => Math.min(min, e.at), Infinity)) : to;
   const from = !query.from || query.from < firstActivity ? (firstActivity <= to ? firstActivity : to) : query.from;
-  const empty: PnlResponse = { currency, from, to, timezone: 'Europe/Madrid', refreshing: false, totalPnl: 0, twrPct: 0, dietzPct: 0, peakCapitalPct: 0, days: [], today: null, progreso: { listos: 0, total: 0 } };
+  const empty: PnlResponse = { currency, from, to, timezone: CLOSES_TIMEZONE, refreshing: false, totalPnl: 0, twrPct: 0, dietzPct: 0, peakCapitalPct: 0, days: [], today: null, progreso: { listos: 0, total: 0 } };
   if (events.length === 0 || from > to) return empty;
 
   // Día anterior (base) + días pedidos. El día de hoy se valora en este instante.
@@ -166,7 +167,7 @@ export async function getDailyPnl(
     ? liveDayBase(today, valueAt(todayIdx - 1), holdings[todayIdx], todayFlows, priceTable, todayIdx)
     : null;
   const progreso = { listos: assets.size - pending.size, total: assets.size };
-  return { currency, from, to, timezone: 'Europe/Madrid', refreshing, totalPnl, twrPct, dietzPct, peakCapitalPct, days, today: liveDay, progreso };
+  return { currency, from, to, timezone: CLOSES_TIMEZONE, refreshing, totalPnl, twrPct, dietzPct, peakCapitalPct, days, today: liveDay, progreso };
 }
 
 function liveDayBase(

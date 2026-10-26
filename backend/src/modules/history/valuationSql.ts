@@ -49,7 +49,8 @@ export const VALUATION_CTES = `
 
 /**
  * JOINs de valoración para la transacción con alias `t`. `tzParam` es el
- * placeholder ($n) de la zona horaria del cierre diario (nunca interpolada).
+ * placeholder ($n) de la zona de los cierres diarios guardados (CLOSES_TIMEZONE,
+ * nunca interpolada): el día de la operación se cruza con el día del cierre.
  */
 export function valuationJoins(tzParam: string): string {
   const localDay = `(t.timestamp AT TIME ZONE ${tzParam})::date`;

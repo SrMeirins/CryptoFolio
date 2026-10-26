@@ -5,6 +5,7 @@ import { getHistoricalPriceEur as getCoinGeckoDailyPriceEur, fetchMarketChart } 
 import { fetchWithTimeout } from './httpTimeout';
 import { dedupeByKey } from './priceDedup';
 import { PRICE_ALIASES } from './priceAliases';
+import { DEFAULT_TIMEZONE } from '../time/appTimezone';
 
 // Precio de cierre de cada día a las 00:00 Europe/Madrid (#164), base del
 // P&L diario (#154). El cierre del día D es el precio en el instante en que
@@ -21,7 +22,12 @@ import { PRICE_ALIASES } from './priceAliases';
 // transitorios (red, 5xx, 429 agotados) lanzan error y no dejan marca.
 
 const REST_BASE = 'https://api.binance.com/api/v3';
-const TIMEZONE = 'Europe/Madrid';
+/**
+ * Zona de los cierres diarios guardados: el día de cada cierre es el de esta
+ * zona. Sigue siendo la de por defecto hasta la caché de cierres por zona (#389).
+ */
+export const CLOSES_TIMEZONE = DEFAULT_TIMEZONE;
+const TIMEZONE = CLOSES_TIMEZONE;
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_429_RETRIES = 3;
