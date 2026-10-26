@@ -5,6 +5,7 @@ import { MAX_LENGTH_SHORT } from '../../modules/validation/textLength';
 import { DISPLAY_CURRENCIES } from '../../modules/fiat/displayCurrency';
 import { sendZodError } from './settingsShared';
 import { VIEWS_KEY } from '../../modules/history/savedViews';
+import { DEFAULT_TIMEZONE, TIMEZONE_CONFIG_KEY, getTimezoneInfo, invalidateTimezoneCache, isValidTimeZone } from '../../modules/time/appTimezone';
 
 const router = Router();
 
@@ -25,6 +26,9 @@ const configSchema = z.object({
 const restrictedValues: Record<string, z.ZodType<string>> = {
   display_currency: z.enum(DISPLAY_CURRENCIES, { error: 'display_currency debe ser EUR o USD' }),
   theme: z.enum(['dark', 'light', 'system'], { error: 'theme debe ser dark, light o system' }),
+  // Zona horaria (#388): una zona IANA conocida (lista blanca) o «» para volver
+  // a la de la variable APP_TIMEZONE o la de por defecto.
+  [TIMEZONE_CONFIG_KEY]: z.string().refine(v => v === '' || isValidTimeZone(v), 'timezone debe ser una zona horaria IANA válida (p. ej. Europe/Madrid)'),
 };
 
 // ── GET /api/settings/config ───────────────────────────────────────────────
@@ -48,12 +52,25 @@ router.put('/config', async (req: Request, res: Response) => {
     sendZodError(res, restricted.error);
     return;
   }
-  await db.query(
-    `INSERT INTO app_config (key, value) VALUES ($1, $2)
-     ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
-    [key, String(value)]
-  );
+  if (key === TIMEZONE_CONFIG_KEY && value === '') {
+    await db.query('DELETE FROM app_config WHERE key = $1', [key]);
+  } else {
+    await db.query(
+      `INSERT INTO app_config (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+      [key, String(value)]
+    );
+  }
+  if (key === TIMEZONE_CONFIG_KEY) invalidateTimezoneCache();
   res.json({ success: true });
+});
+
+// ── GET /api/settings/timezone ─────────────────────────────────────────────
+// Zona efectiva (#388), de dónde sale (ajuste, variable o por defecto) y el
+// ajuste guardado si no es válido y se ha ignorado.
+router.get('/timezone', async (_req: Request, res: Response) => {
+  const info = await getTimezoneInfo(db);
+  res.json({ ...info, default: DEFAULT_TIMEZONE });
 });
 
 // ── GET /api/settings/stats ────────────────────────────────────────────────

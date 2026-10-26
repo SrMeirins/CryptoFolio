@@ -2,7 +2,8 @@ import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
-import { madridYearMonth } from '../../modules/fiscal/madridTime';
+import { localYearMonth } from '../../modules/time/localTime';
+import { DEFAULT_TIMEZONE } from '../../modules/time/appTimezone';
 
 // Carryforward desde el primer ejercicio con datos (#305). Antes solo se
 // cargaban los 4 últimos y el actual: una pérdida de hace 5 años, que aún
@@ -10,7 +11,7 @@ import { madridYearMonth } from '../../modules/fiscal/madridTime';
 let testDb: TestDatabase;
 let pool: Pool;
 let app: import('express').Express;
-const Y = madridYearMonth().year;
+const Y = localYearMonth(DEFAULT_TIMEZONE).year;
 
 async function seed(year: number, gain: number) {
   const w = (await pool.query(`SELECT id FROM wallets LIMIT 1`)).rows[0]?.id

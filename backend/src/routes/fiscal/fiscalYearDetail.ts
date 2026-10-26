@@ -5,13 +5,15 @@ import { getUmbral721, sumaValorCustodiaExchange, valorizarLotesEnFecha } from '
 import { parseYear } from './fiscalShared';
 import { obligacion721 } from '../../modules/fiscal/declaraciones';
 import { listarDeclaraciones, ultimaPresentacion721 } from '../../modules/fiscal/declaracionesRepo';
-import { endOfYearMadrid, madridDate, madridYearMonth } from '../../modules/fiscal/madridTime';
+import { endOfLocalYear, localDate, localYearMonth } from '../../modules/time/localTime';
+import { getAppTimezone } from '../../modules/time/appTimezone';
 
 const router = Router();
 
 // ── GET /api/fiscal/:year/breakdown ───────────────────────────────────────
 // G/P neto agrupado por activo transmitido para el año dado.
 router.get('/:year/breakdown', async (req: Request, res: Response) => {
+  const tz = await getAppTimezone(db);
   const year = parseYear(req.params.year);
   if (!year) return res.status(400).json({ error: 'Año inválido' });
 
@@ -24,11 +26,11 @@ router.get('/:year/breakdown', async (req: Request, res: Response) => {
       COUNT(*) AS operaciones
     FROM fifo_lot_consumptions flc
     JOIN fifo_lots fl ON fl.id = flc.lot_id
-    WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE 'Europe/Madrid') = $1
+    WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE $2) = $1
       AND flc.fiscal_event_type != 'NONE'
     GROUP BY fl.asset
     ORDER BY ABS(SUM(flc.gain_loss_eur)) DESC
-  `, [year]);
+  `, [year, tz]);
 
   res.json(result.rows.map((r: Record<string, unknown>) => ({
     asset:       r.asset as string,
@@ -42,26 +44,27 @@ router.get('/:year/breakdown', async (req: Request, res: Response) => {
 // ── GET /api/fiscal/:year/monthly ──────────────────────────────────────────
 // G/P acumulado mes a mes para el año dado (para gráfico de evolución).
 router.get('/:year/monthly', async (req: Request, res: Response) => {
+  const tz = await getAppTimezone(db);
   const year = parseYear(req.params.year);
   if (!year) return res.status(400).json({ error: 'Año inválido' });
 
   const result = await db.query(`
     SELECT
-      EXTRACT(MONTH FROM flc.consumed_at AT TIME ZONE 'Europe/Madrid')::int AS mes,
+      EXTRACT(MONTH FROM flc.consumed_at AT TIME ZONE $2)::int AS mes,
       COALESCE(SUM(flc.gain_loss_eur), 0)      AS neto_mes
     FROM fifo_lot_consumptions flc
-    WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE 'Europe/Madrid') = $1
+    WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE $2) = $1
       AND flc.fiscal_event_type != 'NONE'
     GROUP BY mes
     ORDER BY mes
-  `, [year]);
+  `, [year, tz]);
 
   const byMonth = new Map(result.rows.map((r: Record<string, unknown>) => [
     parseInt(r.mes as string),
     parseFloat(r.neto_mes as string),
   ]));
 
-  const { year: currentYear, month: currentMonth } = madridYearMonth();
+  const { year: currentYear, month: currentMonth } = localYearMonth(tz);
   const maxMonth = year < currentYear ? 12 : currentMonth;
 
   let acumulado = 0;
@@ -82,10 +85,11 @@ router.get('/:year/monthly', async (req: Request, res: Response) => {
 
 // ── GET /api/fiscal/:year/summary ──────────────────────────────────────────
 router.get('/:year/summary', async (req: Request, res: Response) => {
+  const tz = await getAppTimezone(db);
   const year = parseYear(req.params.year);
   if (!year) return res.status(400).json({ error: 'Año inválido' });
 
-  const currentYear = madridYearMonth().year;
+  const currentYear = localYearMonth(tz).year;
   const esAnioEnCurso = year === currentYear;
 
   const gpRes = await db.query(`
@@ -95,20 +99,20 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
       COALESCE(SUM(flc.gain_loss_eur), 0) AS neto,
       COUNT(*) AS num_operaciones
     FROM fifo_lot_consumptions flc
-    WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE 'Europe/Madrid') = $1
+    WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE $2) = $1
       AND flc.fiscal_event_type != 'NONE'
-  `, [year]);
+  `, [year, tz]);
 
   const rendRes = await db.query(`
     SELECT
       COALESCE(SUM(t.amount_net * COALESCE(t.price_per_unit, 0)), 0) AS total_rendimientos,
       COUNT(*) AS num_rendimientos
     FROM transactions t
-    WHERE EXTRACT(YEAR FROM t.timestamp AT TIME ZONE 'Europe/Madrid') = $1
+    WHERE EXTRACT(YEAR FROM t.timestamp AT TIME ZONE $2) = $1
       AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
-  `, [year]);
+  `, [year, tz]);
 
-  const dec31 = esAnioEnCurso ? new Date() : endOfYearMadrid(year);
+  const dec31 = esAnioEnCurso ? new Date() : endOfLocalYear(tz, year);
   const { activos, preciosPendientes } = await valorizarLotesEnFecha(dec31);
   // Modelo 721: solo cuenta la custodia de terceros (exchanges); la
   // autocustodia (hardware/software) no se declara en este modelo.
@@ -146,12 +150,13 @@ router.get('/:year/events', async (req: Request, res: Response) => {
 
 // ── GET /api/fiscal/:year/modelo721 ───────────────────────────────────────
 router.get('/:year/modelo721', async (req: Request, res: Response) => {
+  const tz = await getAppTimezone(db);
   const year = parseYear(req.params.year);
   if (!year) return res.status(400).json({ error: 'Año inválido' });
 
-  const currentYear = madridYearMonth().year;
+  const currentYear = localYearMonth(tz).year;
   const esAnioEnCurso = year === currentYear;
-  const dec31 = esAnioEnCurso ? new Date() : endOfYearMadrid(year);
+  const dec31 = esAnioEnCurso ? new Date() : endOfLocalYear(tz, year);
 
   const { activos, preciosPendientes } = await valorizarLotesEnFecha(dec31);
   const umbral = await getUmbral721();
@@ -166,7 +171,7 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
     year,
     esAnioEnCurso,
     // Día de Madrid (#303): en el año en curso, recortar el ISO daba el día UTC.
-    fecha:        madridDate(dec31),
+    fecha:        localDate(tz, dec31),
     activos,
     totalValor,
     totalValorCustodia,

@@ -7,11 +7,13 @@ import {
 } from '../../modules/csv/confirmImport';
 import { archivosDe, exchangesForzados, uploadCsv, parseWithdrawalDestinations, parseDepositCosts, retiradasDe } from './importsValidation';
 import { cargarAniosFiscales } from '../../modules/fiscal/carryforward';
-import { madridYearMonth } from '../../modules/fiscal/madridTime';
 import { estadoPreparacion } from '../../modules/pnl/pnlService';
 import { enSegundoPlano } from '../../utils/enSegundoPlano';
 import { verificarEnSegundoPlano } from '../../modules/walletSync/walletSync';
 import { agruparAvisosFifo, impactoPorEjercicio, type ArchivoImportado } from '../../modules/csv/resumenImportacion';
+import { localYearMonth } from '../../modules/time/localTime';
+import { getAppTimezone } from '../../modules/time/appTimezone';
+import { db } from '../../db/client';
 
 const router = Router();
 
@@ -25,6 +27,7 @@ const router = Router();
 // Lote (#326): varios archivos se importan uno tras otro, cada uno como su propia
 // importación, y los precios históricos y el FIFO se ejecutan una sola vez al final.
 router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
+  const tz = await getAppTimezone(db);
   const archivos = archivosDe(req);
   if (archivos.length === 0) { res.status(400).json({ error: 'No se recibió ningún archivo' }); return; }
   let forzados: (Exchange | null)[];
@@ -118,7 +121,7 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
     }
 
     // FASE 3: Motor FIFO, con el G/P de cada ejercicio antes y después para el resumen (#324)
-    const anio = madridYearMonth().year;
+    const anio = localYearMonth(tz).year;
     const antes = await cargarAniosFiscales(anio);
     const fifo = await runFifoPhase(send);
     const despues = await cargarAniosFiscales(anio);

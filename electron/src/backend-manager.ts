@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { pollUntil } from './shared/poll-until';
 import { BACKEND_PORT_BASE } from './shared/ports';
+import { detectSystemTimezone, systemTimezoneEnv } from './shared/system-timezone';
 
 interface BackendOptions {
   databaseUrl: string;
@@ -59,6 +60,8 @@ export class BackendManager {
         ELECTRON_MODE: 'true',
         // El backend solo escucha en localhost — nunca en 0.0.0.0
         BACKEND_HOST: '127.0.0.1',
+        // Zona horaria del sistema (#388), salvo que ya venga definida.
+        ...systemTimezoneEnv(process.env, detectSystemTimezone()),
         ...(this.walletSyncEncryptionKey
           ? { WALLET_SYNC_ENCRYPTION_KEY: this.walletSyncEncryptionKey }
           : {}),

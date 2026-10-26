@@ -4,10 +4,11 @@ import { db } from '../../db/client';
 import { FIFO_DUST_EPSILON } from '../../modules/fifo/constants';
 import { cargarAniosFiscales, compensarPerdidas } from '../../modules/fiscal/carryforward';
 import { parseTiposConfig } from '../../modules/fiscal/irpf';
-import { madridYearMonth } from '../../modules/fiscal/madridTime';
 import { colchonSinTributar, cuotaConExtra } from '../../modules/fiscal/planificador';
 import { sendZodError } from './fiscalShared';
 import { sendInternalError } from '../../middleware/errorHandler';
+import { localYearMonth } from '../../modules/time/localTime';
+import { getAppTimezone } from '../../modules/time/appTimezone';
 
 // Planificador de fin de año (#307). El contexto fiscal del ejercicio en
 // curso y los lotes abiertos en orden FIFO; el navegador los valora con los
@@ -16,7 +17,8 @@ import { sendInternalError } from '../../middleware/errorHandler';
 const router = Router();
 
 async function contexto() {
-  const year = madridYearMonth().year;
+  const tz = await getAppTimezone(db);
+  const year = localYearMonth(tz).year;
   const anios = await cargarAniosFiscales(year);
   const tipos = parseTiposConfig((await db.query("SELECT value FROM app_config WHERE key = 'irpf_tramos_tipos'")).rows[0]?.value);
   return { year, anios, tipos };

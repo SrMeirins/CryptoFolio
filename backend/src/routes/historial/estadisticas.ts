@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../../db/client';
-import { MADRID_TZ } from '../../modules/fiscal/madridTime';
+import { getAppTimezone } from '../../modules/time/appTimezone';
 import { historyExportSchema } from '../../modules/history/listFilters';
 import { getHistoryStats } from '../../modules/history/historyStats';
 import { sendZodError } from '../transactions/transactionsShared';
@@ -11,13 +11,11 @@ import { sendZodError } from '../transactions/transactionsShared';
 
 const router = Router();
 
-// Zona de los meses del gráfico y del cierre diario (la sustituirá #347).
-const STATS_TZ = MADRID_TZ;
-
 router.get('/', async (req: Request, res: Response) => {
+  const tz = await getAppTimezone(db);
   const parsed = historyExportSchema.safeParse(req.query);
   if (!parsed.success) { sendZodError(res, parsed.error); return; }
-  res.json(await getHistoryStats(db, parsed.data, STATS_TZ));
+  res.json(await getHistoryStats(db, parsed.data, tz));
 });
 
 export default router;
