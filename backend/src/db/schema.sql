@@ -382,18 +382,20 @@ CREATE TABLE price_cache (
 CREATE INDEX idx_price_cache_asset ON price_cache(asset, price_date DESC);
 
 -- ============================================================
--- TABLA: price_close_madrid — cierre diario a las 00:00 Europe/Madrid (#164)
--- (también en migrations/001_price_close_madrid.sql para bases ya desplegadas)
+-- TABLA: price_close_daily: cierre diario a las 00:00 locales de cada zona
+-- (#164, #389). Antes price_close_madrid (migraciones 001 y 015).
 -- ============================================================
-CREATE TABLE price_close_madrid (
+CREATE TABLE price_close_daily (
   asset       TEXT NOT NULL,
-  close_date  DATE NOT NULL,                 -- día local (Europe/Madrid) cuyo cierre representa
+  timezone    TEXT NOT NULL,                 -- zona IANA del día local (#389)
+  close_date  DATE NOT NULL,                 -- día local cuyo cierre representa
   price_eur   NUMERIC(38, 18) NOT NULL,      -- -1 = sin precio en ninguna fuente
   source      TEXT NOT NULL,
   fetched_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (asset, close_date),
-  CONSTRAINT chk_price_close_madrid_source CHECK (source IN ('binance_1h', 'coingecko_daily', 'coinpaprika_daily', 'okx_1d', 'none')),
-  CONSTRAINT chk_price_close_madrid_price CHECK (price_eur > 0 OR (price_eur = -1 AND source = 'none'))
+  CONSTRAINT price_close_daily_pkey PRIMARY KEY (asset, timezone, close_date),
+  CONSTRAINT chk_price_close_daily_source CHECK (source IN ('binance_1h', 'coingecko_daily', 'coinpaprika_daily', 'okx_1d', 'none')),
+  CONSTRAINT chk_price_close_daily_price CHECK (price_eur > 0 OR (price_eur = -1 AND source = 'none')),
+  CONSTRAINT chk_price_close_daily_timezone CHECK (char_length(timezone) BETWEEN 1 AND 64)
 );
 
 -- ============================================================

@@ -88,7 +88,7 @@ describe('routes/transactions — listado, estadísticas y facetas', () => {
     await tx('midnight', { ...base, operation_type: 'DEPOSIT_FIAT', timestamp: '2024-03-10T23:30:00Z', asset: 'EUR', amount: 10, amount_net: 10 });
 
     await pool.query(
-      `INSERT INTO price_close_madrid (asset, close_date, price_eur, source) VALUES ('XRP', $1, 0.5, 'okx_1d'), ('USDT', $1, 0.9, 'okx_1d')`, [DAY]);
+      `INSERT INTO price_close_daily (asset, timezone, close_date, price_eur, source) VALUES ('XRP', 'Europe/Madrid', $1, 0.5, 'okx_1d'), ('USDT', 'Europe/Madrid', $1, 0.9, 'okx_1d')`, [DAY]);
     await pool.query(
       `INSERT INTO price_cache (asset, price_eur, source, price_date) VALUES ('ADA', 0.3, 'binance', $1), ('USDT', 0.8, 'binance', $1)`, [DAY]);
 
