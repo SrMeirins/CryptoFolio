@@ -1,0 +1,9 @@
+[
+  {
+    "id": "GHSA-mrhx-c7xc-m3w5",
+    "paquete": "zod",
+    "motivo": "Sin corrección en Zod 3; se corrige al migrar a Zod 4 (#385). Exposición baja: el tamaño de cada petición ya está limitado por el parser JSON de express.",
+    "caduca": "2026-11-30",
+    "issue": "#385"
+  }
+]

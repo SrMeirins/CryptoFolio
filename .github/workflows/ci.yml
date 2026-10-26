@@ -63,13 +63,18 @@ jobs:
         with:
           node-version: '24'
 
+      # Como npm audit --audit-level=high, con excepciones temporales
+      # documentadas y caducables en scripts/audit-exceptions.json (#384).
+      - name: Tests del script de auditoría
+        run: node --test scripts/audit.test.mjs
+
       - name: npm audit (producción)
         working-directory: ${{ matrix.package }}
-        run: npm audit --omit=dev --audit-level=high
+        run: node ../scripts/audit.mjs --omit=dev
 
       - name: npm audit (desarrollo)
         working-directory: ${{ matrix.package }}
-        run: npm audit --audit-level=high
+        run: node ../scripts/audit.mjs
 
       - name: Versiones exactas
         run: node scripts/check-exact-versions.mjs ${{ matrix.package }}/package.json
