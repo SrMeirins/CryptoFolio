@@ -7,6 +7,8 @@ const { dailyMock, eventsMock, closesMock, liveMock } = vi.hoisted(() => ({
 vi.mock('./pnlService', async (orig) => ({ ...(await orig<typeof import('./pnlService')>()), getDailyPnl: dailyMock }));
 vi.mock('./positions', async (orig) => ({ ...(await orig<typeof import('./positions')>()), loadPositionEvents: eventsMock }));
 vi.mock('../prices/closePrices', async (orig) => ({ ...(await orig<typeof import('../prices/closePrices')>()), getCachedCloses: closesMock }));
+// Zona de la aplicación (#389): la de por defecto, sin base de datos.
+vi.mock('../time/appTimezone', async (orig) => ({ ...(await orig<typeof import('../time/appTimezone')>()), getAppTimezone: async () => 'Europe/Madrid' }));
 vi.mock('../prices/liveFeed', () => ({ getAllLivePrices: liveMock }));
 
 const { priceContributions, getDayDetail } = await import('./dayDetail');
@@ -42,7 +44,7 @@ describe('getDayDetail', () => {
     liveMock.mockReturnValue(new Map());
     const r = await getDayDetail('2026-10-10', 'EUR', NOW);
     expect(r).toMatchObject({ date: '2026-10-10', pnl: 15, contributions: [{ asset: 'BTC', pnl: 10 }], other: 5 });
-    expect(closesMock).toHaveBeenCalledWith(['BTC'], '2026-10-09', '2026-10-10');
+    expect(closesMock).toHaveBeenCalledWith(['BTC'], '2026-10-09', '2026-10-10', 'Europe/Madrid');
   });
 
   it('hoy usa el precio en vivo; sin actividad ese día devuelve null', async () => {

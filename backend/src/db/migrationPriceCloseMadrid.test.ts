@@ -19,6 +19,9 @@ describe('migración 001_price_close_madrid', () => {
   beforeAll(async () => {
     testDb = await createTestDatabase();
     pool = new Pool({ connectionString: testDb.connectionString });
+    // schema.sql ya tiene price_close_daily (#389): esta migración se prueba
+    // sobre el estado anterior, al que lleva la reversión de la 015.
+    await pool.query(readFileSync(path.join(__dirname, 'migrations/down/015_cierres_por_zona.sql'), 'utf8'));
   });
 
   afterAll(async () => {

@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { estadoPreparacion, getDailyPnl } from '../modules/pnl/pnlService';
 import { getIntradayPnl } from '../modules/pnl/intraday';
 import { getDayDetail } from '../modules/pnl/dayDetail';
-import { madridDateOf } from '../modules/prices/closePrices';
+import { localDateOf } from '../modules/prices/closePrices';
+import { db } from '../db/client';
+import { getAppTimezone } from '../modules/time/appTimezone';
 import { currencySchema } from '../modules/fiat/displayCurrency';
 import { sendInternalError } from '../middleware/errorHandler';
 
@@ -22,24 +24,29 @@ const querySchema = z.strictObject({
   from: daySchema.optional(),
   to: daySchema.optional(),
   currency: currencySchema,
-}).superRefine((q, ctx) => {
-  const today = madridDateOf(Date.now());
-  if (q.to && q.to > today) ctx.addIssue({ code: 'custom', message: 'to no puede ser futura' });
-  if (q.from && q.to && q.from > q.to) ctx.addIssue({ code: 'custom', message: 'from debe ser anterior o igual a to' });
-  if (q.from) {
-    const end = Date.parse(`${q.to ?? today}T00:00:00Z`);
-    if ((end - Date.parse(`${q.from}T00:00:00Z`)) / 86_400_000 > MAX_RANGE_DAYS) {
-      ctx.addIssue({ code: 'custom', message: `rango máximo ${MAX_RANGE_DAYS} días` });
-    }
-  }
 });
 
+/**
+ * Reglas del rango que dependen de «hoy» en la zona de la aplicación (#389):
+ * se comprueban tras validar el formato, con la zona ya resuelta. null si es válido.
+ */
+export function rangeError(q: { from?: string; to?: string }, today: string): string | null {
+  if (q.to && q.to > today) return 'to no puede ser futura';
+  if (q.from && q.to && q.from > q.to) return 'from debe ser anterior o igual a to';
+  if (q.from) {
+    const end = Date.parse(`${q.to ?? today}T00:00:00Z`);
+    if ((end - Date.parse(`${q.from}T00:00:00Z`)) / 86_400_000 > MAX_RANGE_DAYS) return `rango máximo ${MAX_RANGE_DAYS} días`;
+  }
+  return null;
+}
+
 // GET /api/v1/pnl/daily?from=YYYY-MM-DD&to=YYYY-MM-DD&currency=EUR|USD
-// P&L diario por día local (Europe/Madrid) y rentabilidad acumulada (TWR).
+// P&L diario por día local (zona de la aplicación, #389) y rentabilidad acumulada (TWR).
 // Sin `from`: desde la primera actividad; sin `to`: hasta hoy (en vivo).
 router.get('/daily', async (req: Request, res: Response) => {
   const parsed = querySchema.safeParse(req.query);
-  if (!parsed.success) {
+  const today = localDateOf(await getAppTimezone(db), Date.now());
+  if (!parsed.success || rangeError(parsed.data, today)) {
     res.status(400).json({ error: 'Parámetros inválidos: from/to en formato YYYY-MM-DD, from ≤ to, sin fechas futuras y rango máximo de ~10 años' });
     return;
   }
@@ -77,14 +84,14 @@ router.get('/intraday', async (req: Request, res: Response) => {
   }
 });
 
-const dayQuerySchema = z.strictObject({ date: daySchema, currency: currencySchema })
-  .refine(q => q.date <= madridDateOf(Date.now()), { error: 'date no puede ser futura' });
+const dayQuerySchema = z.strictObject({ date: daySchema, currency: currencySchema });
 
 // GET /api/v1/pnl/day?date=YYYY-MM-DD&currency=EUR|USD
 // Detalle de un día del calendario: cifras y reparto del P&L por activo (#216).
 router.get('/day', async (req: Request, res: Response) => {
   const parsed = dayQuerySchema.safeParse(req.query);
-  if (!parsed.success) {
+  // Sin fechas futuras en la zona de la aplicación (#389).
+  if (!parsed.success || parsed.data.date > localDateOf(await getAppTimezone(db), Date.now())) {
     res.status(400).json({ error: 'Parámetros inválidos: date en formato YYYY-MM-DD, no futura; currency=EUR|USD' });
     return;
   }

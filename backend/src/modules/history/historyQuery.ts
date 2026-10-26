@@ -2,7 +2,6 @@ import { usdPerEurSql } from '../fiat/displayCurrency';
 import { buildHistoryOrderBy, buildHistoryWhere, HistoryFilters } from './listFilters';
 import { FLOW_DIRECTION, VALUATION_COLUMNS, VALUATION_CTES, valuationJoins } from './valuationSql';
 import { FEE_PARENT_CTES, GROUPED_FEES_COLUMN, feeValuedCte } from './feeGrouping';
-import { CLOSES_TIMEZONE } from '../prices/closePrices';
 import { FEE_TYPES } from './operationGroups';
 
 // Consulta de filas del Historial (#346/#349), común al listado paginado y a
@@ -46,9 +45,9 @@ export function groupingEnabled(f: Filters): boolean {
  */
 export function filteredValuedCtes(f: Filters, tz: string, grouped = false, onlyId?: string): { ctes: string; params: unknown[] } {
   const built = buildHistoryWhere(f, tz);
-  // Día local de los filtros: la zona de la aplicación (#388, ya en built.params).
-  // Cruce con los cierres diarios: la zona en que están guardados (hasta #389, Madrid).
-  const all = [...built.params, CLOSES_TIMEZONE];
+  // Zona de la aplicación (#388, #389): la de los filtros y la de los cierres
+  // diarios con que se cruza cada operación.
+  const all = [...built.params, tz];
   const closesTzParam = `$${all.length}`;
   // Filtro interno por id (detalle de una transacción, #373); no está en la API pública.
   let where = built.where;

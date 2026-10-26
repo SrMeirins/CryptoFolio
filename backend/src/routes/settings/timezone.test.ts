@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import type { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
@@ -27,6 +27,8 @@ const setTz = (value: string) => request(app).put('/api/settings/config').send({
 
 describe('zona horaria configurable (#388)', () => {
   beforeAll(async () => {
+    // Sin precios externos (#359): el P&L no debe salir a internet a por cierres.
+    vi.stubEnv('PRICE_SOURCES_OFFLINE', 'true');
     testDb = await createTestDatabase();
     process.env.DATABASE_URL = testDb.connectionString;
     delete process.env.APP_TIMEZONE;
@@ -38,6 +40,7 @@ describe('zona horaria configurable (#388)', () => {
   });
 
   afterAll(async () => {
+    vi.unstubAllEnvs();
     if (testDb) await testDb.teardown();
   });
 
@@ -74,6 +77,31 @@ describe('zona horaria configurable (#388)', () => {
     expect((await setTz('')).status).toBe(200);
     expect((await request(app).get('/api/settings/timezone')).body).toMatchObject({ timezone: 'Europe/Madrid', source: 'defecto' });
     expect((await request(app).get('/api/fiscal/years')).body).toEqual([2025]);
+  });
+
+  it('cierres por zona (#389): la valoración estimada y el P&L usan los de la zona efectiva', async () => {
+    const w = (await pool.query(`SELECT id FROM wallets WHERE name = 'Exchange zona'`)).rows[0].id;
+    // Retiro sin FIFO: se valora con el cierre del día local. Mismo día, dos zonas, dos precios.
+    const tx = (await pool.query(
+      `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id)
+       VALUES ('WITHDRAW', '2025-06-10T12:00:00Z', 'XRP', 10, 10, $1) RETURNING id`, [w])).rows[0].id;
+    await pool.query(`INSERT INTO price_close_daily (asset, timezone, close_date, price_eur, source) VALUES
+      ('XRP', 'Europe/Madrid', '2025-06-10', 0.5, 'binance_1h'), ('XRP', 'Atlantic/Canary', '2025-06-10', 0.6, 'binance_1h')`);
+    const valor = async () => (await request(app).get('/api/transactions?type=WITHDRAW')).body.transactions
+      .find((t: { id: string }) => t.id === tx) as { value_eur: number; value_source: string };
+    try {
+      expect(await valor()).toMatchObject({ value_eur: 5, value_source: 'estimado' });
+      await setTz('Atlantic/Canary');
+      expect(await valor()).toMatchObject({ value_eur: 6, value_source: 'estimado' });
+      expect((await request(app).get('/api/v1/pnl/daily?from=2025-06-09&to=2025-06-10')).body.timezone).toBe('Atlantic/Canary');
+      // Volver a Madrid recupera sus cierres sin descargar nada: siguen en la caché.
+      await setTz('');
+      expect(await valor()).toMatchObject({ value_eur: 5 });
+      expect((await pool.query(`SELECT count(*)::int AS n FROM price_close_daily WHERE asset = 'XRP'`)).rows[0].n).toBe(2);
+    } finally {
+      await pool.query('DELETE FROM transactions WHERE id = $1', [tx]);
+      await pool.query(`DELETE FROM price_close_daily WHERE asset = 'XRP'`);
+    }
   });
 
   it('un ajuste guardado inválido (editado a mano) se ignora y se informa', async () => {
