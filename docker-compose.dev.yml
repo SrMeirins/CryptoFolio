@@ -111,6 +111,8 @@ services:
       BLOCKFROST_API_KEY: ${BLOCKFROST_API_KEY:-}
       SUBSCAN_API_KEY: ${SUBSCAN_API_KEY:-}
       PRICE_REFRESH_INTERVAL_MS: ${PRICE_REFRESH_INTERVAL_MS:-60000}
+      # Zona horaria de la aplicación (#388): vacía, Europe/Madrid; la de Ajustes prevalece.
+      APP_TIMEZONE: ${APP_TIMEZONE:-}
     command: ["npx", "tsx", "watch", "--clear-screen=false", "src/index.ts"]
     volumes:
       # Hot reload: tsx watch lee directamente src/ (no usa dist/)

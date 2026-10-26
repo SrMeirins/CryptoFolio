@@ -1,4 +1,5 @@
 import { calcularTramos, type Tramo } from './tramosIrpf'
+import { zonedFormat } from './zonedFormat'
 
 // Cabecera y navegación de Fiscal (#297): cuota del ahorro, comparación con
 // el año anterior, pestaña de la URL, año contiguo y atajos. Funciones puras.
@@ -25,11 +26,11 @@ export function cuotaAhorro(base: number, tramos?: Tramo[]): { cuota: number; ti
   return { cuota, tipoMedio: base > 0 ? (cuota / base) * 100 : 0 }
 }
 
-const MADRID_MD = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', month: '2-digit', day: '2-digit' })
+const LOCAL_MD = () => zonedFormat('en-CA', { month: '2-digit', day: '2-digit' })
 
 /** Día de hoy en Madrid como MM-DD, para comparar con el mismo periodo del año anterior. */
-export function madridMonthDay(now: Date = new Date()): string {
-  const parts = MADRID_MD.formatToParts(now)
+export function localMonthDay(now: Date = new Date()): string {
+  const parts = LOCAL_MD().formatToParts(now)
   return `${parts.find(p => p.type === 'month')?.value}-${parts.find(p => p.type === 'day')?.value}`
 }
 

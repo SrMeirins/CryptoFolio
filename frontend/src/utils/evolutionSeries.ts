@@ -1,6 +1,7 @@
 import type { DailyPnlDay } from '../api/portfolio'
 import { buildPnlSeries, periodFrom, type PnlPeriod } from './pnlChart'
 import { dayMs } from './chartAxes'
+import { zonedFormat } from './zonedFormat'
 
 // Serie común de las pestañas P&L y Valor del gráfico de evolución (#215):
 // la misma consulta alimenta ambas, así que cambiar de pestaña es inmediato y
@@ -49,9 +50,9 @@ export function fromIntraday(points: readonly IntradayPoint[]): EvolutionPoint[]
 }
 
 const LONG_DATE = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
-const DATE_TIME = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Madrid' })
+const DATE_TIME = () => zonedFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 
-/** Fecha del punto bajo el cursor: «15 de octubre de 2026» o, en 24H, «15 oct, 14:30» (hora de Madrid). */
+/** Fecha del punto bajo el cursor: «15 de octubre de 2026» o, en 24H, «15 oct, 14:30» (hora de la zona de la aplicación). */
 export function formatPointDate(x: number, intraday: boolean): string {
-  return (intraday ? DATE_TIME : LONG_DATE).format(new Date(x))
+  return (intraday ? DATE_TIME() : LONG_DATE).format(new Date(x))
 }

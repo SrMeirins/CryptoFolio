@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dayLabel, filterActivity, groupByDay, madridDay, madridTime, selectRecent } from './recentActivity'
+import { dayLabel, filterActivity, groupByDay, localDay, localTimeOf, selectRecent } from './recentActivity'
 
 // Actividad reciente (#237).
 const TODAY = '2026-10-15'
@@ -7,10 +7,10 @@ const tx = (timestamp: string, group: 'buy' | 'sell' | 'transfer' | 'income' = '
 
 describe('hora de Madrid', () => {
   it('día y hora locales, también con el cambio de horario', () => {
-    expect(madridDay('2026-10-14T22:30:00Z')).toBe('2026-10-15')       // 00:30 CEST
-    expect(madridTime('2026-10-14T22:30:00Z')).toBe('00:30')
-    expect(madridDay('2026-10-25T23:30:00Z')).toBe('2026-10-26')       // 00:30 CET, tras el cambio
-    expect(madridTime('2026-10-25T23:30:00Z')).toBe('00:30')
+    expect(localDay('2026-10-14T22:30:00Z')).toBe('2026-10-15')       // 00:30 CEST
+    expect(localTimeOf('2026-10-14T22:30:00Z')).toBe('00:30')
+    expect(localDay('2026-10-25T23:30:00Z')).toBe('2026-10-26')       // 00:30 CET, tras el cambio
+    expect(localTimeOf('2026-10-25T23:30:00Z')).toBe('00:30')
   })
 })
 

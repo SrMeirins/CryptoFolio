@@ -99,6 +99,8 @@ services:
       COINGECKO_BASE_URL: ${COINGECKO_BASE_URL:-https://api.coingecko.com/api/v3}
       COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
       PRICE_REFRESH_INTERVAL_MS: ${PRICE_REFRESH_INTERVAL_MS:-60000}
+      # Zona horaria de la aplicación (#388): vacía, Europe/Madrid; la de Ajustes prevalece.
+      APP_TIMEZONE: ${APP_TIMEZONE:-}
       # Verificación de saldos on-chain (backend/src/modules/walletSync) —
       # todo opcional: sin WALLET_SYNC_ENCRYPTION_KEY, el resto de la app
       # funciona con normalidad; solo falla si intentas guardar una API key

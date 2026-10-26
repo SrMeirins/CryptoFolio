@@ -10,7 +10,7 @@ import { usePreparacionHistoricos } from '../../hooks/usePreparacionHistoricos'
 import { PreparandoHistoricos } from '../../components/PreparandoHistoricos'
 import { useLiveDayPnl } from '../../hooks/useLiveDayPnl'
 import { dailyPnlQuery, intradayPnlQuery } from '../../queries/currencyQueries'
-import { METRIC_LABELS, PERIOD_TITLES, PNL_PERIODS, madridToday, metricFor, type PnlPeriod } from '../../utils/pnlChart'
+import { METRIC_LABELS, PERIOD_TITLES, PNL_PERIODS, localToday, metricFor, type PnlPeriod } from '../../utils/pnlChart'
 import { evolutionQuery, fromDaily, fromIntraday } from '../../utils/evolutionSeries'
 import { applyLiveToday, periodSummary } from '../../utils/evolutionSummary'
 import { evolutionSubtitle } from '../../utils/panelSubtitles'
@@ -37,7 +37,7 @@ export function EvolutionCard() {
   // Día del mejor o peor resultado cuyo detalle se muestra bajo el resumen (#250).
   const [openDay, setOpenDay] = useState<{ day: string; key: string } | null>(null)
   const baseId = useId()
-  const today = madridToday()
+  const today = localToday()
   const query = evolutionQuery(period, today, range)
 
   // Mientras el servidor descarga cierres se reconsulta cada 5 s; después, cada minuto.

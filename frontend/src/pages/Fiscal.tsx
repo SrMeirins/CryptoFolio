@@ -6,7 +6,7 @@ import { portfolioApi } from '../api/portfolio'
 import { FISCAL_STALE_TIME } from './fiscal/constants'
 import { fiscalYearQueries, prefetchOrder } from './fiscal/fiscalYearQueries'
 import { baseTramosCompensada } from '../utils/tramosIrpf'
-import { adjacentYear, cuotaAhorro, FISCAL_VISTAS, madridMonthDay, parseVista, yearComparison, type FiscalVista } from '../utils/fiscalHeader'
+import { adjacentYear, cuotaAhorro, FISCAL_VISTAS, localMonthDay, parseVista, yearComparison, type FiscalVista } from '../utils/fiscalHeader'
 import { useTramos } from '../hooks/useTramos'
 import { ComparativaAnual } from './fiscal/charts/ComparativaAnual'
 import { EvolucionMensual } from './fiscal/charts/EvolucionMensual'
@@ -73,7 +73,7 @@ export function Fiscal() {
 
   // Año en curso: el anterior «a estas alturas» (mismo día de Madrid) (#297).
   const enCurso = !!summary?.esAnioEnCurso && !switching
-  const hasta = madridMonthDay()
+  const hasta = localMonthDay()
   const { data: prevPeriod } = useQuery({
     queryKey: ['fiscal-neto-hasta', (activeYear ?? 0) - 1, hasta],
     queryFn: () => portfolioApi.getFiscalNetoHasta((activeYear ?? 0) - 1, hasta),
