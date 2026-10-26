@@ -1,3 +1,4 @@
+import { zonedFormat } from './zonedFormat'
 // Marcas de los ejes del gráfico de evolución del Dashboard (#212). Funciones
 // puras para que ambas pestañas (P&L y Valor) usen el mismo criterio:
 //
@@ -29,7 +30,7 @@ export function tickUnit(spanDays: number): TickUnit {
 }
 
 const HOUR_MS = 3_600_000
-const MADRID_HOUR = new Intl.DateTimeFormat('es-ES', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Europe/Madrid' })
+const LOCAL_HOUR = () => zonedFormat('es-ES', { hour: 'numeric', hourCycle: 'h23' })
 
 /** Marcas (ms UTC) de la unidad dentro de [from, to], ambos incluidos. */
 export function timeTicks(from: number, to: number, unit: TickUnit): number[] {
@@ -37,7 +38,7 @@ export function timeTicks(from: number, to: number, unit: TickUnit): number[] {
   if (unit === 'hour3') {
     // Horas en punto múltiplos de 3 en hora de Madrid (00:00, 03:00, …), también con cambio de horario.
     for (let t = Math.ceil(from / HOUR_MS) * HOUR_MS; t <= to; t += HOUR_MS) {
-      if (Number(MADRID_HOUR.format(new Date(t))) % 3 === 0) ticks.push(t)
+      if (Number(LOCAL_HOUR().format(new Date(t))) % 3 === 0) ticks.push(t)
     }
     return ticks
   }
@@ -65,12 +66,12 @@ export function timeTicks(from: number, to: number, unit: TickUnit): number[] {
 }
 
 const DAY_FMT = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' })
-const TIME_FMT = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Madrid' })
+const TIME_FMT = () => zonedFormat('es-ES', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 const MONTH_FMT = new Intl.DateTimeFormat('es-ES', { month: 'short', year: '2-digit', timeZone: 'UTC' })
 
 /** Etiqueta de una marca según la granularidad: «15:00», «15 oct», «oct 26» o «2026». */
 export function formatTick(ms: number, unit: TickUnit): string {
-  if (unit === 'hour3') return TIME_FMT.format(new Date(ms))
+  if (unit === 'hour3') return TIME_FMT().format(new Date(ms))
   if (unit === 'year') return String(new Date(ms).getUTCFullYear())
   const fmt = unit === 'day' || unit === 'monday' ? DAY_FMT : MONTH_FMT
   return fmt.format(new Date(ms)).replace('.', '')

@@ -4,7 +4,7 @@ import { type FieldDefinition } from '../api/portfolio'
 import { WalletPicker } from './WalletPicker'
 import { useWalletsQuery } from '../hooks/useWallets'
 import { fieldClasses, Dropdown } from './ui'
-import { APP_TIMEZONE } from '../constants/timezone'
+import { getAppTimezone } from '../constants/timezone'
 import { fromZonedInput, toZonedInput } from '../utils/zonedDateTime'
 
 const baseInput = fieldClasses()
@@ -60,8 +60,8 @@ export function DynamicField({ field, value, onChange }: {
           id={id}
           type="datetime-local"
           step={1}
-          value={value ? toZonedInput(value as string, APP_TIMEZONE) : ''}
-          onChange={e => onChange(e.target.value ? fromZonedInput(e.target.value, APP_TIMEZONE) : '')}
+          value={value ? toZonedInput(value as string, getAppTimezone()) : ''}
+          onChange={e => onChange(e.target.value ? fromZonedInput(e.target.value, getAppTimezone()) : '')}
           className={`${baseInput} scheme-dark`}
         />
       )}

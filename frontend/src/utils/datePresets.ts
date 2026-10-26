@@ -1,4 +1,4 @@
-import { APP_TIMEZONE } from '../constants/timezone'
+import { zonedFormat } from './zonedFormat'
 
 // Atajos del selector de fechas (#366), en días locales de la app (no en la
 // zona del navegador ni en UTC). Funciones puras sobre fechas AAAA-MM-DD.
@@ -10,11 +10,11 @@ export interface DatePreset {
   to: string
 }
 
-const DAY_FMT = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' })
+const DAY_FMT = () => zonedFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' })
 
 /** Hoy en la zona de la app (AAAA-MM-DD). */
 export function appToday(now: Date = new Date()): string {
-  return DAY_FMT.format(now)
+  return DAY_FMT().format(now)
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')

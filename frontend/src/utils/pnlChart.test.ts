@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { buildPnlSeries, madridToday, metricFor, periodFrom, type PnlDay } from './pnlChart'
+import { buildPnlSeries, localToday, metricFor, periodFrom, type PnlDay } from './pnlChart'
 
 const day = (date: string, pnl: number, twr: number, cap: number, live = false): PnlDay =>
   ({ date, pnl, cumulativePct: twr, cumulativePeakCapitalPct: cap, complete: true, live })
 
-describe('madridToday', () => {
+describe('localToday', () => {
   it('usa la fecha de Madrid, no la UTC', () => {
     // 23:30 UTC del 8 de octubre = 01:30 del 9 en Madrid (CEST)
-    expect(madridToday(new Date('2026-10-08T23:30:00Z'))).toBe('2026-10-09')
+    expect(localToday(new Date('2026-10-08T23:30:00Z'))).toBe('2026-10-09')
     // 23:30 UTC del 8 de enero = 00:30 del 9 en Madrid (CET)
-    expect(madridToday(new Date('2026-01-08T23:30:00Z'))).toBe('2026-01-09')
+    expect(localToday(new Date('2026-01-08T23:30:00Z'))).toBe('2026-01-09')
   })
 })
 

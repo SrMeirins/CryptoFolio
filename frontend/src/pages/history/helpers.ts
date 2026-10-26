@@ -1,23 +1,23 @@
 import type { Transaction, ValuationSource } from '../../api/portfolio'
 import type { Currency } from '../../utils/format'
 import { formatNumber } from '../../utils/format'
-import { APP_TIMEZONE } from '../../constants/timezone'
+import { zonedFormat } from '../../utils/zonedFormat'
 
 // Fechas en la zona de la aplicación, no en la del navegador ni en UTC (#346):
 // la hora de la fila y el día en que se agrupa salen del mismo instante local.
-const DATE_FMT = new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short', year: '2-digit', timeZone: APP_TIMEZONE })
-const TIME_FMT = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: APP_TIMEZONE })
-const DAY_KEY_FMT = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: APP_TIMEZONE })
+const DATE_FMT = () => zonedFormat('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })
+const TIME_FMT = () => zonedFormat('es-ES', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+const DAY_KEY_FMT = () => zonedFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' })
 const DAY_LONG_FMT = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
 
 export function fmtDate(ts: string): { date: string; time: string } {
   const d = new Date(ts)
-  return { date: DATE_FMT.format(d), time: TIME_FMT.format(d) }
+  return { date: DATE_FMT().format(d), time: TIME_FMT().format(d) }
 }
 
 /** Día local (AAAA-MM-DD) de un instante, para agrupar el listado. */
 export function localDayKey(ts: string): string {
-  return DAY_KEY_FMT.format(new Date(ts))
+  return DAY_KEY_FMT().format(new Date(ts))
 }
 
 /** Cabecera de un día (AAAA-MM-DD): «Jueves, 3 de septiembre de 2026», solo la inicial en mayúscula. */

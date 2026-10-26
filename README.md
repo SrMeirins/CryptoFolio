@@ -321,6 +321,7 @@ Todas las opciones se configuran en el archivo `.env` (ver `.env.example` para l
 | `FRONTEND_HOST_PORT` | Puerto en el que se accede a la app | No | `8080` |
 | `COINGECKO_API_KEY` | API key de CoinGecko Pro | No | vacío (usa el tier gratuito) |
 | `PRICE_REFRESH_INTERVAL_MS` | Intervalo de refresco de precios (ms) | No | `60000` (1 min) |
+| `APP_TIMEZONE` | Zona horaria IANA del día local, el ejercicio fiscal y el P&L (p. ej. `Atlantic/Canary`). La de Ajustes prevalece; en la app de escritorio, por defecto, la del sistema | No | `Europe/Madrid` |
 | `WALLET_SYNC_ENCRYPTION_KEY` | Clave que cifra las API keys de verificación on-chain | Solo si usas verificación on-chain | vacío |
 | `ETHERSCAN_API_KEY` / `BLOCKFROST_API_KEY` / `SUBSCAN_API_KEY` | API keys de proveedores on-chain (Ethereum/Cardano/Polkadot) | No — se configuran también desde Settings → Wallets | vacío |
 

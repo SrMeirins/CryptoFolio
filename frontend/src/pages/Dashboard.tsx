@@ -16,7 +16,7 @@ import { EvolutionCard } from './dashboard/EvolutionCard'
 import { PnlCalendar } from './dashboard/PnlCalendar'
 import { AllocationChart } from './dashboard/AllocationChart'
 import { FiscalCard } from './dashboard/FiscalCard'
-import { madridToday } from '../utils/pnlChart'
+import { localToday } from '../utils/pnlChart'
 import { monthRange, ymOf } from '../utils/pnlCalendar'
 import { useLiveDayPnl } from '../hooks/useLiveDayPnl'
 import { usePreparacionHistoricos } from '../hooks/usePreparacionHistoricos'
@@ -59,7 +59,7 @@ export function Dashboard() {
   // «Hoy» de la tarjeta de P&L (#210): misma consulta (y caché) que el mes en
   // curso del calendario y mismo cálculo en vivo, así que ambas cifras coinciden.
   const now = useNow(60_000)
-  const today = madridToday()
+  const today = localToday()
   const month = monthRange(ymOf(today), today)
   const { data: monthPnl } = useCurrencyQuery(
     c => dailyPnlQuery(c, month?.from, month?.to),

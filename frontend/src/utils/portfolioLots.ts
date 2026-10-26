@@ -1,5 +1,6 @@
 import type { OpenLot } from '../api/portfolio'
 import type { Currency } from './format'
+import { zonedFormat } from './zonedFormat'
 
 // Lotes FIFO de un activo para el panel de detalle de Portfolio (#272).
 // Funciones puras: importes en la moneda de visualización, P&L por lote,
@@ -84,19 +85,19 @@ export function daysSince(ms: number | null, now: Date = new Date()): number | n
   return ms === null ? null : Math.max(0, Math.floor((now.getTime() - ms) / 86_400_000))
 }
 
-const LOT_DATE = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Madrid' })
-const LOT_DAY_LONG = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: 'Europe/Madrid' })
-const LOT_TIME = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })
+const LOT_DATE = () => zonedFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+const LOT_DAY_LONG = () => zonedFormat('es-ES', { dateStyle: 'long' })
+const LOT_TIME = () => zonedFormat('es-ES', { hour: '2-digit', minute: '2-digit' })
 
 /** Fecha de apertura con el año completo: «9 abr 2025». */
 export function formatLotDate(iso: string): string {
-  return LOT_DATE.format(new Date(iso)).replace('.', '')
+  return LOT_DATE().format(new Date(iso)).replace('.', '')
 }
 
 /** Detalle del tooltip: «9 de abril de 2025, 14:32 · 554 días». */
 export function lotDateDetail(iso: string, days: number): string {
   const d = new Date(iso)
-  return `${LOT_DAY_LONG.format(d)}, ${LOT_TIME.format(d)} · ${plural(days, 'día', 'días')}`
+  return `${LOT_DAY_LONG().format(d)}, ${LOT_TIME().format(d)} · ${plural(days, 'día', 'días')}`
 }
 
 /**

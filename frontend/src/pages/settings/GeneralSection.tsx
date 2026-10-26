@@ -5,6 +5,7 @@ import { Bell, BellOff, X, ArrowRight, Wrench } from 'lucide-react'
 import { NOTIFICATION_ROUTES, NOTIFICATION_TYPE_META } from '../../constants/notifications'
 import { CurrencyToggle } from '../../components/CurrencyToggle'
 import { ThemeSelector } from '../../components/ThemeSelector'
+import { TimezoneSetting } from './TimezoneSetting'
 import { alpha } from '../../utils/colors'
 import { cardClasses, buttonClasses, iconButtonClasses } from '../../components/ui'
 
@@ -64,6 +65,9 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
           <ThemeSelector />
         </div>
       </div>
+
+      {/* Zona horaria (#390) */}
+      <TimezoneSetting />
 
       {/* Moneda de visualización (#176) */}
       <div className={cardClasses('md')}>

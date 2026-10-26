@@ -1,5 +1,6 @@
 import { formatMoney, type Currency } from '../../utils/format'
 import type { FlowBucket } from '../../utils/evolutionSummary'
+import { zonedFormat } from '../../utils/zonedFormat'
 
 // Marcadores de depósitos y retiradas del gráfico de evolución (#214).
 // - Cada grupo (día, semana o mes según el periodo) tiene una zona de impacto
@@ -17,10 +18,10 @@ interface AxisMap { [id: string]: { scale: Scale } }
 const HIT_RADIUS = 12
 const SHORT_DAY = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 const MONTH = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' })
-const DATE_TIME = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Madrid' })
+const DATE_TIME = () => zonedFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 
 function bucketLabel(b: FlowBucket, intraday: boolean): string {
-  if (intraday) return DATE_TIME.format(new Date(b.anchor.x))
+  if (intraday) return DATE_TIME().format(new Date(b.anchor.x))
   if (b.unit === 'month') return MONTH.format(new Date(b.start))
   if (b.unit === 'week') return `Semana del ${SHORT_DAY.format(new Date(b.start))}`
   return SHORT_DAY.format(new Date(b.start))

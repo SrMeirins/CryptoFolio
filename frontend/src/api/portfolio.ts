@@ -41,7 +41,8 @@ export interface DailyPnlResponse {
   currency: Currency
   from: string
   to: string
-  timezone: 'Europe/Madrid'
+  /** Zona de los días del P&L: la de la aplicación (#389). */
+  timezone: string
   refreshing: boolean
   totalPnl: number
   twrPct: number
@@ -401,6 +402,16 @@ export interface HistoryStats {
   fees_by_asset: { asset: string; ops: number; amount: number; value: Money }[]
 }
 
+/** Zona horaria efectiva de la aplicación (#388). */
+export interface TimezoneInfo {
+  timezone: string
+  /** De dónde sale: el ajuste guardado, la variable APP_TIMEZONE o la de por defecto. */
+  source: 'ajuste' | 'variable' | 'defecto'
+  /** Ajuste guardado que no es una zona válida y se ha ignorado. */
+  invalidSetting: string | null
+  default: string
+}
+
 /** Saldo corrido de un activo en el Historial (#380). */
 export interface RunningBalance {
   asset: string
@@ -715,6 +726,8 @@ export const portfolioApi = {
     api.delete<{ success: boolean }>(`/wallets/networks/${networkId}/api-key`),
   exportBackup: () => api.get<Record<string, unknown>>('/settings/backup'),
   getConfig: () => api.get<Record<string, string>>('/settings/config'),
+  /** Zona horaria efectiva (#388, #390): zona, origen y ajuste guardado inválido. */
+  getTimezone: () => api.get<TimezoneInfo>('/settings/timezone'),
   setConfig: (key: string, value: string) => api.put<{ success: boolean }>('/settings/config', { key, value }),
   getStats: () => api.get<{
     transactions: number; fifoLots: number; imports: number

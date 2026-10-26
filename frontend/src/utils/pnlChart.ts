@@ -1,3 +1,4 @@
+import { zonedFormat } from './zonedFormat'
 // Serie del gráfico de rentabilidad acumulada del Dashboard (#166).
 //
 // Métrica por periodo:
@@ -54,8 +55,8 @@ export const METRIC_LABELS: Record<PnlMetric, { short: string; help: string }> =
 }
 
 /** Día local de hoy en Madrid (YYYY-MM-DD). */
-export function madridToday(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+export function localToday(now: Date = new Date()): string {
+  return zonedFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
 }
 
 /** Primer día del periodo (incluido), o undefined para 'Todo' (y para 24H y Rango, que no son por días fijos). */

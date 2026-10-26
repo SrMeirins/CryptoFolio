@@ -1,10 +1,12 @@
 import { formatPercent } from './format'
 import type { PnlPeriod } from './pnlChart'
+import { zonedFormat } from './zonedFormat'
+import { timezoneLabel } from './timezoneLabel'
 
 // Subtítulos con contexto de páginas y paneles (#232). Funciones puras.
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
-const DAY_LONG = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'Europe/Madrid' })
+const DAY_LONG = () => zonedFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })
 const MONTH_YEAR = new Intl.DateTimeFormat('es-ES', { month: 'short', year: 'numeric', timeZone: 'UTC' })
 const SHORT_DAY = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' })
 const clean = (s: string) => s.replace('.', '')
@@ -13,7 +15,7 @@ const clean = (s: string) => s.replace('.', '')
 export function dashboardSubtitle(assetCount: number, now: Date): string {
   const parts = ['Resumen de tu cartera']
   if (assetCount > 0) parts.push(plural(assetCount, 'activo', 'activos'))
-  parts.push(clean(DAY_LONG.format(now).replace(',', '')))
+  parts.push(clean(DAY_LONG().format(now).replace(',', '')))
   return parts.join(' · ')
 }
 
@@ -64,5 +66,5 @@ export function moversSubtitle(mode: '24h' | 'total', assetCount: number): strin
 
 /** «Octubre de 2026 · hora de Madrid» o, en la vista anual, «2026 · 12 meses». */
 export function calendarSubtitle(view: 'month' | 'year', monthText: string, year: number): string {
-  return view === 'month' ? `${monthText} · día natural, hora de Madrid` : `${year} · resumen por meses`
+  return view === 'month' ? `${monthText} · día natural, ${timezoneLabel()}` : `${year} · resumen por meses`
 }
