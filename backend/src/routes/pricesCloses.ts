@@ -9,10 +9,10 @@ import { sendInternalError } from '../middleware/errorHandler';
 const router = Router();
 
 const MAX_ASSETS = 100;
-const querySchema = z.object({
+const querySchema = z.strictObject({
   assets: z.string().min(1).max(1200),
   days:   z.coerce.number().int().min(2).max(400).default(7),
-}).strict();
+});
 
 // GET /api/v1/prices/closes?assets=BTC,XRP&days=7
 router.get('/closes', async (req: Request, res: Response) => {

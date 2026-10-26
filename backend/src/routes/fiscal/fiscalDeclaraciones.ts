@@ -14,8 +14,8 @@ import { resetObligaciones721Cache } from '../../modules/fiscal/obligacion721';
 const router = Router();
 
 const tipoSchema = z.enum(['renta', 'modelo721']);
-const vacio = z.object({}).strict();
-const modelo721Schema = z.object({ valor: z.number().finite().min(0).max(1e12).optional() }).strict();
+const vacio = z.strictObject({});
+const modelo721Schema = z.strictObject({ valor: z.number().min(0).max(1e12).optional() });
 
 /** Solo ejercicios cerrados: el año en curso aún no se ha declarado. */
 function ejercicioCerrado(raw: string, res: Response): number | null {

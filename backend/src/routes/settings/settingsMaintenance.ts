@@ -17,7 +17,7 @@ const router = Router();
 const bulkSetCostsSchema = z.object({
   updates: z.array(z.object({
     id:           z.string().min(1, 'id es requerido'),
-    pricePerUnit: z.number({ message: 'pricePerUnit debe ser un número' }),
+    pricePerUnit: z.number({ error: 'pricePerUnit debe ser un número' }),
   })).min(1, 'updates no puede estar vacío'),
 });
 

@@ -17,7 +17,7 @@ const revisionSchema = z.object({
   tipo: z.enum(['hueco', 'pendiente']),
   desde: FECHA,
   hasta: FECHA,
-}).refine(v => v.desde <= v.hasta, { message: 'desde no puede ser posterior a hasta', path: ['desde'] });
+}).refine(v => v.desde <= v.hasta, { error: 'desde no puede ser posterior a hasta', path: ['desde'] });
 
 // POST /api/imports/cobertura/revisiones: «No operé en ese periodo».
 router.post('/cobertura/revisiones', async (req: Request, res: Response) => {
@@ -33,7 +33,7 @@ router.post('/cobertura/revisiones', async (req: Request, res: Response) => {
 
 // DELETE /api/imports/cobertura/revisiones/:id: deshacer la marca.
 router.delete('/cobertura/revisiones/:id', async (req: Request, res: Response) => {
-  const id = z.string().uuid().safeParse(req.params.id);
+  const id = z.uuid().safeParse(req.params.id);
   if (!id.success) { res.status(400).json({ error: 'Id de revisión inválido' }); return; }
   const r = await db.query(`DELETE FROM cobertura_revisiones WHERE id = $1 RETURNING id`, [id.data]);
   if (r.rows.length === 0) { res.status(404).json({ error: 'Revisión no encontrada' }); return; }

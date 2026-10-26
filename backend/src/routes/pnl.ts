@@ -18,18 +18,18 @@ const isRealDay = (d: string) => {
 };
 const daySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(isRealDay);
 
-const querySchema = z.object({
+const querySchema = z.strictObject({
   from: daySchema.optional(),
   to: daySchema.optional(),
   currency: currencySchema,
-}).strict().superRefine((q, ctx) => {
+}).superRefine((q, ctx) => {
   const today = madridDateOf(Date.now());
-  if (q.to && q.to > today) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'to no puede ser futura' });
-  if (q.from && q.to && q.from > q.to) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'from debe ser anterior o igual a to' });
+  if (q.to && q.to > today) ctx.addIssue({ code: 'custom', message: 'to no puede ser futura' });
+  if (q.from && q.to && q.from > q.to) ctx.addIssue({ code: 'custom', message: 'from debe ser anterior o igual a to' });
   if (q.from) {
     const end = Date.parse(`${q.to ?? today}T00:00:00Z`);
     if ((end - Date.parse(`${q.from}T00:00:00Z`)) / 86_400_000 > MAX_RANGE_DAYS) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `rango máximo ${MAX_RANGE_DAYS} días` });
+      ctx.addIssue({ code: 'custom', message: `rango máximo ${MAX_RANGE_DAYS} días` });
     }
   }
 });
@@ -60,7 +60,7 @@ router.get('/preparacion', async (_req: Request, res: Response) => {
   }
 });
 
-const intradaySchema = z.object({ currency: currencySchema }).strict();
+const intradaySchema = z.strictObject({ currency: currencySchema });
 
 // GET /api/v1/pnl/intraday?currency=EUR|USD
 // Evolución de las últimas 24 h cada 15 min más el instante actual (#215).
@@ -77,8 +77,8 @@ router.get('/intraday', async (req: Request, res: Response) => {
   }
 });
 
-const dayQuerySchema = z.object({ date: daySchema, currency: currencySchema }).strict()
-  .refine(q => q.date <= madridDateOf(Date.now()), { message: 'date no puede ser futura' });
+const dayQuerySchema = z.strictObject({ date: daySchema, currency: currencySchema })
+  .refine(q => q.date <= madridDateOf(Date.now()), { error: 'date no puede ser futura' });
 
 // GET /api/v1/pnl/day?date=YYYY-MM-DD&currency=EUR|USD
 // Detalle de un día del calendario: cifras y reparto del P&L por activo (#216).

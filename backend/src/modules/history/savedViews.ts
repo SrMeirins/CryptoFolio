@@ -30,7 +30,7 @@ export const viewNameSchema = z.string().trim()
 export const viewFiltersSchema = z.record(z.string(), z.string().max(1000, 'valor de filtro demasiado largo'))
   .superRefine((filtros, ctx) => {
     if ('currency' in filtros) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'una vista no guarda la moneda' });
+      ctx.addIssue({ code: 'custom', message: 'una vista no guarda la moneda' });
       return;
     }
     const parsed = historyExportSchema.safeParse(filtros);
@@ -40,7 +40,7 @@ export const viewFiltersSchema = z.record(z.string(), z.string().max(1000, 'valo
   });
 
 const storedViewSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   nombre: viewNameSchema,
   predeterminada: z.boolean(),
   filtros: viewFiltersSchema,
