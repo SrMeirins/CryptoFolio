@@ -23,8 +23,8 @@ FROM wallets WHERE name = 'Binance Spot';
 -- PRICE_SOURCES_OFFLINE=true, así que no descarga precios. Con estos cierres el
 -- Dashboard muestra la evolución y el P&L (no se queda en «Preparando») y la
 -- auditoría de accesibilidad cubre esos paneles. Precios inventados.
-INSERT INTO price_close_madrid (asset, close_date, price_eur, source)
-SELECT a.asset, d::date, a.base + a.step * (d::date - DATE '2024-01-05'), 'okx_1d'
+INSERT INTO price_close_daily (asset, timezone, close_date, price_eur, source)
+SELECT a.asset, 'Europe/Madrid', d::date, a.base + a.step * (d::date - DATE '2024-01-05'), 'okx_1d'
 FROM (VALUES ('BTC', 40000::numeric, 20::numeric), ('XRP', 0.5, 0.001)) AS a(asset, base, step),
      generate_series(DATE '2024-01-05', (NOW() AT TIME ZONE 'Europe/Madrid')::date, INTERVAL '1 day') AS d
-ON CONFLICT (asset, close_date) DO NOTHING;
+ON CONFLICT (asset, timezone, close_date) DO NOTHING;
