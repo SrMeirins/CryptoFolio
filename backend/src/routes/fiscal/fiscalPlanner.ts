@@ -61,9 +61,9 @@ router.get('/planificador', async (_req: Request, res: Response) => {
   }
 });
 
-const cuotasSchema = z.object({
-  ganancias: z.array(z.number().finite().min(-1e9).max(1e9)).min(1).max(200),
-}).strict();
+const cuotasSchema = z.strictObject({
+  ganancias: z.array(z.number().min(-1e9).max(1e9)).min(1).max(200),
+});
 
 // POST /api/fiscal/planificador/cuotas — cuota del año con cada ganancia (o pérdida) adicional
 router.post('/planificador/cuotas', async (req: Request, res: Response) => {

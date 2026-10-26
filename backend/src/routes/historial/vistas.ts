@@ -13,20 +13,20 @@ import { sendZodError } from '../transactions/transactionsShared';
 
 const router = Router();
 
-const createSchema = z.object({
+const createSchema = z.strictObject({
   nombre: viewNameSchema,
   predeterminada: z.boolean().default(false),
   filtros: viewFiltersSchema,
   sustituir: z.boolean().default(false),
-}).strict();
+});
 
-const updateSchema = z.object({
+const updateSchema = z.strictObject({
   nombre: viewNameSchema.optional(),
   predeterminada: z.boolean().optional(),
   filtros: viewFiltersSchema.optional(),
-}).strict().refine(v => Object.keys(v).length > 0, 'no hay nada que cambiar');
+}).refine(v => Object.keys(v).length > 0, 'no hay nada que cambiar');
 
-const idSchema = z.string().uuid('id de vista no válido');
+const idSchema = z.uuid('id de vista no válido');
 
 function sendViewError(res: Response, err: unknown): boolean {
   if (!(err instanceof ViewError)) return false;

@@ -113,7 +113,7 @@ describe('routes/transactions — listado, estadísticas y facetas', () => {
       ["type=BUY' OR '1'='1", 'type'],
       ['date_from=2026-02-30', 'date_from'],
       ['manually_added=yes', 'manually_added'],
-      ['foo=1', 'Unrecognized'],
+      ['foo=1', 'desconocida: "foo"'],
     ])('%s → 400 legible', async (qs, campo) => {
       const res = await request(app).get(`/api/transactions?${qs}`);
       expect(res.status).toBe(400);
@@ -123,7 +123,7 @@ describe('routes/transactions — listado, estadísticas y facetas', () => {
     it.each([
       ['currency=GBP', 'currency'],
       ['type=NOPE', 'type'],
-      ['limit=10', 'Unrecognized'],
+      ['limit=10', 'desconocida: "limit"'],
     ])('estadísticas: %s → 400 legible', async (qs, campo) => {
       const res = await request(app).get(`/api/v1/historial/estadisticas?${qs}`);
       expect(res.status).toBe(400);

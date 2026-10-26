@@ -17,14 +17,14 @@ const PROTECTED_KEYS = new Set([VIEWS_KEY]);
 const configSchema = z.object({
   key:   z.string().min(1, 'key es requerido').max(MAX_LENGTH_SHORT, `key no puede superar ${MAX_LENGTH_SHORT} caracteres`)
     .refine(k => !PROTECTED_KEYS.has(k), 'esta clave se gestiona con su propia API'),
-  value: z.union([z.string().max(MAX_CONFIG_VALUE, `value no puede superar ${MAX_CONFIG_VALUE} caracteres`), z.number(), z.boolean()], { message: 'value es requerido' }),
+  value: z.union([z.string().max(MAX_CONFIG_VALUE, `value no puede superar ${MAX_CONFIG_VALUE} caracteres`), z.number(), z.boolean()], { error: 'value es requerido' }),
 });
 
 // Claves con un conjunto cerrado de valores: se valida el valor antes de
 // guardarlo para que un cliente no deje la app en un estado inválido.
 const restrictedValues: Record<string, z.ZodType<string>> = {
-  display_currency: z.enum(DISPLAY_CURRENCIES, { message: 'display_currency debe ser EUR o USD' }),
-  theme: z.enum(['dark', 'light', 'system'], { message: 'theme debe ser dark, light o system' }),
+  display_currency: z.enum(DISPLAY_CURRENCIES, { error: 'display_currency debe ser EUR o USD' }),
+  theme: z.enum(['dark', 'light', 'system'], { error: 'theme debe ser dark, light o system' }),
 };
 
 // ── GET /api/settings/config ───────────────────────────────────────────────

@@ -12,14 +12,14 @@ import { sendZodError } from '../transactions/transactionsShared';
 const router = Router();
 
 const MAX_IDS = 200;
-const schema = z.object({
+const schema = z.strictObject({
   asset: z.string().regex(/^[A-Za-z0-9._-]{1,32}$/, 'activo no válido').transform(v => v.toUpperCase()),
-  wallet_id: z.string().uuid('debe ser un UUID válido').optional(),
+  wallet_id: z.uuid('debe ser un UUID válido').optional(),
   ids: z.string().optional()
     .transform(v => (v ? v.split(',').filter(Boolean) : []))
-    .pipe(z.array(z.string().uuid('id de transacción no válido')).max(MAX_IDS, `como mucho ${MAX_IDS} ids`)),
-  group_fees: z.enum(['true', 'false'], { message: 'debe ser true o false' }).transform(v => v === 'true').default('true'),
-}).strict();
+    .pipe(z.array(z.uuid('id de transacción no válido')).max(MAX_IDS, `como mucho ${MAX_IDS} ids`)),
+  group_fees: z.enum(['true', 'false'], { error: 'debe ser true o false' }).transform(v => v === 'true').prefault('true'),
+});
 
 router.get('/', async (req: Request, res: Response) => {
   const parsed = schema.safeParse(req.query);

@@ -12,17 +12,17 @@ const router = Router();
 // una nueva (la primera vez que no hay ninguna), en una sola transacción.
 const nuevaWalletSchema = z.object({
   name:  shortText('name').trim().min(1, 'name es requerido'),
-  type:  z.enum(['hardware', 'software'], { message: 'type debe ser hardware o software' }),
+  type:  z.enum(['hardware', 'software'], { error: 'type debe ser hardware o software' }),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'color debe ser un hexadecimal #RRGGBB'),
   notes: longText('notes').nullish(),
 });
 
 const bodySchema = z.object({
-  walletId:   z.string().uuid('walletId debe ser un UUID válido').optional(),
+  walletId:   z.uuid('walletId debe ser un UUID válido').optional(),
   newWallet:  nuevaWalletSchema.optional(),
-  network_id: z.string().uuid('network_id debe ser un UUID válido').nullable(),
+  network_id: z.uuid('network_id debe ser un UUID válido').nullable(),
   address:    z.string().trim().regex(DIRECCION_RE, 'address no es una dirección válida'),
-}).refine(d => !!d.walletId !== !!d.newWallet, { message: 'Indica una wallet existente o una nueva, no ambas', path: ['walletId'] });
+}).refine(d => !!d.walletId !== !!d.newWallet, { error: 'Indica una wallet existente o una nueva, no ambas', path: ['walletId'] });
 
 class ConflictoError extends Error {}
 class NoEncontradaError extends Error {}

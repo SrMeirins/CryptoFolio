@@ -11,7 +11,7 @@ import { sendZodError } from './transactionsShared';
 const router = Router();
 // Zona de los años fiscales (la sustituirá #347).
 const DETAIL_TZ = MADRID_TZ;
-const idSchema = z.string().uuid('id de transacción no válido');
+const idSchema = z.uuid('id de transacción no válido');
 
 router.get('/:id/detalle', async (req: Request, res: Response) => {
   const id = idSchema.safeParse(req.params.id);

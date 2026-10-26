@@ -9,9 +9,9 @@ import { clampDay } from '../../modules/fiscal/madridTime';
 // La fecha es un día de Madrid (MM-DD) y se incluye completo.
 const router = Router();
 
-const querySchema = z.object({
+const querySchema = z.strictObject({
   hasta: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, 'formato MM-DD'),
-}).strict();
+});
 
 // GET /api/fiscal/:year/neto-hasta?hasta=MM-DD
 router.get('/:year/neto-hasta', async (req: Request, res: Response) => {

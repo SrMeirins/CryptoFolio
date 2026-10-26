@@ -8,7 +8,7 @@ const router = Router();
 
 const walletCreateBodySchema = z.object({
   name:  shortText('name').min(1, 'name es requerido'),
-  type:  z.enum(WALLET_KINDS, { message: `type debe ser uno de: ${WALLET_KINDS.join(', ')}` }),
+  type:  z.enum(WALLET_KINDS, { error: `type debe ser uno de: ${WALLET_KINDS.join(', ')}` }),
   color: shortText('color').nullish(),
   notes: longText('notes').nullish(),
 });
