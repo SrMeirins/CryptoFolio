@@ -50,8 +50,10 @@ test('«?» abre la ayuda accesible; Esc la cierra y devuelve el foco', async ({
   const dialog = page.getByRole('dialog', { name: 'Atajos de teclado' })
   await expect(dialog).toBeVisible()
   for (const theme of ['dark', 'light'] as const) {
-    await page.emulateMedia({ colorScheme: theme })
+    // Sin transiciones y con una pausa: axe no debe medir colores a medio cambiar.
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
+    await page.waitForTimeout(400)
     const { violations } = await new AxeBuilder({ page }).withTags(WCAG).include('[role="dialog"]').analyze()
     expect(violations.map(v => `${theme}: ${v.id}`)).toEqual([])
   }

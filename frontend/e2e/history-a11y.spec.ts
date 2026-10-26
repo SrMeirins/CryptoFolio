@@ -229,8 +229,10 @@ test('saldo corrido (#380): con un activo filtrado, columna «Saldo», saldo act
   await page.goto(`/history?activo=${activo}`)
   await expect(page.getByRole('columnheader', { name: `Saldo ${activo}` })).toBeVisible()
   for (const theme of ['dark', 'light'] as const) {
-    await page.emulateMedia({ colorScheme: theme })
+    // Sin transiciones y con una pausa: axe no debe medir colores a medio cambiar.
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
+    await page.waitForTimeout(400)
     const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).include('main').analyze()
     expect(violations.map(v => `${theme}: ${v.id}`)).toEqual([])
   }
