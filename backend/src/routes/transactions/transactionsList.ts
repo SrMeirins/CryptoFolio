@@ -14,15 +14,17 @@ const HISTORY_TZ = MADRID_TZ;
 
 // ── GET /api/transactions/facets ──────────────────────────────────────────
 // Valores presentes en los datos para los filtros (cuentas, activos, tipos):
-// antes la lista de cuentas era fija y faltaban cuentas reales (#346).
+// antes la lista de cuentas era fija y faltaban cuentas reales (#346). Y los
+// años con transacciones en la zona de la app, para el selector «Año» (#382).
 router.get('/facets', async (_req: Request, res: Response) => {
-  const [accounts, assets, types] = await Promise.all([
+  const [accounts, assets, types, years] = await Promise.all([
     db.query(`SELECT DISTINCT account AS v FROM transactions WHERE account IS NOT NULL AND account <> '' ORDER BY 1`),
     db.query(`SELECT DISTINCT asset AS v FROM transactions ORDER BY 1`),
     db.query(`SELECT DISTINCT operation_type::text AS v FROM transactions ORDER BY 1`),
+    db.query(`SELECT DISTINCT EXTRACT(YEAR FROM timestamp AT TIME ZONE $1)::int AS v FROM transactions ORDER BY 1`, [HISTORY_TZ]),
   ]);
   const values = (r: { rows: { v: string }[] }) => r.rows.map(row => row.v);
-  res.json({ accounts: values(accounts), assets: values(assets), types: values(types) });
+  res.json({ accounts: values(accounts), assets: values(assets), types: values(types), years: years.rows.map(r => Number(r.v)) });
 });
 
 // ── GET /api/transactions ──────────────────────────────────────────────────

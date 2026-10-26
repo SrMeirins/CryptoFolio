@@ -7,6 +7,7 @@ import { LoadingState, iconButtonClasses } from '../../../components/ui'
 import { OP_META } from '../../../constants/operations'
 import type { Currency } from '../../../utils/format'
 import { fmtDate } from '../helpers'
+import { isTypingTarget } from '../../../utils/fiscalHeader'
 import { DeleteConfirm } from '../DeleteConfirm'
 import { DetailBody } from './DetailBody'
 import { detailQuery } from './detailQuery'
@@ -43,6 +44,14 @@ export function TransactionDetailPanel({ id, currency, onClose, onOpen, prev, ne
 
   return (
     <Drawer onClose={onClose} labelledBy={titleId} initialFocusRef={closeRef}>
+      {/* Flechas izquierda/derecha: transacción anterior/siguiente (#382), salvo al escribir. */}
+      <div className="contents" onKeyDown={e => {
+        if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || isTypingTarget(e.target as Element)) return
+        const go = e.key === 'ArrowLeft' ? prev : e.key === 'ArrowRight' ? next : null
+        if (!go) return
+        e.preventDefault()
+        go()
+      }}>
       <header className="flex items-start gap-2 px-5 py-4">
         <div className="flex-1 min-w-0">
           <h2 id={titleId} className="text-base font-semibold text-fg truncate">
@@ -50,8 +59,8 @@ export function TransactionDetailPanel({ id, currency, onClose, onOpen, prev, ne
           </h2>
           {when && <p className="text-xs text-fg-subtle">{when.date} · {when.time}</p>}
         </div>
-        <button type="button" onClick={prev ?? undefined} disabled={!prev} aria-label="Transacción anterior" className={iconButtonClasses('md')}><ChevronLeft size={15} aria-hidden="true" /></button>
-        <button type="button" onClick={next ?? undefined} disabled={!next} aria-label="Transacción siguiente" className={iconButtonClasses('md')}><ChevronRight size={15} aria-hidden="true" /></button>
+        <button type="button" onClick={prev ?? undefined} disabled={!prev} aria-label="Transacción anterior" aria-keyshortcuts="ArrowLeft" className={iconButtonClasses('md')}><ChevronLeft size={15} aria-hidden="true" /></button>
+        <button type="button" onClick={next ?? undefined} disabled={!next} aria-label="Transacción siguiente" aria-keyshortcuts="ArrowRight" className={iconButtonClasses('md')}><ChevronRight size={15} aria-hidden="true" /></button>
         {tx && <button type="button" onClick={() => onEdit(tx)} aria-label="Editar transacción" className={iconButtonClasses('md', false, '', 'brand')}><PenLine size={14} aria-hidden="true" /></button>}
         {tx?.manually_added && !confirmDelete && (
           <button type="button" onClick={() => setConfirmFor(id)} aria-label="Eliminar transacción" className={iconButtonClasses('md', false, '', 'danger')}><Trash2 size={14} aria-hidden="true" /></button>
@@ -66,6 +75,7 @@ export function TransactionDetailPanel({ id, currency, onClose, onOpen, prev, ne
         {isLoading && <LoadingState />}
         {error && <p role="alert" className="px-5 py-4 text-sm text-negative-ink">No se pudo cargar el detalle: {(error as Error).message}</p>}
         {data && <DetailBody data={data} currency={currency} onOpen={onOpen} walletName={walletName} onRestore={onRestore} restoring={restoring} />}
+      </div>
       </div>
     </Drawer>
   )

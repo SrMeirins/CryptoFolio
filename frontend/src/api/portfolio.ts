@@ -425,6 +425,8 @@ export interface TransactionFacets {
   accounts: string[]
   assets: string[]
   types: string[]
+  /** Años con transacciones en la zona de la app, ascendentes (#382). */
+  years: number[]
 }
 
 export interface SimulatedLot {

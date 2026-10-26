@@ -398,5 +398,21 @@ describe('routes/transactions — listado, estadísticas y facetas', () => {
       expect(res.body.assets).toContain('DOGE');
       expect(res.body.types).toContain('FEE_EXCHANGE');
     });
+
+    it('lista los años con transacciones en la zona de la app (#382)', async () => {
+      const w = (await pool.query(`SELECT id FROM wallets WHERE name = 'Exchange test'`)).rows[0].id;
+      // 23:30 UTC del 31/12/2022 ya es 2023 en Madrid.
+      const id = await tx('nochevieja', { wallet_id: w, operation_type: 'DEPOSIT_FIAT', timestamp: '2022-12-31T23:30:00Z', asset: 'EUR', amount: 1, amount_net: 1 });
+      try {
+        const { years } = (await request(app).get('/api/transactions/facets')).body;
+        expect(years).toEqual([...years].sort((a: number, b: number) => a - b));
+        expect(years).toContain(2023);
+        expect(years).not.toContain(2022);
+        expect(years).toContain(2024);
+        expect(years).toContain(Number(DAY.slice(0, 4)));
+      } finally {
+        await pool.query('DELETE FROM transactions WHERE id = $1', [id]);
+      }
+    });
   });
 });
