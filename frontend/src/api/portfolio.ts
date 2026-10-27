@@ -290,6 +290,9 @@ export interface Transaction {
   usd_per_eur?: number | string | null
   fee_asset: string | null
   fee_amount: string | null
+  /** Comisión que el exchange ya incluye en el coste (#415); solo informativa. */
+  included_fee_asset?: string | null
+  included_fee_amount?: string | null
   wallet_id: string
   wallet_name: string
   wallet_color: string
@@ -419,6 +422,8 @@ export interface HistoryStats {
     withdrawn_ops: number; withdrawn: Money; deposited: Money
     income_ops: number; income: Money; income_sin_valor: number
     fee_ops: number; fees: Money; fees_sin_valor: number
+    /** De ellas, incluidas en el coste de la compra (#415). */
+    fees_included: { ops: number; value: Money }
   }
   chart: {
     granularity: 'month' | 'year'; from: string; to: string

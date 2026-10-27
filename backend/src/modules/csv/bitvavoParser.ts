@@ -175,6 +175,8 @@ export function parseBitvavoCsv(fileContent: Buffer | string): CsvParseResult {
         pricePerUnit: row.quotePrice ?? undefined,
         feeAsset: feeAlreadyIncluded ? undefined : (row.feeCurrency || undefined),
         feeAmount: feeAlreadyIncluded ? undefined : (row.feeAmount ?? undefined),
+        // Incluida en el coste (#415): se guarda aparte para mostrarla, el FIFO no la lee.
+        ...(feeAlreadyIncluded && row.feeAmount ? { includedFeeAsset: row.feeCurrency, includedFeeAmount: abs(row.feeAmount) } : {}),
         account: 'Bitvavo',
         notes: 'Bitvavo buy',
         subTradeCount: 1,

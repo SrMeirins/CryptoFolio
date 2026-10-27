@@ -5,7 +5,7 @@ import { createTestDatabase, TestDatabase } from '../test/setup-test-db';
 let testDb: TestDatabase;
 
 describe('esquema — precisión NUMERIC(38,18) para cantidad/precio', () => {
-  it('las 20 columnas de cantidad/precio tienen escala 18, no 10 (incluida usd_per_eur, #174)', async () => {
+  it('las 21 columnas de cantidad/precio tienen escala 18, no 10 (incluidas usd_per_eur, #174, e included_fee_amount, #415)', async () => {
     testDb = await createTestDatabase();
     const pool = new Pool({ connectionString: testDb.connectionString });
     try {
@@ -16,7 +16,7 @@ describe('esquema — precisión NUMERIC(38,18) para cantidad/precio', () => {
           AND data_type = 'numeric'
         ORDER BY table_name, column_name
       `);
-      expect(res.rows.length).toBe(20);
+      expect(res.rows.length).toBe(21);
       for (const row of res.rows) {
         expect(row.numeric_precision).toBe(38);
         expect(row.numeric_scale).toBe(18);

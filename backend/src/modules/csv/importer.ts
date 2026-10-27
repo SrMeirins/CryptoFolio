@@ -254,9 +254,10 @@ export async function importCsvFile(
             walletId, tx.account, tx.notes ?? null,
             destinationWalletId, destPending,
             destino?.address ?? null, destino?.networkId ?? null, destino?.txHash ?? null,
+            tx.includedFeeAsset ?? null, tx.includedFeeAmount ?? null,
           );
           valueClauses.push(
-            `($${b+1},$${b+2},$${b+3}::operation_type,$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},$${b+15},false,$${b+16},$${b+17},NULL,$${b+18},$${b+19},$${b+20})`
+            `($${b+1},$${b+2},$${b+3}::operation_type,$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},$${b+15},false,$${b+16},$${b+17},NULL,$${b+18},$${b+19},$${b+20},$${b+21},$${b+22})`
           );
         }
         await client.query(
@@ -264,7 +265,7 @@ export async function importCsvFile(
            (id,import_id,operation_type,timestamp,asset,amount,amount_net,
             cost_asset,cost_amount,price_per_unit,fee_asset,fee_amount,
             wallet_id,account,notes,manually_added,destination_wallet_id,destination_pending,linked_tx_id,
-            counterparty_address,counterparty_network_id,tx_hash)
+            counterparty_address,counterparty_network_id,tx_hash,included_fee_asset,included_fee_amount)
            VALUES ${valueClauses.join(',')}`,
           params
         );

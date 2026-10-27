@@ -51,7 +51,7 @@ export function DetailBody({ data, currency, onOpen, walletName = () => undefine
               {hint && <span className="sr-only"> ({hint})</span>}
             </dd></div>
           {priceLine && <div><dt className="text-fg-subtle">Precio unitario</dt><dd className="mono text-fg">{priceLine}</dd></div>}
-          <div><dt className="text-fg-subtle">Comisiones</dt><dd><FeeCell tx={tx} currency={currency} /></dd></div>
+          <div><dt className="text-fg-subtle">Comisiones</dt><dd><FeeCell tx={tx} currency={currency} verbose /></dd></div>
           <div><dt className="text-fg-subtle">Wallet</dt><dd className="text-fg">{tx.wallet_name}{tx.account ? ` · ${tx.account}` : ''}</dd></div>
           {tx.destination_wallet_name && <div><dt className="text-fg-subtle">Destino</dt><dd className="text-fg">{tx.destination_wallet_name}</dd></div>}
           <div className="col-span-2"><dt className="text-fg-subtle">ID</dt>

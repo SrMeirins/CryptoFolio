@@ -11,7 +11,7 @@ describe('csvFormat (#349)', () => {
   });
 
   it('plainNumber quita los ceros sobrantes de NUMERIC; money usa dos decimales con punto', () => {
-    expect(plainNumber('601.779800000000000000')).toBe('601.7798');
+    expect(plainNumber('123.456700000000000000')).toBe('123.4567');
     expect(plainNumber('100.000000000000000000')).toBe('100');
     expect(plainNumber('10')).toBe('10');
     expect(plainNumber(null)).toBe('');

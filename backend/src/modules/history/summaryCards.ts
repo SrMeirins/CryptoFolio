@@ -43,7 +43,8 @@ export function cardSql(alias: string) {
     withdrawn: `${c}operation_type = 'WITHDRAW_FIAT'`,
     deposited: `${c}operation_type = 'DEPOSIT_FIAT'`,
     income: `${c}operation_type IN ${sqlList(INCOME_TYPES)}`,
-    fee: `(${c}operation_type IN ${sqlList(FEE_TYPES)} OR (${c}fee_asset IS NOT NULL AND ${c}fee_amount > 0))`,
+    // También la comisión incluida en el coste de una compra (#415).
+    fee: `(${c}operation_type IN ${sqlList(FEE_TYPES)} OR (${c}fee_asset IS NOT NULL AND ${c}fee_amount > 0) OR ${c}included_fee_amount > 0)`,
   };
 }
 
