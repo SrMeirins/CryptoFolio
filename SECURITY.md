@@ -6,7 +6,7 @@ Solo la **última versión publicada** en [Releases](https://github.com/SrMeirin
 
 ## Dependencias
 
-- Todas las dependencias se fijan con **versión exacta** (lo comprueba el CI con `scripts/check-exact-versions.mjs`).
+- Todas las dependencias se fijan con **versión exacta** (lo comprueba el CI con `scripts/check-exact-versions.mjs`), en `backend`, `frontend`, `electron` y la raíz del repositorio, que solo tiene herramientas de desarrollo.
 - Una versión nueva solo se adopta cuando lleva **al menos 2 semanas publicada**, para dar tiempo a detectar paquetes comprometidos o defectuosos.
 - **Excepción:** las correcciones de avisos de seguridad de severidad **alta o crítica** se adoptan sin esperar. Las de severidad moderada o baja siguen la regla general.
 - El CI ejecuta la auditoría con `scripts/audit.mjs`: falla con avisos altos o críticos sin corregir. Un aviso sin corrección disponible puede aceptarse de forma **temporal** en `scripts/audit-exceptions.json`, con motivo, issue de seguimiento y fecha de caducidad; al caducar, el CI vuelve a fallar.
