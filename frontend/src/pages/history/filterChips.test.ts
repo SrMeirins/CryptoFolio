@@ -35,3 +35,10 @@ describe('chip «Solo editadas» (#378)', () => {
     expect(chip).toMatchObject({ id: 'editadas', label: 'Solo editadas', clear: { editedOnly: false } })
   })
 })
+
+describe('chip de la tarjeta del resumen (#407)', () => {
+  it('dice qué tarjeta filtra y si incluye el margen, y se quita solo', () => {
+    expect(activeChips({ ...EMPTY_FILTERS, card: 'ventas' }, names).map(c => [c.label, c.clear])).toEqual([['Tarjeta: Ventas', { card: '' }]])
+    expect(activeChips({ ...EMPTY_FILTERS, card: 'retirado', includeMargin: true }, names)[0].label).toBe('Tarjeta: Retirado (con margen)')
+  })
+})

@@ -132,8 +132,9 @@ export function History() {
         <div className="px-6 pt-4 pb-4 space-y-4">
           {stats && (
             <>
-              <StatsBar totals={stats.totals} currency={currency} filtered={f.hasActiveFilters}
-                margin={{ ...stats.margin, included: includeMargin }} onIncludeMargin={f.setIncludeMargin} />
+              <StatsBar totals={stats.totals} series={stats.series} currency={currency} filtered={f.hasActiveFilters}
+                margin={{ ...stats.margin, included: includeMargin }} onIncludeMargin={f.setIncludeMargin}
+                card={f.filters.card} onSelectCard={c => f.setFilter('card', c)} />
               <AnalyticsPanel stats={stats} currency={currency} onAssetClick={handleAssetClick}
                 datesFiltered={!!(f.filters.date_from || f.filters.date_to)} />
             </>

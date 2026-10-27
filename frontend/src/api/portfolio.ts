@@ -413,6 +413,10 @@ export interface HistoryStats {
     sold_gp: Money
     /** Ventas por lo que se recibe a cambio (#403). */
     sold_by_counterpart: Record<SaleCounterpart, { ops: number; value: Money }>
+    /** Stablecoin pasada a fiat (#407): no se suma a Ventas. */
+    stable_to_fiat: { ops: number; value: Money }
+    /** Fiat retirado al banco o a tarjeta y depositado (#407). */
+    withdrawn_ops: number; withdrawn: Money; deposited: Money
     income_ops: number; income: Money; income_sin_valor: number
     fee_ops: number; fees: Money; fees_sin_valor: number
   }
@@ -426,7 +430,13 @@ export interface HistoryStats {
   fees_by_asset: { asset: string; ops: number; amount: number; value: Money }[]
   /** Operativa de margen (#403): si el resumen la incluye y cuántas operaciones (y ventas) son de margen. */
   margin: { included: boolean; ops: number; sells: number }
+  /** Importe de cada tarjeta por periodo del gráfico (#407). */
+  series: { periodo: string; valor: Record<SummaryCard, Money> }[]
 }
+
+/** Tarjetas del resumen del Historial (#407), espejo de modules/history/summaryCards.ts. */
+export const SUMMARY_CARDS = ['invertido', 'retirado', 'ventas', 'ingresos', 'comisiones'] as const
+export type SummaryCard = typeof SUMMARY_CARDS[number]
 
 export const SALE_COUNTERPARTS = ['fiat', 'stablecoin', 'cripto'] as const
 export type SaleCounterpart = typeof SALE_COUNTERPARTS[number]

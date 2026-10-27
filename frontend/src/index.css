@@ -393,3 +393,34 @@
 /* ── Panel lateral (#272): entra desde la derecha ─────────────────────────── */
 @keyframes drawerIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 .drawer-in { animation: drawerIn 0.22s ease-out both; }
+
+/* ── Tarjetas del resumen del Historial (#407) ─────────────────────────────
+   Borde degradado del color de la tarjeta (--card), brillo y elevación al
+   pasar el cursor o con foco, y entrada escalonada. «Reducir movimiento» las
+   deja quietas (regla global de arriba). */
+.summary-card {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--card) 55%, transparent),
+    color-mix(in srgb, var(--card) 8%, transparent) 55%,
+    color-mix(in srgb, var(--card) 28%, transparent));
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+.summary-card:hover,
+.summary-card:has(> button:focus-visible) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--card) 35%, transparent),
+    0 14px 30px -16px color-mix(in srgb, var(--card) 70%, transparent);
+}
+.summary-card[data-active='true'] {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--card) 70%, transparent);
+}
+.summary-card-body {
+  background-color: var(--cf-bg-card);
+  background-image: radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--card) 16%, transparent), transparent 65%);
+}
+@keyframes summaryCardIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.summary-card-in { animation: summaryCardIn 0.35s ease-out both; }

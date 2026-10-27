@@ -1,4 +1,5 @@
 import { OP_META } from '../../constants/operations'
+import { SUMMARY_CARDS, type SummaryCard } from '../../api/portfolio'
 import { DEFAULT_SORT, type SortKey, type SortState } from './sorting'
 
 // Estado del Historial en la URL (#366), con nombres en castellano como Fiscal
@@ -22,8 +23,10 @@ export interface HistoryFilterState {
   value_max: string
   /** Comisiones agrupadas con su compra o venta (#371); preferencia de vista, no un filtro. */
   groupFees: boolean
-  /** Operativa de margen en el resumen y la analítica (#403); no afecta a la lista. */
+  /** Operativa de margen en el resumen y la analítica (#403); en la lista solo cuenta con una tarjeta. */
   includeMargin: boolean
+  /** Lo que suma una tarjeta del resumen (#407); '' sin tarjeta. */
+  card: SummaryCard | ''
 }
 
 export interface HistoryUrlState {
@@ -35,7 +38,7 @@ export interface HistoryUrlState {
 
 export const EMPTY_FILTERS: HistoryFilterState = {
   search: '', types: [], assets: [], wallet_id: '', account: '', date_from: '', date_to: '',
-  manualOnly: false, editedOnly: false, import_id: '', value_min: '', value_max: '', groupFees: true, includeMargin: false,
+  manualOnly: false, editedOnly: false, import_id: '', value_min: '', value_max: '', groupFees: true, includeMargin: false, card: '',
 }
 
 export const MAX_LIST = 30
@@ -83,6 +86,7 @@ export function parseHistoryUrl(params: URLSearchParams, rememberedMargin = fals
     value_max: max,
     groupFees: g('comisiones') !== 'sueltas',
     includeMargin: g('margen') === 'incluido' || (g('margen') !== 'excluido' && rememberedMargin),
+    card: (SUMMARY_CARDS as readonly string[]).includes(g('tarjeta') ?? '') ? g('tarjeta') as SummaryCard : '',
   }
   // Rangos invertidos: se descarta el extremo «hasta» antes que romper la consulta.
   if (filters.date_from && filters.date_to && filters.date_from > filters.date_to) filters.date_to = ''
@@ -114,6 +118,7 @@ export function toHistoryUrl({ filters: f, sort, page }: HistoryUrlState): URLSe
   if (f.value_max) p.set('max', f.value_max)
   if (!f.groupFees) p.set('comisiones', 'sueltas')
   if (f.includeMargin) p.set('margen', 'incluido')
+  if (f.card) p.set('tarjeta', f.card)
   if (sort.key !== DEFAULT_SORT.key || sort.dir !== DEFAULT_SORT.dir) { p.set('orden', sort.key); p.set('dir', sort.dir) }
   if (page > 1) p.set('pagina', String(page))
   return p
@@ -121,7 +126,7 @@ export function toHistoryUrl({ filters: f, sort, page }: HistoryUrlState): URLSe
 
 export function hasActiveFilters(f: HistoryFilterState): boolean {
   return !!(f.search || f.types.length || f.assets.length || f.wallet_id || f.account || f.date_from || f.date_to
-    || f.manualOnly || f.editedOnly || f.import_id || f.value_min || f.value_max)
+    || f.manualOnly || f.editedOnly || f.import_id || f.value_min || f.value_max || f.card)
 }
 
 /**
@@ -143,6 +148,8 @@ export function toApiParams(f: HistoryFilterState, sort: SortState, offset: numb
     ...(f.date_to ? { date_to: f.date_to } : {}),
     ...(f.manualOnly ? { manually_added: 'true' } : {}),
     ...(f.editedOnly ? { edited: 'true' } : {}),
+    // Tarjeta (#407) con el mismo criterio de margen que el resumen.
+    ...(f.card ? { tarjeta: f.card, ...(f.includeMargin ? { incluir_margen: 'true' } : {}) } : {}),
     ...(f.import_id ? { import_id: f.import_id } : {}),
     ...(f.value_min ? { value_min: f.value_min } : {}),
     ...(f.value_max ? { value_max: f.value_max } : {}),

@@ -2,9 +2,9 @@ import { usdPerEurSql } from '../fiat/displayCurrency';
 import { filteredValuedCtes, groupingEnabled } from './historyQuery';
 import type { HistoryFilters } from './listFilters';
 import {
-  BUY_TYPES, FEE_TYPES, FIAT_ASSETS, INCOME_TYPES, INVESTMENT_TYPES, MARGIN_ACCOUNTS, MARGIN_TYPES, OTHER_OUT_TYPES,
-  SELL_TYPES, STABLECOINS, TRANSFER_TYPES, sqlList,
+  BUY_TYPES, FEE_TYPES, FIAT_ASSETS, INCOME_TYPES, MARGIN_ACCOUNTS, OTHER_OUT_TYPES, SELL_TYPES, STABLECOINS, TRANSFER_TYPES, sqlList,
 } from './operationGroups';
+import { cardSql, marginSql, type SummaryCard } from './summaryCards';
 import { chartPeriod, todayIn, type ChartPeriod } from './statsPeriod';
 
 // Estadísticas del Historial sobre lo filtrado (#376): tarjetas, gráfico de
@@ -16,7 +16,8 @@ import { chartPeriod, todayIn, type ChartPeriod } from './statsPeriod';
 // Compras y ventas según el lado del fiat (#403): recibir fiat es una venta y
 // entregarlo, una compra, aunque el exchange lo registre al revés (comprar EUR
 // con cripto, vender EUR por USDC). Sin margen, las tarjetas, el gráfico y los
-// rankings dejan fuera la operativa de las cuentas de margen.
+// rankings dejan fuera la operativa de las cuentas de margen. Qué suma cada
+// tarjeta vive en summaryCards.ts, compartido con el filtro «Tarjeta» (#407).
 
 export const CATEGORIES = ['compras', 'ventas', 'otras_salidas', 'ingresos', 'transferencias', 'otros'] as const;
 export type Category = typeof CATEGORIES[number];
@@ -36,10 +37,16 @@ export interface HistoryStats {
     sold_gp: Money
     /** Ventas por lo que se recibe a cambio. */
     sold_by_counterpart: Record<Counterpart, { ops: number; value: Money }>
+    /** Stablecoin pasada a fiat (#407): no se suma a Ventas. */
+    stable_to_fiat: { ops: number; value: Money }
+    /** Fiat retirado al banco o a tarjeta y depositado (#407). */
+    withdrawn_ops: number; withdrawn: Money; deposited: Money
     income_ops: number; income: Money; income_sin_valor: number
     fee_ops: number; fees: Money; fees_sin_valor: number
   }
   chart: ChartPeriod & { buckets: { periodo: string; ops: ByCategory; valor: { EUR: ByCategory; USD: ByCategory } }[] }
+  /** Importe de cada tarjeta por periodo del gráfico (#407), para sus mini gráficas. */
+  series: { periodo: string; valor: Record<SummaryCard, Money> }[]
   /** Rankings: sobre lo filtrado con fechas; sin ellas, el último año. */
   rankings_periodo: 'filtrado' | 'ultimo_anio'
   top_assets: { asset: string; ops: number; volume: Money }[]
@@ -54,23 +61,17 @@ export type Counterpart = typeof COUNTERPARTS[number];
 /** Lo mínimo para consultar: el `db` de la app, un Pool o un cliente. */
 type Queryable = { query: (text: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> };
 
+const S = cardSql('');
 const FIAT = sqlList(FIAT_ASSETS);
-/** El exchange registra la venta de cripto como compra de fiat… */
-const FIAT_BOUGHT = `(operation_type IN ${sqlList(BUY_TYPES)} AND asset IN ${FIAT})`;
-/** …y la compra de cripto con fiat como venta de fiat. */
-const FIAT_SOLD = `(operation_type IN ${sqlList(SELL_TYPES)} AND asset IN ${FIAT})`;
-/** Fiat entregado a cambio de cripto. */
-const INVESTED = `((operation_type IN ${sqlList(INVESTMENT_TYPES)} AND cost_asset IN ${FIAT}) OR ${FIAT_SOLD})`;
-/** Fiat recibido a cambio de cripto. */
-const RECOVERED = `((operation_type IN ${sqlList(SELL_TYPES)} AND cost_asset IN ${FIAT}) OR ${FIAT_BOUGHT})`;
 /** Qué se recibe en una venta: el fiat comprado o la contrapartida. */
 const COUNTERPART = `CASE
   WHEN asset IN ${FIAT} OR cost_asset IN ${FIAT} THEN 'fiat'
   WHEN cost_asset IN ${sqlList(STABLECOINS)} THEN 'stablecoin'
   ELSE 'cripto' END`;
 const CATEGORY = `CASE
-  WHEN ${FIAT_BOUGHT} THEN 'ventas'
-  WHEN ${FIAT_SOLD} THEN 'compras'
+  WHEN ${S.stableToFiat} THEN 'otros'
+  WHEN ${S.fiatBought} THEN 'ventas'
+  WHEN ${S.fiatSold} THEN 'compras'
   WHEN operation_type IN ${sqlList(BUY_TYPES)} THEN 'compras'
   WHEN operation_type IN ${sqlList(SELL_TYPES)} THEN 'ventas'
   WHEN operation_type IN ${sqlList(OTHER_OUT_TYPES)} THEN 'otras_salidas'
@@ -105,19 +106,20 @@ export async function getHistoryStats(
 
   const { rows } = await db.query(
     `WITH ${ctes},
-     margin_wallets AS (SELECT DISTINCT wallet_id FROM transactions WHERE account = ANY(${marginAccountsP})),
      vt AS MATERIALIZED (
        SELECT v.id, v.operation_type, v.timestamp, v.asset, v.amount, v.cost_asset, v.fee_asset, v.fee_amount, v.wallet_id,
          v.manually_added, v.value_eur, v.fee_value_eur,
          COALESCE(${usdPerEurSql('v.timestamp')}, 0) AS usd,
          ${CATEGORY} AS cat,
-         ${INVESTED} AS invested,
-         ${RECOVERED} AS recovered,
+         ${S.invested} AS invested,
+         ${S.recovered} AS recovered,
+         ${S.sale} AS is_sale,
+         ${S.stableToFiat} AS stable_to_fiat,
+         ${S.withdrawn} AS withdrawn,
+         ${S.deposited} AS deposited,
          ${COUNTERPART} AS counterpart,
          (SELECT SUM(c.gain_loss_eur) FROM fifo_lot_consumptions c WHERE c.consuming_transaction_id = v.id) AS gp_eur,
-         -- COALESCE: sin cuenta o sin destino la comparación da NULL, no FALSE.
-         COALESCE(v.account = ANY(${marginAccountsP}), FALSE) OR v.operation_type IN ${sqlList(MARGIN_TYPES)}
-           OR EXISTS (SELECT 1 FROM margin_wallets mw WHERE mw.wallet_id IN (v.wallet_id, v.destination_wallet_id)) AS is_margin,
+         ${marginSql('v', marginAccountsP)} AS is_margin,
          DATE_TRUNC('${unit}', v.timestamp AT TIME ZONE ${tzP}) AS bucket,
          ${grouped ? 'EXISTS (SELECT 1 FROM visible s WHERE s.id = v.id)' : 'TRUE'} AS shown
        FROM filtered v
@@ -125,10 +127,10 @@ export async function getHistoryStats(
      shown AS (SELECT * FROM vt WHERE shown AND ${notMargin}),
      -- Cada comisión cobrada: la de la columna fee de una operación y las filas FEE_*.
      fee_items AS (
-       SELECT fee_asset AS asset, fee_amount AS amount, fee_value_eur AS eur, fee_value_eur * usd AS usd, timestamp
+       SELECT fee_asset AS asset, fee_amount AS amount, fee_value_eur AS eur, fee_value_eur * usd AS usd, timestamp, bucket
        FROM vt WHERE fee_asset IS NOT NULL AND fee_amount > 0 AND operation_type NOT IN ${sqlList(FEE_TYPES)} AND ${notMargin} ${paidHere}
        UNION ALL
-       SELECT COALESCE(fee_asset, asset), COALESCE(fee_amount, ABS(amount)), value_eur, value_eur * usd, timestamp
+       SELECT COALESCE(fee_asset, asset), COALESCE(fee_amount, ABS(amount)), value_eur, value_eur * usd, timestamp, bucket
        FROM vt WHERE operation_type IN ${sqlList(FEE_TYPES)} AND ${notMargin} ${paidHere}
      )
      SELECT
@@ -141,11 +143,19 @@ export async function getHistoryStats(
           'invested_usd',     COALESCE(SUM(value_eur * usd) FILTER (WHERE invested), 0),
           'recovered_eur',    COALESCE(SUM(value_eur) FILTER (WHERE recovered), 0),
           'recovered_usd',    COALESCE(SUM(value_eur * usd) FILTER (WHERE recovered), 0),
-          'sells',            COUNT(*) FILTER (WHERE cat = 'ventas'),
-          'sold_eur',         COALESCE(SUM(value_eur) FILTER (WHERE cat = 'ventas'), 0),
-          'sold_usd',         COALESCE(SUM(value_eur * usd) FILTER (WHERE cat = 'ventas'), 0),
-          'sold_gp_eur',      COALESCE(SUM(gp_eur) FILTER (WHERE cat = 'ventas'), 0),
-          'sold_gp_usd',      COALESCE(SUM(gp_eur * usd) FILTER (WHERE cat = 'ventas'), 0),
+          'sells',            COUNT(*) FILTER (WHERE is_sale),
+          'sold_eur',         COALESCE(SUM(value_eur) FILTER (WHERE is_sale), 0),
+          'sold_usd',         COALESCE(SUM(value_eur * usd) FILTER (WHERE is_sale), 0),
+          'sold_gp_eur',      COALESCE(SUM(gp_eur) FILTER (WHERE is_sale), 0),
+          'sold_gp_usd',      COALESCE(SUM(gp_eur * usd) FILTER (WHERE is_sale), 0),
+          'stable_ops',       COUNT(*) FILTER (WHERE stable_to_fiat),
+          'stable_eur',       COALESCE(SUM(value_eur) FILTER (WHERE stable_to_fiat), 0),
+          'stable_usd',       COALESCE(SUM(value_eur * usd) FILTER (WHERE stable_to_fiat), 0),
+          'withdrawn_ops',    COUNT(*) FILTER (WHERE withdrawn),
+          'withdrawn_eur',    COALESCE(SUM(value_eur) FILTER (WHERE withdrawn), 0),
+          'withdrawn_usd',    COALESCE(SUM(value_eur * usd) FILTER (WHERE withdrawn), 0),
+          'deposited_eur',    COALESCE(SUM(value_eur) FILTER (WHERE deposited), 0),
+          'deposited_usd',    COALESCE(SUM(value_eur * usd) FILTER (WHERE deposited), 0),
           'income_ops',       COUNT(*) FILTER (WHERE cat = 'ingresos'),
           'income_eur',       COALESCE(SUM(value_eur) FILTER (WHERE cat = 'ingresos'), 0),
           'income_usd',       COALESCE(SUM(value_eur * usd) FILTER (WHERE cat = 'ingresos'), 0),
@@ -157,10 +167,23 @@ export async function getHistoryStats(
         ) FROM fee_items) AS fees,
        (SELECT COALESCE(json_agg(k), '[]') FROM (
           SELECT counterpart, COUNT(*) AS ops, COALESCE(SUM(value_eur), 0) AS eur, COALESCE(SUM(value_eur * usd), 0) AS usd
-          FROM shown WHERE cat = 'ventas' GROUP BY counterpart
+          FROM shown WHERE is_sale GROUP BY counterpart
         ) k) AS counterparts,
-       (SELECT json_build_object('ops', COUNT(*), 'sells', COUNT(*) FILTER (WHERE cat = 'ventas'))
+       (SELECT json_build_object('ops', COUNT(*), 'sells', COUNT(*) FILTER (WHERE is_sale))
         FROM vt WHERE shown AND is_margin) AS margin,
+       -- Importe de cada tarjeta por periodo (#407), en el mismo periodo que el gráfico.
+       (SELECT COALESCE(json_agg(x ORDER BY x.periodo), '[]') FROM (
+          SELECT TO_CHAR(b.bucket, '${fmt}') AS periodo,
+            COALESCE(SUM(s.value_eur) FILTER (WHERE s.invested), 0) AS inv_eur, COALESCE(SUM(s.value_eur * s.usd) FILTER (WHERE s.invested), 0) AS inv_usd,
+            COALESCE(SUM(s.value_eur) FILTER (WHERE s.withdrawn), 0) AS ret_eur, COALESCE(SUM(s.value_eur * s.usd) FILTER (WHERE s.withdrawn), 0) AS ret_usd,
+            COALESCE(SUM(s.value_eur) FILTER (WHERE s.is_sale), 0) AS ven_eur, COALESCE(SUM(s.value_eur * s.usd) FILTER (WHERE s.is_sale), 0) AS ven_usd,
+            COALESCE(SUM(s.value_eur) FILTER (WHERE s.cat = 'ingresos'), 0) AS ing_eur, COALESCE(SUM(s.value_eur * s.usd) FILTER (WHERE s.cat = 'ingresos'), 0) AS ing_usd,
+            (SELECT COALESCE(SUM(f.eur), 0) FROM fee_items f WHERE f.bucket = b.bucket) AS com_eur,
+            (SELECT COALESCE(SUM(f.usd), 0) FROM fee_items f WHERE f.bucket = b.bucket) AS com_usd
+          FROM generate_series(${fromP}::date::timestamp, ${toP}::date::timestamp, INTERVAL '1 ${unit}') AS b(bucket)
+          LEFT JOIN shown s ON s.bucket = b.bucket
+          GROUP BY b.bucket
+        ) x) AS series,
        (SELECT COALESCE(json_agg(c ORDER BY c.periodo, c.cat), '[]') FROM (
           SELECT TO_CHAR(b.bucket, '${fmt}') AS periodo, s.cat, COUNT(s.id) AS ops,
             COALESCE(SUM(s.value_eur), 0) AS eur, COALESCE(SUM(s.value_eur * s.usd), 0) AS usd
@@ -210,10 +233,20 @@ export async function getHistoryStats(
       recovered: money(t.recovered_eur, t.recovered_usd),
       sells: num(t.sells), sold: money(t.sold_eur, t.sold_usd), sold_gp: money(t.sold_gp_eur, t.sold_gp_usd),
       sold_by_counterpart: byCounterpart,
+      stable_to_fiat: { ops: num(t.stable_ops), value: money(t.stable_eur, t.stable_usd) },
+      withdrawn_ops: num(t.withdrawn_ops), withdrawn: money(t.withdrawn_eur, t.withdrawn_usd),
+      deposited: money(t.deposited_eur, t.deposited_usd),
       income_ops: num(t.income_ops), income: money(t.income_eur, t.income_usd), income_sin_valor: num(t.income_sin_valor),
       fee_ops: num(r.fees.ops), fees: money(r.fees.eur, r.fees.usd), fees_sin_valor: num(r.fees.sin_valor),
     },
     chart: { ...period, buckets: [...buckets.values()] },
+    series: (r.series as Record<string, unknown>[]).map(x => ({
+      periodo: String(x.periodo),
+      valor: {
+        invertido: money(x.inv_eur, x.inv_usd), retirado: money(x.ret_eur, x.ret_usd), ventas: money(x.ven_eur, x.ven_usd),
+        ingresos: money(x.ing_eur, x.ing_usd), comisiones: money(x.com_eur, x.com_usd),
+      },
+    })),
     rankings_periodo: datesFiltered ? 'filtrado' : 'ultimo_anio',
     top_assets: (r.top_assets as Record<string, unknown>[]).map(a => ({ asset: String(a.asset), ops: num(a.ops), volume: money(a.eur, a.usd) })),
     fees_by_asset: (r.fees_by_asset as Record<string, unknown>[]).map(x => ({

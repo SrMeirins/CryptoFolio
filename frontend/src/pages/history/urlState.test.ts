@@ -96,3 +96,21 @@ describe('margen en la URL (#403)', () => {
     expect(Object.keys(toApiParams(on.filters, DEFAULT_SORT, 0, 50, 'EUR'))).not.toContain('incluir_margen')
   })
 })
+
+// Tarjeta del resumen (#407): en la URL y en la API con su criterio de margen.
+describe('tarjeta del resumen en la URL (#407)', () => {
+  it('se lee y se escribe como «tarjeta»; lo inválido se ignora', () => {
+    expect(parseHistoryUrl(new URLSearchParams('tarjeta=ventas')).filters.card).toBe('ventas')
+    expect(parseHistoryUrl(new URLSearchParams('tarjeta=otra')).filters.card).toBe('')
+    const on = { filters: { ...EMPTY_FILTERS, card: 'retirado' as const }, sort: DEFAULT_SORT, page: 1 }
+    expect(toHistoryUrl(on).get('tarjeta')).toBe('retirado')
+  })
+
+  it('va a la API con el margen solo si la tarjeta está puesta', () => {
+    const api = (over: Partial<typeof EMPTY_FILTERS>) => toApiParams({ ...EMPTY_FILTERS, ...over }, DEFAULT_SORT, 0, 50, 'EUR')
+    expect(api({ card: 'ventas' })).toMatchObject({ tarjeta: 'ventas' })
+    expect(api({ card: 'ventas' })).not.toHaveProperty('incluir_margen')
+    expect(api({ card: 'ventas', includeMargin: true })).toMatchObject({ tarjeta: 'ventas', incluir_margen: 'true' })
+    expect(api({ includeMargin: true })).not.toHaveProperty('incluir_margen')
+  })
+})

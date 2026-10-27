@@ -33,7 +33,8 @@ type Filters = HistoryFilters & { sort: HistoryFilters['sort']; dir: HistoryFilt
  * quieren ver como filas).
  */
 export function groupingEnabled(f: Filters): boolean {
-  return f.group_fees !== false && !f.type?.some(t => (FEE_TYPES as readonly string[]).includes(t));
+  // La tarjeta Comisiones (#407) muestra cada comisión en su fila, como las cuenta.
+  return f.group_fees !== false && f.tarjeta !== 'comisiones' && !f.type?.some(t => (FEE_TYPES as readonly string[]).includes(t));
 }
 
 /**

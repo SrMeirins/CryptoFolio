@@ -29,6 +29,10 @@ export function marginNotice(margin: HistoryStats['margin']): string | null {
     : `Sin margen: ${count(margin.ops, 'operación queda fuera', 'operaciones quedan fuera')} del resumen${ventas}.`
 }
 
+export const CARD_TITLES = {
+  invertido: 'Invertido', retirado: 'Retirado', ventas: 'Ventas', ingresos: 'Ingresos', comisiones: 'Comisiones',
+} as const
+
 export const COUNTERPART_LABELS = { fiat: 'A fiat', stablecoin: 'A stablecoin', cripto: 'A otra cripto' } as const
 
 export const moneyIn = (v: Money, currency: Currency) => formatMoney(v[currency], currency)

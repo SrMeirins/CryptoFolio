@@ -1,3 +1,4 @@
+import { CARD_TITLES } from './stats/summaryText'
 import { OP_META, type OpGroup } from '../../constants/operations'
 import type { MultiOption } from '../../components/ui'
 import { fmtShort } from '../../utils/date'
@@ -56,6 +57,7 @@ export function activeChips(
   }
   if (f.manualOnly) chips.push({ id: 'manuales', label: 'Solo manuales', clear: { manualOnly: false } })
   if (f.editedOnly) chips.push({ id: 'editadas', label: 'Solo editadas', clear: { editedOnly: false } })
+  if (f.card) chips.push({ id: 'tarjeta', label: `Tarjeta: ${CARD_TITLES[f.card]}${f.includeMargin ? ' (con margen)' : ''}`, clear: { card: '' } })
   if (f.import_id) chips.push({ id: 'importacion', label: `Archivo: ${names.importFile(f.import_id) ?? '…'}`, clear: { import_id: '' } })
   return chips
 }

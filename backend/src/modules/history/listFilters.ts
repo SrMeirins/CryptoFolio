@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { currencySchema } from '../fiat/displayCurrency';
-import { DB_OPERATION_TYPES } from './operationGroups';
+import { DB_OPERATION_TYPES, MARGIN_ACCOUNTS } from './operationGroups';
+import { SUMMARY_CARDS, cardPredicate, marginSql } from './summaryCards';
 import { operationLabelRankSql } from './operationLabels';
 
 // Filtros de GET /transactions validados con zod (#346). Antes llegaban sin
@@ -57,6 +58,10 @@ const filtersShape = {
   edited:         z.enum(['true', 'false'], { error: 'debe ser true o false' }).transform(v => v === 'true').optional(),
   // Comisiones agrupadas con su operación (#371): «false» las muestra como filas.
   group_fees:     z.enum(['true', 'false'], { error: 'debe ser true o false' }).transform(v => v === 'true').optional(),
+  // Operaciones que suma una tarjeta del resumen (#407).
+  tarjeta:        z.enum(SUMMARY_CARDS, { error: `debe ser una de: ${SUMMARY_CARDS.join(', ')}` }).optional(),
+  // Margen del resumen (#403): en la lista solo cuenta con una tarjeta, como en ella.
+  incluir_margen: z.enum(['true', 'false'], { error: 'incluir_margen debe ser true o false' }).transform(v => v === 'true').optional(),
   sort:           z.enum(SORT_KEYS, { error: `debe ser uno de: ${SORT_KEYS.join(', ')}` }).default('fecha'),
   dir:            z.enum(['asc', 'desc'], { error: 'debe ser asc o desc' }).default('desc'),
 };
@@ -81,7 +86,8 @@ export type HistoryFilters = z.infer<typeof historyExportSchema>;
 /** ¿Hay algún filtro aplicado (no cuentan orden ni moneda)? */
 export function hasFilters(f: HistoryFilters): boolean {
   return !!(f.asset?.length || f.type?.length || f.wallet_id || f.import_id || f.account || f.date_from || f.date_to
-    || f.search || f.manually_added !== undefined || f.edited !== undefined || f.value_min !== undefined || f.value_max !== undefined);
+    || f.search || f.manually_added !== undefined || f.edited !== undefined || f.value_min !== undefined || f.value_max !== undefined
+    || f.tarjeta);
 }
 
 /**
@@ -136,6 +142,11 @@ export function buildHistoryWhere(f: HistoryFilters, tz: string): { where: strin
   }
   if (f.manually_added !== undefined) conds.push(`t.manually_added = ${p(f.manually_added)}`);
   if (f.edited !== undefined) conds.push(`t.original_import IS ${f.edited ? 'NOT ' : ''}NULL`);
+  // Tarjeta del resumen (#407): lo mismo que suma, con su mismo criterio de margen.
+  if (f.tarjeta) {
+    conds.push(cardPredicate(f.tarjeta, 't'));
+    if (!f.incluir_margen) conds.push(`NOT ${marginSql('t', `${p([...MARGIN_ACCOUNTS])}::text[]`)}`);
+  }
 
   return { where: conds.length ? `WHERE ${conds.join(' AND ')}` : '', params };
 }

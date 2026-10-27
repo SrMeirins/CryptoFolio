@@ -41,7 +41,8 @@ export function chartPeriodText(chart: HistoryStats['chart'], datesFiltered: boo
   return from === to ? `${from} · ${unit}` : `${from} – ${to} · ${unit}`
 }
 
-const NOT_STATS = new Set(['limit', 'offset', 'sort', 'dir'])
+// La tarjeta (#407) filtra la lista, no el resumen: las demás tarjetas siguen con sus cifras.
+const NOT_STATS = new Set(['limit', 'offset', 'sort', 'dir', 'tarjeta', 'incluir_margen'])
 /** Parámetros de la consulta: los de la lista sin paginación ni orden (no cambian las cifras). */
 export function statsParams(listParams: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(listParams).filter(([k]) => !NOT_STATS.has(k)))
