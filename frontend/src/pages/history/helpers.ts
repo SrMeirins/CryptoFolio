@@ -92,6 +92,22 @@ const OUTFLOW = new Set([
   'WITHDRAW', 'WITHDRAW_FIAT', 'MARGIN_REPAY',
 ])
 
+const FIAT = new Set(['EUR', 'USD', 'GBP', 'CHF', 'BRL', 'ARS'])
+const BUYS = new Set(['BUY', 'BUY_FIAT', 'BUY_CRYPTO'])
+const SELLS = new Set(['SELL', 'SELL_FIAT', 'SELL_CRYPTO'])
+
+/**
+ * Aclaración de una fila registrada al revés por el exchange (#416): vender
+ * fiat es comprar la contrapartida y comprar fiat, vender la contrapartida.
+ * null en el resto. Espejo de summaryCards.ts del backend.
+ */
+export function fiatSideNote(tx: Pick<Transaction, 'operation_type' | 'asset' | 'cost_asset'>): string | null {
+  if (!FIAT.has(tx.asset) || !tx.cost_asset || FIAT.has(tx.cost_asset)) return null
+  if (SELLS.has(tx.operation_type)) return `compra de ${tx.cost_asset}`
+  if (BUYS.has(tx.operation_type)) return `venta de ${tx.cost_asset}`
+  return null
+}
+
 /** Signo de la cantidad: entrada, salida o neutra (transferencias, bloqueos). */
 export function flowSign(operationType: string): '+' | '−' | '' {
   if (INFLOW.has(operationType)) return '+'

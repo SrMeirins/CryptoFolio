@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toDisplayAmount, localDayKey, fmtDate, fmtDateGroup, calcEurValue, calcFeeEur, valuationHint, flowSign, feeSummary, walletFlow, rowFlowSign } from './helpers'
+import { toDisplayAmount, localDayKey, fmtDate, fmtDateGroup, calcEurValue, calcFeeEur, valuationHint, flowSign, feeSummary, walletFlow, rowFlowSign, fiatSideNote } from './helpers'
 
 describe('toDisplayAmount (#177)', () => {
   it('EUR: el importe tal cual', () => {
@@ -109,5 +109,20 @@ describe('walletFlow y rowFlowSign (#395)', () => {
     expect(walletFlow({ wallet_id: A, destination_wallet_id: null }, A)).toBeNull()
     expect(rowFlowSign({ operation_type: 'BUY', wallet_id: A, destination_wallet_id: null }, A)).toBe('+')
     expect(walletFlow({ wallet_id: A, destination_wallet_id: A }, A)).toBeNull()
+  })
+})
+
+// Filas registradas al revés por el exchange (#416).
+describe('fiatSideNote (#416)', () => {
+  const tx = (operation_type: string, asset: string, cost_asset: string | null) => ({ operation_type, asset, cost_asset })
+  it('vender fiat es comprar la contrapartida y comprar fiat, venderla', () => {
+    expect(fiatSideNote(tx('SELL', 'EUR', 'USDC'))).toBe('compra de USDC')
+    expect(fiatSideNote(tx('BUY', 'EUR', 'ADA'))).toBe('venta de ADA')
+  })
+  it('sin aclaración en las normales o entre fiats', () => {
+    expect(fiatSideNote(tx('BUY', 'XRP', 'EUR'))).toBeNull()
+    expect(fiatSideNote(tx('SELL', 'BTC', 'USDT'))).toBeNull()
+    expect(fiatSideNote(tx('SELL', 'EUR', 'USD'))).toBeNull()
+    expect(fiatSideNote(tx('DEPOSIT_FIAT', 'EUR', null))).toBeNull()
   })
 })

@@ -4,7 +4,7 @@ import type { Transaction } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { formatMoney, formatAmount, type Currency } from '../../utils/format'
 import { OP_META } from '../../constants/operations'
-import { fmtDate, calcEurValue, formatPriceLine, toDisplayAmount, valuationHint, rowFlowSign, walletFlow } from './helpers'
+import { fmtDate, calcEurValue, formatPriceLine, toDisplayAmount, valuationHint, rowFlowSign, walletFlow, fiatSideNote } from './helpers'
 import { T, alpha, ink } from '../../utils/colors'
 import { iconButtonClasses } from '../../components/ui'
 import { DeleteConfirm } from './DeleteConfirm'
@@ -93,6 +93,7 @@ export function TxRow({
 
   const meta   = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: T.muted, group: 'other', rowBg: 'transparent' }
   const sign = rowFlowSign(tx, walletId)
+  const sideNote = fiatSideNote(tx)
   const flow = walletFlow(tx, walletId)
   const amountColor = sign === '+' ? 'text-positive' : sign === '−' && meta.group === 'sell' ? 'text-negative' : 'text-fg'
 
@@ -137,6 +138,8 @@ export function TxRow({
               </span>
             )}
           </div>
+          {/* Registrada al revés por el exchange (#416): qué es en realidad. */}
+          {sideNote && <div className="text-[11px] text-fg-subtle mt-0.5">{sideNote}</div>}
         </td>
 
         {/* Activo + cantidad */}
