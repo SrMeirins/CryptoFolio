@@ -3,7 +3,7 @@ import { TrendingUp, Landmark, TrendingDown, Coins, Zap, type LucideIcon } from 
 import { SALE_COUNTERPARTS, type HistoryStats, type SummaryCard as Card } from '../../api/portfolio'
 import { formatNumber, type Currency } from '../../utils/format'
 import { T } from '../../utils/colors'
-import { SummaryCard } from './stats/SummaryCard'
+import { StatCard } from '../../components/ui'
 import { CARD_TITLES, COUNTERPART_LABELS, count, marginNotice, moneyIn, netLine, signedMoney } from './stats/summaryText'
 
 const CARD_META: Record<Card, { icon: LucideIcon; color: string }> = {
@@ -90,9 +90,11 @@ export function StatsBar({ totals, series, currency, filtered, margin, onInclude
       {notice && <p className="text-xs text-fg-subtle mb-2" role="status">{notice}</p>}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
         {cards.map((c, i) => (
-          <SummaryCard key={c.id} title={CARD_TITLES[c.id]} icon={CARD_META[c.id].icon} color={CARD_META[c.id].color}
+          <StatCard key={c.id} title={CARD_TITLES[c.id]} icon={CARD_META[c.id].icon} color={CARD_META[c.id].color}
             value={c.value[currency]} format={format} series={series.map(s => s.valor[c.id][currency])}
             active={card === c.id} onSelect={() => onSelectCard(card === c.id ? '' : c.id)} delay={i * 60}
+            actionLabel={card === c.id ? 'Quitar el filtro de sus operaciones' : 'Ver sus operaciones'}
+            helpLabel={`Qué suma ${CARD_TITLES[c.id]}`}
             help={<>{c.help}<p className="text-fg-muted">{CLICK_HINT}</p></>} />
         ))}
       </div>
