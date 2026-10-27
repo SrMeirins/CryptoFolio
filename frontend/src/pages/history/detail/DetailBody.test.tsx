@@ -28,30 +28,70 @@ const consumo = {
   id: 'c1', lot_id: 'l1', asset: 'BTC', wallet_name: 'Exchange', opened_at: '2025-03-01T10:00:00.000Z',
   origin: { id: 'buy-1', operation_type: 'BUY', timestamp: '2025-03-01T10:00:00.000Z' },
   quantity: 0.01, cost_eur: 200, proceeds_eur: 300, gain_loss_eur: 100, fiscal_event_type: 'GAIN' as const,
+  role: 'venta' as const, destination_name: null,
 }
 
 describe('DetailBody — trazabilidad FIFO (#373)', () => {
   it('una venta muestra los lotes que consume y los totales con su G/P', () => {
     const html = render(detail({ fifo: { consumed: [consumo], totals: { cost_eur: 200, proceeds_eur: 300, gain_loss_eur: 100 }, opened: [] } }))
     expect(html).toContain('De dónde salen las unidades')
-    expect(html).toContain('Valor de transmisión')
+    expect(html).toContain('Efecto fiscal (la venta)')
     expect(html).toContain('+100,00')
   })
 
   it('una transferencia sin efecto fiscal no muestra G/P ni totales', () => {
-    const html = render(detail({ fifo: { consumed: [{ ...consumo, fiscal_event_type: 'NONE', gain_loss_eur: null }], totals: { cost_eur: 0, proceeds_eur: 0, gain_loss_eur: 0 }, opened: [] } }))
+    const html = render(detail({ fifo: { consumed: [{ ...consumo, fiscal_event_type: 'NONE', gain_loss_eur: null, role: 'traslado', destination_name: 'Fría' }], totals: { cost_eur: 0, proceeds_eur: 0, gain_loss_eur: 0 }, opened: [] } }))
+    expect(html).toContain('Traslado a Fría')
     expect(html).toContain('sin efecto fiscal')
-    expect(html).not.toContain('Valor de transmisión')
+    expect(html).toContain('Sin efecto fiscal: es un traslado entre wallets propias.')
+    expect(html).not.toContain('Efecto fiscal (')
   })
 
   it('una compra muestra el lote que abre y quién lo consumió', () => {
     const html = render(detail({ fifo: { consumed: [], totals: { cost_eur: 0, proceeds_eur: 0, gain_loss_eur: 0 }, opened: [{
       id: 'l1', asset: 'BTC', wallet_name: 'Exchange', opened_at: '2025-03-01T10:00:00.000Z', is_closed: false,
       quantity_original: 0.02, quantity_remaining: 0.01, price_per_unit_eur: 20000, fee_eur: 0,
-      consumed_by: [{ transaction_id: 'sell-1', operation_type: 'SELL', timestamp: '2026-01-15T10:30:00.000Z', quantity: 0.01, proceeds_eur: 300, gain_loss_eur: 100, fiscal_event_type: 'GAIN' }],
+      source: null,
+      consumed_by: [{ transaction_id: 'sell-1', operation_type: 'SELL', timestamp: '2026-01-15T10:30:00.000Z', quantity: 0.01, proceeds_eur: 300, gain_loss_eur: 100, fiscal_event_type: 'GAIN', role: 'venta', destination_name: null }],
     }] } }))
     expect(html).toContain('Adónde van las unidades')
-    expect(html).toContain('quedan 0,01')
+    expect(html).toContain('Sin usar 0,01 de 0,02')
+    expect(html).toContain('50 % usado')
+    expect(html).not.toContain('Viene de')
+  })
+})
+
+// Retiro con comisión de red en el mismo activo (#405), datos sintéticos.
+describe('DetailBody — papel de cada consumo y lotes trasladados (#405)', () => {
+  const traslado = { ...consumo, fiscal_event_type: 'NONE' as const, gain_loss_eur: 0, role: 'traslado' as const, destination_name: 'Fría' }
+  const comision = { ...consumo, id: 'c2', quantity: 1, cost_eur: 0.93, proceeds_eur: 0.934, gain_loss_eur: 0.004, role: 'comision_red' as const, destination_name: 'Fría' }
+  const lote = (id: string, qty: number) => ({
+    id, asset: 'BTC', wallet_name: 'Fría', opened_at: '2025-03-01T10:00:00.000Z', is_closed: false,
+    quantity_original: qty, quantity_remaining: qty, price_per_unit_eur: 1, fee_eur: 0,
+    source: { id: `buy-${id}`, operation_type: 'BUY', timestamp: '2025-03-01T10:00:00.000Z' }, consumed_by: [],
+  })
+  const html = () => render(detail({ fifo: {
+    consumed: [comision, traslado], totals: { cost_eur: 0.93, proceeds_eur: 0.934, gain_loss_eur: 0.004 },
+    opened: [lote('a', 9), lote('b', 5)],
+  } }))
+
+  it('separa la comisión de red del traslado y dice qué tiene efecto fiscal', () => {
+    const h = html()
+    expect(h).toContain('Comisión de red')
+    expect(h).toContain('Traslado a Fría')
+    expect(h).toContain('Efecto fiscal (solo la comisión de red)')
+  })
+
+  it('una ganancia de 0,004 € no se redondea a 0,00 €', () => {
+    expect(html()).toMatch(/\+0,004/)
+    expect(html()).not.toContain('+0,00 €')
+  })
+
+  it('con varios lotes trasladados explica por qué y enlaza cada uno a su compra', () => {
+    const h = html()
+    expect(h).toContain('Un lote por cada compra de origen')
+    expect(h.match(/Viene de/g)).toHaveLength(2)
+    expect(h).toContain('Sin usar 9 de 9')
   })
 })
 

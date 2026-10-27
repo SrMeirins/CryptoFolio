@@ -352,6 +352,11 @@ export interface OriginalRows {
   rows: string[][]
 }
 
+/** Papel de un consumo FIFO (#405), espejo de modules/history/consumptionRole.ts. */
+export type ConsumptionRole =
+  | 'traslado' | 'comision_red' | 'venta' | 'permuta' | 'comision' | 'perdida' | 'donacion'
+  | 'devolucion_margen' | 'intereses_margen' | 'otro'
+
 export interface TransactionDetail {
   transaction: Transaction
   fifo: {
@@ -361,6 +366,8 @@ export interface TransactionDetail {
       origin: { id: string; operation_type: string; timestamp: string }
       quantity: number | null; cost_eur: number | null; proceeds_eur: number | null; gain_loss_eur: number | null
       fiscal_event_type: 'GAIN' | 'LOSS' | 'NONE'
+      /** Papel del consumo en esta operación y destino de un traslado (#405). */
+      role: ConsumptionRole; destination_name: string | null
     }[]
     /** Totales de los consumos con efecto fiscal. */
     totals: { cost_eur: number; proceeds_eur: number; gain_loss_eur: number }
@@ -368,9 +375,12 @@ export interface TransactionDetail {
     opened: {
       id: string; asset: string; wallet_name: string; opened_at: string; is_closed: boolean
       quantity_original: number | null; quantity_remaining: number | null; price_per_unit_eur: number | null; fee_eur: number | null
+      /** Lote de origen de un traslado (#405); null si el lote nace en esta operación. */
+      source: { id: string; operation_type: string; timestamp: string } | null
       consumed_by: {
         transaction_id: string; operation_type: string; timestamp: string
         quantity: number | null; proceeds_eur: number | null; gain_loss_eur: number | null; fiscal_event_type: 'GAIN' | 'LOSS' | 'NONE'
+        role: ConsumptionRole; destination_name: string | null
       }[]
     }[]
   }
