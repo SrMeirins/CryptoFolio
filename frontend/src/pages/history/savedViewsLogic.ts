@@ -10,6 +10,8 @@ import { EMPTY_FILTERS, toApiParams, type HistoryFilterState } from './urlState'
 export function viewFiltersFromState(filters: HistoryFilterState, sort: SortState): Record<string, string> {
   const params: Record<string, string> = { ...toApiParams(filters, sort, 0, 50, 'EUR') }
   for (const k of ['limit', 'offset', 'currency']) delete params[k]
+  // El margen del resumen (#403) no es un filtro de la lista, pero la vista lo recuerda.
+  if (filters.includeMargin) params.incluir_margen = 'true'
   return params
 }
 
@@ -35,6 +37,7 @@ export function stateFromView(filtros: Record<string, string>): { filters: Histo
       value_min: f.value_min ?? '',
       value_max: f.value_max ?? '',
       groupFees: f.group_fees !== 'false',
+      includeMargin: f.incluir_margen === 'true',
     },
     sort: sortKey && ['fecha', 'valor', 'activo', 'tipo'].includes(sortKey)
       ? { key: sortKey, dir: f.dir === 'asc' ? 'asc' : 'desc' }

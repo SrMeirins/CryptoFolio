@@ -63,6 +63,19 @@ export const OUTFLOW_TYPES: readonly DbOperationType[] = [
 export const FIAT_ASSETS = ['EUR', 'USD', 'GBP', 'CHF', 'BRL', 'ARS'] as const;
 
 /**
+ * Stablecoins para clasificar la contrapartida de una venta (#403). Solo para
+ * el resumen: fiscalmente son otra moneda virtual, no fiat (fiscal/contrapartida.ts).
+ */
+export const STABLECOINS = ['USDT', 'USDC', 'FDUSD', 'BUSD', 'DAI', 'TUSD', 'USDP', 'PYUSD', 'USDE', 'EURC', 'EURI'] as const;
+
+/**
+ * Operativa de margen (#403): cuentas de margen del exchange y préstamos. Los
+ * nombres de cuenta tienen espacios: van como parámetro, no con sqlList.
+ */
+export const MARGIN_ACCOUNTS: readonly string[] = ['Cross Margin', 'Isolated Margin'];
+export const MARGIN_TYPES: readonly DbOperationType[] = ['MARGIN_BORROW', 'MARGIN_REPAY'];
+
+/**
  * Lista SQL literal de valores constantes (`('BUY','SELL')`). Solo admite los
  * valores de las constantes de este módulo, nunca entrada del usuario.
  */

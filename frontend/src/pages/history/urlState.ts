@@ -22,6 +22,8 @@ export interface HistoryFilterState {
   value_max: string
   /** Comisiones agrupadas con su compra o venta (#371); preferencia de vista, no un filtro. */
   groupFees: boolean
+  /** Operativa de margen en el resumen y la analítica (#403); no afecta a la lista. */
+  includeMargin: boolean
 }
 
 export interface HistoryUrlState {
@@ -33,7 +35,7 @@ export interface HistoryUrlState {
 
 export const EMPTY_FILTERS: HistoryFilterState = {
   search: '', types: [], assets: [], wallet_id: '', account: '', date_from: '', date_to: '',
-  manualOnly: false, editedOnly: false, import_id: '', value_min: '', value_max: '', groupFees: true,
+  manualOnly: false, editedOnly: false, import_id: '', value_min: '', value_max: '', groupFees: true, includeMargin: false,
 }
 
 export const MAX_LIST = 30
@@ -60,7 +62,8 @@ export function cleanAmount(v: string | null): string {
   return AMOUNT_RE.test(t) ? t : ''
 }
 
-export function parseHistoryUrl(params: URLSearchParams): HistoryUrlState {
+/** `rememberedMargin`: la última elección del margen, si la URL no la trae (#403). */
+export function parseHistoryUrl(params: URLSearchParams, rememberedMargin = false): HistoryUrlState {
   const g = (k: string) => params.get(k)
   const desde = g('desde') ?? '', hasta = g('hasta') ?? ''
   const min = cleanAmount(g('min')), max = cleanAmount(g('max'))
@@ -79,6 +82,7 @@ export function parseHistoryUrl(params: URLSearchParams): HistoryUrlState {
     value_min: min,
     value_max: max,
     groupFees: g('comisiones') !== 'sueltas',
+    includeMargin: g('margen') === 'incluido' || (g('margen') !== 'excluido' && rememberedMargin),
   }
   // Rangos invertidos: se descarta el extremo «hasta» antes que romper la consulta.
   if (filters.date_from && filters.date_to && filters.date_from > filters.date_to) filters.date_to = ''
@@ -109,6 +113,7 @@ export function toHistoryUrl({ filters: f, sort, page }: HistoryUrlState): URLSe
   if (f.value_min) p.set('min', f.value_min)
   if (f.value_max) p.set('max', f.value_max)
   if (!f.groupFees) p.set('comisiones', 'sueltas')
+  if (f.includeMargin) p.set('margen', 'incluido')
   if (sort.key !== DEFAULT_SORT.key || sort.dir !== DEFAULT_SORT.dir) { p.set('orden', sort.key); p.set('dir', sort.dir) }
   if (page > 1) p.set('pagina', String(page))
   return p
