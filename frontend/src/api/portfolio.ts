@@ -600,6 +600,8 @@ export interface OperationType {
   example?: string
   badge: string
   badgeColor: 'green' | 'red' | 'blue' | 'gray' | 'amber'
+  /** Solo para editar importadas; no se ofrece al crear (#394). */
+  editOnly?: boolean
 }
 
 export interface CategoryMeta { label: string; description: string; icon: string }

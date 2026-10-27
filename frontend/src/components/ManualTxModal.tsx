@@ -7,7 +7,7 @@ import { useToast } from '../hooks/useToast'
 import { ManualTxPreviewPanel } from './ManualTxPreviewPanel'
 import { ManualTxDoneScreen } from './ManualTxDoneScreen'
 import { ImportEditNotice } from './ImportEditNotice'
-import { amountNetFor } from './manualTxData'
+import { amountNetFor, editFormType, savedOperationType } from './manualTxData'
 import { buttonClasses, iconButtonClasses, Modal } from './ui'
 
 interface ManualTxModalProps {
@@ -23,7 +23,7 @@ function isFeeOperation(operationTypeId: string): boolean {
 function txToInitialValues(tx: Transaction): { operationTypeId: string; fields: Record<string, unknown> } {
   const isFeeOp = isFeeOperation(tx.operation_type)
   return {
-    operationTypeId: tx.operation_type,
+    operationTypeId: editFormType(tx),
     fields: {
       timestamp:   tx.timestamp,
       asset:       isFeeOp ? undefined : tx.asset,
@@ -41,7 +41,7 @@ function txToInitialValues(tx: Transaction): { operationTypeId: string; fields: 
 }
 
 function buildTxData(result: WizardResult, original?: Transaction): Record<string, unknown> {
-  const op = result.operationTypeId
+  const op = savedOperationType(result.operationTypeId, original)
   const isFeeOp = isFeeOperation(op)
 
   const asset  = isFeeOp ? result.fields.fee_asset  : result.fields.asset

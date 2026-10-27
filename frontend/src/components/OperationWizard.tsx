@@ -79,7 +79,8 @@ export function OperationWizard(props: OperationWizardProps) {
 }
 
 function OperationWizardForm({ catalog, unknownOperation, initialValues, onComplete, onCancel, titleId, notice }: OperationWizardProps & { catalog: CatalogData }) {
-  // Modo edición: tipo y campos precargados desde initialValues.
+  // Modo edición: tipo y campos precargados desde initialValues. Si el tipo
+  // no tiene formulario, se empieza en «Tipo» sin perder los campos (#394).
   const initialType = initialValues
     ? catalog.operations.find(op => op.id === initialValues.operationTypeId) ?? null
     : null
@@ -87,7 +88,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
   const [selectedType, setSelectedType] = useState<OperationType | null>(initialType)
   const [expandedCat, setExpandedCat]   = useState<string | null>('ACQUISITION')
   const [fieldValues, setFieldValues]   = useState<Record<string, unknown>>(
-    () => buildInitialFields(initialType && initialValues ? initialValues.fields : {}, unknownOperation),
+    () => buildInitialFields(initialValues?.fields ?? {}, unknownOperation),
   )
   const [showHelper, setShowHelper]     = useState(false)
   const [applyToAll, setApplyToAll]     = useState(false)
@@ -229,7 +230,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
             {CATEGORIES_ORDER.map(catKey => {
               const meta = catalog.categories[catKey]
               if (!meta) return null
-              const ops = catalog.operations.filter(op => op.category === catKey)
+              const ops = catalog.operations.filter(op => op.category === catKey && !op.editOnly)
               if (ops.length === 0) return null
               const isOpen = expandedCat === catKey
               const color  = CATEGORY_COLORS[catKey]
