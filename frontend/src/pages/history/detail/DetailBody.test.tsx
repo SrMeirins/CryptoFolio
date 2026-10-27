@@ -11,7 +11,7 @@ function detail(overrides: Partial<TransactionDetail> = {}): TransactionDetail {
   return {
     transaction: makeTx({ operation_type: 'SELL', asset: 'BTC', value_eur: 300, value_source: 'fifo' }),
     fifo: { consumed: [], totals: { cost_eur: 0, proceeds_eur: 0, gain_loss_eur: 0 }, opened: [] },
-    origin: { import: null, source_rows: 0 },
+    origin: { import: null, source_rows: 0, original_rows: null },
     onchain: { tx_hash: null, address: null, network: null, tx_url: null, address_url: null },
     fiscal_years: [],
     ...overrides,
@@ -64,12 +64,41 @@ describe('DetailBody — origen, on-chain y enlaces (#373)', () => {
   it('indica el archivo y cuántas filas agrupa, con el nombre como texto literal', () => {
     const html = render(detail({ origin: {
       import: { id: 'imp-1', filename: '<img src=x>.csv', exchange: 'binance', imported_at: '2026-01-20T10:00:00.000Z' },
-      source_rows: 3,
+      source_rows: 3, original_rows: null,
     } }))
     expect(html).toContain('href="/history?importacion=imp-1"')
     expect(html).toContain('Agrupa 3 filas del archivo.')
     expect(html).toContain('&lt;img src=x&gt;.csv')
     expect(html).not.toContain('<img src=x>')
+  })
+
+  const IMPORT = { id: 'imp-1', filename: 'orden.csv', exchange: 'binance', imported_at: '2026-01-20T10:00:00.000Z' }
+
+  it('importada antes de #374: recuento y cómo completar las filas', () => {
+    const html = render(detail({ origin: { import: IMPORT, source_rows: 2, original_rows: null } }))
+    expect(html).toContain('vuelve a importar este archivo para verlas')
+    expect(html).not.toContain('<table')
+  })
+
+  it('filas originales (#374): tabla sin columnas vacías y el texto como literal', () => {
+    const html = render(detail({ origin: { import: IMPORT, source_rows: 2, original_rows: {
+      columns: ['Time', 'Operation', 'Change', 'Remark'],
+      rows: [['2024-02-01 10:00:00', 'Transaction Buy', '40', '<b>fill</b>'], ['2024-02-01 10:00:00', 'Transaction Buy', '60', '']],
+    } } }))
+    expect(html).toContain('<caption class="sr-only">Filas originales del archivo</caption>')
+    expect(html).toContain('<th scope="col"')
+    expect(html).toContain('&lt;b&gt;fill&lt;/b&gt;')
+    expect(html).not.toContain('<b>fill</b>')
+    expect(html).not.toContain('vuelve a importar')
+    expect(html).not.toContain('Mostrar las')
+  })
+
+  it('con más de 5 filas muestra las primeras y un botón para el resto', () => {
+    const rows = Array.from({ length: 7 }, (_, i) => ['t', String(i)])
+    const html = render(detail({ origin: { import: IMPORT, source_rows: 7, original_rows: { columns: ['Time', 'Change'], rows } } }))
+    expect(html.match(/<tr class="border-t/g)).toHaveLength(5)
+    expect(html).toContain('Mostrar las 7 filas')
+    expect(html).toContain('aria-expanded="false"')
   })
 
   it('el explorador abre en pestaña nueva sin referrer y lo anuncia', () => {

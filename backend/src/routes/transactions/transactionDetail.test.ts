@@ -41,6 +41,14 @@ describe('detalle de una transacción (#373)', () => {
         VALUES ($1, '987654321', '2024-01-10T10:00:00Z', 'Spot', 'Buy', 'XRP', 33.3, $2, $3, $4)`, [imp, i === 0 ? '<b>nota</b>' : null, `rh-373-${i}`, ids.buy]);
     }
 
+    // Orden importada con filas originales (#374): dos fills parciales.
+    await tx('orden', { operation_type: 'BUY', timestamp: '2024-02-01T10:00:00Z', asset: 'XRP', amount: 100, amount_net: 100, cost_asset: 'USDC', cost_amount: 50, wallet_id: w, import_id: imp });
+    for (const [i, change, remark] of [[0, '60', ''], [1, '40', '<b>fill</b>']] as const) {
+      await pool.query(`INSERT INTO raw_transactions (import_id, user_id, time, account, operation, coin, change, remark, row_hash, transaction_id, original_row)
+        VALUES ($1, '', '2024-02-01T10:00:00Z', 'Spot', 'BUY', 'XRP', 100, '', $2, $3, $4::jsonb)`,
+        [imp, `rh-374-${i}`, ids.orden, JSON.stringify({ Time: '2024-02-01 10:00:00', Account: 'Spot', Operation: 'Transaction Buy', Coin: 'XRP', Change: change, Remark: remark })]);
+    }
+
     const { default: router } = await import('./transactionDetail');
     app = express();
     app.use('/api/v1/transactions', router);
@@ -68,9 +76,22 @@ describe('detalle de una transacción (#373)', () => {
 
   it('origen: archivo y número de filas que agrupa, nunca el user_id ni el contenido de las filas', async () => {
     const d = await detalle('buy');
-    expect(d.origin).toEqual({ import: expect.objectContaining({ filename: 'sintetico.csv', exchange: 'binance' }), source_rows: 3 });
+    expect(d.origin).toEqual({ import: expect.objectContaining({ filename: 'sintetico.csv', exchange: 'binance' }), source_rows: 3, original_rows: null });
     expect(JSON.stringify(d)).not.toContain('987654321');
     expect(JSON.stringify(d)).not.toContain('<b>nota</b>');
+  });
+
+  it('origen con filas originales (#374): cada fill con su importe, columnas en el orden del CSV, sin user_id', async () => {
+    const d = await detalle('orden');
+    expect(d.origin.source_rows).toBe(2);
+    expect(d.origin.original_rows).toEqual({
+      columns: ['Time', 'Account', 'Operation', 'Coin', 'Change', 'Remark'],
+      rows: [
+        ['2024-02-01 10:00:00', 'Spot', 'Transaction Buy', 'XRP', '40', '<b>fill</b>'],
+        ['2024-02-01 10:00:00', 'Spot', 'Transaction Buy', 'XRP', '60', ''],
+      ],
+    });
+    expect(JSON.stringify(d)).not.toContain('User ID');
   });
 
   it('transferencia: consumo sin efecto fiscal y enlaces al explorador de su red', async () => {
@@ -90,7 +111,7 @@ describe('detalle de una transacción (#373)', () => {
 
   it('manual: sin origen ni datos on-chain', async () => {
     const d = await detalle('manual');
-    expect(d.origin).toEqual({ import: null, source_rows: 0 });
+    expect(d.origin).toEqual({ import: null, source_rows: 0, original_rows: null });
     expect(d.onchain.tx_url).toBeNull();
   });
 

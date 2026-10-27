@@ -49,11 +49,14 @@ export function firmaLote(seleccion: readonly ArchivoSel[]): string {
 }
 
 /**
- * Archivos que se envían a importar: los que traen algo nuevo. Si ninguno lo trae
- * (solo hay costes de depósitos que guardar), el primero reconocido, como con un solo archivo.
+ * Archivos que se envían a importar: los que traen algo nuevo o filas originales
+ * que completar (#374). Si ninguno (solo hay costes de depósitos que guardar), el
+ * primero reconocido, como con un solo archivo.
  */
 export function indicesAConfirmar(archivos: readonly ArchivoLote[]): number[] {
-  const listos = archivos.filter(a => a.estado === 'listo').map(a => a.indice)
+  const listos = archivos
+    .filter(a => a.estado === 'listo' || (a.estado !== 'no_reconocido' && (a.faltanOriginales ?? 0) > 0))
+    .map(a => a.indice)
   if (listos.length > 0) return listos
   const reconocido = archivos.find(a => a.estado !== 'no_reconocido')
   return reconocido ? [reconocido.indice] : []

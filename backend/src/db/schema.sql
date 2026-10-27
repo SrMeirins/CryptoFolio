@@ -229,7 +229,11 @@ CREATE TABLE raw_transactions (
   remark         TEXT,
   row_hash       TEXT NOT NULL,
   transaction_id UUID,
-  UNIQUE(row_hash)
+  -- Fila tal como venía en el CSV, sin «User ID» (#374); NULL en las antiguas.
+  original_row   JSONB,
+  UNIQUE(row_hash),
+  CONSTRAINT chk_raw_transactions_original_row
+    CHECK (original_row IS NULL OR (jsonb_typeof(original_row) = 'object' AND NOT original_row ? 'User ID'))
 );
 
 CREATE INDEX idx_raw_transactions_time   ON raw_transactions(time);

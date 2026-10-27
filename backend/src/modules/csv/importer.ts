@@ -10,6 +10,7 @@ import { enrichIncomeTransactionsWithPrices } from './importerEnrichment';
 import { buildTransferDestinationMap, resolveWalletId, resolveDestinationWalletId } from './importerTransferDestinations';
 import { destinosDeRetiros } from './retiradas/destinosDb';
 import { aplicarComisionRetiro, conComision } from './retiradas/comision';
+import { completeOriginalRows, originalRowsByHash } from './originalRows';
 
 export { previewCsvFile } from './importerPreview';
 export type { UnknownOperationSample, DepositReview, PreviewResult } from './importerPreview';
@@ -21,6 +22,8 @@ export interface ImportResult {
   duplicateRows: number;
   /** Importadas editadas a mano que se han respetado (#378). */
   editedKept: number;
+  /** Filas ya guardadas a las que se ha añadido su fila original (#374). */
+  originalRowsCompleted: number;
   ignoredRows: number;
   errors: string[];
   warnings: string[];
@@ -62,7 +65,19 @@ export async function importCsvFile(
     'SELECT id, filename FROM csv_imports WHERE file_hash = $1',
     [fileHash]
   );
+  const originals = originalRowsByHash(parseResult.rawRows);
   if (existing.rows.length > 0) {
+    // El mismo archivo no vuelve a importar nada, pero completa las filas
+    // originales de una importación anterior a #374.
+    const completed = await completeOriginalRows(db, originals);
+    if (completed > 0) {
+      onStatus?.(`Archivo ya importado: ${completed} filas originales completadas`);
+      return {
+        importId: existing.rows[0].id, totalRows: parseResult.stats.totalRows, newTransactions: 0,
+        duplicateRows: parseResult.transactions.length, editedKept: 0, originalRowsCompleted: completed,
+        ignoredRows: parseResult.stats.ignoredRows, errors: [], warnings: validation.warnings, validation,
+      };
+    }
     throw new Error(
       `Este CSV exacto ya fue importado (${existing.rows[0].filename}). ` +
       `Si quieres importar un rango solapado, el sistema detectará automáticamente las filas nuevas.`
@@ -342,18 +357,25 @@ export async function importCsvFile(
         for (const { hash, row } of chunk) {
           const { id, tx } = row;
           const b = params.length;
-          params.push(importId, tx.timestamp, tx.account, tx.operationType, tx.asset, tx.amount, tx.notes ?? '', hash, id);
-          valueClauses.push(`($${b+1},'',$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9})`);
+          const original = originals.get(hash);
+          params.push(importId, tx.timestamp, tx.account, tx.operationType, tx.asset, tx.amount, tx.notes ?? '', hash, id,
+            original ? JSON.stringify(original) : null);
+          valueClauses.push(`($${b+1},'',$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10}::jsonb)`);
         }
         await client.query(
           `INSERT INTO raw_transactions
-           (import_id,user_id,time,account,operation,coin,change,remark,row_hash,transaction_id)
+           (import_id,user_id,time,account,operation,coin,change,remark,row_hash,transaction_id,original_row)
            VALUES ${valueClauses.join(',')}
            ON CONFLICT (row_hash) DO NOTHING`,
           params
         );
       }
     }
+
+    // Filas que ya estaban (exportación solapada): se completa su original (#374).
+    const originalRowsCompleted = existingHashSet.size > 0
+      ? await completeOriginalRows(client, new Map([...originals].filter(([h]) => existingHashSet.has(h))))
+      : 0;
 
     await client.query(
       `UPDATE csv_imports SET row_count = $1, skipped_count = $2 WHERE id = $3`,
@@ -370,6 +392,7 @@ export async function importCsvFile(
       newTransactions,
       duplicateRows,
       editedKept,
+      originalRowsCompleted,
       ignoredRows: parseResult.stats.ignoredRows,
       errors: parseResult.errors.map((e) => e.message),
       warnings: validation.warnings,

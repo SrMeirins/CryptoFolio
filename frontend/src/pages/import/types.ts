@@ -47,6 +47,8 @@ export interface ArchivoLote {
   duplicadas: number
   repetidasEnLote: number
   rango: { from: string; to: string } | null
+  /** Filas ya importadas sin su fila original que el archivo puede completar (#374). */
+  faltanOriginales?: number
 }
 
 export interface DestinoRetiro {
@@ -93,6 +95,8 @@ export interface PreviewResult {
   /** Archivos del lote y filas repetidas entre ellos (#326). */
   archivos?: ArchivoLote[]
   repetidasEnLote?: number
+  /** Filas ya importadas sin su fila original que estos archivos pueden completar (#374). */
+  originalRowsMissing?: number
 }
 
 export interface ProgressEvent {
@@ -113,7 +117,7 @@ export interface ProgressEvent {
 export interface ResumenImportacion {
   importId: string
   /** Desglose del lote (#326): una importación por archivo. */
-  archivos?: { importId: string; archivo: string; exchange: string; nuevas: number; duplicadas: number; editadas_respetadas?: number }[]
+  archivos?: { importId: string; archivo: string; exchange: string; nuevas: number; duplicadas: number; editadas_respetadas?: number; originales_completadas?: number }[]
   archivo: string
   nuevas: number
   duplicadas: number

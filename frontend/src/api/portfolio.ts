@@ -346,6 +346,12 @@ export interface GroupedFee {
 }
 
 /** Detalle con trazabilidad de una transacción (#373). */
+/** Filas originales del CSV (#374): columnas en el orden del archivo y valores como texto. */
+export interface OriginalRows {
+  columns: string[]
+  rows: string[][]
+}
+
 export interface TransactionDetail {
   transaction: Transaction
   fifo: {
@@ -372,6 +378,8 @@ export interface TransactionDetail {
     import: { id: string; filename: string; exchange: string; imported_at: string } | null
     /** Filas del archivo que agrupa la transacción (p. ej. fills parciales). */
     source_rows: number
+    /** Las filas tal como venían en el CSV (#374); null si se importó antes. */
+    original_rows: OriginalRows | null
   }
   onchain: { tx_hash: string | null; address: string | null; network: string | null; tx_url: string | null; address_url: string | null }
   fiscal_years: number[]
