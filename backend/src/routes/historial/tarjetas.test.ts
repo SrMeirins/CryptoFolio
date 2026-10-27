@@ -87,6 +87,18 @@ describe('tarjetas del resumen y filtro «Tarjeta» (#407)', () => {
     expect((await stats()).totals.fee_ops + 1).toBe((await stats('incluir_margen=true')).totals.fee_ops);
   });
 
+  it('entradas y salidas de la lista por el lado del fiat, como las tarjetas (#416)', async () => {
+    const { totals } = await stats();
+    const flows = async (card: string) => (await request(app).get(`/api/transactions?tarjeta=${card}`)).body.flows.EUR;
+    expect((await flows('invertido')).entradas).toBeCloseTo(totals.invested.EUR, 8);
+    expect((await flows('invertido')).salidas).toBe(0);
+    expect((await flows('ventas')).salidas).toBeCloseTo(totals.sold.EUR, 8);
+    // Pasar USDC a EUR no es entrada ni salida.
+    const usdc = await request(app).get('/api/transactions?asset=USDC&type=SELL');
+    expect(usdc.body.total).toBe(1);
+    expect(usdc.body.flows.EUR).toEqual({ entradas: 0, salidas: 0 });
+  });
+
   it('tarjeta inválida: 400 legible', async () => {
     const res = await request(app).get('/api/transactions?tarjeta=otra');
     expect(res.status).toBe(400);

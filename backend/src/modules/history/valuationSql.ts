@@ -1,4 +1,5 @@
 import { ACQUISITION_TYPES, DISPOSAL_TYPES, FEE_TYPES, INFLOW_TYPES, OUTFLOW_TYPES, sqlList } from './operationGroups';
+import { cardSql } from './summaryCards';
 
 // Valoración en EUR de cada transacción del Historial (#346), en la consulta y
 // sin columnas persistidas: así sigue siendo coherente tras cada recálculo FIFO.
@@ -105,12 +106,20 @@ export const VALUATION_COLUMNS = `
     ELSE 'sin_precio'
   END) AS fee_value_source`;
 
+const SIDE = cardSql('t');
+
 /**
  * Sentido de la operación en el total filtrado: 'in', 'out' o NULL (neutra).
  * Un retiro a una wallet propia es un movimiento interno, no una salida.
+ * Por el lado del fiat, como el resumen (#416): comprar cripto es entrada y
+ * venderla por fiat, salida, aunque el exchange lo registre al revés; pasar
+ * una stablecoin a fiat no cuenta.
  */
 export const FLOW_DIRECTION = `
   (CASE
+    WHEN ${SIDE.stableToFiat} THEN NULL
+    WHEN ${SIDE.fiatSold} THEN 'in'
+    WHEN ${SIDE.fiatBought} THEN 'out'
     WHEN t.operation_type IN ${sqlList(INFLOW_TYPES)} THEN 'in'
     WHEN t.operation_type = 'WITHDRAW' AND t.destination_wallet_id IS NOT NULL THEN NULL
     WHEN t.operation_type IN ${sqlList(OUTFLOW_TYPES)} THEN 'out'
