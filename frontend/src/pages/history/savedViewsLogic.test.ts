@@ -37,3 +37,14 @@ describe('vistas y comisiones agrupadas (#371)', () => {
     expect(stateFromView({}).filters.groupFees).toBe(true)
   })
 })
+
+describe('vistas y margen del resumen (#403)', () => {
+  it('la vista recuerda si incluye el margen', () => {
+    const on = { ...EMPTY_FILTERS, includeMargin: true }
+    const filtros = viewFiltersFromState(on, DEFAULT_SORT)
+    expect(filtros.incluir_margen).toBe('true')
+    expect(stateFromView(filtros).filters.includeMargin).toBe(true)
+    expect(viewFiltersFromState(EMPTY_FILTERS, DEFAULT_SORT)).not.toHaveProperty('incluir_margen')
+    expect(stateFromView({}).filters.includeMargin).toBe(false)
+  })
+})

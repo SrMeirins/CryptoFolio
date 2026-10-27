@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
+import { readIncludeMargin, saveIncludeMargin } from './stats/analyticsPrefs'
 import { DEFAULT_SORT, nextSort, type SortKey, type SortState } from './sorting'
 import {
   EMPTY_FILTERS, hasActiveFilters as anyFilter, parseHistoryUrl, toApiParams, toHistoryUrl,
@@ -18,7 +19,7 @@ export type { HistoryFilterState }
 export function useHistoryFilters() {
   const currency = useCurrency()
   const [params, setParams] = useSearchParams()
-  const [initial] = useState(() => parseHistoryUrl(params))
+  const [initial] = useState(() => parseHistoryUrl(params, readIncludeMargin()))
   const [filters, setFilters] = useState<HistoryFilterState>(initial.filters)
   const [searchInput, setSearchInput] = useState(initial.filters.search)
   const [sort, setSort] = useState<SortState>(initial.sort)
@@ -58,7 +59,7 @@ export function useHistoryFilters() {
     const text = params.toString()
     if (text === lastWritten.current) return
     lastWritten.current = text
-    const parsed = parseHistoryUrl(params)
+    const parsed = parseHistoryUrl(params, readIncludeMargin())
     setFilters(parsed.filters)
     setSearchInput(parsed.filters.search)
     setSort(parsed.sort)
@@ -84,7 +85,14 @@ export function useHistoryFilters() {
   const setOffset = useCallback((offset: number, tx: string | null = null) => { setPage(Math.floor(offset / PAGE_SIZE) + 1); setFocusTx(tx) }, [])
   const clearImport = useCallback(() => patchFilters({ import_id: '' }), [patchFilters])
   const clearFilters = useCallback(() => {
-    setFilters(EMPTY_FILTERS); setSearchInput(''); setSort(DEFAULT_SORT); setPage(1); setFocusTx(null)
+    // El margen es una preferencia del resumen, no un filtro: se conserva.
+    setFilters(prev => ({ ...EMPTY_FILTERS, includeMargin: prev.includeMargin }))
+    setSearchInput(''); setSort(DEFAULT_SORT); setPage(1); setFocusTx(null)
+  }, [])
+  /** Margen en el resumen (#403): no cambia la lista, así que mantiene página y detalle. */
+  const setIncludeMargin = useCallback((include: boolean) => {
+    saveIncludeMargin(include)
+    setFilters(prev => ({ ...prev, includeMargin: include }))
   }, [])
   /** Sustituye filtros y orden de golpe (aplicar una vista guardada, #369). */
   const applyState = useCallback((next: { filters: HistoryFilterState; sort: SortState }) => {
@@ -99,6 +107,7 @@ export function useHistoryFilters() {
     filters, searchInput, sort, page, offset, queryParams, focusTx, startedEmpty,
     hasActiveFilters: anyFilter(filters),
     setFilter, patchFilters, setSearchInput, setDateRange, setOffset, clearImport, clearFilters, toggleSort, applyState,
+    setIncludeMargin,
     openTx: setFocusTx,
   }
 }

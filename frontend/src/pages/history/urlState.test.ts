@@ -73,3 +73,26 @@ describe('filtro «Editadas» (#378)', () => {
     expect(toApiParams(EMPTY_FILTERS, DEFAULT_SORT, 0, 50, 'EUR').edited).toBeUndefined()
   })
 })
+
+// Margen en el resumen (#403): en la URL, con la última elección si no la trae.
+describe('margen en la URL (#403)', () => {
+  const url = (q: string, remembered = false) => parseHistoryUrl(new URLSearchParams(q), remembered).filters.includeMargin
+
+  it('por defecto sin margen; «margen=incluido» lo incluye', () => {
+    expect(url('')).toBe(false)
+    expect(url('margen=incluido')).toBe(true)
+    expect(url('margen=raro')).toBe(false)
+  })
+
+  it('sin parámetro usa la última elección; «excluido» la anula', () => {
+    expect(url('', true)).toBe(true)
+    expect(url('margen=excluido', true)).toBe(false)
+  })
+
+  it('solo se escribe cuando se incluye y nunca va a la API de la lista', () => {
+    const on = { filters: { ...EMPTY_FILTERS, includeMargin: true }, sort: DEFAULT_SORT, page: 1 }
+    expect(toHistoryUrl(on).get('margen')).toBe('incluido')
+    expect(toHistoryUrl({ ...on, filters: EMPTY_FILTERS }).has('margen')).toBe(false)
+    expect(Object.keys(toApiParams(on.filters, DEFAULT_SORT, 0, 50, 'EUR'))).not.toContain('incluir_margen')
+  })
+})

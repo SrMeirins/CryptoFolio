@@ -396,7 +396,13 @@ export interface HistoryStats {
   totals: {
     ops: number; unique_assets: number; manual: number
     fiat_buys: number; invested: Money
+    /** Fiat recibido al vender cripto (#403): Invertido menos esto es el neto. */
+    recovered: Money
     sells: number; sold: Money
+    /** Resultado (G/P) de las ventas según el FIFO (#403). */
+    sold_gp: Money
+    /** Ventas por lo que se recibe a cambio (#403). */
+    sold_by_counterpart: Record<SaleCounterpart, { ops: number; value: Money }>
     income_ops: number; income: Money; income_sin_valor: number
     fee_ops: number; fees: Money; fees_sin_valor: number
   }
@@ -408,7 +414,12 @@ export interface HistoryStats {
   rankings_periodo: 'filtrado' | 'ultimo_anio'
   top_assets: { asset: string; ops: number; volume: Money }[]
   fees_by_asset: { asset: string; ops: number; amount: number; value: Money }[]
+  /** Operativa de margen (#403): si el resumen la incluye y cuántas operaciones (y ventas) son de margen. */
+  margin: { included: boolean; ops: number; sells: number }
 }
+
+export const SALE_COUNTERPARTS = ['fiat', 'stablecoin', 'cripto'] as const
+export type SaleCounterpart = typeof SALE_COUNTERPARTS[number]
 
 /** Zona horaria efectiva de la aplicación (#388). */
 export interface TimezoneInfo {

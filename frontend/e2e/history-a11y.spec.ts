@@ -89,7 +89,8 @@ test('estadísticas (#376): siguen a los filtros y el gráfico alterna número y
   const resumen = page.getByRole('region', { name: /Resumen/ })
   await expect(resumen).toBeVisible()
   await expect(resumen).not.toContainText('según los filtros')
-  const opsCard = resumen.getByText('Operaciones', { exact: true }).locator('..')
+  // Título y ayuda (#403) van juntos: la tarjeta es el contenedor de ambos.
+  const opsCard = resumen.getByText('Operaciones', { exact: true }).locator('../..')
   const total = await opsCard.locator('.mono').textContent()
 
   // Con un filtro, las tarjetas se rotulan y cambian.

@@ -63,6 +63,12 @@ describe('vistas guardadas del Historial', () => {
     expect((await crear({ nombre: 'X', filtros: { type: "BUY' OR 1=1" } })).status).toBe(400);
     expect((await crear({ nombre: 'X', filtros: { value_min: '-1' } })).status).toBe(400);
     expect((await crear({ nombre: 'X', filtros: { currency: 'USD' } })).status).toBe(400);
+    // El margen del resumen (#403) se guarda con la vista; solo true o false.
+    const conMargen = await crear({ nombre: 'Con margen', filtros: { type: 'SELL', incluir_margen: 'true' } });
+    expect(conMargen.status).toBe(201);
+    expect(conMargen.body.vista.filtros.incluir_margen).toBe('true');
+    await request(app).delete(`${base}/${conMargen.body.vista.id}`);
+    expect((await crear({ nombre: 'X', filtros: { incluir_margen: 'si' } })).status).toBe(400);
     expect((await crear({ nombre: 'X', filtros: { limit: '10' } })).status).toBe(400);
     expect((await crear({ nombre: 'X', filtros: { foo: '1' } })).status).toBe(400);
   });
