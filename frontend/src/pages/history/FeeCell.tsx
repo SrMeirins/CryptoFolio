@@ -6,9 +6,10 @@ import { feeSummary } from './helpers'
 /**
  * Celda «Fee» del Historial (#371): la comisión propia de la operación y, con
  * comisiones agrupadas, su total en la moneda de visualización y «+N
- * comisiones». El desglose está en el detalle de la fila.
+ * comisiones». El desglose está en el detalle de la fila. En una entrada desde
+ * otra wallet propia (#395) se atenúa: la pagó la wallet de origen.
  */
-export function FeeCell({ tx, currency }: { tx: Transaction; currency: Currency }) {
+export function FeeCell({ tx, currency, paidElsewhere = false }: { tx: Transaction; currency: Currency; paidElsewhere?: boolean }) {
   const s = feeSummary(tx, currency)
   if (s.count === 0) return <span className="text-fg-subtle text-xs">—</span>
   const grouped = tx.grouped_fees.length
@@ -19,7 +20,7 @@ export function FeeCell({ tx, currency }: { tx: Transaction; currency: Currency 
       {own && <CryptoIcon symbol={tx.fee_asset!} size={14} />}
       <div>
         {own && (
-          <div className="text-xs mono text-fg-muted">
+          <div className={`text-xs mono ${paidElsewhere ? 'text-fg-subtle' : 'text-fg-muted'}`}>
             {formatAmount(tx.fee_amount!, 6)} <span className="text-fg-subtle text-xs">{tx.fee_asset}</span>
           </div>
         )}
@@ -32,6 +33,7 @@ export function FeeCell({ tx, currency }: { tx: Transaction; currency: Currency 
         {grouped > 0 && (
           <div className="text-[11px] text-fg-subtle">+{grouped} {grouped === 1 ? 'comisión' : 'comisiones'}</div>
         )}
+        {paidElsewhere && <div className="text-[11px] text-fg-subtle">pagada en origen</div>}
       </div>
     </div>
   )

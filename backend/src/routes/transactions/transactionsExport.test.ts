@@ -21,6 +21,8 @@ const csv = (qs = '') => request(app).get(`/api/transactions/export.csv${qs}`).b
 });
 const lines = (body: string) => body.replace(/^\uFEFF/, '').trimEnd().split('\n');
 
+let coldWallet: string;
+
 describe('routes/transactions — exportación CSV', () => {
   beforeAll(async () => {
     testDb = await createTestDatabase();
@@ -34,9 +36,10 @@ describe('routes/transactions — exportación CSV', () => {
       `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, cost_asset, cost_amount, wallet_id)
        SELECT 'BUY', TIMESTAMPTZ '2025-01-01T00:00:00Z' + (g || ' hours')::interval, 'BTC', 1, 1, 'EUR', g, $1
        FROM generate_series(1, ${N}) g`, [w]);
+    coldWallet = (await pool.query(`INSERT INTO wallets (name, type) VALUES ('Fría test', 'hardware') RETURNING id`)).rows[0].id;
     await pool.query(
-      `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id, notes)
-       VALUES ('TRANSFER_INTERNAL', '2024-06-01T10:00:00Z', 'XRP', 5, 5, $1, '=HYPERLINK("http://x");b')`, [w]);
+      `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id, destination_wallet_id, notes)
+       VALUES ('TRANSFER_INTERNAL', '2024-06-01T10:00:00Z', 'XRP', 5, 5, $1, $2, '=HYPERLINK("http://x");b')`, [w, coldWallet]);
 
     const { default: router } = await import('./index');
     app = express();
@@ -89,6 +92,12 @@ describe('routes/transactions — exportación CSV', () => {
   it('neutraliza fórmulas y cita el separador en las notas', async () => {
     const fila = lines((await csv('?asset=XRP')).body)[1];
     expect(fila).toContain(`"'=HYPERLINK(""http://x"");b"`);
+  });
+
+  it('con la wallet de destino exporta la transferencia que llega a ella (#395)', async () => {
+    const ls = lines((await csv(`?wallet_id=${coldWallet}`)).body);
+    expect(ls).toHaveLength(2);
+    expect(ls[1]).toContain('Fría test');
   });
 
   it('valida los filtros y rechaza la paginación', async () => {

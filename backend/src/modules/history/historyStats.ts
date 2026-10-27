@@ -58,6 +58,10 @@ export async function getHistoryStats(db: Queryable, f: HistoryFilters, tz: stri
   const datesFiltered = !!(f.date_from || f.date_to);
   const all = [...params, tz, period.from, period.to];
   const [tzP, fromP, toP] = [all.length - 2, all.length - 1, all.length].map(i => `$${i}`);
+  // Con filtro de wallet (#395), solo las comisiones que pagó ella: una entrada
+  // desde otra wallet propia trae la comisión pagada en origen.
+  let paidHere = '';
+  if (f.wallet_id) { all.push(f.wallet_id); paidHere = `AND wallet_id = $${all.length}`; }
   const unit = period.granularity;
   const fmt = unit === 'year' ? 'YYYY' : 'YYYY-MM';
   const recent = datesFiltered ? 'TRUE' : `timestamp >= NOW() - INTERVAL '1 year'`;
@@ -65,7 +69,7 @@ export async function getHistoryStats(db: Queryable, f: HistoryFilters, tz: stri
   const { rows } = await db.query(
     `WITH ${ctes},
      vt AS MATERIALIZED (
-       SELECT v.id, v.operation_type, v.timestamp, v.asset, v.amount, v.cost_asset, v.fee_asset, v.fee_amount,
+       SELECT v.id, v.operation_type, v.timestamp, v.asset, v.amount, v.cost_asset, v.fee_asset, v.fee_amount, v.wallet_id,
          v.manually_added, v.value_eur, v.fee_value_eur,
          COALESCE(${usdPerEurSql('v.timestamp')}, 0) AS usd,
          ${CATEGORY} AS cat,
@@ -77,10 +81,10 @@ export async function getHistoryStats(db: Queryable, f: HistoryFilters, tz: stri
      -- Cada comisión cobrada: la de la columna fee de una operación y las filas FEE_*.
      fee_items AS (
        SELECT fee_asset AS asset, fee_amount AS amount, fee_value_eur AS eur, fee_value_eur * usd AS usd, timestamp
-       FROM vt WHERE fee_asset IS NOT NULL AND fee_amount > 0 AND operation_type NOT IN ${sqlList(FEE_TYPES)}
+       FROM vt WHERE fee_asset IS NOT NULL AND fee_amount > 0 AND operation_type NOT IN ${sqlList(FEE_TYPES)} ${paidHere}
        UNION ALL
        SELECT COALESCE(fee_asset, asset), COALESCE(fee_amount, ABS(amount)), value_eur, value_eur * usd, timestamp
-       FROM vt WHERE operation_type IN ${sqlList(FEE_TYPES)}
+       FROM vt WHERE operation_type IN ${sqlList(FEE_TYPES)} ${paidHere}
      )
      SELECT
        (SELECT json_build_object(
