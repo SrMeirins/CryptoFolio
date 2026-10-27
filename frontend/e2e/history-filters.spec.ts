@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { abrirMasFiltros } from './historyHelpers'
 
 // Filtros avanzados del Historial (#366): multiselección con teclado, chips,
 // búsqueda con debounce y URL que restaura la vista. Solo lee: no modifica datos.
@@ -50,7 +51,7 @@ test('la búsqueda espera a que dejes de teclear: una sola petición', async ({ 
     const u = new URL(r.url())
     if (u.pathname.endsWith('/api/transactions') && u.searchParams.has('search')) searches.push(u.searchParams.get('search')!)
   })
-  await page.getByRole('searchbox', { name: /Buscar por activo/ }).pressSequentially('BTC', { delay: 40 })
+  await page.getByRole('combobox', { name: /Buscar por activo/ }).pressSequentially('BTC', { delay: 40 })
   await expect(page).toHaveURL(/[?&]buscar=BTC/)
   await page.waitForLoadState('networkidle').catch(() => { /* el WebSocket puede mantenerla abierta */ })
   expect(searches.filter(s => s !== 'BTC')).toEqual([])
@@ -60,6 +61,7 @@ test('la búsqueda espera a que dejes de teclear: una sola petición', async ({ 
 test('agrupar comisiones: conmutador con teclado y estado en la URL (#371)', async ({ page }) => {
   await page.goto('/history')
   await expect(page.getByRole('table')).toBeVisible()
+  await abrirMasFiltros(page)
   const toggle = page.getByRole('button', { name: 'Agrupar comisiones' })
   await expect(toggle).toHaveAttribute('aria-pressed', 'true')
   await toggle.focus()

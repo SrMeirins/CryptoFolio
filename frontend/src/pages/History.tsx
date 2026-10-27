@@ -120,7 +120,7 @@ export function History() {
           onExport={exportCsv} onNew={() => setShowNewTx(true)}
           currentBalance={balance?.data ? { amount: balance.data.current, asset: balance.asset, wallet: balance.walletFiltered } : null} />
         <HistoryToolbar ref={searchRef} filters={f.filters} searchInput={f.searchInput} wallets={wallets}
-          accounts={d.accounts} assets={d.assets} presentTypes={d.presentTypes} imports={d.imports}
+          assets={d.assets} presentTypes={d.presentTypes} imports={d.imports}
           currencySymbol={currencySymbol} isFetching={d.isFetching}
           setSearchInput={f.setSearchInput} setFilter={f.setFilter} patchFilters={f.patchFilters}
           setDateRange={f.setDateRange} onCopyLink={() => { void copyLink() }} onHelp={() => setShowHelp(true)}

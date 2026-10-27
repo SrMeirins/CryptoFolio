@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
+import { abrirMasFiltros } from './historyHelpers'
 
 // Teclado en Historial (#351): foco visible, panel de detalle (#373) y borrado
 // cancelable.
@@ -136,6 +137,7 @@ test('importada (#378): el modal avisa del archivo, tiene nombre y cancelar no g
 
 test('filtro «Editadas» (#378): conmutador accesible, en la URL y con su chip', async ({ page }) => {
   await openHistory(page, 'dark')
+  await abrirMasFiltros(page)
   const boton = page.getByRole('button', { name: 'Editadas', exact: true })
   await expect(boton).toHaveAttribute('aria-pressed', 'false')
   await boton.click()
