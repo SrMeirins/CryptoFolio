@@ -2,13 +2,17 @@ import type { QueryResultRow } from 'pg';
 import { historyExportSchema } from './listFilters';
 import { historyRowsSql } from './historyQuery';
 import { INCOME_TYPES } from './operationGroups';
+import { originalRowsTable } from '../csv/originalRows';
+
+/** Máximo de filas originales en el detalle (una orden real llega a decenas). */
+const MAX_ORIGINAL_ROWS = 1000;
 
 // Detalle de una transacción del Historial (#373): la fila valorada (igual que
 // en el listado), su trazabilidad FIFO en ambos sentidos (de dónde salen sus
 // unidades y adónde van), el archivo de origen y cuántas filas suyas agrupa,
 // los datos on-chain con enlaces al explorador y los años fiscales afectados.
-// raw_transactions guarda un hash por fila de origen con los datos ya
-// normalizados de la transacción, no la fila original: solo se cuentan.
+// Las filas originales del CSV se guardan desde #374; en importaciones
+// anteriores solo hay hashes y se cuentan.
 
 /** Lo mínimo para consultar: el `db` de la app, un Pool o un cliente. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,7 +66,12 @@ export async function getTransactionDetail(db: Queryable, id: string, tz: string
        ORDER BY l.created_at`, [id]),
     db.query(`SELECT id, filename, exchange, imported_at FROM csv_imports WHERE id = $1`, [tx.import_id]),
     // Filas del archivo que agrupa (p. ej. los fills parciales de una orden).
-    db.query(`SELECT count(*)::int AS n FROM raw_transactions WHERE transaction_id = $1`, [id]),
+    db.query(
+      `SELECT count(*)::int AS n,
+         (SELECT COALESCE(json_agg(o.original_row), '[]'::json) FROM (
+            SELECT original_row FROM raw_transactions
+            WHERE transaction_id = $1 AND original_row IS NOT NULL LIMIT ${MAX_ORIGINAL_ROWS}) o) AS originals
+       FROM raw_transactions WHERE transaction_id = $1`, [id]),
     db.query(
       `SELECT t.tx_hash, t.counterparty_address, n.name AS network, n.explorer_url, n.explorer_tx_url
        FROM transactions t LEFT JOIN networks n ON n.id = t.counterparty_network_id
@@ -117,6 +126,10 @@ export async function getTransactionDetail(db: Queryable, id: string, tz: string
     origin: {
       import: origin.rows[0] ?? null,
       source_rows: Number(raw.rows[0]?.n ?? 0),
+      // Filas tal como venían en el CSV (#374); null si se importó antes.
+      original_rows: (raw.rows[0]?.originals ?? []).length > 0
+        ? originalRowsTable(origin.rows[0]?.exchange ?? null, raw.rows[0].originals)
+        : null,
     },
     onchain: {
       tx_hash: c0.tx_hash ?? null,

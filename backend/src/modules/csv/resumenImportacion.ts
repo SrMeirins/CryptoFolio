@@ -22,6 +22,8 @@ export interface ArchivoImportado {
   importId: string; archivo: string; exchange: string; nuevas: number; duplicadas: number
   /** Importadas editadas a mano que el importador no ha tocado (#378). */
   editadas_respetadas?: number
+  /** Filas de importaciones anteriores a las que se ha añadido su original (#374). */
+  originales_completadas?: number
 }
 
 export interface ResumenImportacion {

@@ -34,6 +34,8 @@ export function ImportResult({ resumen, duracion, log, onGoToDashboard, onReset,
   const faltanPrecios = resumen ? resumen.precios.necesarios - resumen.precios.obtenidos : 0
   // Lote (#326): una importación por archivo, cada una con su enlace al Historial.
   const porArchivo = resumen?.archivos && resumen.archivos.length > 1 ? resumen.archivos : null
+  // Filas de importaciones anteriores que ahora tienen su fila original (#374).
+  const completadas = (resumen?.archivos ?? []).reduce((s, a) => s + (a.originales_completadas ?? 0), 0)
 
   return (
     <div className="space-y-4">
@@ -78,7 +80,13 @@ export function ImportResult({ resumen, duracion, log, onGoToDashboard, onReset,
               </dd>
             </div>
           </dl>
-        ) : (
+        ) : null}
+        {resumen && completadas > 0 && (
+          <p className="text-xs text-fg-muted">
+            {fmt.format(completadas)} {completadas === 1 ? 'fila' : 'filas'} de importaciones anteriores ya {completadas === 1 ? 'tiene' : 'tienen'} su fila original: el detalle de cada transacción las muestra.
+          </p>
+        )}
+        {resumen ? null : (
           <p className="text-sm text-fg-muted">La importación terminó, pero no llegó el resumen (se perdió la conexión). Revisa el Historial para ver lo importado.</p>
         )}
 
@@ -91,7 +99,8 @@ export function ImportResult({ resumen, duracion, log, onGoToDashboard, onReset,
                   <ExchangeBadge exchange={a.exchange} size={18} />
                   <span className="min-w-0 flex-1 truncate text-fg">{a.archivo}</span>
                   <span className="text-xs text-fg-subtle mono">{fmt.format(a.nuevas)} nueva{a.nuevas !== 1 ? 's' : ''} · {fmt.format(a.duplicadas)} ya estaba{a.duplicadas !== 1 ? 'n' : ''}
-                    {!!a.editadas_respetadas && <> · {fmt.format(a.editadas_respetadas)} editada{a.editadas_respetadas !== 1 ? 's' : ''} a mano sin tocar</>}</span>
+                    {!!a.editadas_respetadas && <> · {fmt.format(a.editadas_respetadas)} editada{a.editadas_respetadas !== 1 ? 's' : ''} a mano sin tocar</>}
+                    {!!a.originales_completadas && <> · {fmt.format(a.originales_completadas)} fila{a.originales_completadas !== 1 ? 's' : ''} original{a.originales_completadas !== 1 ? 'es' : ''} completada{a.originales_completadas !== 1 ? 's' : ''}</>}</span>
                   {a.nuevas > 0 && (
                     <button type="button" onClick={() => onVerHistorial(a.importId)} className="text-xs text-brand hover:underline">Ver en Historial</button>
                   )}

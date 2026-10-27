@@ -2,9 +2,11 @@ import { Link } from 'react-router-dom'
 import type { TransactionDetail } from '../../../api/portfolio'
 import { fmtDate } from '../helpers'
 import { importHistoryLink } from './detailLinks'
+import { OriginalRowsTable } from './OriginalRowsTable'
 
-// Origen de una transacción (#373): archivo de importación y cuántas filas
-// suyas agrupa (p. ej. los fills parciales de una orden).
+// Origen de una transacción (#373): archivo de importación y las filas suyas
+// que agrupa (p. ej. los fills parciales de una orden), tal como venían en el
+// archivo (#374). Las importadas antes solo tienen el recuento.
 
 export function OriginSection({ origin, manual }: { origin: TransactionDetail['origin']; manual: boolean }) {
   if (!origin.import) {
@@ -18,6 +20,9 @@ export function OriginSection({ origin, manual }: { origin: TransactionDetail['o
         <span className="text-fg font-medium break-all">{origin.import.filename}</span> · {origin.import.exchange} · importado el {imported.date}
       </p>
       {n > 0 && <p className="text-fg-muted">Agrupa {n} {n === 1 ? 'fila' : 'filas'} del archivo.</p>}
+      {origin.original_rows
+        ? <OriginalRowsTable table={origin.original_rows} />
+        : n > 0 && <p className="text-fg-subtle">Importado antes de guardar las filas originales: vuelve a importar este archivo para verlas.</p>}
       <p><Link to={importHistoryLink(origin.import.id)} className="text-brand-ink hover:underline">Ver todas las transacciones de este archivo</Link></p>
     </div>
   )

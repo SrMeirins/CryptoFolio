@@ -34,6 +34,8 @@ export interface PreviewResult {
   depositReviews: DepositReview[];  // depósitos externos que necesitan coste
   /** Historial de retiradas de Binance aportado (#320): cuántas se han emparejado. */
   retiradas?: ResumenRetiradas | null;
+  /** Filas ya importadas sin su fila original que este archivo puede completar (#374). */
+  originalRowsMissing?: number;
 }
 
 export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'binance', retiradasBuffers: readonly Buffer[] = []): Promise<PreviewResult> {
@@ -96,6 +98,13 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
     ? await db.query('SELECT row_hash FROM raw_transactions WHERE row_hash = ANY($1)', [allHashes])
     : { rows: [] as { row_hash: string }[] };
   const existingHashes = new Set(existingRes.rows.map((r: { row_hash: string }) => r.row_hash));
+
+  // Filas guardadas antes de #374 que este archivo puede completar.
+  const rawHashes = parseResult.rawRows.map(r => r.hash);
+  const missingRes = rawHashes.length > 0
+    ? await db.query('SELECT count(*)::int AS n FROM raw_transactions WHERE row_hash = ANY($1) AND original_row IS NULL', [rawHashes])
+    : { rows: [{ n: 0 }] };
+  const originalRowsMissing = Number(missingRes.rows[0]?.n ?? 0);
 
   let duplicateCount = 0;
   let newCount = 0;
@@ -171,5 +180,6 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
     unknownOperationSamples,
     depositReviews,
     retiradas: resumen,
+    originalRowsMissing,
   };
 }

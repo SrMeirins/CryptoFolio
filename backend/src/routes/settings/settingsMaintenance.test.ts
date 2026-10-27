@@ -167,4 +167,38 @@ describe('routes/settings — mantenimiento', () => {
       );
     });
   });
+  describe('POST /transactions/fix-stale-withdrawals (#374)', () => {
+    // Datos sintéticos: dos retiros pendientes importados. Solo el que viene de
+    // un «Asset Recovery» (según la fila original del CSV) pasa a pérdida.
+    async function retiro(hash: string, original: Record<string, string> | null): Promise<string> {
+      const w = (await pool.query(`INSERT INTO wallets (name, type) VALUES ($1, 'exchange') RETURNING id`, [`Mant ${hash}`])).rows[0].id;
+      const imp = (await pool.query(
+        `INSERT INTO csv_imports (filename, file_hash, row_count, exchange) VALUES ('sint.csv', $1, 1, 'binance') RETURNING id`, [`fh-${hash}`])).rows[0].id;
+      const tx = (await pool.query(
+        `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id, destination_pending, import_id)
+         VALUES ('WITHDRAW', '2024-05-01T10:00:00Z', 'SINT', 5, 5, $1, TRUE, $2) RETURNING id`, [w, imp])).rows[0].id;
+      await pool.query(
+        `INSERT INTO raw_transactions (import_id, user_id, time, account, operation, coin, change, remark, row_hash, transaction_id, original_row)
+         VALUES ($1, '', '2024-05-01T10:00:00Z', 'Spot', 'WITHDRAW', 'SINT', 5, '', $2, $3, $4::jsonb)`,
+        [imp, hash, tx, original ? JSON.stringify(original) : null]);
+      return tx;
+    }
+
+    it('reclasifica a LOST según la operación original del CSV y deja el resto', async () => {
+      const forzado = await retiro('h-recovery', { Time: '24-05-01 10:00:00', Account: 'Spot', Operation: 'Asset Recovery', Coin: 'SINT', Change: '-5', Remark: '' });
+      const normal = await retiro('h-normal', { Time: '24-05-01 10:00:00', Account: 'Spot', Operation: 'Withdraw', Coin: 'SINT', Change: '-5', Remark: '' });
+      const antiguo = await retiro('h-antiguo', null);
+
+      const res = await request(app).post('/api/settings/transactions/fix-stale-withdrawals');
+      expect(res.status).toBe(200);
+      expect(res.body.records.map((r: { id: string }) => r.id)).toEqual([forzado]);
+
+      const tipos = (await pool.query(
+        `SELECT id, operation_type::text AS t, notes FROM transactions WHERE id = ANY($1)`, [[forzado, normal, antiguo]])).rows;
+      const por = Object.fromEntries(tipos.map(r => [r.id, r]));
+      expect(por[forzado]).toMatchObject({ t: 'LOST', notes: 'Asset Recovery — activo retirado por Binance' });
+      expect(por[normal].t).toBe('WITHDRAW');
+      expect(por[antiguo].t).toBe('WITHDRAW');
+    });
+  });
 });

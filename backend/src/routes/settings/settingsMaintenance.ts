@@ -26,6 +26,8 @@ const bulkSetCostsSchema = z.object({
 // Convierte a LOST los WITHDRAW+destination_pending=TRUE cuya operación CSV
 // original era "Asset Recovery" o "Token Swap - Distribution" con change < 0.
 // Binance fuerza estos retiros (delisting): no van a ninguna wallet, son pérdidas.
+// La operación original sale de la fila del CSV (#374): las columnas fijas de
+// raw_transactions guardan el tipo ya normalizado y nunca coincidían.
 router.post('/transactions/fix-stale-withdrawals', async (_req: Request, res: Response) => {
   try {
     const result = await db.query(
@@ -34,14 +36,14 @@ router.post('/transactions/fix-stale-withdrawals', async (_req: Request, res: Re
            destination_wallet_id = NULL,
            destination_pending   = FALSE,
            notes = COALESCE(t.notes,
-             rt.operation || ' — activo retirado por Binance')
+             (rt.original_row->>'Operation') || ' — activo retirado por Binance')
        FROM raw_transactions rt
        WHERE rt.transaction_id = t.id
          AND t.operation_type = 'WITHDRAW'
          AND t.destination_pending = TRUE
          AND t.original_import IS NULL  -- las editadas a mano no se tocan (#378)
-         AND rt.operation IN ('Asset Recovery', 'Token Swap - Distribution')
-         AND rt.change < 0
+         AND rt.original_row->>'Operation' IN ('Asset Recovery', 'Token Swap - Distribution')
+         AND rt.original_row->>'Change' LIKE '-%'
        RETURNING t.id, t.asset, t.timestamp`
     );
     res.json({ fixed: result.rows.length, records: result.rows });
