@@ -50,3 +50,9 @@ describe('statsParams (#376)', () => {
       .toEqual({ asset: 'BTC', currency: 'EUR', value_min: '10' })
   })
 })
+
+describe('statsParams y tarjeta (#407)', () => {
+  it('la tarjeta filtra la lista, no el resumen', () => {
+    expect(statsParams({ limit: '50', tarjeta: 'ventas', incluir_margen: 'true', type: 'SELL' })).toEqual({ type: 'SELL' })
+  })
+})

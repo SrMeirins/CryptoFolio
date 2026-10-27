@@ -1,4 +1,4 @@
-import type { SavedView } from '../../api/portfolio'
+import { SUMMARY_CARDS, type SavedView, type SummaryCard } from '../../api/portfolio'
 import { DEFAULT_SORT, type SortState } from './sorting'
 import { EMPTY_FILTERS, toApiParams, type HistoryFilterState } from './urlState'
 
@@ -38,6 +38,7 @@ export function stateFromView(filtros: Record<string, string>): { filters: Histo
       value_max: f.value_max ?? '',
       groupFees: f.group_fees !== 'false',
       includeMargin: f.incluir_margen === 'true',
+      card: (SUMMARY_CARDS as readonly string[]).includes(f.tarjeta ?? '') ? f.tarjeta as SummaryCard : '',
     },
     sort: sortKey && ['fecha', 'valor', 'activo', 'tipo'].includes(sortKey)
       ? { key: sortKey, dir: f.dir === 'asc' ? 'asc' : 'desc' }

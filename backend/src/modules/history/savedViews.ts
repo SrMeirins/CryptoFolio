@@ -33,13 +33,7 @@ export const viewFiltersSchema = z.record(z.string(), z.string().max(1000, 'valo
       ctx.addIssue({ code: 'custom', message: 'una vista no guarda la moneda' });
       return;
     }
-    // El margen del resumen (#403) no es un filtro de la lista: se valida aparte.
-    const { incluir_margen: margen, ...listFilters } = filtros;
-    if (margen !== undefined && margen !== 'true' && margen !== 'false') {
-      ctx.addIssue({ code: 'custom', message: 'incluir_margen debe ser true o false', path: ['incluir_margen'] });
-      return;
-    }
-    const parsed = historyExportSchema.safeParse(listFilters);
+    const parsed = historyExportSchema.safeParse(filtros);
     if (!parsed.success) {
       for (const issue of parsed.error.issues) ctx.addIssue({ ...issue, path: [...issue.path] });
     }

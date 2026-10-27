@@ -89,14 +89,14 @@ test('estadísticas (#376): siguen a los filtros y el gráfico alterna número y
   const resumen = page.getByRole('region', { name: /Resumen/ })
   await expect(resumen).toBeVisible()
   await expect(resumen).not.toContainText('según los filtros')
-  // Título y ayuda (#403) van juntos: la tarjeta es el contenedor de ambos.
-  const opsCard = resumen.getByText('Operaciones', { exact: true }).locator('../..')
-  const total = await opsCard.locator('.mono').textContent()
+  // El número de operaciones va en la cabecera del resumen (#407).
+  const cabecera = page.locator('#historial-resumen')
+  const total = await cabecera.textContent()
 
-  // Con un filtro, las tarjetas se rotulan y cambian.
+  // Con un filtro, el resumen se rotula y cambia.
   await page.goto('/history?tipo=SELL')
   await expect(resumen).toContainText('según los filtros')
-  await expect(opsCard.locator('.mono')).not.toHaveText(total ?? '')
+  await expect(cabecera).not.toHaveText(total ?? '')
 
   // Abrir la analítica y cambiar de modo no lanza peticiones de estadísticas.
   const analitica = page.getByRole('button', { name: /Analítica de actividad/ })
