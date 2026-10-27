@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ByCategory, HistoryStats } from '../../../api/portfolio'
-import { chartPeriodText, chartRows, statsParams } from './statsChart'
+import { activePeriod, chartPeriodText, chartRows, periodBreakdown, periodRange, statsParams } from './statsChart'
 
 const cats = (over: Partial<ByCategory> = {}): ByCategory => ({
   compras: 0, ventas: 0, otras_salidas: 0, ingresos: 0, transferencias: 0, otros: 0, ...over,
@@ -54,5 +54,38 @@ describe('statsParams (#376)', () => {
 describe('statsParams y tarjeta (#407)', () => {
   it('la tarjeta filtra la lista, no el resumen', () => {
     expect(statsParams({ limit: '50', tarjeta: 'ventas', incluir_margen: 'true', type: 'SELL' })).toEqual({ type: 'SELL' })
+  })
+})
+
+// Meses enlazables y desglose del detalle (#413). Datos sintéticos.
+describe('periodRange, activePeriod y periodBreakdown (#413)', () => {
+  const cats = (o: Partial<ByCategory>): ByCategory => ({ compras: 0, ventas: 0, otras_salidas: 0, ingresos: 0, transferencias: 0, otros: 0, ...o })
+  const bucket = (periodo: string, ops: Partial<ByCategory>, eur: Partial<ByCategory>) =>
+    ({ periodo, ops: cats(ops), valor: { EUR: cats(eur), USD: cats(eur) } })
+  const chart: HistoryStats['chart'] = {
+    granularity: 'month', from: '2024-01-01', to: '2024-03-31',
+    buckets: [bucket('2024-02', { compras: 3, ventas: 1 }, { compras: 30, ventas: 90 }), bucket('2024-03', {}, {})],
+  }
+
+  it('rango del mes con su último día (también bisiesto) y del año', () => {
+    expect(periodRange('2024-02', 'month')).toEqual({ from: '2024-02-01', to: '2024-02-29' })
+    expect(periodRange('2023-02', 'month')).toEqual({ from: '2023-02-01', to: '2023-02-28' })
+    expect(periodRange('2025-12', 'month')).toEqual({ from: '2025-12-01', to: '2025-12-31' })
+    expect(periodRange('2025', 'year')).toEqual({ from: '2025-01-01', to: '2025-12-31' })
+  })
+
+  it('mes activo solo si el filtro es exactamente ese mes', () => {
+    expect(activePeriod(chart, '2024-02-01', '2024-02-29')).toBe('2024-02')
+    expect(activePeriod(chart, '2024-02-01', '2024-02-28')).toBeNull()
+    expect(activePeriod(chart, '', '')).toBeNull()
+  })
+
+  it('desglose por la medida activa, sin vacías y con la dominante primero', () => {
+    const porNumero = periodBreakdown(chart.buckets[0], 'ops', 'EUR')
+    expect(porNumero.items.map(i => [i.category, i.share])).toEqual([['compras', 0.75], ['ventas', 0.25]])
+    expect(porNumero).toMatchObject({ ops: 4, value: 120 })
+    const porValor = periodBreakdown(chart.buckets[0], 'valor', 'EUR')
+    expect(porValor.items[0].category).toBe('ventas')
+    expect(periodBreakdown(chart.buckets[1], 'ops', 'EUR').items).toEqual([])
   })
 })

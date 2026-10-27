@@ -136,7 +136,7 @@ export function History() {
                 margin={{ ...stats.margin, included: includeMargin }} onIncludeMargin={f.setIncludeMargin}
                 card={f.filters.card} onSelectCard={c => f.setFilter('card', c)} />
               <AnalyticsPanel stats={stats} currency={currency} onAssetClick={handleAssetClick}
-                datesFiltered={!!(f.filters.date_from || f.filters.date_to)} />
+                dateFrom={f.filters.date_from} dateTo={f.filters.date_to} onDateRange={f.setDateRange} />
             </>
           )}
           {balance?.data && (
