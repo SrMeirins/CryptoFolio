@@ -29,6 +29,15 @@ updates:
       seguridad-electron: { applies-to: security-updates, patterns: ['*'] }
     commit-message: { prefix: 'fix(deps)' }
 
+  # Raíz (#368): herramientas de desarrollo del repositorio (markdownlint-cli2).
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 0
+    groups:
+      seguridad-raiz: { applies-to: security-updates, patterns: ['*'] }
+    commit-message: { prefix: 'fix(deps)' }
+
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday }

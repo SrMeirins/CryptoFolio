@@ -14,6 +14,6 @@
     "dist:linux": "npm run build && npm run dist:linux --prefix electron"
   },
   "devDependencies": {
-    "markdownlint-cli2": "^0.23.3"
+    "markdownlint-cli2": "0.24.0"
   }
 }

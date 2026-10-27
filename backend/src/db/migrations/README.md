@@ -36,4 +36,3 @@ Cada migración `NNN_descripcion.sql` tiene su script de reversión en
 `down/NNN_descripcion.sql`. El runner no lee ese subdirectorio: la reversión
 se aplica a mano y se cubre con un test (p. ej.
 `src/db/migrationPriceCloseMadrid.test.ts`).
-
