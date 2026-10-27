@@ -68,8 +68,16 @@ export function StatsBar({ totals, series, currency, filtered, margin, onInclude
     </> },
     { id: 'ingresos', value: totals.income, help:
       <p>Staking, recompensas, intereses, cashback y airdrops a su valor de mercado al recibirlos: {count(totals.income_ops, 'ingreso', 'ingresos')}{sinPrecio(totals.income_sin_valor)}.</p> },
-    { id: 'comisiones', value: totals.fees, help:
-      <p>Comisiones cobradas, valoradas con el FIFO: {count(totals.fee_ops, 'comisión', 'comisiones')}{sinPrecio(totals.fees_sin_valor)}. No incluye las que el exchange ya suma al coste de la compra.</p> },
+    { id: 'comisiones', value: totals.fees, help: <>
+      <p>Comisiones cobradas, valoradas con el FIFO: {count(totals.fee_ops, 'comisión', 'comisiones')}{sinPrecio(totals.fees_sin_valor)}.</p>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+        <dt className="text-fg-muted">Cobradas aparte</dt>
+        <dd className="mono text-right">{count(totals.fee_ops - totals.fees_included.ops, 'comisión', 'comisiones')} · {money({ EUR: totals.fees.EUR - totals.fees_included.value.EUR, USD: totals.fees.USD - totals.fees_included.value.USD })}</dd>
+        <dt className="text-fg-muted">Incluidas en el coste</dt>
+        <dd className="mono text-right">{count(totals.fees_included.ops, 'comisión', 'comisiones')} · {money(totals.fees_included.value)}</dd>
+      </dl>
+      <p>Las incluidas en el coste ya forman parte del precio de compra: se muestran, pero no se descuentan otra vez.</p>
+    </> },
   ]
 
   return (

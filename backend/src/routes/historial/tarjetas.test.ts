@@ -99,6 +99,21 @@ describe('tarjetas del resumen y filtro «Tarjeta» (#407)', () => {
     expect(usdc.body.flows.EUR).toEqual({ entradas: 0, salidas: 0 });
   });
 
+  it('comisión incluida en el coste: suma en Comisiones, aparte en su desglose y en el filtro (#415)', async () => {
+    const before = (await stats()).totals;
+    const id = await tx({ wallet_id: (await pool.query(`SELECT id FROM wallets WHERE name = 'Spot test'`)).rows[0].id, account: 'Bitvavo', timestamp: AT,
+      operation_type: 'BUY', asset: 'SINT', amount: 10, amount_net: 10, cost_asset: 'EUR', cost_amount: 20.05, included_fee_asset: 'EUR', included_fee_amount: 0.05 });
+    try {
+      const { totals } = await stats();
+      expect(totals.fee_ops).toBe(before.fee_ops + 1);
+      expect(totals.fees_included).toMatchObject({ ops: 1, value: { EUR: 0.05 } });
+      expect(totals.fees.EUR - before.fees.EUR).toBeCloseTo(0.05, 8);
+      expect((await request(app).get('/api/transactions?tarjeta=comisiones')).body.total).toBe(totals.fee_ops);
+    } finally {
+      await pool.query('DELETE FROM transactions WHERE id = $1', [id]);
+    }
+  });
+
   it('tarjeta inválida: 400 legible', async () => {
     const res = await request(app).get('/api/transactions?tarjeta=otra');
     expect(res.status).toBe(400);

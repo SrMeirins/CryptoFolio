@@ -69,6 +69,9 @@ export interface ParsedTransaction {
   // Fees
   feeAsset?: string;
   feeAmount?: number;    // Siempre positivo
+  /** Comisión que el exchange ya incluye en costAmount (#415): solo informativa. */
+  includedFeeAsset?: string;
+  includedFeeAmount?: number;
   // Meta
   account: string;
   notes?: string;

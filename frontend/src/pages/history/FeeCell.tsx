@@ -9,9 +9,22 @@ import { feeSummary } from './helpers'
  * comisiones». El desglose está en el detalle de la fila. En una entrada desde
  * otra wallet propia (#395) se atenúa: la pagó la wallet de origen.
  */
-export function FeeCell({ tx, currency, paidElsewhere = false }: { tx: Transaction; currency: Currency; paidElsewhere?: boolean }) {
+export function FeeCell({ tx, currency, paidElsewhere = false, verbose = false }: {
+  tx: Transaction; currency: Currency; paidElsewhere?: boolean
+  /** Texto largo («incluida en el coste») para el panel de detalle (#415). */
+  verbose?: boolean
+}) {
   const s = feeSummary(tx, currency)
-  if (s.count === 0) return <span className="text-fg-subtle text-xs">—</span>
+  const included = Number(tx.included_fee_amount ?? 0)
+  if (s.count === 0 && included <= 0) return <span className="text-fg-subtle text-xs">—</span>
+  // Incluida en el coste por el exchange (#415): se ve, atenuada, pero no se suma otra vez.
+  const includedLine = included > 0 && tx.included_fee_asset && (
+    <div className="text-xs text-fg-subtle mono">
+      {tx.included_fee_asset === 'EUR' && currency === 'EUR' ? formatMoney(included, 'EUR') : `${formatAmount(included, 6)} ${tx.included_fee_asset}`}
+      <span className="font-sans"> · {verbose ? 'incluida en el coste' : 'en el coste'}</span>
+    </div>
+  )
+  if (s.count === 0) return includedLine
   const grouped = tx.grouped_fees.length
   const own = !!(tx.fee_asset && tx.fee_amount && Number(tx.fee_amount) > 0)
   const hint = s.missing > 0 ? `${s.missing} sin precio` : s.estimated ? 'incluye valores estimados' : null
@@ -34,6 +47,7 @@ export function FeeCell({ tx, currency, paidElsewhere = false }: { tx: Transacti
           <div className="text-[11px] text-fg-subtle">+{grouped} {grouped === 1 ? 'comisión' : 'comisiones'}</div>
         )}
         {paidElsewhere && <div className="text-[11px] text-fg-subtle">pagada en origen</div>}
+        {includedLine}
       </div>
     </div>
   )

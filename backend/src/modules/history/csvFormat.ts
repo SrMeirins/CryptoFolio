@@ -67,7 +67,7 @@ export function localDate(date: Date, tz: string): string {
   return isoLocal(date, tz).slice(0, 10);
 }
 
-/** NUMERIC de Postgres («601.779800000000000000») sin ceros sobrantes; vacío si es null. */
+/** NUMERIC de Postgres («123.456700000000000000») sin ceros sobrantes; vacío si es null. */
 export function plainNumber(v: string | null): string {
   if (v === null || v === undefined) return '';
   if (!v.includes('.')) return v;

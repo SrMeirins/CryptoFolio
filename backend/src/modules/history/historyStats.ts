@@ -43,6 +43,8 @@ export interface HistoryStats {
     withdrawn_ops: number; withdrawn: Money; deposited: Money
     income_ops: number; income: Money; income_sin_valor: number
     fee_ops: number; fees: Money; fees_sin_valor: number
+    /** De ellas, incluidas en el coste de la compra por el exchange (#415). */
+    fees_included: { ops: number; value: Money }
   }
   chart: ChartPeriod & { buckets: { periodo: string; ops: ByCategory; valor: { EUR: ByCategory; USD: ByCategory } }[] }
   /** Importe de cada tarjeta por periodo del gráfico (#407), para sus mini gráficas. */
@@ -108,6 +110,7 @@ export async function getHistoryStats(
     `WITH ${ctes},
      vt AS MATERIALIZED (
        SELECT v.id, v.operation_type, v.timestamp, v.asset, v.amount, v.cost_asset, v.fee_asset, v.fee_amount, v.wallet_id,
+         v.included_fee_asset, v.included_fee_amount,
          v.manually_added, v.value_eur, v.fee_value_eur,
          COALESCE(${usdPerEurSql('v.timestamp')}, 0) AS usd,
          ${CATEGORY} AS cat,
@@ -127,11 +130,17 @@ export async function getHistoryStats(
      shown AS (SELECT * FROM vt WHERE shown AND ${notMargin}),
      -- Cada comisión cobrada: la de la columna fee de una operación y las filas FEE_*.
      fee_items AS (
-       SELECT fee_asset AS asset, fee_amount AS amount, fee_value_eur AS eur, fee_value_eur * usd AS usd, timestamp, bucket
+       SELECT fee_asset AS asset, fee_amount AS amount, fee_value_eur AS eur, fee_value_eur * usd AS usd, timestamp, bucket, FALSE AS included
        FROM vt WHERE fee_asset IS NOT NULL AND fee_amount > 0 AND operation_type NOT IN ${sqlList(FEE_TYPES)} AND ${notMargin} ${paidHere}
        UNION ALL
-       SELECT COALESCE(fee_asset, asset), COALESCE(fee_amount, ABS(amount)), value_eur, value_eur * usd, timestamp, bucket
+       SELECT COALESCE(fee_asset, asset), COALESCE(fee_amount, ABS(amount)), value_eur, value_eur * usd, timestamp, bucket, FALSE
        FROM vt WHERE operation_type IN ${sqlList(FEE_TYPES)} AND ${notMargin} ${paidHere}
+       UNION ALL
+       -- Incluida en el coste de la compra (#415): en EUR vale lo que es; en otra moneda, sin valor.
+       SELECT included_fee_asset, included_fee_amount,
+         CASE WHEN included_fee_asset = 'EUR' THEN included_fee_amount END,
+         CASE WHEN included_fee_asset = 'EUR' THEN included_fee_amount * usd END, timestamp, bucket, TRUE
+       FROM vt WHERE included_fee_amount > 0 AND ${notMargin} ${paidHere}
      )
      SELECT
        (SELECT json_build_object(
@@ -163,7 +172,10 @@ export async function getHistoryStats(
         ) FROM shown) AS totals,
        (SELECT json_build_object(
           'ops', COUNT(*), 'eur', COALESCE(SUM(eur), 0), 'usd', COALESCE(SUM(usd), 0),
-          'sin_valor', COUNT(*) FILTER (WHERE eur IS NULL)
+          'sin_valor', COUNT(*) FILTER (WHERE eur IS NULL),
+          'included_ops', COUNT(*) FILTER (WHERE included),
+          'included_eur', COALESCE(SUM(eur) FILTER (WHERE included), 0),
+          'included_usd', COALESCE(SUM(usd) FILTER (WHERE included), 0)
         ) FROM fee_items) AS fees,
        (SELECT COALESCE(json_agg(k), '[]') FROM (
           SELECT counterpart, COUNT(*) AS ops, COALESCE(SUM(value_eur), 0) AS eur, COALESCE(SUM(value_eur * usd), 0) AS usd
@@ -238,6 +250,7 @@ export async function getHistoryStats(
       deposited: money(t.deposited_eur, t.deposited_usd),
       income_ops: num(t.income_ops), income: money(t.income_eur, t.income_usd), income_sin_valor: num(t.income_sin_valor),
       fee_ops: num(r.fees.ops), fees: money(r.fees.eur, r.fees.usd), fees_sin_valor: num(r.fees.sin_valor),
+      fees_included: { ops: num(r.fees.included_ops), value: money(r.fees.included_eur, r.fees.included_usd) },
     },
     chart: { ...period, buckets: [...buckets.values()] },
     series: (r.series as Record<string, unknown>[]).map(x => ({

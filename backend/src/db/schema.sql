@@ -276,6 +276,9 @@ CREATE TABLE transactions (
   tx_hash                 TEXT CHECK (char_length(tx_hash) <= 128),
   -- Importada editada (#378): campos tal como se importaron; NULL = no modificada.
   original_import         JSONB,
+  -- Comisión ya incluida en el coste por el exchange (#415); solo informativa.
+  included_fee_asset      TEXT,
+  included_fee_amount     NUMERIC(38, 18),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -286,6 +289,11 @@ CREATE INDEX idx_transactions_type      ON transactions(operation_type);
 CREATE INDEX idx_transactions_wallet    ON transactions(wallet_id);
 CREATE INDEX idx_transactions_dest      ON transactions(destination_wallet_id);
 CREATE INDEX idx_transactions_editadas  ON transactions(timestamp) WHERE original_import IS NOT NULL;
+ALTER TABLE transactions ADD CONSTRAINT chk_transactions_included_fee CHECK (
+  (included_fee_asset IS NULL) = (included_fee_amount IS NULL)
+  AND (included_fee_amount IS NULL OR included_fee_amount > 0)
+  AND (included_fee_asset IS NULL OR char_length(included_fee_asset) <= 32)
+);
 ALTER TABLE transactions ADD CONSTRAINT chk_transactions_original_import
   CHECK (original_import IS NULL OR (jsonb_typeof(original_import) = 'object' AND NOT manually_added));
 
