@@ -1,9 +1,9 @@
 import { utilityProcess, UtilityProcess } from 'electron';
-import path from 'path';
 import fs from 'fs';
 import { pollUntil } from './shared/poll-until';
 import { BACKEND_PORT_BASE } from './shared/ports';
 import { detectSystemTimezone, systemTimezoneEnv } from './shared/system-timezone';
+import { backendEntryPath } from './shared/backend-entry';
 
 interface BackendOptions {
   databaseUrl: string;
@@ -35,13 +35,9 @@ export class BackendManager {
     this.walletSyncEncryptionKey = opts.walletSyncEncryptionKey;
   }
 
-  /** Ruta al entry point del backend compilado */
+  /** Ruta al entry point del backend compilado (#396). */
   private get entryPath(): string {
-    if (process.env.NODE_ENV === 'development') {
-      return path.join(__dirname, '../../../backend/dist/index.js');
-    }
-    // En producción, electron-builder copia el backend a extraResources
-    return path.join(process.resourcesPath, 'backend', 'dist', 'index.js');
+    return backendEntryPath(process.env.NODE_ENV === 'development', __dirname, process.resourcesPath);
   }
 
   async start(): Promise<void> {
