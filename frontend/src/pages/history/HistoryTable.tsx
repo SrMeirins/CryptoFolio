@@ -13,7 +13,7 @@ import { nextRowIndex } from './keyboard/shortcutKeys'
 // Tabla del Historial (#351): cabeceras ordenables, grupos por día local
 // (solo ordenando por fecha) y filas de transacción.
 
-export function HistoryTable({ transactions, sort, onSort, currency, searchTerm, selectedId, deletingId, onOpen, onPrefetch, onDelete, onEdit, skipLink, balance }: {
+export function HistoryTable({ transactions, sort, onSort, currency, searchTerm, selectedId, deletingId, onOpen, onPrefetch, onDelete, onEdit, skipLink, balance, walletId }: {
   transactions: Transaction[]
   sort: SortState
   onSort: (col: SortKey) => void
@@ -30,6 +30,8 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
   skipLink?: { href: string; onActivate: () => void }
   /** Saldo corrido del activo filtrado (#380): añade la columna «Saldo». */
   balance?: RunningBalanceView | null
+  /** Wallet filtrada (#395), para el sentido de las operaciones entre wallets. */
+  walletId?: string
 }) {
   const columns = balance ? 8 : 7
   // Foco itinerante (#382): la tabla es una sola parada de Tab (la fila activa);
@@ -100,7 +102,7 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
                 <TxRow key={tx.id} tx={tx} onDelete={onDelete} onEdit={onEdit} onOpen={onOpen} onPrefetch={onPrefetch}
                   isDeleting={deletingId === tx.id} searchTerm={searchTerm} currency={currency} selected={tx.id === selectedId}
                   balance={balance ? { asset: balance.asset, value: balance.byId.get(tx.id) } : undefined}
-                  rowIndex={ids.indexOf(tx.id)} tabbable={tx.id === activeId} onActivate={setActiveState} />
+                  rowIndex={ids.indexOf(tx.id)} tabbable={tx.id === activeId} onActivate={setActiveState} walletId={walletId} />
               ))}
             </Fragment>
           ))}

@@ -117,7 +117,11 @@ export function buildHistoryWhere(f: HistoryFilters, tz: string): { where: strin
   if (f.import_id)      conds.push(`t.import_id = ${p(f.import_id)}`);
   if (f.asset?.length)  conds.push(`t.asset = ANY(${p(f.asset)}::text[])`);
   if (f.type?.length)   conds.push(`t.operation_type::text = ANY(${p(f.type)}::text[])`);
-  if (f.wallet_id)      conds.push(`t.wallet_id = ${p(f.wallet_id)}`);
+  // Wallet de origen o de destino (#395): una transferencia a la wallet también es suya.
+  if (f.wallet_id) {
+    const w = p(f.wallet_id);
+    conds.push(`(t.wallet_id = ${w} OR t.destination_wallet_id = ${w})`);
+  }
   if (f.account)        conds.push(`t.account = ${p(f.account)}`);
   if (f.date_from || f.date_to) {
     const zone = p(tz);

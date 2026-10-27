@@ -4,7 +4,7 @@ import type { Transaction } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { formatMoney, formatAmount, type Currency } from '../../utils/format'
 import { OP_META } from '../../constants/operations'
-import { fmtDate, calcEurValue, formatPriceLine, toDisplayAmount, valuationHint, flowSign } from './helpers'
+import { fmtDate, calcEurValue, formatPriceLine, toDisplayAmount, valuationHint, rowFlowSign, walletFlow } from './helpers'
 import { T, alpha, ink } from '../../utils/colors'
 import { iconButtonClasses } from '../../components/ui'
 import { DeleteConfirm } from './DeleteConfirm'
@@ -57,10 +57,12 @@ function OpChip({ type }: { type: string }) {
 }
 
 export function TxRow({
-  tx, onDelete, onEdit, onOpen, onPrefetch, isDeleting, searchTerm, currency, selected = false, balance, rowIndex, tabbable = true, onActivate,
+  tx, onDelete, onEdit, onOpen, onPrefetch, isDeleting, searchTerm, currency, selected = false, balance, rowIndex, tabbable = true, onActivate, walletId,
 }: {
   tx: Transaction
   currency: Currency
+  /** Wallet filtrada (#395): da el sentido de las operaciones entre wallets. */
+  walletId?: string
   /** Su detalle está abierto en el panel (#373); visible al cargar si viene de un enlace (#237). */
   selected?: boolean
   /** Saldo del activo filtrado tras la operación (#380); sin él no hay columna. */
@@ -90,7 +92,8 @@ export function TxRow({
   }
 
   const meta   = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: T.muted, group: 'other', rowBg: 'transparent' }
-  const sign = flowSign(tx.operation_type)
+  const sign = rowFlowSign(tx, walletId)
+  const flow = walletFlow(tx, walletId)
   const amountColor = sign === '+' ? 'text-positive' : sign === '−' && meta.group === 'sell' ? 'text-negative' : 'text-fg'
 
   const { date, time } = fmtDate(tx.timestamp)
@@ -167,13 +170,19 @@ export function TxRow({
 
         {/* Fee: propia y agrupadas (#371) */}
         <td className="px-3 py-2.5 align-middle">
-          <FeeCell tx={tx} currency={currency} />
+          <FeeCell tx={tx} currency={currency} paidElsewhere={flow === 'entrada'} />
         </td>
 
         {/* Wallet */}
         <td className="px-3 py-2.5 align-middle">
-          {tx.operation_type === 'TRANSFER_INTERNAL' && tx.destination_wallet_name ? (
+          {/* Origen y destino en cualquier operación hacia una wallet propia (#395). */}
+          {tx.destination_wallet_name ? (
             <div className="flex items-center gap-1 flex-wrap">
+              {flow && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-lg font-medium bg-background-tertiary ${flow === 'entrada' ? 'text-positive' : 'text-fg-muted'}`}>
+                  {flow === 'entrada' ? 'Entrada' : 'Salida'}
+                </span>
+              )}
               <span className="text-xs px-2 py-0.5 rounded-lg font-semibold"
                 style={{ backgroundColor: `${alpha(tx.wallet_color, 9)}`, color: ink(tx.wallet_color) }}>
                 {tx.wallet_name}

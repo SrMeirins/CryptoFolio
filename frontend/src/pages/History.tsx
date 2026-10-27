@@ -159,7 +159,7 @@ export function History() {
             <HistoryTable transactions={d.transactions} sort={f.sort} onSort={f.toggleSort} currency={currency}
               searchTerm={f.filters.search} selectedId={f.focusTx} deletingId={d.deletingId}
               onOpen={f.openTx} onPrefetch={nav.prefetch} onDelete={id => { void d.deleteTx(id) }} onEdit={setEditingTx}
-              balance={balance}
+              balance={balance} walletId={f.filters.wallet_id || undefined}
               skipLink={total > PAGE_SIZE ? { href: `#${PAGINATION_ID}`, onActivate: () => paginationRef.current?.focus() } : undefined} />
           )}
         </div>

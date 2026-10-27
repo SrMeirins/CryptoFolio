@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toDisplayAmount, localDayKey, fmtDate, fmtDateGroup, calcEurValue, calcFeeEur, valuationHint, flowSign, feeSummary } from './helpers'
+import { toDisplayAmount, localDayKey, fmtDate, fmtDateGroup, calcEurValue, calcFeeEur, valuationHint, flowSign, feeSummary, walletFlow, rowFlowSign } from './helpers'
 
 describe('toDisplayAmount (#177)', () => {
   it('EUR: el importe tal cual', () => {
@@ -82,5 +82,32 @@ describe('feeSummary (#371)', () => {
   it('sin comisión propia, solo las agrupadas; marca estimadas y sin precio', () => {
     const s = feeSummary({ ...base, fee_amount: null, fee_value_eur: null, grouped_fees: [g(1, 'estimado'), g(null, 'sin_precio')] }, 'EUR')
     expect(s).toEqual({ count: 2, total: 1, missing: 1, estimated: true })
+  })
+})
+
+// Sentido respecto a la wallet filtrada (#395).
+describe('walletFlow y rowFlowSign (#395)', () => {
+  const A = 'wallet-a', B = 'wallet-b'
+  const retiro = { operation_type: 'WITHDRAW', wallet_id: A, destination_wallet_id: B }
+  const transfer = { operation_type: 'TRANSFER_INTERNAL', wallet_id: A, destination_wallet_id: B }
+
+  it('desde la wallet de destino es una entrada, con +', () => {
+    expect(walletFlow(retiro, B)).toBe('entrada')
+    expect(rowFlowSign(retiro, B)).toBe('+')
+    expect(rowFlowSign(transfer, B)).toBe('+')
+  })
+
+  it('desde la wallet de origen es una salida, con -', () => {
+    expect(walletFlow(transfer, A)).toBe('salida')
+    expect(rowFlowSign(transfer, A)).toBe('−')
+    expect(rowFlowSign(retiro, A)).toBe('−')
+  })
+
+  it('sin filtro, sin destino o hacia la misma wallet manda el tipo', () => {
+    expect(walletFlow(retiro)).toBeNull()
+    expect(rowFlowSign(transfer)).toBe('')
+    expect(walletFlow({ wallet_id: A, destination_wallet_id: null }, A)).toBeNull()
+    expect(rowFlowSign({ operation_type: 'BUY', wallet_id: A, destination_wallet_id: null }, A)).toBe('+')
+    expect(walletFlow({ wallet_id: A, destination_wallet_id: A }, A)).toBeNull()
   })
 })

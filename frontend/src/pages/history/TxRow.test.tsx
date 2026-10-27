@@ -8,13 +8,13 @@ import { TxRow } from './TxRow'
 // Render estático (sin DOM ni efectos) de una fila del Historial (#346).
 const tx = makeTx
 
-function render(t: Transaction, currency: 'EUR' | 'USD' = 'EUR', selected = false): string {
+function render(t: Transaction, currency: 'EUR' | 'USD' = 'EUR', selected = false, walletId?: string): string {
   const client = new QueryClient()
   return renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <table><tbody>
         <TxRow tx={t} currency={currency} onDelete={() => {}} onEdit={() => {}} onOpen={() => {}} onPrefetch={() => {}}
-          isDeleting={false} searchTerm="" selected={selected} />
+          isDeleting={false} searchTerm="" selected={selected} walletId={walletId} />
       </tbody></table>
     </QueryClientProvider>,
   )
@@ -119,5 +119,37 @@ describe('TxRow — saldo corrido (#380)', () => {
   it('sin dato, «—» con texto accesible; sin activo filtrado, no hay celda', () => {
     expect(conSaldo(undefined)).toContain('<span class="sr-only">Sin saldo</span>')
     expect(render(tx({}))).not.toContain('Sin saldo')
+  })
+})
+
+// Operaciones entre wallets propias (#395): origen y destino siempre, y el
+// sentido respecto a la wallet filtrada.
+describe('TxRow, wallets de origen y destino (#395)', () => {
+  const COLD = '00000000-0000-0000-0000-000000000009'
+  const retiro = tx({ destination_wallet_id: COLD, destination_wallet_name: 'Fría', destination_wallet_color: '#123456' })
+
+  it('un retiro a una wallet propia muestra origen y destino, sin sentido si no se filtra', () => {
+    const html = render(retiro)
+    expect(html).toContain('Exchange')
+    expect(html).toContain('Fría')
+    expect(html).toContain('hacia')
+    expect(html).not.toContain('Entrada')
+    expect(html).not.toContain('Salida')
+  })
+
+  it('filtrando por la de destino es una entrada con +', () => {
+    const html = render(retiro, 'EUR', false, COLD)
+    expect(html).toContain('Entrada')
+    expect(html).toMatch(/text-positive[^>]*>\+10/)
+  })
+
+  it('filtrando por la de origen es una salida', () => {
+    expect(render(retiro, 'EUR', false, retiro.wallet_id)).toContain('Salida')
+  })
+
+  it('la comisión de una entrada se marca como pagada en origen', () => {
+    const conFee = tx({ ...retiro, fee_asset: 'XRP', fee_amount: '0.1' })
+    expect(render(conFee, 'EUR', false, COLD)).toContain('pagada en origen')
+    expect(render(conFee, 'EUR', false, conFee.wallet_id)).not.toContain('pagada en origen')
   })
 })

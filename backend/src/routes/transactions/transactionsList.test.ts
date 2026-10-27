@@ -16,6 +16,7 @@ RECENT.setUTCHours(12, 0, 0, 0);
 const DAY = RECENT.toISOString().slice(0, 10);
 const at = (min: number) => new Date(RECENT.getTime() + min * 60_000).toISOString();
 const ids: Record<string, string> = {};
+const wallets: Record<string, string> = {};
 
 type TxFields = Record<string, unknown>;
 async function tx(key: string, f: TxFields): Promise<string> {
@@ -54,6 +55,7 @@ describe('routes/transactions — listado, estadísticas y facetas', () => {
 
     const a = (await pool.query(`INSERT INTO wallets (name, type) VALUES ('Exchange test', 'exchange') RETURNING id`)).rows[0].id;
     const b = (await pool.query(`INSERT INTO wallets (name, type) VALUES ('Fría test', 'hardware') RETURNING id`)).rows[0].id;
+    Object.assign(wallets, { a, b });
     const base = { wallet_id: a };
 
     // 1. Compra con EUR → «coste», comisión en EUR.
@@ -311,6 +313,44 @@ describe('routes/transactions — listado, estadísticas y facetas', () => {
     it('los flujos siguen a los filtros', async () => {
       const { flows } = (await request(app).get('/api/transactions?type=SELL')).body;
       expect(flows.EUR).toEqual({ entradas: 0, salidas: 58 });
+    });
+  });
+
+  describe('GET / — filtro por wallet de origen o destino (#395)', () => {
+    const idsOf = (res: { body: { transactions: { id: string }[] } }) => res.body.transactions.map(t => t.id).sort();
+
+    it('la wallet de destino ve las transferencias y retiros que llegan a ella', async () => {
+      const res = await request(app).get(`/api/transactions?wallet_id=${wallets.b}`);
+      expect(res.body.total).toBe(2);
+      expect(idsOf(res)).toEqual([ids.withdrawOwn, ids.noPrice].sort());
+    });
+
+    it('la wallet de origen sigue viendo todas las suyas, también las que salen', async () => {
+      const res = await request(app).get(`/api/transactions?wallet_id=${wallets.a}&limit=200`);
+      expect(res.body.total).toBe(11);
+      expect(idsOf(res)).toContain(ids.withdrawOwn);
+    });
+
+    it('un movimiento entre wallets propias no cuenta como entrada ni salida', async () => {
+      const { flows } = (await request(app).get(`/api/transactions?wallet_id=${wallets.b}`)).body;
+      expect(flows.EUR).toEqual({ entradas: 0, salidas: 0 });
+    });
+
+    it('las estadísticas usan el mismo filtro', async () => {
+      const stats = (await request(app).get(`/api/v1/historial/estadisticas?wallet_id=${wallets.b}`)).body;
+      expect(stats.totals.ops).toBe(2);
+    });
+
+    it('las comisiones solo cuentan en la wallet que las pagó', async () => {
+      // Comisión de red en el retiro a la wallet fría, solo durante este test.
+      await pool.query(`UPDATE transactions SET fee_asset = 'XRP', fee_amount = 0.1 WHERE id = $1`, [ids.withdrawOwn]);
+      try {
+        const totals = async (w: string) => (await request(app).get(`/api/v1/historial/estadisticas?wallet_id=${w}`)).body.totals;
+        expect((await totals(wallets.b)).fee_ops).toBe(0);
+        expect((await totals(wallets.a)).fee_ops).toBe(5);
+      } finally {
+        await pool.query(`UPDATE transactions SET fee_asset = NULL, fee_amount = NULL WHERE id = $1`, [ids.withdrawOwn]);
+      }
     });
   });
 

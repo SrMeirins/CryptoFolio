@@ -100,6 +100,30 @@ export function flowSign(operationType: string): '+' | '−' | '' {
 }
 
 /**
+ * Sentido de una operación entre wallets respecto a la wallet filtrada (#395):
+ * «entrada» si llega a ella desde otra, «salida» si sale de ella hacia otra.
+ * Sin filtro, o sin wallet de destino, no hay sentido propio.
+ */
+export function walletFlow(
+  tx: Pick<Transaction, 'wallet_id' | 'destination_wallet_id'>, walletId?: string,
+): 'entrada' | 'salida' | null {
+  if (!walletId || !tx.destination_wallet_id || tx.destination_wallet_id === tx.wallet_id) return null
+  if (tx.destination_wallet_id === walletId) return 'entrada'
+  if (tx.wallet_id === walletId) return 'salida'
+  return null
+}
+
+/** Signo de la fila (#395): el de la wallet filtrada si la operación es entre wallets; si no, el del tipo. */
+export function rowFlowSign(
+  tx: Pick<Transaction, 'operation_type' | 'wallet_id' | 'destination_wallet_id'>, walletId?: string,
+): '+' | '−' | '' {
+  const flow = walletFlow(tx, walletId)
+  if (flow === 'entrada') return '+'
+  if (flow === 'salida') return '−'
+  return flowSign(tx.operation_type)
+}
+
+/**
  * Comisión total de una fila (#371): la suya más las agrupadas, en la moneda de
  * visualización. `total` suma las que tienen precio; `missing` cuenta las que
  * no (o no tienen tipo USD) y `estimated` indica si alguna es estimada.
