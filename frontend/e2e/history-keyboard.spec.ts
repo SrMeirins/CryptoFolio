@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
+import { abrirMasFiltros } from './historyHelpers'
 
 // Atajos de teclado y saltos por año del Historial (#382). Solo lectura.
 
@@ -15,12 +16,14 @@ const years = async (page: Page) => ((await (await page.request.get('/api/transa
 
 test('«/» enfoca la búsqueda y las flechas saltan de año fiscal', async ({ page }) => {
   await openHistory(page)
+  // El selector de año está en «Más filtros» (#414); las flechas funcionan igual.
+  await abrirMasFiltros(page)
   const ys = await years(page)
   const ultimo = ys[ys.length - 1]
 
   await blur(page)
   await page.keyboard.press('/')
-  await expect(page.getByRole('searchbox', { name: /Buscar/ })).toBeFocused()
+  await expect(page.getByRole('combobox', { name: /Buscar/ })).toBeFocused()
 
   // Escribiendo, las flechas no cambian de año.
   await page.keyboard.press('ArrowLeft')
@@ -104,5 +107,6 @@ test('Fiscal enlaza las operaciones de su año en el Historial', async ({ page }
   const anio = (await enlace.textContent())?.match(/\d{4}/)?.[0]
   await enlace.click()
   await expect(page).toHaveURL(new RegExp(`/history\\?desde=${anio}-01-01&hasta=${anio}-12-31`))
+  await abrirMasFiltros(page)
   await expect(page.getByRole('button', { name: /Filtrar por año/ })).toContainText(anio ?? '')
 })

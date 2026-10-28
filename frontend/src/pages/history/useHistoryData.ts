@@ -81,7 +81,6 @@ export function useHistoryData(queryParams: Record<string, string>, offset: numb
 
   return {
     data, transactions, total, isLoading, isFetching,
-    accounts: facets?.accounts ?? [],
     assets: facets?.assets ?? [],
     presentTypes: facets?.types ?? [],
     years: facets?.years ?? [],

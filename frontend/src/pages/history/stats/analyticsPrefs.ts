@@ -33,3 +33,14 @@ export function readIncludeMargin(): boolean {
 export function saveIncludeMargin(include: boolean): void {
   try { localStorage.setItem(MARGIN_KEY, include ? '1' : '0') } catch { /* almacenamiento no disponible */ }
 }
+
+const MORE_FILTERS_KEY = 'cryptofolio.historial.masFiltros'
+
+/** Si «Más filtros» estaba desplegado (#414). */
+export function readMoreFiltersOpen(): boolean {
+  try { return localStorage.getItem(MORE_FILTERS_KEY) === '1' } catch { return false }
+}
+
+export function saveMoreFiltersOpen(open: boolean): void {
+  try { localStorage.setItem(MORE_FILTERS_KEY, open ? '1' : '0') } catch { /* almacenamiento no disponible */ }
+}
