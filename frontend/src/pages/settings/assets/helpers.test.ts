@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { cumpleFiltro, fmtPrice } from './helpers'
+import { SOURCE_META, cumpleFiltro, fmtPrice } from './helpers'
 
-// Activos: filtros por estado del precio y formato (#337). Datos sintéticos.
+// Activos: filtros por estado del precio y formato (#337, #444). Datos sintéticos.
+const clean = (s: string) => s.replace(/\s/g, ' ')
 const a = (over: Partial<Parameters<typeof cumpleFiltro>[0]>) => ({ is_stablecoin: false, price_source: 'eur_direct', ...over })
 
 describe('cumpleFiltro', () => {
@@ -22,7 +23,19 @@ describe('cumpleFiltro', () => {
 
 describe('fmtPrice', () => {
   it('precios muy pequeños sin notación científica', () => {
-    expect(fmtPrice(0.0000094963)).toBe('€0,0000094963')
-    expect(fmtPrice(2.5)).toBe('€2,5000')
+    expect(clean(fmtPrice(0.0000094963))).toBe('0,0000094963 €')
+    expect(clean(fmtPrice(2.5))).toBe('2,5000 €')
+  })
+
+  it('símbolo detrás, como el resto de la app (#444)', () => {
+    expect(clean(fmtPrice(73031.92))).toBe('73.031,92 €')
+    expect(clean(fmtPrice(0.092794))).toBe('0,092794 €')
+    expect(fmtPrice(1)).not.toMatch(/^€/)
+  })
+})
+
+describe('SOURCE_META (#444)', () => {
+  it('solo tokens del tema, sin colores fijos', () => {
+    for (const meta of Object.values(SOURCE_META)) expect(meta.color).toMatch(/^var\(--cf-/)
   })
 })

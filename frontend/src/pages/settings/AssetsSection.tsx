@@ -9,8 +9,9 @@ import { type SortKey, type SortDir, type FiltroPrecio, FILTROS_PRECIO, cumpleFi
 import { SortButton } from './assets/SortButton'
 import { AssetItem } from './assets/AssetItem'
 import { AddAssetDialog } from './assets/AddAssetDialog'
-import { T } from '../../utils/colors'
-import { buttonClasses, iconButtonClasses } from '../../components/ui'
+import { T, alpha, ink } from '../../utils/colors'
+import { buttonClasses, iconButtonClasses, Pagination } from '../../components/ui'
+import { paginate, type PageSize } from '../../utils/pagination'
 import { fieldClasses } from '../../components/ui'
 
 export function AssetsSection() {
@@ -24,7 +25,8 @@ export function AssetsSection() {
   const [detectingAll, setDetectingAll] = useState(false)
   const [detectResult, setDetectResult] = useState<{ detected: number; failed: number } | null>(null)
   const [showStablecoins, setShowStablecoins] = useState(false)
-  const [page, setPage]                 = useState(0)
+  const [page, setPage]                 = useState(1)
+  const [pageSize, setPageSize]         = useState<PageSize>(25)
   const [sortKey, setSortKey]           = useState<SortKey>('name')
   const [sortDir, setSortDir]           = useState<SortDir>('asc')
   // Filtro rápido por estado del precio (#337).
@@ -38,7 +40,7 @@ export function AssetsSection() {
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('asc') }
-    setPage(0)
+    setPage(1)
   }
 
   const precioDe = (a: AssetMetadata) => prices[a.symbol] ?? a.precio_actual
@@ -67,9 +69,9 @@ export function AssetsSection() {
   const unknown     = filtered.filter(a => !a.is_stablecoin && a.price_source === 'unknown')
   const normal      = sortAssets(filtered.filter(a => !a.is_stablecoin && a.price_source !== 'unknown' && a.price_source !== 'fiat'))
 
-  const PAGE_SIZE   = 10
-  const totalPages  = Math.ceil(normal.length / PAGE_SIZE)
-  const normalPaged = normal.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  // Paginación común (#444), con el tamaño de página elegible.
+  const pageData    = paginate(normal, page, pageSize)
+  const normalPaged = pageData.items
 
   async function handleDetectAll() {
     setDetectingAll(true)
@@ -117,7 +119,7 @@ export function AssetsSection() {
             {unknown.length > 0 && !detectingAll && (
               <button type="button" onClick={handleDetectAll}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
-                style={{ backgroundColor: '#f59e0b18', color: T.warning }}>
+                style={{ backgroundColor: alpha(T.warning, 9), color: ink(T.warning) }}>
                 <Zap size={12} /> Detectar {unknown.length} sin precio
               </button>
             )}
@@ -158,7 +160,7 @@ export function AssetsSection() {
             const activo = filtro === f.value
             return (
               <button key={f.value} type="button" aria-pressed={activo} title={f.title}
-                onClick={() => { setFiltro(f.value); setPage(0) }}
+                onClick={() => { setFiltro(f.value); setPage(1) }}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
                   activo ? 'border-brand bg-brand/10 text-brand-ink' : 'border-border text-fg-muted hover:text-fg'}`}>
                 {f.label}
@@ -173,7 +175,7 @@ export function AssetsSection() {
           <div className="relative flex-1">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
             <input placeholder="Buscar activo..." value={search}
-              onChange={e => { setSearch(e.target.value); setPage(0) }} className={inputSearch} />
+              onChange={e => { setSearch(e.target.value); setPage(1) }} className={inputSearch} />
             {!search && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-fg-subtle">{assets.length} activos</span>}
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -204,29 +206,8 @@ export function AssetsSection() {
             <div className="space-y-1.5">
               {normalPaged.map(renderAssetItem)}
             </div>
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between pt-2">
-                <span className="text-xs text-fg-subtle">
-                  {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, normal.length)} de {normal.length} activos
-                </span>
-                <div className="flex items-center gap-1">
-                  <button type="button" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-                    className={buttonClasses('secondary', 'sm')}>
-                    ← Anterior
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => (
-                    <button type="button" key={i} onClick={() => setPage(i)}
-                      className={`w-7 h-7 text-xs rounded-lg transition-colors ${i === page ? 'bg-brand-solid text-on-brand font-medium' : 'bg-background-tertiary border border-border hover:bg-border text-fg-muted'}`}>
-                      {i + 1}
-                    </button>
-                  ))}
-                  <button type="button" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1}
-                    className={buttonClasses('secondary', 'sm')}>
-                    Siguiente →
-                  </button>
-                </div>
-              </div>
-            )}
+            <Pagination page={pageData.page} pages={pageData.pages} from={pageData.from} to={pageData.to} total={pageData.total}
+              size={pageSize} onPage={setPage} onSize={n => { setPageSize(n); setPage(1) }} label="activos" />
           </div>
         )}
 

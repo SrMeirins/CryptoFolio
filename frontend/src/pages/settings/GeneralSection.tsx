@@ -7,6 +7,7 @@ import { CurrencyToggle } from '../../components/CurrencyToggle'
 import { ThemeSelector } from '../../components/ThemeSelector'
 import { TimezoneSetting } from './TimezoneSetting'
 import { alpha } from '../../utils/colors'
+import { APP_VERSION } from '../../constants/appInfo'
 import { cardClasses, buttonClasses, iconButtonClasses } from '../../components/ui'
 
 const NOTIFICATION_LABELS: Record<string, string> = {
@@ -103,7 +104,7 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
             <div className="w-7 h-7 rounded-full bg-positive/15 flex items-center justify-center shrink-0">
               <Bell size={13} className="text-positive" />
             </div>
-            <p className="text-sm text-positive">Todo en orden — no hay notificaciones activas.</p>
+            <p className="text-sm text-positive">Todo en orden: no hay notificaciones activas.</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -160,11 +161,11 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
         <div className="space-y-2 text-xs text-fg-subtle">
           <div className="flex items-center justify-between">
             <span>Versión</span>
-            <span className="mono text-fg-muted">0.3.0-dev</span>
+            <span className="mono text-fg-muted">{APP_VERSION}</span>
           </div>
           <div className="flex items-center justify-between">
             <span>Método fiscal</span>
-            <span className="mono text-fg-muted">FIFO — Normativa española (AEAT)</span>
+            <span className="mono text-fg-muted">FIFO, normativa española (AEAT)</span>
           </div>
           <div className="flex items-center justify-between">
             <span>Fuente de precios</span>
