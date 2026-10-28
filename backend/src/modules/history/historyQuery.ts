@@ -1,4 +1,5 @@
 import { usdPerEurSql } from '../fiat/displayCurrency';
+import { feeInPriceSql } from './feeInPrice';
 import { buildHistoryOrderBy, buildHistoryWhere, HistoryFilters } from './listFilters';
 import { FLOW_DIRECTION, VALUATION_COLUMNS, VALUATION_CTES, valuationJoins } from './valuationSql';
 import { FEE_PARENT_CTES, GROUPED_FEES_COLUMN, feeValuedCte } from './feeGrouping';
@@ -12,6 +13,7 @@ const ROW_COLUMNS = `
   t.id, t.operation_type, t.timestamp, t.asset, t.amount, t.amount_net,
   t.cost_asset, t.cost_amount, t.price_per_unit,
   t.fee_asset, t.fee_amount, t.included_fee_asset, t.included_fee_amount,
+  ${feeInPriceSql('t')} AS fee_in_price,
   t.wallet_id, w.name AS wallet_name, w.color AS wallet_color, w.type AS wallet_kind,
   t.account, t.destination_wallet_id,
   dw.name AS destination_wallet_name, dw.color AS destination_wallet_color,

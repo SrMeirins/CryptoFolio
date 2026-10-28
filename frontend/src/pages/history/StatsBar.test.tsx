@@ -13,7 +13,7 @@ const totals: HistoryStats['totals'] = {
   stable_to_fiat: { ops: 1, value: m(20) },
   withdrawn_ops: 1, withdrawn: m(40), deposited: m(150),
   income_ops: 4, income: m(8), income_sin_valor: 1,
-  fee_ops: 3, fees: m(2), fees_sin_valor: 0, fees_included: { ops: 1, value: m(0.5) },
+  fee_ops: 3, fees: m(2), fees_sin_valor: 0, fees_included: { ops: 1, value: m(0.5) }, fees_in_price_ops: 0,
 }
 const zero = { invertido: m(0), retirado: m(0), ventas: m(0), ingresos: m(0), comisiones: m(0) }
 const series: HistoryStats['series'] = [{ periodo: '2026-01', valor: zero }, { periodo: '2026-02', valor: { ...zero, invertido: m(100) } }]
