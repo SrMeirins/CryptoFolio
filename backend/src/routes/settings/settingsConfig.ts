@@ -6,6 +6,7 @@ import { DISPLAY_CURRENCIES } from '../../modules/fiat/displayCurrency';
 import { sendZodError } from './settingsShared';
 import { VIEWS_KEY } from '../../modules/history/savedViews';
 import { preferenceSchemas } from '../../modules/settings/preferences';
+import { DISMISSED_KEY } from '../../modules/notifications/preferences';
 import { DEFAULT_TIMEZONE, TIMEZONE_CONFIG_KEY, getTimezoneInfo, invalidateTimezoneCache, isValidTimeZone } from '../../modules/time/appTimezone';
 
 const router = Router();
@@ -14,7 +15,7 @@ const router = Router();
 // valores cortos; un límite evita cargas enormes en app_config.
 export const MAX_CONFIG_VALUE = 2000;
 // Claves con API propia: no se escriben con el PUT genérico.
-const PROTECTED_KEYS = new Set([VIEWS_KEY]);
+const PROTECTED_KEYS = new Set([VIEWS_KEY, DISMISSED_KEY]);
 
 const configSchema = z.object({
   key:   z.string().min(1, 'key es requerido').max(MAX_LENGTH_SHORT, `key no puede superar ${MAX_LENGTH_SHORT} caracteres`)

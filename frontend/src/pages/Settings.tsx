@@ -69,7 +69,7 @@ export function Settings() {
             {activeTab === 'assets'  && <AssetsSection />}
             {activeTab === 'fiscal'  && <div className={scroll}><FiscalSection /></div>}
             {activeTab === 'datos'   && <div className={scroll}><DatosSection /></div>}
-            {activeTab === 'general' && <div className={scroll}><GeneralSection onNavigate={handleTabChange} /></div>}
+            {activeTab === 'general' && <div className={scroll}><GeneralSection /></div>}
           </div>
         </div>
       </div>

@@ -122,6 +122,19 @@ describe('routes/settings — config y stats', () => {
     });
   });
 
+  describe('PUT /config — avisos (#447)', () => {
+    const put = (key: string, value: unknown) => request(app).put('/api/settings/config').send({ key, value });
+
+    it('categorías silenciadas: lista JSON de categorías conocidas', async () => {
+      for (const value of ['["precios","fiscal"]', '[]']) expect((await put('notifications_muted', value)).status).toBe(200);
+      for (const value of ['["otra"]', '["fiscal","fiscal"]', 'fiscal', '{}']) expect((await put('notifications_muted', value)).status).toBe(400);
+    });
+
+    it('los descartes solo se escriben con su propia API', async () => {
+      expect((await put('notifications_dismissed', '{}')).status).toBe(400);
+    });
+  });
+
   describe('GET /stats', () => {
     it('devuelve los 6 contadores esperados', async () => {
       const res = await request(app).get('/api/settings/stats');

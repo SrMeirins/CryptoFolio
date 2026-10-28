@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MUTED_KEY, mutedSchema } from '../notifications/preferences';
 
 // Preferencias de General (#446): claves de app_config con un conjunto cerrado
 // de valores. El PUT genérico las valida antes de guardarlas.
@@ -19,4 +20,6 @@ export const preferenceSchemas: Record<string, z.ZodType<string>> = {
   [DUST_THRESHOLD_KEY]: dustThresholdSchema,
   [PRIVACY_ON_START_KEY]: z.enum(['true', 'false'], { error: 'privacy_on_start debe ser true o false' }),
   [START_PAGE_KEY]: z.enum(START_PAGES, { error: 'start_page debe ser una de las páginas de inicio permitidas' }),
+  // Categorías de avisos silenciadas (#447).
+  [MUTED_KEY]: mutedSchema,
 };

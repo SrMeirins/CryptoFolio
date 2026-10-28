@@ -150,6 +150,41 @@ describe('routes/settings — mantenimiento', () => {
     });
   });
 
+  describe('avisos: descartar y silenciar (#447)', () => {
+    const ids = async (q = '') => ((await request(app).get(`/api/settings/notifications${q}`)).body as Array<{ id: string; muted?: boolean; dismissed?: boolean }>);
+
+    it('descartar oculta el aviso hasta que cambia; silenciar oculta su categoría', async () => {
+      await pool.query(`INSERT INTO asset_metadata (symbol, name, price_source) VALUES ('SINTNP1', 'Sintético 1', 'unknown')`);
+      expect((await ids()).map(n => n.id)).toContain('no-price');
+
+      const dis = await request(app).post('/api/settings/notifications/dismiss').send({ ids: ['no-price'] });
+      expect(dis.status).toBe(200);
+      expect(dis.body.dismissed).toBe(1);
+      expect((await ids()).map(n => n.id)).not.toContain('no-price');
+      expect((await ids('?incluir=todas')).find(n => n.id === 'no-price')).toMatchObject({ dismissed: true, muted: false });
+
+      // Otro activo sin precio: el aviso cambia y vuelve a salir.
+      await pool.query(`INSERT INTO asset_metadata (symbol, name, price_source) VALUES ('SINTNP2', 'Sintético 2', 'unknown')`);
+      expect((await ids()).map(n => n.id)).toContain('no-price');
+
+      await pool.query(`INSERT INTO app_config (key, value) VALUES ('notifications_muted', '["precios"]')
+                        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
+      expect((await ids()).map(n => n.id)).not.toContain('no-price');
+      expect((await ids('?incluir=todas')).find(n => n.id === 'no-price')).toMatchObject({ muted: true });
+      await pool.query(`DELETE FROM app_config WHERE key = 'notifications_muted'`);
+    });
+
+    it('sin ids descarta todos los visibles; ids no válidos dan 400', async () => {
+      const visibles = (await ids()).length;
+      const res = await request(app).post('/api/settings/notifications/dismiss').send({});
+      expect(res.body.dismissed).toBe(visibles);
+      expect(await ids()).toEqual([]);
+      for (const body of [{ ids: 'no-price' }, { ids: [1] }, { ids: Array.from({ length: 51 }, (_, i) => `x${i}`) }]) {
+        expect((await request(app).post('/api/settings/notifications/dismiss').send(body)).status).toBe(400);
+      }
+    });
+  });
+
   describe('GET /pending-deposits', () => {
     it('devuelve un array (posiblemente vacío)', async () => {
       const res = await request(app).get('/api/settings/pending-deposits');
