@@ -108,7 +108,7 @@ export function Fiscal() {
   const setVista = useCallback((v: FiscalVista) => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev)
-      for (const k of ['desde', 'hasta', 'activo']) next.delete(k)
+      for (const k of ['desde', 'hasta', 'activo', 'resultado', 'seccion']) next.delete(k)
       if (v === 'resumen') next.delete('vista')
       else next.set('vista', v)
       return next
@@ -119,6 +119,17 @@ export function Fiscal() {
     setSearchParams({ vista: 'operaciones', ...filters })
   }, [setSearchParams])
   const urlFilters = filtersFromUrl(searchParams)
+
+  // Tarjeta Rendimientos (#418): en Operaciones, baja a su tabla y le pasa el
+  // foco en cuanto está pintada.
+  const seccion = searchParams.get('seccion')
+  useEffect(() => {
+    if (vista !== 'operaciones' || seccion !== 'rendimientos' || !events) return
+    const el = document.getElementById('fiscal-rendimientos')
+    if (!el) return
+    el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+    el.focus({ preventScroll: true })
+  }, [vista, seccion, events])
 
   // En pantallas estrechas la fila de pestañas se desplaza: la activa siempre a la vista.
   useEffect(() => {
@@ -228,7 +239,7 @@ export function Fiscal() {
         ) : summary && vista === 'resumen' ? (
           <>
             <FiscalHero summary={summary} cuota={cuota} tipoMedio={tipoMedio} comparison={comparison} aviso={caducan && <AvisoCaducidad {...caducan} compact />}
-              declarada={!!rentaDeclarada} />
+              declarada={!!rentaDeclarada} onOpen={openOperaciones} />
             {!summary.esAnioEnCurso && <Block i={1}><DeclaracionRenta year={activeYear} declaracion={rentaDeclarada} /></Block>}
             {calendario && (
               <Block i={1}>

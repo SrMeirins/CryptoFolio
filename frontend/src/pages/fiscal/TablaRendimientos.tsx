@@ -50,7 +50,8 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
   }, {})
 
   return (
-    <div className={cardClasses('none', 'overflow-hidden')}>
+    // Destino de la tarjeta Rendimientos del ejercicio (#418): recibe el foco al llegar.
+    <div id="fiscal-rendimientos" tabIndex={-1} className={cardClasses('none', 'overflow-hidden scroll-mt-4 focus:outline-hidden')}>
       <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-wrap gap-2">
         <TableExpandToggle
           icon={TrendingDown}
