@@ -9,6 +9,8 @@ import { MAX_LENGTH_SHORT } from '../../modules/validation/textLength';
 import { sendZodError, validateSymbol } from './settingsShared';
 import { sendInternalError } from '../../middleware/errorHandler';
 import { requestLivePriceResync } from '../../modules/prices/liveFeed';
+import { syncAssetIcons } from '../../modules/assets/assetIcons';
+import { isValidCoinGeckoId } from '../../modules/assets/iconSources';
 
 const router = Router();
 
@@ -38,8 +40,10 @@ router.get('/assets', async (_req: Request, res: Response) => {
     `SELECT am.symbol, am.name, am.coingecko_id, am.is_stablecoin,
             am.binance_eur_pair, am.binance_usdt_pair, am.binance_btc_pair,
             am.price_source, am.auto_detected, am.last_price_check,
+            am.icon_coingecko_id, am.icon_id_source, ai.source AS icon_source,
             EXISTS (SELECT 1 FROM fifo_lots fl WHERE fl.asset = am.symbol AND NOT fl.is_closed) AS en_cartera
      FROM asset_metadata am
+     LEFT JOIN asset_icons ai ON ai.symbol = am.symbol AND ai.status = 'ok'
      ORDER BY am.symbol`
   );
   // Precio en vivo y su fuente (#337), para filtrar los activos sin precio o de respaldo.
@@ -153,6 +157,28 @@ router.put('/assets/:symbol', async (req: Request, res: Response) => {
 });
 
 // ── DELETE /api/settings/assets/:symbol ───────────────────────────────────
+// ── PUT /api/settings/assets/:symbol/icon-id ───────────────────────────────
+// Corrige el logo de un activo (#449): fija a mano el id de CoinGecko del logo
+// o, con null, vuelve al automático. Solo afecta al logo, nunca a los precios.
+// Se descarta el logo guardado y se vuelve a buscar en segundo plano.
+const iconIdSchema = z.object({
+  id: z.string().refine(isValidCoinGeckoId, 'id debe ser un id de CoinGecko (minúsculas, números y guiones)').nullable(),
+});
+router.put('/assets/:symbol/icon-id', async (req: Request, res: Response) => {
+  const symbol = validateSymbol(req.params.symbol);
+  if (!symbol) { res.status(400).json({ error: 'Símbolo inválido' }); return; }
+  const validation = iconIdSchema.safeParse(req.body);
+  if (!validation.success) { sendZodError(res, validation.error); return; }
+  const { id } = validation.data;
+  const updated = await db.query(
+    `UPDATE asset_metadata SET icon_coingecko_id = $2, icon_id_source = CASE WHEN $2::text IS NULL THEN NULL ELSE 'manual' END
+     WHERE symbol = $1`, [symbol, id]);
+  if (updated.rowCount === 0) { res.status(404).json({ error: 'Activo no encontrado' }); return; }
+  await db.query('DELETE FROM asset_icons WHERE symbol = $1', [symbol]);
+  void syncAssetIcons({ force: true });
+  res.json({ success: true });
+});
+
 router.delete('/assets/:symbol', async (req: Request, res: Response) => {
   const symbol = validateSymbol(req.params.symbol);
   if (!symbol) { res.status(400).json({ error: 'Símbolo inválido' }); return; }

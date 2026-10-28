@@ -30,9 +30,13 @@ test('Ver en Portfolio filtra por esa wallet y el valor coincide', async ({ page
   await page.getByRole('link', { name: 'Ver en Portfolio' }).first().click()
   await expect(page).toHaveURL(/\/portfolio\?wallet=[0-9a-f-]{36}$/)
   await expect(page.getByRole('button', { name: new RegExp(`^Mostrando solo ${name}`) })).toBeVisible()
-  // La tarjeta de Portfolio nombra la wallet con su valor: el mismo que en Ajustes.
+  // La tarjeta de Portfolio nombra la wallet con su valor: el mismo cálculo que
+  // en Ajustes. Los precios en vivo se mueven entre una página y otra: margen del 0,5 %.
   const portfolioCard = page.getByRole('group', { name: 'Filtrar la tabla por wallet' }).getByRole('button', { name: new RegExp(`^${name}: `) })
-  expect(((await portfolioCard.getAttribute('aria-label')) ?? '').replace(/\s/g, ' ')).toContain(valor)
+  const amount = (text: string) => Number((text.match(/-?[\d.]+,\d+|-?[\d.]+/)?.[0] ?? 'NaN').replace(/\./g, '').replace(',', '.'))
+  const enAjustes = amount(valor)
+  const enPortfolio = amount(((await portfolioCard.getAttribute('aria-label')) ?? '').replace(`${name}: `, ''))
+  expect(Math.abs(enPortfolio - enAjustes)).toBeLessThanOrEqual(Math.max(0.01, Math.abs(enAjustes) * 0.005))
 })
 
 test('Ver sus operaciones abre el Historial con esa wallet', async ({ page }) => {

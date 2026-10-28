@@ -241,6 +241,10 @@ export interface AssetMetadata {
   /** Precio en vivo en EUR y su fuente, si lo hay (#337). */
   precio_actual?: number | null
   fuente_actual?: 'binance' | 'coingecko' | 'coinpaprika' | 'okx' | null
+  /** Logo (#449): id de CoinGecko solo para el logo, cómo se fijó y de dónde salió el logo guardado. */
+  icon_coingecko_id?: string | null
+  icon_id_source?: 'auto' | 'manual' | null
+  icon_source?: 'coingecko' | 'local' | 'flag' | null
 }
 
 export interface ManualTxPreview {
@@ -700,6 +704,8 @@ export const portfolioApi = {
   getAssets: () => api.get<AssetMetadata[]>('/settings/assets'),
   createAsset: (data: Partial<AssetMetadata>) => api.post<{ success: boolean; symbol: string }>('/settings/assets', data),
   updateAsset: (symbol: string, data: Partial<AssetMetadata>) => api.put<{ success: boolean }>(`/settings/assets/${symbol}`, data),
+  // Corrige el logo (#449): id de CoinGecko solo para el logo; null vuelve al automático.
+  setAssetIconId: (symbol: string, id: string | null) => api.put<{ success: boolean }>(`/settings/assets/${encodeURIComponent(symbol)}/icon-id`, { id }),
   deleteAsset: (symbol: string) => api.delete<{ success: boolean }>(`/settings/assets/${symbol}`),
   detectPairs: (symbol: string) => api.post<AssetMetadata>(`/settings/assets/${symbol}/detect`, {}),
   detectAllPairs: () => api.post<{ detected: number; failed: number; total: number }>('/settings/assets/detect-all', {}),
