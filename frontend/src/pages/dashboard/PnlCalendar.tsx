@@ -122,7 +122,8 @@ export function PnlCalendar() {
           onOpen={next => { setView('month'); go(next) }} />
       ) : (
         <>
-          {complete.length > 0 && <CalendarStats stats={stats} total={monthSummary(complete)} currency={currency} />}
+          {complete.length > 0 && <CalendarStats stats={stats} total={monthSummary(complete)} currency={currency}
+            selected={selected} onOpenDay={d => setSelected(s => (s === d ? null : d))} />}
           <MonthTrend days={days} currency={currency} hovered={hovered} onHover={setHovered}
             lastDay={Number(weeks.flat().filter(Boolean).at(-1)?.slice(8) ?? 31)} />
           {isError && <p className="text-xs text-fg-subtle py-6 text-center">No se pudo cargar el P&L del mes.</p>}
