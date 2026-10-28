@@ -1,13 +1,17 @@
 import { useState, useMemo, type KeyboardEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
-import { AlertCircle, Check, RotateCcw, Calculator, Landmark, Percent, Globe } from 'lucide-react'
+import { AlertCircle, RotateCcw, Scale, Landmark, Percent, BellRing } from 'lucide-react'
 import { TRAMOS_DEFAULT } from '../../utils/tramosIrpf'
 import { SettingsCard } from './SettingsCard'
 import { SavedMark } from './SavedMark'
 import { useSettingFeedback } from '../../hooks/useSettingFeedback'
 import { useToast } from '../../hooks/useToast'
 import { validateRate, validateThreshold } from '../../utils/settingsValidation'
+import { useCurrentFiscalBase } from '../../hooks/useCurrentFiscalBase'
+import { preview721, previewCuota } from '../../utils/fiscalPreview'
+import { NOTIFICATIONS_MUTED_KEY, mutedCategories } from '../../constants/notifications'
+import { formatEur } from '../../utils/format'
 import { formatNumber } from '../../utils/format'
 
 /** Importe entero en euros con el símbolo detrás (#444). */
@@ -102,22 +106,48 @@ export function FiscalSection() {
   }
   const isDefault = storedTipos.every((t, i) => t === DEFAULT_TIPOS[i])
 
+  // ── Vista previa (#451): efecto en el ejercicio más reciente antes de aplicar ──
+  const fiscalBase = useCurrentFiscalBase()
+  const draftTipos = storedTipos.map((t, i) => {
+    const v = rateDrafts[i] !== undefined ? validateRate(rateDrafts[i]) : null
+    return v && v.ok ? v.value : t
+  })
+  const tramosActuales = TRAMOS_DEFAULT.map((t, i) => ({ ...t, tipo: storedTipos[i] }))
+  const cuota = fiscalBase ? previewCuota(fiscalBase.base, tramosActuales, draftTipos) : null
+  const cambiaTipos = draftTipos.some((t, i) => t !== storedTipos[i])
+  const draftThreshold = thresholdDraft !== null ? validateThreshold(thresholdDraft) : null
+  const umbralPrevisto = draftThreshold && draftThreshold.ok ? draftThreshold.value : threshold
+  const obligacion = fiscalBase ? preview721(fiscalBase.valor721, umbralPrevisto, fiscalBase.valorIncompleto) : null
+
+  // ── Recordatorios (#451): los avisos de la categoría Fiscal (#447) ──
+  const recordatorios = !mutedCategories(config[NOTIFICATIONS_MUTED_KEY]).includes('fiscal')
+  async function setRecordatorios(on: boolean, undoable = true) {
+    const now = mutedCategories(currentConfig()[NOTIFICATIONS_MUTED_KEY])
+    const next = on ? now.filter(k => k !== 'fiscal') : [...new Set([...now, 'fiscal' as const])]
+    if (await saveConfig(NOTIFICATIONS_MUTED_KEY, JSON.stringify(next))) {
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      void queryClient.invalidateQueries({ queryKey: ['notifications-all'] })
+      confirm('recordatorios', on ? 'Recordatorios de plazos activados' : 'Recordatorios de plazos silenciados', undoable ? () => void setRecordatorios(!on, false) : undefined)
+    }
+  }
+
   return (
     <div className="space-y-4 max-w-3xl">
-      {/* Método de cálculo: FIFO único */}
-      <SettingsCard index={0} icon={Calculator} title="Método de cálculo de plusvalías"
-        description="La normativa española (AEAT) obliga al uso de FIFO para criptoactivos.">
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-brand/40 bg-brand/6 w-fit">
-          <Check size={15} aria-hidden="true" className="text-brand-ink shrink-0" />
-          <div>
-            <p className="text-sm font-semibold text-brand-ink">FIFO</p>
-            <p className="text-xs text-fg-subtle">First In, First Out</p>
-          </div>
-        </div>
-        <p className="text-xs text-fg-subtle flex items-start gap-1.5">
-          <AlertCircle size={11} aria-hidden="true" className="shrink-0 mt-0.5" />
-          FIFO es el único método soportado y el exigido por la AEAT.
-        </p>
+      {/* Normativa (#451): lo que aplica la app, sin opciones que no se pueden elegir */}
+      <SettingsCard index={0} icon={Scale} title="Normativa"
+        description="Lo que aplica la app a tus cálculos. Hoy solo admite la residencia fiscal en España.">
+        <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          {[
+            ['Residencia fiscal', 'España'],
+            ['Método de cálculo', 'FIFO, el exigido por la AEAT'],
+            ['Impuesto', 'IRPF, base del ahorro'],
+            ['Modelos', 'Modelo 100 (Renta) y Modelo 721'],
+          ].map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-3 border-b border-border/50 py-1.5">
+              <dt className="text-fg-subtle text-xs">{k}</dt><dd className="text-xs text-fg text-right">{v}</dd>
+            </div>
+          ))}
+        </dl>
       </SettingsCard>
 
       {/* Umbral Modelo 721 */}
@@ -153,6 +183,12 @@ export function FiscalSection() {
           <AlertCircle size={11} aria-hidden="true" className="shrink-0 mt-0.5" />
           El umbral legal vigente es de {formatEurInteger(50000)}. Modifícalo solo si la normativa cambia.
         </p>
+        {fiscalBase && obligacion && (
+          <p aria-live="polite" className="text-xs rounded-lg bg-overlay/4 px-3 py-2 text-fg-muted">
+            {fiscalBase.enCurso ? 'Hoy' : `A 31 de diciembre de ${fiscalBase.year}`} tienes <span className="mono text-fg">{formatEur(fiscalBase.valor721)}</span>{fiscalBase.valorIncompleto ? ' como mínimo' : ''} en exchanges.
+            {' '}Con un umbral de {formatEurInteger(umbralPrevisto)}, {obligacion.obligado ? 'estarías obligado a presentar el Modelo 721' : 'no estarías obligado a presentarlo'}{obligacion.seguro ? '.' : ', a falta de algunos precios.'}
+          </p>
+        )}
       </SettingsCard>
 
       {/* Tramos IRPF */}
@@ -190,22 +226,27 @@ export function FiscalSection() {
           <AlertCircle size={11} aria-hidden="true" className="shrink-0 mt-0.5" />
           Modifica solo si la normativa fiscal cambia. Afecta al simulador de venta y a la página Fiscal.
         </p>
+        {fiscalBase && cuota && (
+          <p aria-live="polite" className="text-xs rounded-lg bg-overlay/4 px-3 py-2 text-fg-muted">
+            Cuota estimada de {fiscalBase.year}{fiscalBase.enCurso ? ' hasta hoy' : ''}: <span className="mono text-fg">{formatEur(cuota.antes)}</span>
+            {cambiaTipos && cuota.diferencia !== 0 && (
+              <>; con este cambio, <span className="mono text-fg">{formatEur(cuota.despues)}</span> ({cuota.diferencia > 0 ? '+' : ''}{formatEur(cuota.diferencia)})</>
+            )}.
+          </p>
+        )}
       </SettingsCard>
 
-      {/* País fiscal */}
-      <SettingsCard index={3} icon={Globe} title="País de residencia fiscal"
-        description="Determina la normativa aplicable y los formularios generados.">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-brand/40 bg-brand/6">
-            <div>
-              <p className="text-sm font-medium">España</p>
-              <p className="text-xs text-fg-subtle">IRPF · Modelo 100 · Modelo 721</p>
-            </div>
-            <Check size={14} aria-hidden="true" className="text-brand-ink ml-2" />
-          </div>
-          <span className="text-xs text-fg-subtle">Otros países: próximamente</span>
-        </div>
-      </SettingsCard>
+      {/* Recordatorios de plazos (#451): la categoría Fiscal de los avisos */}
+      <SettingsCard index={3} icon={BellRing} title="Recordatorios de plazos" status={<SavedMark stamp={saved} id="recordatorios" />}
+        description="Aviso en la campana a 30 días de la campaña de la Renta y del plazo del Modelo 721, y de nuevo a 7 días. Es la misma opción que la categoría Fiscal de General."
+        action={
+          <label className="inline-flex items-center cursor-pointer shrink-0">
+            <input type="checkbox" role="switch" checked={recordatorios} aria-label="Recordatorios de plazos fiscales" className="peer sr-only"
+              onChange={e => void setRecordatorios(e.target.checked)} />
+            <span aria-hidden="true"
+              className="relative w-9 h-5 rounded-full bg-overlay/15 ring-1 ring-inset ring-fg-subtle/60 peer-checked:ring-0 transition-colors peer-checked:bg-brand-solid peer-focus-visible:ring-2 peer-focus-visible:ring-brand/60 after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4" />
+          </label>
+        } />
     </div>
   )
 }
