@@ -421,7 +421,10 @@ CREATE TABLE asset_icons (
   content_type  TEXT,
   data          BYTEA,
   fetched_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- De dónde salió el logo (#449): CoinGecko, el paquete local o una bandera.
+  source        TEXT,
   CONSTRAINT chk_asset_icons_status CHECK (status IN ('ok', 'missing')),
+  CONSTRAINT chk_asset_icons_source CHECK (source IS NULL OR source IN ('coingecko', 'local', 'flag')),
   CONSTRAINT chk_asset_icons_content CHECK (
     (status = 'ok' AND data IS NOT NULL AND octet_length(data) <= 262144
        AND content_type IN ('image/png', 'image/jpeg', 'image/webp'))
@@ -449,7 +452,16 @@ CREATE TABLE asset_metadata (
   -- relleno automático de pares no los vuelve a añadir (#277).
   disabled_pairs     TEXT[] NOT NULL DEFAULT '{}',
   -- Id de CoinPaprika (#337): fuente de respaldo; se busca una sola vez por activo.
-  coinpaprika_id     TEXT CHECK (char_length(coinpaprika_id) <= 100)
+  coinpaprika_id     TEXT CHECK (char_length(coinpaprika_id) <= 100),
+  -- Id de CoinGecko solo para el logo (#449), aparte de coingecko_id (precios):
+  -- resuelto por símbolo («auto») o fijado a mano en Ajustes («manual»).
+  icon_coingecko_id  TEXT,
+  icon_id_source     TEXT,
+  CONSTRAINT chk_asset_metadata_icon_id CHECK (
+    (icon_coingecko_id IS NULL) = (icon_id_source IS NULL)
+    AND (icon_coingecko_id IS NULL OR icon_coingecko_id ~ '^[a-z0-9][a-z0-9-]{0,99}$')
+    AND (icon_id_source IS NULL OR icon_id_source IN ('auto', 'manual'))
+  )
 );
 
 INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_eur_pair, price_source) VALUES

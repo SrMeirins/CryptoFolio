@@ -36,11 +36,11 @@ export function AssetItem({ asset, price, isEditing, onEdit, onSaved, onDelete }
           }
         </div>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <button type="button" onClick={onEdit} aria-label="Editar activo"
+          <button type="button" onClick={onEdit} aria-label={`Editar ${asset.symbol}`}
             className={iconButtonClasses('md')}>
             <Edit2 size={12} />
           </button>
-          <button type="button" onClick={onDelete} aria-label="Eliminar activo"
+          <button type="button" onClick={onDelete} aria-label={`Eliminar ${asset.symbol}`}
             className={iconButtonClasses('md', false, '', 'danger')}>
             <Trash2 size={12} />
           </button>

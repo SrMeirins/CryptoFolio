@@ -5,6 +5,7 @@ import { portfolioApi, type AssetMetadata } from '../../../api/portfolio'
 import { Toggle } from '../../../components/Toggle'
 import { PairInputsGrid } from './PairInputsGrid'
 import { CoinGeckoIdEditor } from './CoinGeckoIdEditor'
+import { AssetLogoEditor } from './AssetLogoEditor'
 import { T, alpha } from '../../../utils/colors'
 import { buttonClasses, fieldClasses } from '../../../components/ui'
 import { formatNumber } from '../../../utils/format'
@@ -61,6 +62,9 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
 
   return (
     <div className="border-t border-border bg-background-tertiary/20 px-4 py-4 space-y-4">
+      {/* Logo (#449): de dónde sale y corrección solo para el logo */}
+      <AssetLogoEditor asset={asset} />
+
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium text-fg-muted">Editar pares de <span className="mono">{asset.symbol}</span></p>
         <button type="button" onClick={handleDetect} disabled={detecting}
@@ -88,9 +92,9 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
             onKeyDown={e => e.key === 'Enter' && handleTest()}
             placeholder={`${asset.symbol}EUR, ${asset.symbol}USDT...`}
             className={fieldClasses('md', false, 'flex-1 mono')} />
-          <button type="button" onClick={handleTest} disabled={testLoading || !testPairVal}
+          <button type="button" onClick={handleTest} disabled={testLoading || !testPairVal} aria-label="Probar el par en Binance" title="Probar el par en Binance"
             className="px-3 py-2 bg-background-tertiary hover:bg-border disabled:opacity-50 rounded-lg text-sm transition-colors">
-            {testLoading ? <RefreshCw size={13} className="animate-spin" /> : <Search size={13} />}
+            {testLoading ? <RefreshCw size={13} aria-hidden="true" className="animate-spin" /> : <Search size={13} aria-hidden="true" />}
           </button>
         </div>
         {testResult && (
