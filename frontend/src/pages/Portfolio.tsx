@@ -271,11 +271,11 @@ export function Portfolio() {
             </section>
           ) : (
             <WalletSections sections={walletSections} total={all.total} compact={compact}
-              onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} />
+              onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} onOpen={setDetailAsset} />
           )}
           <DustSection rows={dust.rows} value={dust.value} total={all.total} threshold={market.dustThreshold}
             compact={compact} open={dustOpen || (mainCount === 0 && dust.rows.length > 0)} onToggle={toggleDust}
-            index={mainCount + 1} />
+            index={mainCount + 1} onOpen={setDetailAsset} />
         </>
       )}
     </div>

@@ -93,7 +93,7 @@ export function WalletCards({ wallets, selected, onSelect }: {
               footer={<Composition w={w} />}
               onSelect={() => onSelect(on ? null : w.walletId)} active={on}
               actionLabel={`${pnlText ? `P&L no realizado ${pnlText}. ` : ''}${on ? 'Quitar el filtro de la tabla' : 'Filtrar la tabla por esta wallet'}`}
-              helpLabel={`Detalle de ${w.name}`}
+              helpLabel={`Detalle de la wallet ${w.name}`}
               help={<>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
                   <dt className="text-fg-muted">Tipo</dt><dd className="text-right">{KIND_LABEL[w.kind] ?? (w.kind || 'Fiat')}</dd>

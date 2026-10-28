@@ -8,7 +8,7 @@ import type { UnifiedRow } from '../../utils/assetTable'
 // Polvo de todas las wallets en un único bloque plegable al final (#269), en
 // lugar de una tabla de polvo (y otra vacía) por wallet. Cada fila lleva el
 // chip de su wallet.
-export function DustSection({ rows, value, total, threshold, compact, open, onToggle, index }: {
+export function DustSection({ rows, value, total, threshold, compact, open, onToggle, index, onOpen }: {
   rows: UnifiedRow[]
   value: number
   total: number
@@ -17,6 +17,8 @@ export function DustSection({ rows, value, total, threshold, compact, open, onTo
   open: boolean
   onToggle: () => void
   index: number
+  /** Abre el detalle del activo (#460): el polvo también tiene su panel. */
+  onOpen: (asset: string) => void
 }) {
   const currency = useCurrency()
   if (rows.length === 0) return null
@@ -35,7 +37,7 @@ export function DustSection({ rows, value, total, threshold, compact, open, onTo
       </button>
       {open && (
         <div className="border-t border-border">
-          <AssetTable rows={rows} portfolioTotal={total} compact={compact} keyByWallet />
+          <AssetTable rows={rows} portfolioTotal={total} compact={compact} keyByWallet onOpen={onOpen} />
         </div>
       )}
     </section>
