@@ -4,7 +4,7 @@ import { ValueChart } from './ValueChart'
 import { EvolutionSummary } from './EvolutionSummary'
 import { CalendarDayDetail } from './calendar/CalendarDayDetail'
 import { DateRangePicker } from '../../components/DateRangePicker'
-import { SegmentedControl, Tabs, cardClasses, tabId, tabPanelId, PanelHeader } from '../../components/ui'
+import { SegmentedControl, Tabs, tabId, tabPanelId, PanelHeader, panelSurface } from '../../components/ui'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
 import { usePreparacionHistoricos } from '../../hooks/usePreparacionHistoricos'
 import { PreparandoHistoricos } from '../../components/PreparandoHistoricos'
@@ -83,7 +83,7 @@ export function EvolutionCard() {
   const state = { loading: active.isLoading, error: active.isError, intraday: query.intraday, currency, points, animationKey }
 
   return (
-    <div className={cardClasses('none', 'px-5 py-5')}>
+    <div className={panelSurface('none', 'px-5 py-5')}>
       <PanelHeader
         icon={LineChart}
         title="Evolución"

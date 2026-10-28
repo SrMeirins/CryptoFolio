@@ -9,7 +9,7 @@ import { formatMoney, formatPercent } from '../../utils/format'
 import { NEUTRAL_COLOR, allocationByAsset, allocationByWallet, concentration, type AllocationItem, type AllocationMode } from '../../utils/allocation'
 import { allocationSubtitle } from '../../utils/panelSubtitles'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import { PanelHeader, SegmentedControl, badgeClasses, cardClasses } from '../../components/ui'
+import { PanelHeader, SegmentedControl, badgeClasses, panelSurface } from '../../components/ui'
 
 // Distribución de la cartera (#235): anillo interactivo con el total en el
 // centro y lista con icono, peso, valor y variación 24 h. Se puede ver por
@@ -40,7 +40,7 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
   const fill = (i: AllocationItem) => (i.kind === 'fiat' ? `url(#${FIAT_PATTERN})` : i.color)
 
   return (
-    <div className={cardClasses('none', 'px-5 py-5 h-full')}>
+    <div className={panelSurface('none', 'px-5 py-5 h-full')}>
       <PanelHeader
         icon={PieChart}
         title="Distribución"

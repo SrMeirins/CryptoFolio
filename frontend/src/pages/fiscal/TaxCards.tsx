@@ -6,6 +6,7 @@ import { useTramos } from '../../hooks/useTramos'
 import { calcularTramos, tramoActivo } from '../../utils/tramosIrpf'
 import { tramosScale } from '../../utils/fiscalCharts'
 import { FiscalChartCard } from './FiscalChartCard'
+import { panelSurface } from '../../components/ui'
 
 export function TramosIRPF({ base, label }: { base: number; label: string }) {
   const tramosConfig = useTramos()
@@ -20,7 +21,7 @@ export function TramosIRPF({ base, label }: { base: number; label: string }) {
   const scale = tramosScale(base, tramosConfig)
   if (tramosCompactos(base) && !abierto) {
     return (
-      <section aria-label={label} className="flex items-center gap-3 flex-wrap rounded-xl border border-border bg-background-card px-4 py-3 text-sm">
+      <section aria-label={label} className={panelSurface('none', 'flex items-center gap-3 flex-wrap px-4 py-3 text-sm')}>
         <Scale size={14} className="text-fg-subtle shrink-0" aria-hidden="true" />
         <p className="flex-1 min-w-[14rem] text-fg-muted">
           <span className="text-fg-subtle">{label}:</span> base <span className="mono text-fg">{formatEur(base)}</span> al <span className="mono text-fg">{tipoMarginal} %</span>

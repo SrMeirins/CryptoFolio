@@ -1,6 +1,6 @@
 import { ChevronDown } from 'lucide-react'
 import { AssetTable } from '../../components/AssetTable'
-import { cardClasses, panelClasses, panelEnterStyle } from '../../components/ui'
+import { panelClasses, panelEnterStyle, panelSurface } from '../../components/ui'
 import { formatMoney } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
 import type { UnifiedRow } from '../../utils/assetTable'
@@ -21,7 +21,7 @@ export function DustSection({ rows, value, total, threshold, compact, open, onTo
   const currency = useCurrency()
   if (rows.length === 0) return null
   return (
-    <section aria-label="Polvo" className={panelClasses(cardClasses('none', 'overflow-clip'))} style={panelEnterStyle(index)}>
+    <section aria-label="Polvo" className={panelClasses(panelSurface('none', 'overflow-clip'))} style={panelEnterStyle(index)}>
       <button type="button" onClick={onToggle} aria-expanded={open}
         className="w-full px-5 py-3 flex items-center justify-between gap-3 hover:bg-overlay/3 transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60">
         <span className="flex items-center gap-2">
