@@ -245,6 +245,10 @@ export interface AssetMetadata {
   icon_coingecko_id?: string | null
   icon_id_source?: 'auto' | 'manual' | null
   icon_source?: 'coingecko' | 'local' | 'flag' | null
+  /** Uso (#450): operaciones con el activo. */
+  operaciones?: number
+  /** Último fallo de precio (#450), en memoria del backend. */
+  ultimo_fallo?: { source: 'coingecko' | 'coinpaprika' | 'okx'; reason: 'sin-respuesta' | 'sin-precio'; at: string } | null
 }
 
 export interface ManualTxPreview {
@@ -705,6 +709,8 @@ export const portfolioApi = {
   createAsset: (data: Partial<AssetMetadata>) => api.post<{ success: boolean; symbol: string }>('/settings/assets', data),
   updateAsset: (symbol: string, data: Partial<AssetMetadata>) => api.put<{ success: boolean }>(`/settings/assets/${symbol}`, data),
   // Corrige el logo (#449): id de CoinGecko solo para el logo; null vuelve al automático.
+  // Reintenta los precios de CoinGecko y del respaldo (#450); 429 si se repite antes de un minuto.
+  retryPrices: () => api.post<{ success: boolean }>('/settings/assets/retry-prices', {}),
   setAssetIconId: (symbol: string, id: string | null) => api.put<{ success: boolean }>(`/settings/assets/${encodeURIComponent(symbol)}/icon-id`, { id }),
   deleteAsset: (symbol: string) => api.delete<{ success: boolean }>(`/settings/assets/${symbol}`),
   detectPairs: (symbol: string) => api.post<AssetMetadata>(`/settings/assets/${symbol}/detect`, {}),

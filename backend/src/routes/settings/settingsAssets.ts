@@ -8,7 +8,8 @@ import { updateCoinGeckoId } from '../../modules/prices/coingecko';
 import { MAX_LENGTH_SHORT } from '../../modules/validation/textLength';
 import { sendZodError, validateSymbol } from './settingsShared';
 import { sendInternalError } from '../../middleware/errorHandler';
-import { requestLivePriceResync } from '../../modules/prices/liveFeed';
+import { requestLivePriceResync, retryPrices } from '../../modules/prices/liveFeed';
+import { getPriceFailure } from '../../modules/prices/priceFailures';
 import { syncAssetIcons } from '../../modules/assets/assetIcons';
 import { isValidCoinGeckoId } from '../../modules/assets/iconSources';
 
@@ -41,6 +42,7 @@ router.get('/assets', async (_req: Request, res: Response) => {
             am.binance_eur_pair, am.binance_usdt_pair, am.binance_btc_pair,
             am.price_source, am.auto_detected, am.last_price_check,
             am.icon_coingecko_id, am.icon_id_source, ai.source AS icon_source,
+            (SELECT COUNT(*) FROM transactions t WHERE t.asset = am.symbol)::int AS operaciones,
             EXISTS (SELECT 1 FROM fifo_lots fl WHERE fl.asset = am.symbol AND NOT fl.is_closed) AS en_cartera
      FROM asset_metadata am
      LEFT JOIN asset_icons ai ON ai.symbol = am.symbol AND ai.status = 'ok'
@@ -49,7 +51,22 @@ router.get('/assets', async (_req: Request, res: Response) => {
   // Precio en vivo y su fuente (#337), para filtrar los activos sin precio o de respaldo.
   res.json(result.rows.map((r: { symbol: string }) => ({
     ...r, precio_actual: getLivePrice(r.symbol), fuente_actual: getLiveSource(r.symbol),
+    // Último fallo de precio (#450), en memoria del backend.
+    ultimo_fallo: getPriceFailure(r.symbol),
   })));
+});
+
+// ── POST /api/settings/assets/retry-prices ─────────────────────────────────
+// Reintenta los precios de CoinGecko y del respaldo (#450); limitado a una vez
+// por minuto: si es pronto, 429 con lo que falta.
+router.post('/assets/retry-prices', async (_req: Request, res: Response) => {
+  const r = await retryPrices();
+  if (!r.started) {
+    res.setHeader('Retry-After', String(Math.ceil(r.retryInMs / 1000)));
+    res.status(429).json({ error: 'Espera un momento antes de volver a reintentar', retry_in_ms: r.retryInMs });
+    return;
+  }
+  res.json({ success: true });
 });
 
 // ── POST /api/settings/assets ──────────────────────────────────────────────

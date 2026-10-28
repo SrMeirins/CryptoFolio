@@ -1,5 +1,4 @@
 import { fieldClasses } from '../../../components/ui/classes'
-import { formatNumber, formatSignificant } from '../../../utils/format'
 import { T } from '../../../utils/colors'
 export const SOURCE_META: Record<string, { label: string; color: string }> = {
   // Tokens del tema (#444): siguen el modo claro u oscuro.
@@ -12,18 +11,7 @@ export const SOURCE_META: Record<string, { label: string; color: string }> = {
   unknown:    { label: 'Sin precio',  color: T.negative },
 }
 
-/** Precio en EUR con el símbolo detrás, como el resto de la app (#444). */
-export function fmtPrice(p: number): string {
-  const eur = (n: string) => `${n}\u00a0€`
-  if (p >= 10000)   return eur(formatNumber(p, 2, 2))
-  if (p >= 1)       return eur(formatNumber(p, 4, 4))
-  if (p >= 0.001)   return eur(formatNumber(p, 6, 6))
-  // Muy pequeños (#337): cifras significativas, nunca notación científica.
-  return eur(formatSignificant(p, 5))
-}
 
-export type SortKey = 'name' | 'price' | 'source'
-export type SortDir = 'asc' | 'desc'
 
 // Compartido por AssetEditPanel y AddAssetDialog — antes declarado por
 // duplicado e idéntico en ambos.

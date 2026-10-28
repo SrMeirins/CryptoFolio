@@ -1,6 +1,7 @@
 import { db } from '../../db/client';
 import { priceSourcesOffline } from './offlineMode';
 import { precioActualRespaldo } from './respaldo/cascada';
+import { recordPriceFailure } from './priceFailures';
 import { PRICE_ALIASES } from './priceAliases';
 import { WebSocket } from 'ws';
 import { getOrDetectPairInfo, loadPairCache, getPairInfo } from './pairDetector';
@@ -165,6 +166,8 @@ async function refreshCoinGeckoOnlyPrices(): Promise<void> {
   } catch (e) {
     console.error('[PRICES] Error refrescando precios CoinGecko-only:', (e as Error).message);
   }
+  // Último fallo por activo (#450): los de solo CoinGecko que se quedan sin precio en este ciclo.
+  for (const symbol of soloCoinGecko) if (!resueltos.has(symbol)) recordPriceFailure(symbol, 'coingecko', 'sin-precio');
   // Tras CoinGecko (también si ha fallado): lo que siga sin precio, al respaldo (#337).
   await refrescarRespaldo(soloCoinGecko.filter(s => !resueltos.has(s)))
     .catch(e => console.error('[PRICES] Error en el respaldo de precios:', (e as Error).message));
@@ -199,8 +202,10 @@ async function refrescarRespaldo(soloCoinGeckoSinPrecio: readonly string[]): Pro
     try {
       const r = await precioActualRespaldo(symbol, usdtEur);
       if (r) { setLivePrice(symbol, r.precio); liveSources.set(symbol, r.fuente); }
+      else recordPriceFailure(symbol, 'coinpaprika', 'sin-precio');
     } catch (e) {
       console.warn(`[PRICES] Respaldo sin precio para ${symbol}:`, (e as Error).message);
+      recordPriceFailure(symbol, 'coinpaprika', 'sin-respuesta');
     }
   }
 }
@@ -422,6 +427,20 @@ export function syncLivePriceSubscriptions(): Promise<void> {
 
 // Versión "dispara y olvida" para rutas y procesos que modifican activos: no
 // bloquea la respuesta y registra el error sin propagarlo.
+// Reintento a mano desde Ajustes (#450): vuelve a pedir los precios de CoinGecko
+// y del respaldo sin esperar al ciclo, como mucho una vez por minuto.
+const RETRY_COOLDOWN_MS = 60_000;
+let lastRetryAt = 0;
+export async function retryPrices(): Promise<{ started: boolean; retryInMs: number }> {
+  const wait = lastRetryAt + RETRY_COOLDOWN_MS - Date.now();
+  if (wait > 0) return { started: false, retryInMs: wait };
+  lastRetryAt = Date.now();
+  ultimoRespaldo.clear();
+  requestLivePriceResync();
+  await refreshCoinGeckoOnlyPrices();
+  return { started: true, retryInMs: RETRY_COOLDOWN_MS };
+}
+
 export function requestLivePriceResync(): void {
   syncLivePriceSubscriptions().catch(e =>
     console.error('[WS] Error resincronizando suscripciones de precios:', (e as Error).message));
