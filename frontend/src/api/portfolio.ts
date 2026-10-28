@@ -1,3 +1,4 @@
+import type { NotificationCategory } from '../constants/notifications'
 import { api } from './client'
 import type { Currency } from '../utils/format'
 // Tipos del módulo fiscal detallado (pages/fiscal/) — viven ahí por ser
@@ -676,6 +677,13 @@ export interface Notification {
   count?: number
 }
 
+/** Aviso con su estado según las preferencias (#447): silenciado por categoría o descartado. */
+export interface NotificationWithState extends Notification {
+  categoryKey: NotificationCategory | null
+  muted: boolean
+  dismissed: boolean
+}
+
 export const portfolioApi = {
   getLots: () => api.get<FifoLot[]>('/fifo/lots'),
   getLockedAmounts: () => api.get<LockedAmount[]>('/fifo/locked'),
@@ -818,6 +826,10 @@ export const portfolioApi = {
     netInvested: number
   }>(`/fifo/eur-flow?currency=${currency}`),
   getNotifications: () => api.get<Notification[]>('/settings/notifications'),
+  // Todos los avisos con su estado, para el resumen por categoría de Ajustes (#447).
+  getAllNotifications: () => api.get<NotificationWithState[]>('/settings/notifications?incluir=todas'),
+  // Descartar hasta que cambie su contenido (#447); sin ids, todos los visibles.
+  dismissNotifications: (ids?: string[]) => api.post<{ dismissed: number }>('/settings/notifications/dismiss', ids ? { ids } : {}),
   // Cobertura temporal de las importaciones y revisiones de huecos (#328).
   getCobertura: () => api.get<CoberturaExchange[]>('/imports/cobertura'),
   revisarCobertura: (data: { exchange: 'binance' | 'bitvavo'; tipo: 'hueco' | 'pendiente'; desde: string; hasta: string }) =>

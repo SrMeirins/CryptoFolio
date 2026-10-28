@@ -19,8 +19,11 @@ async function fakeConfig(page: Page) {
       await route.fulfill({ json: { success: true } })
       return
     }
-    const real = await route.fetch()
-    await route.fulfill({ response: real, json: { ...(await real.json()), ...overrides } })
+    // Si la página navega a mitad de la petición, la respuesta ya no existe: se ignora.
+    try {
+      const real = await route.fetch()
+      await route.fulfill({ response: real, json: { ...(await real.json()), ...overrides } })
+    } catch { /* navegación en curso */ }
   })
   return writes
 }
