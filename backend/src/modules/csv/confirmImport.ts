@@ -140,6 +140,7 @@ export async function importTransactionsPhase(
   emit('importing', `✓ ${importResult.newTransactions} transacciones nuevas importadas (${importResult.duplicateRows} duplicadas ignoradas)`);
   if (importResult.editedKept > 0) emit('importing', `${importResult.editedKept} transacciones editadas a mano se han respetado`);
   if (importResult.originalRowsCompleted > 0) emit('importing', `${importResult.originalRowsCompleted} filas originales completadas en importaciones anteriores`);
+  if (importResult.orphanBuysReclassified > 0) emit('importing', `${importResult.orphanBuysReclassified} compras sin pago en el CSV pasan de airdrop a compra`);
   if (importResult.errors.length > 0) {
     emit(
       'importing',

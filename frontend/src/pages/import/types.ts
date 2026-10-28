@@ -74,6 +74,8 @@ export interface DepositReview {
   amount: number
   historicalPrice: number | null
   existingInDb?: boolean
+  /** «compra»: compra con fiat cuyo pago en EUR no está en el CSV (#435). */
+  kind?: 'deposito' | 'compra'
 }
 
 export interface PreviewResult {

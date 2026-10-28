@@ -136,20 +136,24 @@ export function interpretBuyCryptoWithFiat(
   const receivedRow = group.find((r) => r.change > 0);
 
   if (!paidRow || !receivedRow) {
-    // Fila huérfana: solo hay la cripto recibida sin contrapartida de pago.
-    // Puede ocurrir cuando el export no incluye el período del pago EUR.
-    // Se abre lote al precio de mercado del día como mejor estimación.
+    // Compra huérfana (#435): solo consta la cripto recibida, sin la fila del
+    // pago (pagada con tarjeta o banco fuera del saldo de Binance, o fuera del
+    // periodo exportado). Es una compra, nunca un rendimiento: se pide el coste
+    // en la revisión al importar, con el precio de mercado del día como propuesta.
     const row = group.find((r) => r.change > 0) ?? group[0];
     return {
-      operationType: 'AIRDROP',
+      operationType: 'BUY',
       timestamp,
       asset: row.coin,
       amount: abs(row.change),
       amountNet: abs(row.change),
+      costAsset: 'EUR',
       account,
-      notes: `${row.operation} — contrapartida EUR no disponible en este export (verificar coste manualmente)`,
+      notes: `${row.operation}: el pago en EUR no está en el CSV (pagado fuera del saldo de Binance); coste indicado en la revisión o a precio de mercado`,
       subTradeCount: 1,
       rawRowHashes: hashes,
+      needsCostReview: true,
+      orphanFiatBuy: true,
     };
   }
 
