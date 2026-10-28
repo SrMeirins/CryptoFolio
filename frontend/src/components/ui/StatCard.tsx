@@ -33,6 +33,8 @@ export interface StatCardProps {
   chip?: ReactNode
   /** Serie real para la mini gráfica; sin serie, no hay gráfica. */
   series?: readonly number[]
+  /** Contenido propio al pie en lugar de la mini gráfica (p. ej. una barra de composición). */
+  footer?: ReactNode
   help?: ReactNode
   /** Nombre accesible del botón de ayuda; por defecto «Cómo se calcula <título>». */
   helpLabel?: string
@@ -63,7 +65,7 @@ function Value({ value, format, tone, flash, compact }: Pick<StatCardProps, 'val
 
 export function StatCard(props: StatCardProps) {
   const {
-    title, icon: Icon, visual, color, value, format, loading, chip, series, help, helpLabel,
+    title, icon: Icon, visual, color, value, format, loading, chip, series, footer, help, helpLabel,
     onSelect, active = false, expands = false, actionLabel, compact = false, delay = 0,
   } = props
   const text = typeof value === 'number' && format ? format(value) : String(value)
@@ -85,7 +87,8 @@ export function StatCard(props: StatCardProps) {
         {loading ? <span className={`block ${compact ? 'mt-2 h-5' : 'mt-3 h-7'} w-32 skeleton rounded-lg`} /> : <Value {...props} />}
         {/* Sobre el botón que cubre la tarjeta: el chip puede ser un control propio. */}
         {chip && !loading && <span className="relative z-10 block mt-1.5 w-fit">{chip}</span>}
-        {series && series.length > 1 && !loading && (
+        {footer && !loading && <span className="block mt-2.5">{footer}</span>}
+        {!footer && series && series.length > 1 && !loading && (
           <span className="block mt-2 h-7">
             <Sparkline values={series} days={series.length} color={color} decorative className="w-full h-7" />
           </span>

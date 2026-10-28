@@ -80,4 +80,10 @@ describe('StatCard (#410)', () => {
     expect(html).toContain('data-ring="1"')
     expect(html).not.toContain('color-mix(in srgb, var(--cf-info) 16%')
   })
+
+  it('pie propio en lugar de la mini gráfica (#417)', () => {
+    const html = render({ footer: <span data-pie="1" />, series: [1, 2, 3] })
+    expect(html).toContain('data-pie="1"')
+    expect(html).not.toContain('<svg viewBox="0 0 100 28"')
+  })
 })
