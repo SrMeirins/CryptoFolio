@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateRate, validateThreshold } from './settingsValidation'
+import { validateDust, validateRate, validateThreshold } from './settingsValidation'
 
 // Validación de los ajustes de Fiscal (#445).
 describe('validateThreshold', () => {
@@ -22,5 +22,17 @@ describe('validateRate', () => {
 
   it('rechaza 0, negativos, más de 100 y texto', () => {
     for (const raw of ['0', '-1', '100.1', '', 'x', '1e2']) expect(validateRate(raw).ok).toBe(false)
+  })
+})
+
+describe('validateDust (#446)', () => {
+  it('acepta de 0 a 1000 con coma o punto y hasta dos decimales', () => {
+    expect(validateDust('0')).toEqual({ ok: true, value: 0 })
+    expect(validateDust('2,5')).toEqual({ ok: true, value: 2.5 })
+    expect(validateDust('1000')).toEqual({ ok: true, value: 1000 })
+  })
+
+  it('rechaza negativos, más de 1000, tres decimales y texto', () => {
+    for (const raw of ['-1', '1000.01', '1,555', '', 'x']) expect(validateDust(raw).ok).toBe(false)
   })
 })

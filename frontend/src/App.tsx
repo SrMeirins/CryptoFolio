@@ -14,8 +14,11 @@ import { useApplyTheme } from './hooks/useTheme'
 import { usePrivacyStore } from './store/privacyStore'
 import { useTimezoneStore } from './store/timezoneStore'
 import { useTimezoneSync } from './hooks/useTimezoneSync'
+import { useStartupPreferences } from './hooks/useStartupPreferences'
 
 function RoutedContent() {
+  // Privacidad al abrir y página de inicio (#446); necesita el router.
+  useStartupPreferences()
   const { pathname } = useLocation()
   // Modo privacidad (#254): al cambiarlo se vuelven a pintar las páginas, que
   // formatean los importes con el estado nuevo.

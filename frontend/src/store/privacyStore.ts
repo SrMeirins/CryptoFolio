@@ -21,6 +21,8 @@ setAmountsHidden(initial)
 interface PrivacyState {
   hidden: boolean
   toggle: () => void
+  /** Fija el modo (#446: privacidad al abrir). */
+  setHidden: (hidden: boolean) => void
 }
 
 export const usePrivacyStore = create<PrivacyState>(set => ({
@@ -31,4 +33,9 @@ export const usePrivacyStore = create<PrivacyState>(set => ({
     saveHidden(hidden)
     return { hidden }
   }),
+  setHidden: hidden => {
+    setAmountsHidden(hidden)
+    saveHidden(hidden)
+    set({ hidden })
+  },
 }))
