@@ -21,3 +21,12 @@ export function validateRate(raw: string): Validation<number> {
   if (value <= 0 || value > 100) return { ok: false, error: 'Mayor que 0 y hasta 100' }
   return { ok: true, value }
 }
+
+/** Umbral de polvo en euros (#446): de 0 a 1.000, con coma o punto y hasta dos decimales. */
+export function validateDust(raw: string): Validation<number> {
+  const text = raw.trim().replace(',', '.')
+  if (!/^\d{1,4}(\.\d{1,2})?$/.test(text)) return { ok: false, error: 'Introduce un importe con hasta dos decimales' }
+  const value = Number(text)
+  if (value > 1000) return { ok: false, error: 'Hasta 1.000 €' }
+  return { ok: true, value }
+}

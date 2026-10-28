@@ -6,6 +6,7 @@ import { NOTIFICATION_ROUTES, NOTIFICATION_TYPE_META } from '../../constants/not
 import { CurrencyToggle } from '../../components/CurrencyToggle'
 import { ThemeSelector } from '../../components/ThemeSelector'
 import { TimezoneSetting } from './TimezoneSetting'
+import { PreferencesCard } from './PreferencesCard'
 import { alpha } from '../../utils/colors'
 import { APP_VERSION } from '../../constants/appInfo'
 import { buttonClasses, iconButtonClasses } from '../../components/ui'
@@ -77,8 +78,11 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
         description={<>Moneda en la que se muestran precios, valores y P&amp;L. El dólar se toma del precio de USDT en cada fecha. La sección Fiscal se muestra siempre en EUR. También puedes cambiarla desde la barra superior.</>}
         action={<CurrencyToggle size="md" onChanged={(prev, next) => confirm('moneda', `Importes en ${next}`, () => setCurrency(prev))} />} />
 
+      {/* Preferencias (#446) */}
+      <PreferencesCard index={3} />
+
       {/* Notificaciones */}
-      <SettingsCard index={3} icon={Bell} title="Notificaciones del sistema" description="Alertas activas que requieren tu atención."
+      <SettingsCard index={4} icon={Bell} title="Notificaciones del sistema" description="Alertas activas que requieren tu atención."
         action={notifications.length > 0 && (
           <button type="button" onClick={dismissAll}
             className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
@@ -143,7 +147,7 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
       </SettingsCard>
 
       {/* Acerca de */}
-      <SettingsCard index={4} icon={Info} title="Acerca de CryptoFolio">
+      <SettingsCard index={5} icon={Info} title="Acerca de CryptoFolio">
         <div className="space-y-2 text-xs text-fg-subtle">
           <div className="flex items-center justify-between">
             <span>Versión</span>

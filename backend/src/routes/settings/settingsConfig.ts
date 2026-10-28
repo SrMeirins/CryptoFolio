@@ -5,6 +5,7 @@ import { MAX_LENGTH_SHORT } from '../../modules/validation/textLength';
 import { DISPLAY_CURRENCIES } from '../../modules/fiat/displayCurrency';
 import { sendZodError } from './settingsShared';
 import { VIEWS_KEY } from '../../modules/history/savedViews';
+import { preferenceSchemas } from '../../modules/settings/preferences';
 import { DEFAULT_TIMEZONE, TIMEZONE_CONFIG_KEY, getTimezoneInfo, invalidateTimezoneCache, isValidTimeZone } from '../../modules/time/appTimezone';
 
 const router = Router();
@@ -29,6 +30,8 @@ const restrictedValues: Record<string, z.ZodType<string>> = {
   // Zona horaria (#388): una zona IANA conocida (lista blanca) o «» para volver
   // a la de la variable APP_TIMEZONE o la de por defecto.
   [TIMEZONE_CONFIG_KEY]: z.string().refine(v => v === '' || isValidTimeZone(v), 'timezone debe ser una zona horaria IANA válida (p. ej. Europe/Madrid)'),
+  // Preferencias de General (#446): umbral de polvo, privacidad al abrir y página de inicio.
+  ...preferenceSchemas,
 };
 
 // ── GET /api/settings/config ───────────────────────────────────────────────
