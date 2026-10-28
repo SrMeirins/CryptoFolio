@@ -5,7 +5,7 @@ import { portfolioApi, type AssetMetadata } from '../../../api/portfolio'
 import { Toggle } from '../../../components/Toggle'
 import { PairInputsGrid } from './PairInputsGrid'
 import { CoinGeckoIdEditor } from './CoinGeckoIdEditor'
-import { T } from '../../../utils/colors'
+import { T, alpha } from '../../../utils/colors'
 import { buttonClasses, fieldClasses } from '../../../components/ui'
 import { formatNumber } from '../../../utils/format'
 
@@ -62,10 +62,10 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
   return (
     <div className="border-t border-border bg-background-tertiary/20 px-4 py-4 space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-fg-muted">Editar pares — <span className="mono">{asset.symbol}</span></p>
+        <p className="text-xs font-medium text-fg-muted">Editar pares de <span className="mono">{asset.symbol}</span></p>
         <button type="button" onClick={handleDetect} disabled={detecting}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-          style={{ backgroundColor: '#6366f118', color: T.brand }}>
+          style={{ backgroundColor: alpha(T.brand, 9), color: T.brand }}>
           {detecting ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}
           Auto-detectar
         </button>
@@ -96,7 +96,7 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
         {testResult && (
           <div className={`flex items-center gap-2 text-xs ${testResult.exists ? 'text-positive' : 'text-negative'}`}>
             {testResult.exists
-              ? <><CheckCircle size={12} /> Existe — precio: <span className="mono font-medium">{formatNumber(testResult.price ?? 0, 6, 6)} EUR</span></>
+              ? <><CheckCircle size={12} /> Existe, precio: <span className="mono font-medium">{formatNumber(testResult.price ?? 0, 6, 6)} EUR</span></>
               : <><XCircle size={12} /> Par no encontrado en Binance</>
             }
           </div>

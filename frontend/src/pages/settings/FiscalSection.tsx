@@ -7,6 +7,9 @@ import { SettingsCard } from './SettingsCard'
 import { buttonClasses } from '../../components/ui'
 import { formatNumber } from '../../utils/format'
 
+/** Importe entero en euros con el símbolo detrás (#444). */
+const formatEurInteger = (n: number) => `${formatNumber(n, 0)}\u00a0€`
+
 export function FiscalSection() {
   const { data: config = {} } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
   const queryClient = useQueryClient()
@@ -103,18 +106,18 @@ export function FiscalSection() {
                   ? 'border-brand bg-brand/10 text-brand-ink'
                   : 'border-border bg-background-tertiary text-fg-muted hover:border-fg-subtle hover:text-fg'
               }`}>
-              €{formatNumber(preset, 0)}
+              {formatEurInteger(preset)}
             </button>
           ))}
           <span className="text-xs text-fg-subtle ml-1">o introduce un valor personalizado:</span>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-0 bg-background-tertiary border border-border rounded-lg overflow-hidden focus-within:border-brand transition-colors">
-            <span className="px-3 py-2.5 text-sm text-fg-subtle border-r border-border bg-background-secondary">€</span>
-            <input type="text" inputMode="numeric" value={thresholdInput}
+            <input type="text" inputMode="numeric" value={thresholdInput} aria-label="Umbral del Modelo 721 en euros"
               onChange={e => setThresholdInput(e.target.value.replace(/[^0-9]/g, ''))}
               className="px-3 py-2.5 text-sm mono bg-transparent text-fg w-32 focus:outline-hidden"
               placeholder="50000" />
+            <span className="px-3 py-2.5 text-sm text-fg-subtle border-l border-border bg-background-secondary">€</span>
           </div>
           <button type="button" onClick={saveThreshold}
             disabled={savingThreshold || thresholdInput === String(threshold) || !thresholdInput}
@@ -123,19 +126,19 @@ export function FiscalSection() {
           </button>
           {thresholdInput === String(threshold) && threshold > 0 && (
             <div className="flex items-center gap-1.5 text-xs text-positive">
-              <Check size={12} /> Guardado: €{formatNumber(threshold, 0)}
+              <Check size={12} /> Guardado: {formatEurInteger(threshold)}
             </div>
           )}
         </div>
         <p className="text-xs text-fg-subtle flex items-start gap-1.5">
           <AlertCircle size={11} className="shrink-0 mt-0.5" />
-          El umbral legal vigente es €50.000. Modifícalo solo si la normativa cambia.
+          El umbral legal vigente es de {formatEurInteger(50000)}. Modifícalo solo si la normativa cambia.
         </p>
       </SettingsCard>
 
       {/* Tramos IRPF */}
       <SettingsCard
-        title="Tramos IRPF — base del ahorro"
+        title="Tramos IRPF de la base del ahorro"
         description="Porcentajes aplicables a las ganancias patrimoniales. Los tramos en euros son fijos por ley."
         action={
           <button type="button" onClick={resetTramos}
@@ -204,7 +207,6 @@ export function FiscalSection() {
       >
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-brand/40 bg-brand/6">
-            <span className="text-lg">🇪🇸</span>
             <div>
               <p className="text-sm font-medium">España</p>
               <p className="text-xs text-fg-subtle">IRPF · Modelo 100 · Modelo 721</p>

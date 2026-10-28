@@ -4,9 +4,10 @@ import { portfolioApi } from '../../api/portfolio'
 import { RefreshCw, Trash2, Zap, Download } from 'lucide-react'
 import { useToast } from '../../hooks/useToast'
 import { useRunFifo } from '../../hooks/useRunFifo'
-import { T } from '../../utils/colors'
+import { T, alpha } from '../../utils/colors'
 import { cardClasses, buttonClasses, fieldClasses } from '../../components/ui'
 import { formatNumber } from '../../utils/format'
+import { backupFilename } from '../../constants/appInfo'
 
 const CONFIRM_WORD = 'CONFIRMAR'
 
@@ -48,7 +49,7 @@ export function DatosSection() {
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href     = url
-      a.download = `cryptotracker-backup-${new Date().toISOString().slice(0, 10)}.json`
+      a.download = backupFilename()
       a.click()
       URL.revokeObjectURL(url)
     } finally { setExporting(false) }
@@ -76,7 +77,7 @@ export function DatosSection() {
     { label: 'Importaciones',    value: stats?.imports,      color: T.warning },
     { label: 'Precios en caché', value: stats?.priceCache,   color: T.info },
     { label: 'Wallets',          value: stats?.wallets,      color: T.purple },
-    { label: 'Activos',          value: stats?.assets,       color: '#ec4899' },
+    { label: 'Activos',          value: stats?.assets,       color: T.negative },
   ]
 
   return (
@@ -134,7 +135,7 @@ export function DatosSection() {
               )}
               <button type="button" onClick={handleRunFifo} disabled={runningFifo}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                style={{ backgroundColor: '#6366f118', color: T.brand }}>
+                style={{ backgroundColor: alpha(T.brand, 9), color: T.brand }}>
                 {runningFifo ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
                 Ejecutar
               </button>
