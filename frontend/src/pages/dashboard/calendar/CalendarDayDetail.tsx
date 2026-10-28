@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { X } from 'lucide-react'
 import { useCurrencyQuery } from '../../../hooks/useCurrencyQuery'
 import { dayDetailQuery } from '../../../queries/currencyQueries'
@@ -9,7 +10,8 @@ import { longDate, signedMoney, signedPct, toneOf } from './format'
 
 // Detalle del día elegido (#216), bajo la cuadrícula: P&L, %, valor al cierre,
 // flujos de capital y los activos que más aportaron o restaron (efecto precio),
-// con el resto en «Operaciones del día y otros».
+// con el resto en «Operaciones del día y otros». Marco con el color del signo
+// del día, como las celdas (#412).
 
 const TOP = 3
 // Por debajo de esto, la diferencia es redondeo de céntimos, no operaciones del día.
@@ -54,7 +56,9 @@ export function CalendarDayDetail({ date, day, onClose }: { date: string; day: C
   return (
     <section aria-label={`Detalle del ${longDate(date)}`} aria-live="polite"
       onKeyDown={e => { if (e.key === 'Escape') onClose() }}
-      className="mt-3 rounded-xl border border-border bg-background-tertiary/40 p-4 animate-page-in">
+      style={{ '--card': pnl > 0 ? 'var(--cf-positive)' : pnl < 0 ? 'var(--cf-negative)' : 'var(--cf-fg-subtle)', '--heat': '0.3' } as CSSProperties}
+      className="heat-frame mt-3 rounded-2xl p-px animate-page-in">
+      <div className="heat-body rounded-[15px] p-4">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
           <h4 className="text-sm font-semibold text-fg first-letter:uppercase">{longDate(date)}{day?.live ? ' · en vivo' : ''}</h4>
@@ -85,6 +89,7 @@ export function CalendarDayDetail({ date, day, onClose }: { date: string; day: C
           <ContributionList title="Más restaron" items={losses} currency={currency} />
         </div>
       )}
+      </div>
     </section>
   )
 }

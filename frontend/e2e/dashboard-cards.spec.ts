@@ -47,3 +47,22 @@ for (const theme of ['dark', 'light'] as const) {
     expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`vista Año del P&L diario sin violaciones de axe (tema ${theme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })
+    await page.goto('/')
+    await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
+    const year = page.getByRole('radio', { name: 'Año', exact: true })
+    await year.waitFor({ timeout: 15_000 }).catch(() => {})
+    test.skip(await year.count() === 0, 'Calendario aún sin históricos')
+    await year.click()
+    await expect(year).toHaveAttribute('aria-checked', 'true')
+    // Al pulsar, la página se desplaza y el ratón puede quedar sobre el mapa de
+    // movimientos, que atenúa el resto: se aparta para medir el estado de reposo.
+    await page.mouse.move(0, 0)
+    await page.waitForTimeout(400)
+    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+    expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
+  })
+}

@@ -1,13 +1,17 @@
-import { useRef, useState, type KeyboardEvent } from 'react'
+import { useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { WEEKDAYS, type CalendarDay } from '../../../utils/pnlCalendar'
 import { gridMove } from '../../../utils/calendarStats'
-import { heatBackground } from '../../../utils/topMovers'
+import { heatVars } from '../../../utils/topMovers'
 import type { Currency } from '../../../utils/format'
-import { longDate, signedMoney, signedPct, toneOf } from './format'
+import { longDate, signedMoney, signedPct } from './format'
 
-// Cuadrícula del mes (#167, #216): un botón por día con su P&L y %, color
-// continuo según la magnitud, columna con el total de cada semana y navegación
-// con flechas (patrón grid del WAI-ARIA: un solo día en el orden de tabulación).
+// Cuadrícula del mes (#167, #216): un botón por día con su P&L y %, columna con
+// el total de cada semana y navegación con flechas (patrón grid del WAI-ARIA: un
+// solo día en el orden de tabulación). Estilo de StatCard (#412): borde
+// degradado y brillo con la intensidad del día, cifra con el color del signo.
+
+/** Color de la cifra sobre el fondo tintado: las variantes «ink» mantienen el contraste. */
+const inkOf = (n: number) => (n > 0 ? 'text-positive-ink' : n < 0 ? 'text-negative-ink' : 'text-fg-muted')
 
 const WEEKDAY_NAMES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
 
@@ -25,7 +29,7 @@ function useChangeDirection(value: number): 'up' | 'down' | null {
 function LiveFigure({ pnl, currency, tone }: { pnl: number; currency: Currency; tone: string }) {
   const dir = useChangeDirection(pnl)
   return (
-    <span key={pnl} className={`block ${dir ? 'live-tick' : ''} ${tone}`}>
+    <span key={pnl} className={`${dir ? 'live-tick' : ''} ${tone}`}>
       {signedMoney(pnl, currency)}
     </span>
   )
@@ -56,10 +60,9 @@ function DayCell({ date, data, today, maxAbs, currency, selected, focusable, hig
     : !data ? `${longDate(date)}: sin datos`
     : !data.complete ? `${longDate(date)}: calculando`
     : `${longDate(date)}${data.live ? ' (hoy desde las 00:00, en vivo)' : ''}: ${signedMoney(data.pnl, currency)}${data.pct === null ? '' : `, ${signedPct(data.pct)}`}`
-  const barWidth = hasData && maxAbs > 0 ? Math.min(100, (Math.abs(data.pnl) / maxAbs) * 100) : 0
 
   return (
-    <td role="gridcell" className="p-[3px] align-top" aria-selected={selected}>
+    <td role="gridcell" className="px-1 py-[3px] align-top" aria-selected={selected}>
       <button
         type="button"
         ref={el => register(date, el)}
@@ -72,35 +75,39 @@ function DayCell({ date, data, today, maxAbs, currency, selected, focusable, hig
         onMouseLeave={() => onHover(null)}
         onFocus={() => onHover(date)}
         onBlur={() => onHover(null)}
-        // Mosaico (#234): color con la escala del mapa de calor, sin borde, relieve suave.
-        style={hasData ? { background: heatBackground(data.pnl, maxAbs) } : undefined}
-        className={`group relative w-full ${compact ? 'h-8' : 'h-[68px]'} rounded-xl overflow-hidden text-left transition-[transform,box-shadow,opacity] duration-150
+        // Marco de intensidad (#412): borde y brillo según la escala del mapa de calor.
+        style={hasData ? heatVars(data.pnl, maxAbs) as CSSProperties : undefined}
+        className={`group relative block w-full ${compact ? 'h-7' : 'h-14'} rounded-xl text-left transition-[transform,box-shadow,opacity] duration-150
           focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand motion-reduce:transition-none
-          ${hasData ? 'cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_1px_2px_rgba(0,0,0,0.2)] hover:-translate-y-px hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_6px_16px_rgba(0,0,0,0.3)]' : 'cursor-default'}
+          ${hasData ? 'heat-frame p-px cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_10px_22px_-14px_var(--card)]' : 'cursor-default'}
           ${!hasData && !future ? 'bg-overlay/3' : ''} ${future ? 'opacity-35' : ''}
           ${selected ? 'ring-2 ring-brand' : highlighted ? 'ring-2 ring-fg/40' : ''}
           ${data?.live && !selected ? 'calendar-live' : ''}`}
       >
-        <span aria-hidden="true" className={`absolute top-1.5 left-2 text-[11px] mono ${hasData ? 'text-fg' : 'text-fg-subtle'}`}>{dayNumber}</span>
+        {hasData && <span aria-hidden="true" className="heat-body absolute inset-px rounded-[11px]" />}
+        <span aria-hidden="true" className={`absolute top-1.5 left-2 text-[11px] mono ${hasData ? 'text-fg-muted' : 'text-fg-subtle'}`}>{dayNumber}</span>
         {data?.live && <span aria-hidden="true" className="absolute top-1.5 right-2 text-[10px] font-semibold text-brand">● hoy</span>}
         {hasData ? (
-          <span aria-hidden="true" className="absolute inset-x-2 bottom-2.5 flex flex-col">
+          <span aria-hidden="true" className="absolute inset-x-2 bottom-2 flex items-baseline gap-1.5 overflow-hidden">
             {data.live
-              ? <LiveFigure pnl={data.pnl} currency={currency} tone="text-[13px] font-semibold mono text-fg truncate" />
-              : <span className="text-[13px] font-semibold mono text-fg truncate">{signedMoney(data.pnl, currency)}</span>}
-            {/* El % aparece al pasar el cursor o al enfocar; siempre está en el detalle y en el nombre accesible. */}
-            <span className="text-[11px] mono text-fg h-0 opacity-0 group-hover:h-auto group-hover:opacity-100 group-focus-visible:h-auto group-focus-visible:opacity-100 transition-opacity">
+              ? <LiveFigure pnl={data.pnl} currency={currency} tone={`shrink-0 text-[13px] font-semibold mono ${inkOf(data.pnl)}`} />
+              : <span className={`shrink-0 text-[13px] font-semibold mono ${inkOf(data.pnl)}`}>{signedMoney(data.pnl, currency)}</span>}
+            {/* El % aparece a la derecha al pasar el cursor o al enfocar; siempre está en el detalle y en el nombre accesible. */}
+            <span className="min-w-0 truncate text-[11px] mono text-fg-muted opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">
               {data.pct === null ? '—' : signedPct(data.pct)}
             </span>
           </span>
-        ) : !future && !compact && <span aria-hidden="true" className="absolute inset-x-0 bottom-3 text-center text-xs mono text-fg-subtle">—</span>}
-        {/* Barra proporcional a la magnitud del día */}
-        {hasData && (
-          <span aria-hidden="true" className={`absolute left-0 bottom-0 h-[3px] ${data.pnl >= 0 ? 'bg-positive' : 'bg-negative'}`} style={{ width: `${barWidth}%` }} />
-        )}
+        ) : !future && !compact && <span aria-hidden="true" className="absolute inset-x-0 bottom-2 text-center text-xs mono text-fg-subtle">—</span>}
       </button>
     </td>
   )
+}
+
+/** Total de la semana (#412): píldora con el color de su signo. */
+function WeekTotal({ value, currency }: { value: number; currency: Currency }) {
+  const frame = value > 0 ? 'bg-positive/10 border-positive/25 text-positive-ink'
+    : value < 0 ? 'bg-negative/10 border-negative/25 text-negative-ink' : 'border-border text-fg-subtle'
+  return <span className={`inline-block px-1 py-px rounded-md border text-[10px] leading-4 mono font-semibold whitespace-nowrap ${frame}`}>{signedMoney(value, currency)}</span>
 }
 
 export function CalendarMonthGrid({ weeks, byDate, totals, today, maxAbs, currency, selected, onSelect, caption, hovered, onHover }: {
@@ -133,14 +140,14 @@ export function CalendarMonthGrid({ weeks, byDate, totals, today, maxAbs, curren
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto overflow-y-hidden py-0.5">
       <table role="grid" className="w-full table-fixed min-w-148" aria-label={caption}>
         <thead>
           <tr>
             {WEEKDAYS.map((d, i) => (
               <th key={d} scope="col" abbr={WEEKDAY_NAMES[i]} className="text-xs font-medium text-fg-subtle pb-1">{d}</th>
             ))}
-            <th scope="col" abbr="total de la semana" className="text-xs font-medium text-fg-subtle pb-1 w-20">Semana</th>
+            <th scope="col" abbr="total de la semana" className="text-xs font-medium text-fg-subtle pb-1 w-22">Semana</th>
           </tr>
         </thead>
         <tbody>
@@ -152,9 +159,9 @@ export function CalendarMonthGrid({ weeks, byDate, totals, today, maxAbs, curren
                     highlighted={hovered === date} onHover={onHover} compact={week.every(d => !d || d > today)}
                     register={(d, el) => { refs.current[d] = el }} />
                 : <td key={`vacío-${i}`} className="p-0.5" aria-hidden="true" />)}
-              <td className="p-0.5 align-middle text-right">
+              <td className="py-0.5 pl-1 align-middle text-right">
                 {totals[wi] !== null && (
-                  <span className={`text-xs mono font-medium ${toneOf(totals[wi] ?? 0)}`}>{signedMoney(totals[wi] ?? 0, currency)}</span>
+                  <WeekTotal value={totals[wi] ?? 0} currency={currency} />
                 )}
               </td>
             </tr>

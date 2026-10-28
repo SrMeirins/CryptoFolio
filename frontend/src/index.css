@@ -348,6 +348,26 @@
 }
 .calendar-live { animation: calendarLive 2.4s ease-in-out infinite; }
 
+/* Marco de intensidad del calendario (#412): el estilo de StatCard con el
+   borde degradado y el brillo de la esquina proporcionales a --heat (0 a 1),
+   para que el mapa de calor se siga leyendo de un vistazo. */
+.heat-frame {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--card) calc(12% + var(--heat, 1) * 48%), transparent),
+    color-mix(in srgb, var(--card) calc(4% + var(--heat, 1) * 6%), transparent) 55%,
+    color-mix(in srgb, var(--card) calc(8% + var(--heat, 1) * 24%), transparent));
+}
+.heat-swatch {
+  background: color-mix(in srgb, var(--card) calc(var(--heat, 1) * 42%), var(--cf-bg-card));
+  border: 1px solid color-mix(in srgb, var(--card) calc(20% + var(--heat, 1) * 50%), transparent);
+}
+/* Fondo con la intensidad del día en toda la celda (más color cuanto mayor el
+   importe) y un brillo en la esquina, como StatCard. */
+.heat-body {
+  background-color: color-mix(in srgb, var(--card) calc(var(--heat, 1) * 42%), var(--cf-bg-card));
+  background-image: radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--card) calc(var(--heat, 1) * 22%), transparent), transparent 70%);
+}
+
 /* Entrada escalonada de los paneles (#232); el retraso lo da panelEnterStyle(). */
 @keyframes panelIn {
   from { opacity: 0; transform: translateY(8px); }
