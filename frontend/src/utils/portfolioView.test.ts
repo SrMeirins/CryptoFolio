@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FifoLot, FiatBalance } from '../api/portfolio'
-import { assetView, breakEvenDistance, filterByPnl, rowPnl } from './portfolioView'
+import { assetView, breakEvenDistance, filterByPnl, rowPnl, walletParam } from './portfolioView'
 import { portfolioSections } from './portfolioSections'
 
 // Vista «Por activo» y filtros de Portfolio (#271).
@@ -72,5 +72,12 @@ describe('vistas Por activo y Por wallet', () => {
     const byWallet = w.sections.reduce((s, x) => s + sum(x.rows), 0) + w.dustValue
     expect(byAsset).toBeCloseTo(w.total, 9)
     expect(byWallet).toBeCloseTo(w.total, 9)
+  })
+})
+
+describe('walletParam (#448)', () => {
+  it('acepta un UUID y descarta cualquier otro valor', () => {
+    expect(walletParam('3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d')).toBe('3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d')
+    for (const raw of [null, '', '../settings', '1 OR 1=1', '3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d-x', '<script>']) expect(walletParam(raw)).toBeNull()
   })
 })

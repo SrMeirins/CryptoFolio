@@ -767,7 +767,10 @@ export const portfolioApi = {
     address: string
   }) => api.post<{ wallet: { id: string; name: string; color: string }; addressId: string }>('/wallets/link-address', data),
   createWallet: (data: Record<string, unknown>) => api.post<{ id: string }>('/wallets', data),
-  updateWallet: (id: string, data: Record<string, unknown>) => api.put<{ success: boolean }>(`/wallets/${id}`, data),
+  // Solo se cambian los campos enviados (#448); notes: null las vacía.
+  updateWallet: (id: string, data: { name: string; type?: string; color?: string; notes?: string | null }) => api.put<{ success: boolean }>(`/wallets/${id}`, data),
+  // Uso de cada wallet para Ajustes (#448): operaciones y última actividad.
+  getWalletSummary: () => api.get<{ wallet_id: string; operations: number; last_activity: string | null }[]>('/wallets/summary'),
   deleteWallet: (id: string) => api.delete<{ success: boolean }>(`/wallets/${id}`),
   createAddress: (walletId: string, data: Record<string, unknown>) => api.post<{ id: string }>(`/wallets/${walletId}/addresses`, data),
   updateAddress: (walletId: string, addressId: string, data: Record<string, unknown>) => api.put<{ success: boolean }>(`/wallets/${walletId}/addresses/${addressId}`, data),

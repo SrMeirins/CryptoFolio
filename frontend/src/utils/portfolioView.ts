@@ -45,3 +45,8 @@ export function filterByPnl(rows: readonly UnifiedRow[], filter: PnlFilter, pric
     return pnl !== null && (filter === 'gain' ? pnl > 0 : pnl < 0)
   })
 }
+
+/** Wallet de ?wallet= (#448): solo un UUID; cualquier otro valor se ignora. */
+export function walletParam(raw: string | null): string | null {
+  return raw && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw) ? raw : null
+}
