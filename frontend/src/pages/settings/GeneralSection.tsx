@@ -1,14 +1,20 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { portfolioApi } from '../../api/portfolio'
-import { Bell, BellOff, X, ArrowRight, Wrench } from 'lucide-react'
+import { Bell, BellOff, X, ArrowRight, Wrench, Palette, Coins, Info } from 'lucide-react'
 import { NOTIFICATION_ROUTES, NOTIFICATION_TYPE_META } from '../../constants/notifications'
 import { CurrencyToggle } from '../../components/CurrencyToggle'
 import { ThemeSelector } from '../../components/ThemeSelector'
 import { TimezoneSetting } from './TimezoneSetting'
 import { alpha } from '../../utils/colors'
 import { APP_VERSION } from '../../constants/appInfo'
-import { cardClasses, buttonClasses, iconButtonClasses } from '../../components/ui'
+import { buttonClasses, iconButtonClasses } from '../../components/ui'
+import { SettingsCard } from './SettingsCard'
+import { SavedMark } from './SavedMark'
+import { useSettingFeedback } from '../../hooks/useSettingFeedback'
+import { useSetTheme } from '../../hooks/useTheme'
+import { useDisplayCurrency } from '../../hooks/useDisplayCurrency'
+import { THEME_LABELS } from '../../utils/theme'
 
 const NOTIFICATION_LABELS: Record<string, string> = {
   'no-price':            'Ir a Activos',
@@ -20,6 +26,10 @@ const NOTIFICATION_LABELS: Record<string, string> = {
 export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  // Guardado al momento con Deshacer (#445).
+  const { saved, confirm } = useSettingFeedback()
+  const setTheme = useSetTheme()
+  const { setCurrency } = useDisplayCurrency()
 
   function goTo(dest: string) {
     if (dest.startsWith('/settings?tab=')) {
@@ -52,52 +62,29 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-4 max-w-3xl">
 
       {/* Tema (#197/#198) */}
-      <div className={cardClasses('md')}>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h3 className="font-semibold text-sm">Tema</h3>
-            <p className="text-xs text-fg-subtle mt-0.5 leading-relaxed">
-              Oscuro, claro o el mismo que el sistema operativo. También puedes alternar entre claro y oscuro desde la barra superior.
-            </p>
-          </div>
-          <ThemeSelector />
-        </div>
-      </div>
+      <SettingsCard index={0} icon={Palette} title="Tema" status={<SavedMark stamp={saved} id="tema" />}
+        description="Oscuro, claro o el mismo que el sistema operativo. También puedes alternar entre claro y oscuro desde la barra superior."
+        action={<ThemeSelector onChanged={(prev, next) => confirm('tema', `Tema ${THEME_LABELS[next].toLowerCase()}`, () => setTheme(prev))} />} />
 
       {/* Zona horaria (#390) */}
-      <TimezoneSetting />
+      <TimezoneSetting index={1} />
 
       {/* Moneda de visualización (#176) */}
-      <div className={cardClasses('md')}>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h3 className="font-semibold text-sm">Moneda de visualización</h3>
-            <p className="text-xs text-fg-subtle mt-0.5 leading-relaxed">
-              Moneda en la que se muestran precios, valores y P&amp;L. El dólar se toma del precio de USDT
-              en cada fecha. La sección Fiscal se muestra siempre en EUR. También puedes cambiarla desde la barra superior.
-            </p>
-          </div>
-          <CurrencyToggle size="md" />
-        </div>
-      </div>
+      <SettingsCard index={2} icon={Coins} title="Moneda de visualización" status={<SavedMark stamp={saved} id="moneda" />}
+        description={<>Moneda en la que se muestran precios, valores y P&amp;L. El dólar se toma del precio de USDT en cada fecha. La sección Fiscal se muestra siempre en EUR. También puedes cambiarla desde la barra superior.</>}
+        action={<CurrencyToggle size="md" onChanged={(prev, next) => confirm('moneda', `Importes en ${next}`, () => setCurrency(prev))} />} />
 
       {/* Notificaciones */}
-      <div className={cardClasses('md', 'space-y-4')}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-sm">Notificaciones del sistema</h3>
-            <p className="text-xs text-fg-subtle mt-0.5">Alertas activas que requieren tu atención.</p>
-          </div>
-          {notifications.length > 0 && (
-            <button type="button" onClick={dismissAll}
-              className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
-              <BellOff size={11} /> Descartar todas
-            </button>
-          )}
-        </div>
+      <SettingsCard index={3} icon={Bell} title="Notificaciones del sistema" description="Alertas activas que requieren tu atención."
+        action={notifications.length > 0 && (
+          <button type="button" onClick={dismissAll}
+            className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
+            <BellOff size={11} aria-hidden="true" /> Descartar todas
+          </button>
+        )}>
 
         {notifications.length === 0 ? (
           <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-positive/8 border border-positive/20">
@@ -153,11 +140,10 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
             })}
           </div>
         )}
-      </div>
+      </SettingsCard>
 
       {/* Acerca de */}
-      <div className={cardClasses('md', 'space-y-3')}>
-        <h3 className="font-semibold text-sm">Acerca de CryptoFolio</h3>
+      <SettingsCard index={4} icon={Info} title="Acerca de CryptoFolio">
         <div className="space-y-2 text-xs text-fg-subtle">
           <div className="flex items-center justify-between">
             <span>Versión</span>
@@ -179,7 +165,7 @@ export function GeneralSection({ onNavigate }: { onNavigate?: (tab: string) => v
         <p className="text-xs text-fg-subtle pt-2 border-t border-border">
           Esta herramienta genera información orientativa. Consulta siempre con un asesor fiscal antes de presentar tu declaración.
         </p>
-      </div>
+      </SettingsCard>
 
     </div>
   )

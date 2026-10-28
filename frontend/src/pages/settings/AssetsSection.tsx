@@ -109,7 +109,7 @@ export function AssetsSection() {
   return (
     <div className="h-full flex flex-col">
       {/* Header fijo */}
-      <div className="shrink-0 px-6 pt-6 pb-4 space-y-3 border-b border-border">
+      <div className="shrink-0 pb-4 space-y-3 border-b border-border">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-medium">Activos y precios</h2>
@@ -188,7 +188,7 @@ export function AssetsSection() {
       </div>
 
       {/* Lista con scroll */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto py-4 pr-1 space-y-4">
         {isLoading && <div className="py-8 text-center text-fg-subtle text-sm">Cargando...</div>}
 
         {unknown.length > 0 && (

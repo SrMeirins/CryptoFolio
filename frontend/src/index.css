@@ -389,6 +389,22 @@
 .sparkline-reveal { transform-box: fill-box; transform-origin: left; transform: scaleX(0); animation: sparkReveal 0.9s ease-out 0.15s forwards; }
 @keyframes sparkReveal { to { transform: scaleX(1); } }
 
+/* ── Ajustes (#445) ────────────────────────────────────────────────────────
+   Cambio de sección con fundido y desplazamiento corto; marca de guardado que
+   aparece y se desvanece. Quietos con «Reducir movimiento» (regla global). */
+@keyframes settingsSectionIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.settings-section-in { animation: settingsSectionIn 0.24s ease-out both; }
+@keyframes savedMark {
+  0%   { opacity: 0; transform: scale(0.8); }
+  15%  { opacity: 1; transform: scale(1); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+.saved-mark { animation: savedMark 2.2s ease-out both; }
+/* Sin movimiento, la marca se queda fija en lugar de desvanecerse al instante. */
+@media (prefers-reduced-motion: reduce) { .saved-mark { animation: none; } }
+.settings-nav-indicator { transition: transform 0.25s ease-out, width 0.25s ease-out, height 0.25s ease-out; }
+
 /* ── Paneles grandes en versión ligera (#255, #419) ──────────────────────
    Una sola clase para gráficos y tablas: brillo suave en la esquina con el
    acento del panel (--panel, marca por defecto) y borde iluminado al pasar el
