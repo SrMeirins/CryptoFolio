@@ -133,6 +133,10 @@ describe('routes/settings — config y stats', () => {
     it('los descartes solo se escriben con su propia API', async () => {
       expect((await put('notifications_dismissed', '{}')).status).toBe(400);
     });
+
+    it('los tipos IRPF ya no se escriben aquí, sino por ejercicio (#452)', async () => {
+      expect((await put('irpf_tramos_tipos', '[19,21,23,27,30]')).status).toBe(400);
+    });
   });
 
   describe('GET /stats', () => {

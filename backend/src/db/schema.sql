@@ -415,6 +415,18 @@ CREATE TABLE price_close_daily (
 -- Logos de los activos descargados por el backend y servidos desde el propio
 -- origen; 'missing' = sin logo disponible (se reintenta más adelante).
 -- ============================================================
+-- Tramos IRPF por ejercicio (#452): solo los tipos cambiados a mano; cada
+-- ejercicio parte de la escala oficial del ahorro de su año (escalasAhorro.ts).
+CREATE TABLE irpf_escalas (
+  ejercicio   INTEGER PRIMARY KEY CHECK (ejercicio BETWEEN 2000 AND 2100),
+  tipos       NUMERIC(5, 2)[] NOT NULL,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_irpf_escalas_tipos CHECK (
+    cardinality(tipos) BETWEEN 1 AND 10
+    AND 0 < ALL(tipos) AND 100 >= ALL(tipos)
+  )
+);
+
 CREATE TABLE asset_icons (
   symbol        TEXT PRIMARY KEY,
   status        TEXT NOT NULL,
