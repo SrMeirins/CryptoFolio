@@ -3,7 +3,7 @@ import { db } from '../../db/client';
 import { ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
 import { Exchange, parseExchangeCsv, validateExchangeCsv } from './exchanges';
-import { refreshLivePrices } from '../prices/binance';
+import { getHistoricalPriceEur, refreshLivePrices } from '../prices/binance';
 import { requestLivePriceResync } from '../prices/liveFeed';
 import { getOrDetectPairInfo } from '../prices/pairDetector';
 import { enrichIncomeTransactionsWithPrices } from './importerEnrichment';
@@ -11,6 +11,7 @@ import { buildTransferDestinationMap, resolveWalletId, resolveDestinationWalletI
 import { destinosDeRetiros } from './retiradas/destinosDb';
 import { aplicarComisionRetiro, conComision } from './retiradas/comision';
 import { completeOriginalRows, originalRowsByHash } from './originalRows';
+import { reclassifyOrphanBuy, reclassifyOrphanBuys } from './orphanBuys';
 
 export { previewCsvFile } from './importerPreview';
 export type { UnknownOperationSample, DepositReview, PreviewResult } from './importerPreview';
@@ -24,6 +25,8 @@ export interface ImportResult {
   editedKept: number;
   /** Filas ya guardadas a las que se ha añadido su fila original (#374). */
   originalRowsCompleted: number;
+  /** Compras con fiat sin pago que estaban como airdrop y pasan a compra (#435). */
+  orphanBuysReclassified: number;
   ignoredRows: number;
   errors: string[];
   warnings: string[];
@@ -70,11 +73,15 @@ export async function importCsvFile(
     // El mismo archivo no vuelve a importar nada, pero completa las filas
     // originales de una importación anterior a #374.
     const completed = await completeOriginalRows(db, originals);
-    if (completed > 0) {
-      onStatus?.(`Archivo ya importado: ${completed} filas originales completadas`);
+    // … y reclasifica sus compras huérfanas guardadas como airdrop (#435).
+    const reclassified = await reclassifyOrphanBuys(db, parseResult.transactions);
+    if (completed > 0 || reclassified > 0) {
+      if (completed > 0) onStatus?.(`Archivo ya importado: ${completed} filas originales completadas`);
+      if (reclassified > 0) onStatus?.(`${reclassified} compras sin pago en el CSV pasan de airdrop a compra`);
       return {
         importId: existing.rows[0].id, totalRows: parseResult.stats.totalRows, newTransactions: 0,
         duplicateRows: parseResult.transactions.length, editedKept: 0, originalRowsCompleted: completed,
+        orphanBuysReclassified: reclassified,
         ignoredRows: parseResult.stats.ignoredRows, errors: [], warnings: validation.warnings, validation,
       };
     }
@@ -162,6 +169,8 @@ export async function importCsvFile(
     const upgradeRows: { transactionId: string; newOpType: string }[] = [];
     // Retiros ya importados sin dirección que ahora la traen (p. ej. al añadir el historial de retiradas).
     const destinoRows: { transactionId: string; key: string }[] = [];
+    // Compras con fiat sin su pago importadas antes como airdrop (#435): pasan a compra.
+    const orphanBuyRows: { transactionId: string; notes: string | undefined }[] = [];
 
     for (const tx of parseResult.transactions) {
       processed++;
@@ -174,12 +183,14 @@ export async function importCsvFile(
           const completaDestino = !!meta && destinos.has(existingHash);
           const reclasifica = !!meta && meta.destination_pending && meta.operation_type === 'WITHDRAW'
             && (tx.operationType === 'LOST' || tx.operationType === 'GIFT_SENT');
+          const compraHuerfana = !!meta && !!tx.orphanFiatBuy && meta.operation_type === 'AIRDROP';
           // Una importada editada a mano no se toca (#378).
           if (meta?.editada) {
-            if (completaDestino || reclasifica) editedKept++;
+            if (completaDestino || reclasifica || compraHuerfana) editedKept++;
           } else if (meta) {
             if (completaDestino) destinoRows.push({ transactionId: meta.transaction_id, key: existingHash });
             if (reclasifica) upgradeRows.push({ transactionId: meta.transaction_id, newOpType: tx.operationType });
+            if (compraHuerfana) orphanBuyRows.push({ transactionId: meta.transaction_id, notes: tx.notes });
           }
         }
         onProgress?.(processed, totalTx, tx.asset, tx.operationType);
@@ -208,9 +219,13 @@ export async function importCsvFile(
         }
       }
 
-      const depositPriceOverride = tx.needsCostReview
+      let depositPriceOverride = tx.needsCostReview
         ? (depositCosts[tx.rawRowHashes[0]] ?? null)
         : null;
+      // Compra huérfana sin coste indicado (#435): el precio de mercado del día, como propuso la revisión.
+      if (tx.orphanFiatBuy && depositPriceOverride === null) {
+        try { depositPriceOverride = (await getHistoricalPriceEur(tx.asset, tx.timestamp)) || null; } catch { /* sin precio */ }
+      }
 
       // Comisión de red del historial de retiradas de Binance (#335): llega a destino
       // el importe sin ella y la comisión es una disposición en el FIFO, como en Bitvavo.
@@ -328,6 +343,15 @@ export async function importCsvFile(
       }
     }
 
+    // Compras huérfanas importadas antes como airdrop (#435): pasan a compra con EUR.
+    // Su coste es el indicado en la revisión (ya aplicado por id) o, si no, el
+    // valor de mercado con el que se importaron.
+    let orphanBuysReclassified = 0;
+    for (const { transactionId, notes } of orphanBuyRows) {
+      if (await reclassifyOrphanBuy(client, transactionId, notes ?? null)) orphanBuysReclassified++;
+    }
+    if (orphanBuysReclassified > 0) onStatus?.(`${orphanBuysReclassified} compras sin pago en el CSV pasan de airdrop a compra`);
+
     // Completa la dirección de retiros ya importados sin ella (#320); nunca pisa una existente.
     for (const { transactionId, key } of destinoRows) {
       const d = destinos.get(key);
@@ -394,6 +418,7 @@ export async function importCsvFile(
       duplicateRows,
       editedKept,
       originalRowsCompleted,
+      orphanBuysReclassified,
       ignoredRows: parseResult.stats.ignoredRows,
       errors: parseResult.errors.map((e) => e.message),
       warnings: validation.warnings,

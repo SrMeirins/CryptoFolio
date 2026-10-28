@@ -78,6 +78,8 @@ export interface ParsedTransaction {
   subTradeCount: number;
   rawRowHashes: string[];
   needsCostReview?: boolean;  // depósito externo: coste de adquisición desconocido
+  /** Compra con fiat cuya fila de pago no está en el CSV (#435): coste a revisar, nunca rendimiento. */
+  orphanFiatBuy?: boolean;
 }
 
 // Lo que devuelve el parser completo
