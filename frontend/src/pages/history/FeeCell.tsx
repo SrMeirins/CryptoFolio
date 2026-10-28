@@ -16,6 +16,14 @@ export function FeeCell({ tx, currency, paidElsewhere = false, verbose = false }
 }) {
   const s = feeSummary(tx, currency)
   const included = Number(tx.included_fee_amount ?? 0)
+  // Comisión dentro del precio (#431): el exchange no la desglosa; se dice, sin cifra.
+  if (s.count === 0 && included <= 0 && tx.fee_in_price) {
+    return (
+      <span className="text-xs text-fg-subtle" title={`${tx.fee_in_price}: el exchange no desglosa la comisión`}>
+        {verbose ? `Incluida en el precio (${tx.fee_in_price}); el exchange no la desglosa` : 'en el precio'}
+      </span>
+    )
+  }
   if (s.count === 0 && included <= 0) return <span className="text-fg-subtle text-xs">—</span>
   // Incluida en el coste por el exchange (#415): se ve, atenuada, pero no se suma otra vez.
   const includedLine = included > 0 && tx.included_fee_asset && (

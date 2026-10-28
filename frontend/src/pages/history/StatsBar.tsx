@@ -77,6 +77,9 @@ export function StatsBar({ totals, series, currency, filtered, margin, onInclude
         <dd className="mono text-right">{count(totals.fees_included.ops, 'comisión', 'comisiones')} · {money(totals.fees_included.value)}</dd>
       </dl>
       <p>Las incluidas en el coste ya forman parte del precio de compra: se muestran, pero no se descuentan otra vez.</p>
+      {totals.fees_in_price_ops > 0 && (
+        <p>Además, {count(totals.fees_in_price_ops, 'operación lleva', 'operaciones llevan')} la comisión dentro del precio (Convert, compras con tarjeta…): el exchange no la desglosa y no está en la cifra.</p>
+      )}
     </> },
   ]
 

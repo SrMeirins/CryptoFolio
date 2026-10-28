@@ -5,6 +5,7 @@ import {
   BUY_TYPES, FEE_TYPES, FIAT_ASSETS, INCOME_TYPES, MARGIN_ACCOUNTS, OTHER_OUT_TYPES, SELL_TYPES, STABLECOINS, TRANSFER_TYPES, sqlList,
 } from './operationGroups';
 import { cardSql, marginSql, type SummaryCard } from './summaryCards';
+import { feeInPriceSql } from './feeInPrice';
 import { chartPeriod, todayIn, type ChartPeriod } from './statsPeriod';
 
 // Estadísticas del Historial sobre lo filtrado (#376): tarjetas, gráfico de
@@ -45,6 +46,8 @@ export interface HistoryStats {
     fee_ops: number; fees: Money; fees_sin_valor: number
     /** De ellas, incluidas en el coste de la compra por el exchange (#415). */
     fees_included: { ops: number; value: Money }
+    /** Con la comisión incluida en el precio, sin cifra en el CSV (#431): no suman. */
+    fees_in_price_ops: number
   }
   chart: ChartPeriod & { buckets: { periodo: string; ops: ByCategory; valor: { EUR: ByCategory; USD: ByCategory } }[] }
   /** Importe de cada tarjeta por periodo del gráfico (#407), para sus mini gráficas. */
@@ -123,6 +126,7 @@ export async function getHistoryStats(
          ${COUNTERPART} AS counterpart,
          (SELECT SUM(c.gain_loss_eur) FROM fifo_lot_consumptions c WHERE c.consuming_transaction_id = v.id) AS gp_eur,
          ${marginSql('v', marginAccountsP)} AS is_margin,
+         ${feeInPriceSql('v')} IS NOT NULL AS fee_in_price,
          DATE_TRUNC('${unit}', v.timestamp AT TIME ZONE ${tzP}) AS bucket,
          ${grouped ? 'EXISTS (SELECT 1 FROM visible s WHERE s.id = v.id)' : 'TRUE'} AS shown
        FROM filtered v
@@ -165,6 +169,7 @@ export async function getHistoryStats(
           'withdrawn_usd',    COALESCE(SUM(value_eur * usd) FILTER (WHERE withdrawn), 0),
           'deposited_eur',    COALESCE(SUM(value_eur) FILTER (WHERE deposited), 0),
           'deposited_usd',    COALESCE(SUM(value_eur * usd) FILTER (WHERE deposited), 0),
+          'fee_in_price_ops', COUNT(*) FILTER (WHERE fee_in_price),
           'income_ops',       COUNT(*) FILTER (WHERE cat = 'ingresos'),
           'income_eur',       COALESCE(SUM(value_eur) FILTER (WHERE cat = 'ingresos'), 0),
           'income_usd',       COALESCE(SUM(value_eur * usd) FILTER (WHERE cat = 'ingresos'), 0),
@@ -251,6 +256,7 @@ export async function getHistoryStats(
       income_ops: num(t.income_ops), income: money(t.income_eur, t.income_usd), income_sin_valor: num(t.income_sin_valor),
       fee_ops: num(r.fees.ops), fees: money(r.fees.eur, r.fees.usd), fees_sin_valor: num(r.fees.sin_valor),
       fees_included: { ops: num(r.fees.included_ops), value: money(r.fees.included_eur, r.fees.included_usd) },
+      fees_in_price_ops: num(t.fee_in_price_ops),
     },
     chart: { ...period, buckets: [...buckets.values()] },
     series: (r.series as Record<string, unknown>[]).map(x => ({

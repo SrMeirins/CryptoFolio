@@ -293,6 +293,8 @@ export interface Transaction {
   /** Comisión que el exchange ya incluye en el coste (#415); solo informativa. */
   included_fee_asset?: string | null
   included_fee_amount?: string | null
+  /** Operación de origen si la comisión va incluida en el precio y el CSV no la desglosa (#431). */
+  fee_in_price?: string | null
   wallet_id: string
   wallet_name: string
   wallet_color: string
@@ -424,6 +426,8 @@ export interface HistoryStats {
     fee_ops: number; fees: Money; fees_sin_valor: number
     /** De ellas, incluidas en el coste de la compra (#415). */
     fees_included: { ops: number; value: Money }
+    /** Con la comisión incluida en el precio, sin cifra en el CSV (#431): no suman. */
+    fees_in_price_ops: number
   }
   chart: {
     granularity: 'month' | 'year'; from: string; to: string
