@@ -17,7 +17,7 @@ import { navIcon } from '../constants/navigation'
 import { portfolioSubtitle } from '../utils/panelSubtitles'
 import { portfolioSections } from '../utils/portfolioSections'
 import { portfolioInventory } from '../utils/portfolioInventory'
-import { assetView, filterByPnl, type PnlFilter, type PortfolioView } from '../utils/portfolioView'
+import { assetView, filterByPnl, walletParam, type PnlFilter, type PortfolioView } from '../utils/portfolioView'
 import { isSearchShortcut, readDensity, readDustOpen, readView, saveDensity, saveDustOpen, saveView, type Density } from '../utils/portfolioPrefs'
 
 const VIEW_OPTIONS = [
@@ -62,7 +62,8 @@ export function Portfolio() {
   const [density, setDensity] = useState<Density>(readDensity)
   const [dustOpen, setDustOpen] = useState(readDustOpen)
   // Wallet elegida en las tarjetas (#270): filtra la tabla; null = todas.
-  const [walletFilter, setWalletFilter] = useState<string | null>(null)
+  // ?wallet=<id> llega desde Ajustes (#448); solo se acepta un UUID.
+  const [walletFilter, setWalletFilter] = useState<string | null>(() => walletParam(params.get('wallet')))
   // Vista de la tabla (recordada) y filtro de resultado (#271).
   const [view, setView] = useState<PortfolioView>(readView)
   const [pnlFilter, setPnlFilter] = useState<PnlFilter>('all')
