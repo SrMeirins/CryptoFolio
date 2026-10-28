@@ -68,3 +68,10 @@ export function summaryTiles(summary: PeriodSummary | null, intraday: boolean, c
   }
   return [extreme('best'), extreme('worst'), drawdown]
 }
+
+/** Chip de la mini tarjeta: el % del día y su fecha, o la duración de la caída. */
+export function tileChip(tile: SummaryTile): string | null {
+  if (tile.value === '—') return null
+  if (tile.id === 'drawdown') return tile.badge
+  return [tile.badge, tile.detail].filter(Boolean).join(' · ') || null
+}

@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { portfolioApi } from '../api/portfolio'
 import { formatMoney, formatMoneyCompact, formatPercent } from '../utils/format'
-import { type Change24h } from '../components/MetricCard'
+import { type Change24h } from '../components/Change24hChip'
 import { PortfolioSummaryCards } from '../components/PortfolioSummaryCards'
 import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
 import { useDisplayMarket } from '../hooks/useDisplayMarket'
@@ -24,7 +25,7 @@ import { PageHeader, panelClasses, panelEnterStyle } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 import { dashboardSubtitle } from '../utils/panelSubtitles'
 import { useNow } from '../hooks/useNow'
-import { valueSparkline } from '../utils/sparkline'
+import { pnlSparkline, returnSparkline, valueSparkline } from '../utils/sparkline'
 
 export function Dashboard() {
   // Precios en la moneda de visualización (#177): en USD sin USDT aún, vacíos.
@@ -76,6 +77,25 @@ export function Dashboard() {
     () => (preparacion.listo && allPnl?.currency === currency ? valueSparkline(allPnl.days, hasPrices ? totalValue : null) : []),
     [preparacion.listo, allPnl, currency, hasPrices, totalValue],
   )
+  // P&L y Rentabilidad (#412): la misma serie diaria, sin peticiones nuevas.
+  const trendDays = preparacion.listo && allPnl?.currency === currency ? allPnl.days : null
+  const pnlTrend = useMemo(() => (trendDays ? pnlSparkline(trendDays, hasPrices ? totalPnl : null) : []), [trendDays, hasPrices, totalPnl])
+  const returnTrend = useMemo(() => (trendDays ? returnSparkline(trendDays) : []), [trendDays])
+
+  // Destinos de las tarjetas (#412). Rentabilidad baja al gráfico de evolución
+  // y le pasa el foco, para que el teclado y el lector sigan el salto.
+  const navigate = useNavigate()
+  const evolutionRef = useRef<HTMLDivElement>(null)
+  const targets = {
+    portfolio: () => navigate('/portfolio'),
+    evolution: () => {
+      const el = evolutionRef.current
+      if (!el) return
+      el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+      el.focus({ preventScroll: true })
+    },
+    withdrawn: () => navigate('/history?tarjeta=retirado'),
+  }
 
   // Variación de 24h en tiempo real con el precio de hace 24h del WebSocket (#147).
   // Se memoriza el cálculo, no el texto: el formato depende de la moneda y del
@@ -127,6 +147,9 @@ export function Dashboard() {
         todayPnl={preparacion.listo ? liveToday?.pnl ?? null : null}
         todayPending={!preparacion.listo}
         valueTrend={valueTrend}
+        pnlTrend={pnlTrend}
+        returnTrend={returnTrend}
+        targets={targets}
         eurFlow={eurFlow}
         valueTooltip={
           <>
@@ -191,7 +214,8 @@ export function Dashboard() {
         <TopMovers lots={lots} />
       </div>
 
-      <div className={panelClasses('rounded-xl')} style={panelEnterStyle(2)}>
+      <div ref={evolutionRef} id="evolucion" tabIndex={-1} role="region" aria-label="Evolución de la cartera"
+        className={panelClasses('rounded-xl scroll-mt-4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60')} style={panelEnterStyle(2)}>
         <EvolutionCard />
       </div>
 

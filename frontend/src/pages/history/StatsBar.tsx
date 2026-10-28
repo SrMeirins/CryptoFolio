@@ -50,7 +50,7 @@ export function StatsBar({ totals, series, currency, filtered, margin, onInclude
         <dt className="text-fg-muted">Retirado</dt><dd className="mono text-right">{money(totals.withdrawn)}</dd>
         <dt className="text-fg-muted">Neto en cripto</dt><dd className="mono text-right">{money(bankNet)}</dd>
       </dl>
-      <p>Sin filtros, el neto coincide con «EUR neto en cripto» del Dashboard.</p>
+      <p>Sin filtros, el neto coincide con «EUR neto» del Dashboard.</p>
     </> },
     { id: 'ventas', value: totals.sold, help: <>
       <p>Valor de lo vendido a fiat o a stablecoin: {count(totals.sells, 'venta', 'ventas')}, con un resultado de {signedMoney(totals.sold_gp[currency], currency)} según el FIFO.</p>

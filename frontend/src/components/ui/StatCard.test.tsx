@@ -60,4 +60,24 @@ describe('StatCard (#410)', () => {
   it('entrada escalonada con su retraso', () => {
     expect(render({ delay: 120 })).toContain('animation-delay:120ms')
   })
+
+  it('clicable: el botón cubre la tarjeta y el chip queda fuera de él, para poder ser un control (#412)', () => {
+    const html = render({ onSelect: () => {}, chip: <button type="button">24 h</button> })
+    expect(html).toMatch(/<button type="button" aria-pressed="false" aria-label="Ingresos: 12,50 €"[^>]*class="absolute inset-px[^"]*"><\/button>/)
+    expect(html).toContain('relative z-10 block mt-1.5 w-fit"><button type="button">24 h</button>')
+  })
+
+  it('si despliega un detalle, aria-expanded en lugar de aria-pressed (#412)', () => {
+    const html = render({ onSelect: () => {}, expands: true, active: true })
+    expect(html).toContain('aria-expanded="true"')
+    expect(html).not.toContain('aria-pressed')
+  })
+
+  it('compacta: menos relleno y cifra menor; un elemento propio sustituye al icono (#412)', () => {
+    const html = render({ compact: true, visual: <svg data-ring="1" /> })
+    expect(html).toContain('px-3 py-2.5')
+    expect(html).toContain('text-[15px]')
+    expect(html).toContain('data-ring="1"')
+    expect(html).not.toContain('color-mix(in srgb, var(--cf-info) 16%')
+  })
 })
