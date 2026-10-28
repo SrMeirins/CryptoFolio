@@ -10,8 +10,10 @@ import { T, alpha } from '../../../utils/colors'
 import { buttonClasses, fieldClasses } from '../../../components/ui'
 import { formatNumber } from '../../../utils/format'
 
-export function AssetEditPanel({ asset, onSaved, onCancel }: {
+export function AssetEditPanel({ asset, onSaved, onCancel, embedded = false }: {
   asset: AssetMetadata; onSaved: () => void; onCancel: () => void
+  /** Dentro del panel lateral (#450): sin el borde ni el fondo de la fila desplegada. */
+  embedded?: boolean
 }) {
   const queryClient = useQueryClient()
   const [eurPair,     setEurPair]     = useState(asset.binance_eur_pair  ?? '')
@@ -61,7 +63,7 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
   const isCoinGeckoSource = asset.price_source === 'coingecko'
 
   return (
-    <div className="border-t border-border bg-background-tertiary/20 px-4 py-4 space-y-4">
+    <div className={embedded ? 'space-y-4' : 'border-t border-border bg-background-tertiary/20 px-4 py-4 space-y-4'}>
       {/* Logo (#449): de dónde sale y corrección solo para el logo */}
       <AssetLogoEditor asset={asset} />
 
