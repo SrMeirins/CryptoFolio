@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState, type KeyboardEvent } from 'react'
 import { Calendar } from 'lucide-react'
 import type { Transaction } from '../../api/portfolio'
-import { cardClasses, tableHeadRowClasses } from '../../components/ui'
+import { tableHeadRowClasses, panelSurface } from '../../components/ui'
 import type { Currency } from '../../utils/format'
 import { fmtDateGroup, localDayKey } from './helpers'
 import { groupsByDay, type SortKey, type SortState } from './sorting'
@@ -63,7 +63,7 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
   }, [transactions, byDay])
 
   return (
-    <div className={cardClasses('none', 'overflow-hidden relative')}>
+    <div className={panelSurface('none', 'overflow-hidden relative')}>
       {skipLink && (
         <a href={skipLink.href} onClick={e => { e.preventDefault(); skipLink.onActivate() }}
           className="sr-only focus:not-sr-only focus:absolute focus:z-10 focus:top-2 focus:left-2 focus:px-3 focus:py-1.5 focus:rounded-lg focus:bg-background-card focus:text-fg focus:text-xs focus:ring-2 focus:ring-brand">

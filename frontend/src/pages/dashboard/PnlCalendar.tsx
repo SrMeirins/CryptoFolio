@@ -8,7 +8,7 @@ import { dailyPnlQuery } from '../../queries/currencyQueries'
 import { localToday } from '../../utils/pnlChart'
 import { addMonths, compareYm, monthGrid, monthLabel, monthRange, monthSummary, ymOf, type YearMonth } from '../../utils/pnlCalendar'
 import { monthStats, weekTotals, yearMonths } from '../../utils/calendarStats'
-import { Button, SegmentedControl, cardClasses, iconButtonClasses, PanelHeader, Skeleton, MonthPicker } from '../../components/ui'
+import { Button, SegmentedControl, iconButtonClasses, PanelHeader, Skeleton, MonthPicker, panelSurface } from '../../components/ui'
 import { CalendarMonthGrid } from './calendar/CalendarMonthGrid'
 import { CalendarStats } from './calendar/CalendarStats'
 import { CalendarLegend } from './calendar/CalendarLegend'
@@ -87,7 +87,7 @@ export function PnlCalendar() {
   const step = (delta: number) => go(view === 'month' ? addMonths(ym, delta) : { year: ym.year + delta, month: ym.month })
 
   return (
-    <div className={cardClasses('none', 'px-5 py-5')}>
+    <div className={panelSurface('none', 'px-5 py-5')}>
       <PanelHeader
         icon={CalendarDays}
         title="P&L diario"

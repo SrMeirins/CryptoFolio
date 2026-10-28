@@ -389,25 +389,19 @@
 .sparkline-reveal { transform-box: fill-box; transform-origin: left; transform: scaleX(0); animation: sparkReveal 0.9s ease-out 0.15s forwards; }
 @keyframes sparkReveal { to { transform: scaleX(1); } }
 
-/* ── Microinteracciones (#255) ─────────────────────────────────────────── */
-/* Brillo de borde con el acento del tema al pasar el cursor o al navegar con
-   teclado dentro del panel (solo foco visible, no al hacer clic). */
-.panel-glow {
-  transition: box-shadow 0.25s ease-out, transform 0.25s ease-out;
+/* ── Paneles grandes en versión ligera (#255, #419) ──────────────────────
+   Una sola clase para gráficos y tablas: brillo suave en la esquina con el
+   acento del panel (--panel, marca por defecto) y borde iluminado al pasar el
+   cursor o al navegar con teclado dentro (solo foco visible). Sin elevación ni
+   borde degradado: eso es de las tarjetas de métricas. */
+.panel-soft {
+  background-image: radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--panel, var(--cf-brand)) 7%, transparent), transparent 45%);
+  transition: border-color 0.25s ease-out, box-shadow 0.25s ease-out;
 }
-.panel-glow:hover,
-.panel-glow:has(:focus-visible) {
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--cf-brand) 32%, transparent),
-    0 10px 28px -14px color-mix(in srgb, var(--cf-brand) 55%, transparent);
-}
-/* Tooltip translúcido del gráfico de evolución: deja intuir la curva detrás. */
-.glass-tooltip {
-  background: color-mix(in srgb, var(--cf-tooltip-bg) 78%, transparent);
-  border: 1px solid color-mix(in srgb, var(--cf-brand) 18%, var(--cf-border));
-  box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.45);
-  backdrop-filter: blur(10px) saturate(1.4);
-  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+.panel-soft:hover,
+.panel-soft:has(:focus-visible) {
+  border-color: color-mix(in srgb, var(--panel, var(--cf-brand)) 38%, var(--cf-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--panel, var(--cf-brand)) 14%, transparent);
 }
 
 /* ── Panel lateral (#272): entra desde la derecha ─────────────────────────── */

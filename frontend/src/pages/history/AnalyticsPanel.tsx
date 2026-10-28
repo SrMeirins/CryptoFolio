@@ -3,7 +3,7 @@ import { BarChart2, ChevronDown, ChevronUp } from 'lucide-react'
 import { STATS_CATEGORIES, type HistoryStats } from '../../api/portfolio'
 import type { Currency } from '../../utils/format'
 import { useChartColors } from '../../hooks/useChartColors'
-import { cardClasses } from '../../components/ui'
+import { panelSurface } from '../../components/ui'
 import { CATEGORY_LABELS, activePeriod, chartPeriodText, periodRange, type ChartMode } from './stats/statsChart'
 import { readAnalyticsOpen, readChartMode, saveAnalyticsOpen, saveChartMode } from './stats/analyticsPrefs'
 import { ActivityChart, type CategoryColors } from './stats/ActivityChart'
@@ -64,7 +64,7 @@ export function AnalyticsPanel({ stats, currency, dateFrom, dateTo, onAssetClick
   }
 
   return (
-    <div className={cardClasses('none', 'overflow-hidden')}>
+    <div className={panelSurface('none', 'overflow-hidden')}>
       <button
         type="button"
         onClick={toggleOpen}

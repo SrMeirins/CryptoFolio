@@ -1,6 +1,6 @@
 import { Calendar, CheckCircle2, TrendingUp, TrendingDown, Coins, ListChecks } from 'lucide-react'
 import { AnimatedNumber } from '../../components/AnimatedNumber'
-import { panelClasses, panelEnterStyle, Skeleton, StatCard } from '../../components/ui'
+import { panelClasses, panelEnterStyle, panelSurface, Skeleton, StatCard } from '../../components/ui'
 import { formatEur, formatNumber, formatPercent, pnlColor } from '../../utils/format'
 import { T } from '../../utils/colors'
 import type { YearComparison } from '../../utils/fiscalHeader'
@@ -24,7 +24,7 @@ function Delta({ value, label, invert = false }: { value: number; label: string;
 
 export function FiscalHeroSkeleton() {
   return (
-    <div className={panelClasses('rounded-2xl border border-border bg-background-card p-6 space-y-4')}>
+    <div className={panelClasses(panelSurface('none', 'rounded-2xl p-6 space-y-4'))}>
       <Skeleton className="h-3 w-40" />
       <Skeleton className="h-10 w-56" />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">{[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-8" />)}</div>
@@ -45,10 +45,11 @@ export function FiscalHero({ summary, cuota, tipoMedio, comparison, aviso, decla
   onOpen?: (filters: Record<string, string>) => void
 }) {
   const neto = summary.netoPatrimonial
-  const tint = neto > 0.005 ? 'from-positive/10' : neto < -0.005 ? 'from-negative/10' : 'from-overlay/5'
+  // Versión ligera de los paneles (#419): el brillo de la esquina toma el color del neto.
+  const panel = neto > 0.005 ? 'var(--cf-positive)' : neto < -0.005 ? 'var(--cf-negative)' : 'var(--cf-fg-subtle)'
   return (
-    <section aria-label={`Resultado fiscal de ${summary.year}`} style={panelEnterStyle(0)}
-      className={panelClasses(`rounded-2xl border border-border bg-background-card bg-linear-to-br ${tint} to-transparent p-6 space-y-5`)}>
+    <section aria-label={`Resultado fiscal de ${summary.year}`} style={{ ...panelEnterStyle(0), '--panel': panel } as React.CSSProperties}
+      className={panelClasses(panelSurface('none', 'rounded-2xl p-6 space-y-5'))}>
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">

@@ -12,7 +12,7 @@ import { localToday } from '../../utils/pnlChart'
 import { filterActivity, groupByDay, localTimeOf, selectRecent, type ActivityFilter } from '../../utils/recentActivity'
 import { activitySubtitle } from '../../utils/panelSubtitles'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import { EmptyState, PanelHeader, SegmentedControl, Skeleton, cardClasses } from '../../components/ui'
+import { EmptyState, PanelHeader, SegmentedControl, Skeleton, panelSurface } from '../../components/ui'
 
 // Actividad reciente (#237): línea de tiempo de los últimos 7 días (máx. 12
 // operaciones; si no hay, las 8 últimas) agrupada por día en hora de Madrid,
@@ -45,7 +45,7 @@ export function RecentActivity() {
   const groups = useMemo(() => groupByDay(filterActivity(items, filter), today), [items, filter, today])
 
   return (
-    <div className={cardClasses('none', 'overflow-hidden')}>
+    <div className={panelSurface('none', 'overflow-hidden')}>
       <PanelHeader
         icon={History}
         title="Actividad reciente"

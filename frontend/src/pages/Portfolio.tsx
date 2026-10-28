@@ -11,7 +11,7 @@ import { usePricesStore } from '../store/pricesStore'
 import { WalletCards } from './portfolio/WalletCards'
 import { WalletSections } from './portfolio/WalletSections'
 import { DustSection } from './portfolio/DustSection'
-import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState, PageHeader, SegmentedControl, Dropdown, cardClasses, panelClasses, panelEnterStyle } from '../components/ui'
+import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState, PageHeader, SegmentedControl, Dropdown, panelClasses, panelEnterStyle, panelSurface } from '../components/ui'
 import { AssetTable } from '../components/AssetTable'
 import { navIcon } from '../constants/navigation'
 import { portfolioSubtitle } from '../utils/panelSubtitles'
@@ -260,7 +260,7 @@ export function Portfolio() {
       ) : (
         <>
           {view === 'asset' ? (
-            <section aria-label="Posiciones" className={panelClasses(cardClasses('none', 'overflow-clip'))} style={panelEnterStyle(1)}>
+            <section aria-label="Posiciones" className={panelClasses(panelSurface('none', 'overflow-clip'))} style={panelEnterStyle(1)}>
               <AssetTable rows={assetRows} portfolioTotal={all.total} compact={compact}
                 onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} onOpen={setDetailAsset} exportName="posiciones"
                 header={<>
