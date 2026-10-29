@@ -11,6 +11,8 @@ export interface ToastItem {
   title: string
   message?: string
   duration?: number
+  /** Acción opcional, p. ej. «Deshacer» (#445); al pulsarla se cierra el aviso. */
+  action?: { label: string; onClick: () => void }
 }
 
 export interface ToastContextValue {

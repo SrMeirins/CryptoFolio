@@ -8,14 +8,17 @@ const router = Router();
 
 const walletCreateBodySchema = z.object({
   name:  shortText('name').min(1, 'name es requerido'),
-  type:  z.enum(WALLET_KINDS, { message: `type debe ser uno de: ${WALLET_KINDS.join(', ')}` }),
-  color: shortText('color').nullish(),
+  type:  z.enum(WALLET_KINDS, { error: `type debe ser uno de: ${WALLET_KINDS.join(', ')}` }),
+  color: shortText('color').regex(/^#[0-9a-fA-F]{6}$/, 'color debe ser un color hexadecimal #RRGGBB').nullish(),
   notes: longText('notes').nullish(),
 });
 
+// Edición (#448): solo se tocan los campos enviados. Antes, editar nombre y
+// color sin enviar las notas las borraba. `type` ya se puede cambiar.
 const walletUpdateBodySchema = z.object({
   name:  shortText('name').min(1, 'name es requerido'),
-  color: shortText('color').nullish(),
+  type:  z.enum(WALLET_KINDS, { error: `type debe ser uno de: ${WALLET_KINDS.join(', ')}` }).optional(),
+  color: shortText('color').regex(/^#[0-9a-fA-F]{6}$/, 'color debe ser un color hexadecimal #RRGGBB').optional(),
   notes: longText('notes').nullish(),
 });
 
@@ -101,6 +104,22 @@ router.get('/', async (_req: Request, res: Response) => {
   res.json(wallets.rows.map(conDiagnosticos));
 });
 
+// ── GET /api/wallets/summary ───────────────────────────────────────────────
+// Uso de cada wallet para Ajustes (#448): operaciones en las que participa,
+// como origen o destino, y la fecha de la última. El valor lo calcula el
+// frontend con los mismos lotes y precios que Portfolio, para que coincida.
+router.get('/summary', async (_req: Request, res: Response) => {
+  const { rows } = await db.query(`
+    SELECT w.id AS wallet_id,
+           COUNT(t.id)::int AS operations,
+           MAX(t.timestamp) AS last_activity
+    FROM wallets w
+    LEFT JOIN transactions t ON t.wallet_id = w.id OR t.destination_wallet_id = w.id
+    GROUP BY w.id
+  `);
+  res.json(rows);
+});
+
 // ── POST /api/wallets ──────────────────────────────────────────────────────
 router.post('/', async (req: Request, res: Response) => {
   const validation = walletCreateBodySchema.safeParse(req.body);
@@ -132,17 +151,28 @@ router.put('/:id', async (req: Request, res: Response) => {
     return;
   }
   const { id } = paramsValidation.data;
-  const { name, color, notes } = bodyValidation.data;
+  const { name, type, color, notes } = bodyValidation.data;
 
   const wallet = await db.query('SELECT is_system FROM wallets WHERE id = $1', [id]);
   if (wallet.rows.length === 0) {
     res.status(404).json({ error: 'Wallet no encontrada' });
     return;
   }
+  // Las wallets del sistema (sub-cuentas de exchange) no cambian de tipo.
+  if (type !== undefined && wallet.rows[0].is_system) {
+    res.status(403).json({ error: 'No se puede cambiar el tipo de una wallet del sistema' });
+    return;
+  }
 
+  // Lista cerrada de columnas: los campos ausentes se conservan; notes: null las vacía.
   await db.query(
-    `UPDATE wallets SET name = $1, color = $2, notes = $3 WHERE id = $4`,
-    [name, color, notes ?? null, id]
+    `UPDATE wallets SET
+       name  = $1,
+       type  = COALESCE($2, type),
+       color = COALESCE($3, color),
+       notes = CASE WHEN $4::boolean THEN $5 ELSE notes END
+     WHERE id = $6`,
+    [name, type ?? null, color ?? null, notes !== undefined, notes ?? null, id]
   );
   res.json({ success: true });
 });

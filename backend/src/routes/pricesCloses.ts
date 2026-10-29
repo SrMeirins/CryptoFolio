@@ -3,16 +3,17 @@ import { z } from 'zod';
 import { db } from '../db/client';
 import { validateSymbol } from './settings/settingsShared';
 import { sendInternalError } from '../middleware/errorHandler';
+import { getAppTimezone } from '../modules/time/appTimezone';
 
 // Cierres diarios (hora de Madrid) de varios activos en una sola consulta
 // (#282): alimentan los mini-gráficos de 7 días de la tabla de Portfolio.
 const router = Router();
 
 const MAX_ASSETS = 100;
-const querySchema = z.object({
+const querySchema = z.strictObject({
   assets: z.string().min(1).max(1200),
   days:   z.coerce.number().int().min(2).max(400).default(7),
-}).strict();
+});
 
 // GET /api/v1/prices/closes?assets=BTC,XRP&days=7
 router.get('/closes', async (req: Request, res: Response) => {
@@ -29,12 +30,12 @@ router.get('/closes', async (req: Request, res: Response) => {
   try {
     const result = await db.query(
       `SELECT asset, close_date::text AS date, price_eur::float AS price
-       FROM price_close_madrid
-       WHERE asset = ANY($1::text[])
-         AND close_date >= (NOW() AT TIME ZONE 'Europe/Madrid')::date - ($2::int - 1)
+       FROM price_close_daily
+       WHERE asset = ANY($1::text[]) AND timezone = $3
+         AND close_date >= (NOW() AT TIME ZONE $3)::date - ($2::int - 1)
          AND price_eur > 0
        ORDER BY asset, close_date`,
-      [assets, parsed.data.days],
+      [assets, parsed.data.days, await getAppTimezone(db)],
     );
     const closes: Record<string, Array<{ date: string; price: number }>> = {};
     for (const a of assets as string[]) closes[a] = [];

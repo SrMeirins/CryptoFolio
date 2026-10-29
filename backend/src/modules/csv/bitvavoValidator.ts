@@ -1,7 +1,7 @@
 import { ValidationResult } from './validator';
 import { parseCsvLine } from './csvUtils';
 
-const REQUIRED_COLUMNS = [
+export const BITVAVO_COLUMNS = [
   'Timezone', 'Date', 'Time', 'Type', 'Currency', 'Amount',
   'Quote Currency', 'Quote Price', 'Received / Paid Currency', 'Received / Paid Amount',
   'Fee currency', 'Fee amount', 'Status', 'Transaction ID', 'Address',
@@ -35,7 +35,7 @@ export function validateBitvavoCsvStructure(fileBuffer: Buffer): ValidationResul
   const columns = header.split(separator).map((c) => c.trim().replace(/^"|"$/g, ''));
   result.detectedColumns = columns;
 
-  for (const required of REQUIRED_COLUMNS) {
+  for (const required of BITVAVO_COLUMNS) {
     if (!columns.includes(required)) {
       result.errors.push(`Columna requerida no encontrada: "${required}" — ¿es un CSV de Bitvavo?`);
     }

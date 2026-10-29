@@ -1,9 +1,12 @@
+<!-- Cabecera centrada con logo: el título va dentro del bloque HTML. -->
+<!-- markdownlint-disable-next-line MD041 -->
 <div align="center">
 
 <img src="public/favicon.svg" width="80" alt="CryptoFolio logo" />
 
 # CryptoFolio
 
+<!-- markdownlint-disable-next-line MD036 -->
 **Gestión de portfolio y fiscalidad crypto para España — 100% self-hosted**
 
 *Tus datos en tu máquina. Sin suscripciones. Sin nubes.*
@@ -73,6 +76,7 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 ## ✨ Características
 
 ### 📊 Portfolio
+
 - Precios en **tiempo real** vía Binance WebSocket — sin delay, sin refresco manual
 - **Wallets frías** configuradas manualmente (Ledger, Tangem, Trezor...) y cuenta de **Binance** vía CSV
 - Variación **24h** por activo con indicadores visuales
@@ -80,6 +84,7 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 - Detección de **posiciones de polvo** (dust)
 
 ### 🧾 Fiscal — España
+
 - Cálculo **FIFO** según normativa española vigente (LIRPF)
 - Ganancias y pérdidas patrimoniales separadas por activo y año
 - Rendimientos del capital mobiliario (staking, intereses, airdrops)
@@ -100,6 +105,7 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 > 📖 **[Ver referencia completa de operaciones soportadas (Binance) →](docs/operaciones-soportadas.md)** · **[Bitvavo →](docs/operaciones-soportadas-bitvavo.md)**
 
 ### 📋 Historial
+
 - Búsqueda y filtrado por fecha, activo, tipo de operación y wallet
 - Exportación a **Excel**
 - Vista de operaciones agrupadas por tipo
@@ -131,7 +137,7 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 <div align="center">
 
 | Capa | Tecnología |
-|:----:|:----------:|
+| :----: | :----------: |
 | Frontend | React 19 · TypeScript · Vite · Tailwind CSS · Recharts |
 | Backend | Node.js 20 · Express · TypeScript |
 | Base de datos | PostgreSQL 16 |
@@ -178,9 +184,11 @@ Docker es el programa que permite ejecutar CryptoFolio sin instalar nada más en
 2. Ejecuta el instalador y sigue los pasos (requiere reiniciar)
 3. Abre Docker Desktop y espera a que el icono de la ballena aparezca en la barra de tareas
 4. Abre **PowerShell** o **Terminal** y verifica que funciona:
+
    ```powershell
    docker --version
    ```
+
    Deberías ver algo como `Docker version 26.x.x`
 
 </details>
@@ -192,6 +200,7 @@ Docker es el programa que permite ejecutar CryptoFolio sin instalar nada más en
 2. Arrastra Docker.app a tu carpeta de Aplicaciones
 3. Ábrelo y acepta los permisos
 4. Abre **Terminal** y verifica:
+
    ```bash
    docker --version
    ```
@@ -321,6 +330,7 @@ Todas las opciones se configuran en el archivo `.env` (ver `.env.example` para l
 | `FRONTEND_HOST_PORT` | Puerto en el que se accede a la app | No | `8080` |
 | `COINGECKO_API_KEY` | API key de CoinGecko Pro | No | vacío (usa el tier gratuito) |
 | `PRICE_REFRESH_INTERVAL_MS` | Intervalo de refresco de precios (ms) | No | `60000` (1 min) |
+| `APP_TIMEZONE` | Zona horaria IANA del día local, el ejercicio fiscal y el P&L (p. ej. `Atlantic/Canary`). La de Ajustes prevalece; en la app de escritorio, por defecto, la del sistema | No | `Europe/Madrid` |
 | `WALLET_SYNC_ENCRYPTION_KEY` | Clave que cifra las API keys de verificación on-chain | Solo si usas verificación on-chain | vacío |
 | `ETHERSCAN_API_KEY` / `BLOCKFROST_API_KEY` / `SUBSCAN_API_KEY` | API keys de proveedores on-chain (Ethereum/Cardano/Polkadot) | No — se configuran también desde Settings → Wallets | vacío |
 
@@ -449,7 +459,7 @@ En el entorno de desarrollo es normal ver durante unos segundos «no puede estab
 
 CryptoFolio es **gratuito para uso personal self-hosted** bajo la licencia [AGPL-3.0](LICENSE).
 
-El uso comercial — ofrecer el software como servicio o integrarlo en un producto de pago — requiere una [licencia comercial](COMMERCIAL_LICENSE.md). Contacto: marincaserojorge@gmail.com
+El uso comercial — ofrecer el software como servicio o integrarlo en un producto de pago — requiere una [licencia comercial](COMMERCIAL_LICENSE.md). Contacto: <marincaserojorge@gmail.com>
 
 ---
 

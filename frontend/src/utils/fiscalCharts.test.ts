@@ -82,4 +82,10 @@ describe('filtersFromUrl', () => {
     expect(filtersFromUrl(new URLSearchParams('desde=2025-03-01&hasta=2025-03-31&activo=XRP'))).toEqual({ from: '2025-03-01', to: '2025-03-31', asset: 'XRP' })
     expect(filtersFromUrl(new URLSearchParams('desde=ayer&activo=<script>'))).toEqual({})
   })
+
+  it('resultado: ganancia o pérdida; cualquier otro valor se ignora (#418)', () => {
+    expect(filtersFromUrl(new URLSearchParams('resultado=ganancia'))).toEqual({ result: 'gain' })
+    expect(filtersFromUrl(new URLSearchParams('resultado=perdida'))).toEqual({ result: 'loss' })
+    expect(filtersFromUrl(new URLSearchParams('resultado=todo'))).toEqual({})
+  })
 })

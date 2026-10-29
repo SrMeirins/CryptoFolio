@@ -15,6 +15,11 @@ import fifoSalesDetailRouter from './routes/fifo/fifoSalesDetail';
 import pricesRouter from './routes/prices';
 import pricesClosesRouter from './routes/pricesCloses';
 import pnlRouter from './routes/pnl';
+import historialVistasRouter from './routes/historial/vistas';
+import historialEstadisticasRouter from './routes/historial/estadisticas';
+import historialSaldosRouter from './routes/historial/saldos';
+import transactionDetailRouter from './routes/transactions/transactionDetail';
+import transactionRestoreRouter from './routes/transactions/transactionRestore';
 import assetIconsRouter from './routes/assetIcons';
 import catalogRouter from './routes/catalog';
 import settingsRouter from './routes/settings';
@@ -32,6 +37,9 @@ app.use(morgan('combined'));
 
 app.use(globalLimiter);
 
+// Las copias de seguridad (#453) viajan enteras en el cuerpo: unos 2,6 MB
+// cifrados por cada 3.000 filas, así que su ruta admite más.
+app.use('/api/settings/backup', express.json({ limit: '100mb' }));
 app.use(express.json({ limit: '10mb' }));
 
 app.use('/health', healthRouter);
@@ -44,6 +52,11 @@ app.use('/api/transactions', transactionsRouter);
 app.use('/api/fiscal', fiscalRouter);
 app.use('/api/wallets', walletsRouter);
 app.use('/api/v1/pnl', pnlRouter);
+app.use('/api/v1/historial/vistas', historialVistasRouter);
+app.use('/api/v1/historial/estadisticas', historialEstadisticasRouter);
+app.use('/api/v1/historial/saldos', historialSaldosRouter);
+app.use('/api/v1/transactions', transactionDetailRouter);
+app.use('/api/v1/transactions', transactionRestoreRouter);
 app.use('/api/v1/fifo', fifoLotsDetailRouter);
 app.use('/api/v1/fifo', fifoSalesDetailRouter);
 app.use('/api/v1/prices', pricesClosesRouter);

@@ -3,7 +3,9 @@ import type { FifoLot } from '../api/portfolio'
 import { usePricesStore } from '../store/pricesStore'
 import { useCurrency } from './useDisplayCurrency'
 import { convertLots, convertOpen24, convertPrices, liveRate } from '../utils/displayMarket'
-import { DUST_THRESHOLD_EUR } from '../utils/topMovers'
+import { useQuery } from '@tanstack/react-query'
+import { portfolioApi } from '../api/portfolio'
+import { dustThresholdEur } from '../utils/preferences'
 import type { Currency } from '../utils/format'
 
 export interface DisplayMarket {
@@ -35,7 +37,9 @@ export function useDisplayMarket(): DisplayMarket {
   // El EUR de hace 24h, con el USDT de hace 24h (mismo criterio que convertOpen24).
   const fiatOpen24 = liveRate(currency, rawOpen24)
 
-  return { currency, rate, prices, open24, fiatOpen24, dustThreshold: DUST_THRESHOLD_EUR * (rate ?? 1) }
+  // Umbral de polvo configurable (#446), en euros y convertido a la moneda visible.
+  const { data: config } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
+  return { currency, rate, prices, open24, fiatOpen24, dustThreshold: dustThresholdEur(config) * (rate ?? 1) }
 }
 
 /**

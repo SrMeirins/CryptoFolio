@@ -100,14 +100,54 @@ describe('routes/settings — config y stats', () => {
     });
   });
 
+  describe('PUT /config — preferencias de General (#446)', () => {
+    const put = (key: string, value: unknown) => request(app).put('/api/settings/config').send({ key, value });
+
+    it('umbral de polvo: importes de 0 a 1000 con hasta dos decimales', async () => {
+      for (const value of ['0', '1', '2.5', '1000']) expect((await put('dust_threshold_eur', value)).status).toBe(200);
+      for (const value of ['-1', '1000.01', '1,5', '2.555', 'abc', '', '1e3', 5]) expect((await put('dust_threshold_eur', value)).status).toBe(400);
+      expect((await request(app).get('/api/settings/config')).body.dust_threshold_eur).toBe('1000');
+    });
+
+    it('privacidad al abrir: solo true o false', async () => {
+      for (const value of ['true', 'false']) expect((await put('privacy_on_start', value)).status).toBe(200);
+      for (const value of ['yes', '1', '', true]) expect((await put('privacy_on_start', value)).status).toBe(400);
+      expect((await request(app).get('/api/settings/config')).body.privacy_on_start).toBe('false');
+    });
+
+    it('página de inicio: solo las de la lista blanca', async () => {
+      for (const value of ['/portfolio', '/fiscal', '/history', '/']) expect((await put('start_page', value)).status).toBe(200);
+      for (const value of ['/settings', 'https://ejemplo.invalid', '//evil', '/history?x=1', '']) expect((await put('start_page', value)).status).toBe(400);
+      expect((await request(app).get('/api/settings/config')).body.start_page).toBe('/');
+    });
+  });
+
+  describe('PUT /config — avisos (#447)', () => {
+    const put = (key: string, value: unknown) => request(app).put('/api/settings/config').send({ key, value });
+
+    it('categorías silenciadas: lista JSON de categorías conocidas', async () => {
+      for (const value of ['["precios","fiscal"]', '[]']) expect((await put('notifications_muted', value)).status).toBe(200);
+      for (const value of ['["otra"]', '["fiscal","fiscal"]', 'fiscal', '{}']) expect((await put('notifications_muted', value)).status).toBe(400);
+    });
+
+    it('los descartes solo se escriben con su propia API', async () => {
+      expect((await put('notifications_dismissed', '{}')).status).toBe(400);
+    });
+
+    it('los tipos IRPF ya no se escriben aquí, sino por ejercicio (#452)', async () => {
+      expect((await put('irpf_tramos_tipos', '[19,21,23,27,30]')).status).toBe(400);
+    });
+  });
+
   describe('GET /stats', () => {
-    it('devuelve los 6 contadores esperados', async () => {
+    it('devuelve los 6 contadores y la salud de la base (#454)', async () => {
       const res = await request(app).get('/api/settings/stats');
       expect(res.status).toBe(200);
       expect(Object.keys(res.body).sort()).toEqual(
-        ['assets', 'fifoLots', 'imports', 'priceCache', 'transactions', 'wallets'].sort()
+        ['assets', 'dbSizeBytes', 'fifoLots', 'imports', 'lastBackupAt', 'lastFifoAt', 'lastImportAt', 'priceCache', 'transactions', 'wallets'].sort()
       );
       expect(typeof res.body.transactions).toBe('number');
+      expect(res.body.dbSizeBytes).toBeGreaterThan(0);
     });
   });
 });

@@ -1,5 +1,6 @@
 import { createServer } from 'http';
 import { parsePriceSourcesOffline } from './modules/prices/offlineMode';
+import { envTimezone } from './modules/time/appTimezone';
 import app from './app';
 import { db, pool } from './db/client';
 import { runMigrations } from './db/run-migrations';
@@ -9,6 +10,7 @@ import { syncAssetIcons } from './modules/assets/assetIcons';
 import { startPairCompletion } from './modules/prices/pairCompletion';
 import { repairMissingCoinGeckoIds } from './modules/prices/coingecko';
 import { scheduleWalletSync } from './modules/walletSync/scheduler';
+import { scheduleAutoBackups } from './modules/backup/autoBackup';
 
 const server = createServer(app);
 const PORT = parseInt(process.env.BACKEND_PORT || '3001', 10);
@@ -16,6 +18,9 @@ const PORT = parseInt(process.env.BACKEND_PORT || '3001', 10);
 // Configuración inválida → no arrancar (fallo seguro, #359).
 try {
   if (parsePriceSourcesOffline(process.env.PRICE_SOURCES_OFFLINE)) console.info('[CONFIG] PRICE_SOURCES_OFFLINE=true: precios solo desde la caché');
+  // Zona horaria (#388): una APP_TIMEZONE desconocida impide arrancar.
+  const envTz = envTimezone();
+  if (envTz) console.info(`[CONFIG] APP_TIMEZONE=${envTz}`);
 } catch (err) {
   console.error('[FATAL]', (err as Error).message);
   process.exit(1);
@@ -32,6 +37,8 @@ async function bootstrap() {
     await runMigrations();
     setupPricesWebSocket(server);
     scheduleWalletSync();
+    // Copias automáticas cifradas con la clave del equipo (#454).
+    scheduleAutoBackups();
 
     // BACKEND_HOST lo fija electron/backend-manager.ts a '127.0.0.1' para no
     // exponer el puerto a la LAN en la app de escritorio (app single-user, sin

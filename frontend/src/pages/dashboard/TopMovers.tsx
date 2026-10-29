@@ -8,7 +8,7 @@ import { heatmapCells, moverData, moversSummary, rankLabels, rankMovers, type Mo
 import { formatMoney, formatPercent, formatPrice } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
 import { T, alpha } from '../../utils/colors'
-import { SegmentedControl, cardClasses, PanelHeader, badgeClasses } from '../../components/ui'
+import { SegmentedControl, PanelHeader, badgeClasses, panelSurface } from '../../components/ui'
 import { moversSubtitle } from '../../utils/panelSubtitles'
 import { Activity } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -98,7 +98,7 @@ export function TopMovers({ lots }: { lots: FifoLot[] }) {
   )
 
   return (
-    <div className={cardClasses('none', 'overflow-hidden')}>
+    <div className={panelSurface('none', 'overflow-hidden')}>
       <PanelHeader
         icon={Activity}
         title="Variación"

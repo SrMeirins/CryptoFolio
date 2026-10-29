@@ -21,9 +21,24 @@ function copyDbAssets(root) {
   return migrations.length;
 }
 
-module.exports = { copyDbAssets };
+/** Copia el paquete local de logos (src/assets/crypto-icons, #449) a dist/assets/. */
+function copyIconAssets(root) {
+  const src = path.join(root, 'src', 'assets', 'crypto-icons');
+  const dest = path.join(root, 'dist', 'assets', 'crypto-icons');
+  if (!fs.existsSync(src)) return 0;
+  fs.mkdirSync(dest, { recursive: true });
+  const icons = fs.readdirSync(src, { withFileTypes: true })
+    .filter(e => e.isFile() && e.name.endsWith('.png'))
+    .map(e => e.name);
+  for (const name of icons) fs.copyFileSync(path.join(src, name), path.join(dest, name));
+  return icons.length;
+}
+
+module.exports = { copyDbAssets, copyIconAssets };
 
 if (require.main === module) {
-  const count = copyDbAssets(path.resolve(__dirname, '..'));
+  const root = path.resolve(__dirname, '..');
+  const count = copyDbAssets(root);
   console.log(`[build] schema.sql y ${count} migraciones copiadas a dist/db`);
+  console.log(`[build] ${copyIconAssets(root)} logos del paquete local copiados a dist/assets`);
 }

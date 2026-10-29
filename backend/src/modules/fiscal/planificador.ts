@@ -1,3 +1,4 @@
+import type { Escala } from './escalasAhorro';
 import { calcularIrpfAhorro } from './irpf';
 import { baseAhorro, compensarPerdidas, type AnioFiscal } from './compensacion';
 
@@ -13,7 +14,7 @@ function baseConExtra(anios: readonly AnioFiscal[], year: number, extra: number)
 }
 
 /** Cuota del ahorro del año `year` (al céntimo) si se añade `extra` al neto de ganancias y pérdidas. */
-export function cuotaConExtra(anios: readonly AnioFiscal[], year: number, tipos: readonly number[], extra: number): number {
+export function cuotaConExtra(anios: readonly AnioFiscal[], year: number, tipos: readonly number[] | Escala, extra: number): number {
   return Math.round(calcularIrpfAhorro(baseConExtra(anios, year, extra), tipos) * 100) / 100;
 }
 

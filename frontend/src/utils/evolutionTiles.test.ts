@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { summaryTiles } from './evolutionTiles'
+import { summaryTiles, tileChip } from './evolutionTiles'
 import type { PeriodSummary } from './evolutionSummary'
 
 // Mini-tarjetas del resumen de evolución (#250).
@@ -52,5 +52,18 @@ describe('summaryTiles', () => {
     expect(best.day).toBeNull()
     expect(best.detail).toMatch(/–/)
     expect(dd.badge).toBeNull()
+  })
+})
+
+describe('tileChip (#412)', () => {
+  it('mejor y peor día: el % y la fecha; sin %, solo la fecha', () => {
+    const [best, worst] = summaryTiles(summary, false, 'EUR')
+    expect(clean(tileChip(best) ?? '')).toBe('+4,20% · 20 abr 26')
+    expect(tileChip(worst)).toBe('3 may 26')
+  })
+
+  it('máxima caída: su duración; sin dato, sin chip', () => {
+    expect(tileChip(summaryTiles(summary, false, 'EUR')[2])).toBe('10 días')
+    expect(summaryTiles(null, false, 'EUR').map(tileChip)).toEqual([null, null, null])
   })
 })

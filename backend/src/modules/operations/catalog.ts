@@ -5,6 +5,7 @@ import { DISPOSITION_OPERATIONS } from './disposition';
 import { MOVEMENT_OPERATIONS } from './movement';
 import { FEE_OPERATIONS } from './fee';
 import { SPECIAL_OPERATIONS } from './special';
+import { MARGIN_OPERATIONS } from './margin';
 
 export type {
   FiscalTreatment,
@@ -22,6 +23,7 @@ export const OPERATION_CATALOG: OperationType[] = [
   ...MOVEMENT_OPERATIONS,
   ...FEE_OPERATIONS,
   ...SPECIAL_OPERATIONS,
+  ...MARGIN_OPERATIONS,
 ];
 
 export function getOperationType(id: string): OperationType | undefined {

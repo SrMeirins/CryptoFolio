@@ -1,8 +1,9 @@
 import { utilityProcess, UtilityProcess } from 'electron';
-import path from 'path';
 import fs from 'fs';
 import { pollUntil } from './shared/poll-until';
 import { BACKEND_PORT_BASE } from './shared/ports';
+import { detectSystemTimezone, systemTimezoneEnv } from './shared/system-timezone';
+import { backendEntryPath } from './shared/backend-entry';
 
 interface BackendOptions {
   databaseUrl: string;
@@ -13,6 +14,8 @@ interface BackendOptions {
   // funcionando normalmente, solo la verificación de saldos on-chain queda
   // deshabilitada (falla de forma controlada al intentar guardar una key).
   walletSyncEncryptionKey?: string;
+  // Carpeta de las copias automáticas cifradas del backend (#454).
+  autoBackupDir?: string;
 }
 
 export class BackendManager {
@@ -21,6 +24,7 @@ export class BackendManager {
   private readonly port: number;
   private readonly onCrash?: (detail: string) => void;
   private readonly walletSyncEncryptionKey?: string;
+  private readonly autoBackupDir?: string;
   private recentStderr: string[] = [];
   private running = false;
 
@@ -32,15 +36,12 @@ export class BackendManager {
     this.port = opts.port ?? BACKEND_PORT_BASE;
     this.onCrash = opts.onCrash;
     this.walletSyncEncryptionKey = opts.walletSyncEncryptionKey;
+    this.autoBackupDir = opts.autoBackupDir;
   }
 
-  /** Ruta al entry point del backend compilado */
+  /** Ruta al entry point del backend compilado (#396). */
   private get entryPath(): string {
-    if (process.env.NODE_ENV === 'development') {
-      return path.join(__dirname, '../../../backend/dist/index.js');
-    }
-    // En producción, electron-builder copia el backend a extraResources
-    return path.join(process.resourcesPath, 'backend', 'dist', 'index.js');
+    return backendEntryPath(process.env.NODE_ENV === 'development', __dirname, process.resourcesPath);
   }
 
   async start(): Promise<void> {
@@ -59,9 +60,12 @@ export class BackendManager {
         ELECTRON_MODE: 'true',
         // El backend solo escucha en localhost — nunca en 0.0.0.0
         BACKEND_HOST: '127.0.0.1',
+        // Zona horaria del sistema (#388), salvo que ya venga definida.
+        ...systemTimezoneEnv(process.env, detectSystemTimezone()),
         ...(this.walletSyncEncryptionKey
           ? { WALLET_SYNC_ENCRYPTION_KEY: this.walletSyncEncryptionKey }
           : {}),
+        ...(this.autoBackupDir ? { AUTO_BACKUP_DIR: this.autoBackupDir } : {}),
       },
       stdio: 'pipe',
     });

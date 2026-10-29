@@ -5,10 +5,10 @@ import { usePreparacionHistoricos } from '../../hooks/usePreparacionHistoricos'
 import { PreparandoHistoricos } from '../../components/PreparandoHistoricos'
 import { useLiveDayPnl } from '../../hooks/useLiveDayPnl'
 import { dailyPnlQuery } from '../../queries/currencyQueries'
-import { madridToday } from '../../utils/pnlChart'
+import { localToday } from '../../utils/pnlChart'
 import { addMonths, compareYm, monthGrid, monthLabel, monthRange, monthSummary, ymOf, type YearMonth } from '../../utils/pnlCalendar'
 import { monthStats, weekTotals, yearMonths } from '../../utils/calendarStats'
-import { Button, SegmentedControl, cardClasses, iconButtonClasses, PanelHeader, Skeleton, MonthPicker } from '../../components/ui'
+import { Button, SegmentedControl, iconButtonClasses, PanelHeader, Skeleton, MonthPicker, panelSurface } from '../../components/ui'
 import { CalendarMonthGrid } from './calendar/CalendarMonthGrid'
 import { CalendarStats } from './calendar/CalendarStats'
 import { CalendarLegend } from './calendar/CalendarLegend'
@@ -16,6 +16,7 @@ import { CalendarDayDetail } from './calendar/CalendarDayDetail'
 import { CalendarYearView } from './calendar/CalendarYearView'
 import { MonthTrend } from './calendar/MonthTrend'
 import { calendarSubtitle } from '../../utils/panelSubtitles'
+import { timezoneLabel } from '../../utils/timezoneLabel'
 
 // Calendario de ganancias y pérdidas diarias (#167), sobre GET /api/v1/pnl/daily.
 // El día de hoy se recalcula con cada precio en vivo (#213). Desde #216: vista
@@ -27,7 +28,7 @@ type View = 'month' | 'year'
 const navButton = iconButtonClasses('sm', false, 'disabled:hover:bg-transparent')
 
 export function PnlCalendar() {
-  const today = madridToday()
+  const today = localToday()
   const current = ymOf(today)
   const [view, setView] = useState<View>('month')
   const [ym, setYm] = useState<YearMonth>(current)
@@ -86,14 +87,14 @@ export function PnlCalendar() {
   const step = (delta: number) => go(view === 'month' ? addMonths(ym, delta) : { year: ym.year + delta, month: ym.month })
 
   return (
-    <div className={cardClasses('none', 'px-5 py-5')}>
+    <div className={panelSurface('none', 'px-5 py-5')}>
       <PanelHeader
         icon={CalendarDays}
         title="P&L diario"
         className="mb-3"
         subtitle={calendarSubtitle(view, monthLabel(ym), ym.year)}
         help={<>
-          <p>Ganancia o pérdida de cada día natural, de 00:00 a 24:00 (hora de Madrid), sin contar depósitos ni retiradas.</p>
+          <p>Ganancia o pérdida de cada día natural, de 00:00 a 24:00 ({timezoneLabel()}), sin contar depósitos ni retiradas.</p>
           <p><span className="text-brand">● hoy</span> se actualiza en vivo desde las 00:00. El chip «24h» de la tarjeta Valor mide en cambio las últimas 24 horas móviles, por eso las cifras no coinciden.</p>
           <p>Pulsa un día para ver su detalle. Con el teclado, las flechas recorren los días.</p>
         </>}
@@ -121,7 +122,8 @@ export function PnlCalendar() {
           onOpen={next => { setView('month'); go(next) }} />
       ) : (
         <>
-          {complete.length > 0 && <CalendarStats stats={stats} total={monthSummary(complete)} currency={currency} />}
+          {complete.length > 0 && <CalendarStats stats={stats} total={monthSummary(complete)} currency={currency}
+            selected={selected} onOpenDay={d => setSelected(s => (s === d ? null : d))} />}
           <MonthTrend days={days} currency={currency} hovered={hovered} onHover={setHovered}
             lastDay={Number(weeks.flat().filter(Boolean).at(-1)?.slice(8) ?? 31)} />
           {isError && <p className="text-xs text-fg-subtle py-6 text-center">No se pudo cargar el P&L del mes.</p>}

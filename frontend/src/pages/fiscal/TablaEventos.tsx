@@ -8,7 +8,7 @@ import { OperacionesFilters } from './OperacionesFilters'
 import { RecompraSummary } from './RecompraSummary'
 import { WarningsLegend } from './EventWarnings'
 import type { FiscalEvent, FiscalSummary } from './types'
-import { buttonClasses, cardClasses, Pagination, tableFootRowClasses, tableHeadRowClasses } from '../../components/ui'
+import { buttonClasses, Pagination, tableFootRowClasses, tableHeadRowClasses, panelSurface } from '../../components/ui'
 import { useDebounce } from '../../hooks/useDebounce'
 import { usePrivacyStore } from '../../store/privacyStore'
 import { paginate, type PageSize } from '../../utils/pagination'
@@ -79,7 +79,7 @@ export function TablaEventos({ events, summary, initialFilters }: {
 
   return (
     // @container: tabla o tarjetas según el ancho de la tarjeta, no de la ventana (con la barra lateral, 1024 px no bastan).
-    <div className={cardClasses('none', 'overflow-hidden @container')}>
+    <div className={panelSurface('none', 'overflow-hidden @container')}>
       <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-wrap gap-2">
         <TableExpandToggle icon={TrendingUp} title="Ganancias y Pérdidas Patrimoniales" count={events.length}
           expanded={expanded} onToggle={() => setExpanded(!expanded)} />

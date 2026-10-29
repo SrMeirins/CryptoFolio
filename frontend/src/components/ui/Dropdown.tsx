@@ -165,14 +165,14 @@ export function Dropdown<T extends string | number>({
                 onClick={() => choose(i)}
                 className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm select-none
                   ${o.disabled ? 'text-fg-subtle/60 cursor-not-allowed' : 'cursor-pointer text-fg'}
-                  ${i === active && !o.disabled ? 'bg-brand/12' : ''} ${isSelected ? 'font-medium text-brand' : ''}`}
+                  ${i === active && !o.disabled ? 'bg-brand/12' : ''} ${isSelected ? 'font-medium text-brand-ink' : ''}`}
               >
                 {o.prefix}
                 <span className="flex-1 min-w-0">
                   <span className="block truncate">{o.label}</span>
                   {o.description && <span className="block text-[11px] font-normal text-fg-subtle whitespace-normal">{o.description}</span>}
                 </span>
-                {isSelected && <Check size={14} aria-hidden="true" className="text-brand shrink-0" />}
+                {isSelected && <Check size={14} aria-hidden="true" className="text-brand-ink shrink-0" />}
               </div>
               </Fragment>
             )

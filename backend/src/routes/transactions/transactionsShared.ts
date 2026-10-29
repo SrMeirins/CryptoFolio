@@ -1,26 +1,22 @@
-import { z, ZodError } from 'zod';
+import { z } from 'zod';
 import { Response } from 'express';
 import { getHistoricalPriceEur } from '../../modules/prices/binance';
 import { runFifoEngine } from '../../modules/fifo/engine';
 import { MAX_LENGTH_LONG, MAX_LENGTH_SHORT } from '../../modules/validation/textLength';
+import { DB_OPERATION_TYPES } from '../../modules/history/operationGroups';
 
-// Construye un mensaje 400 legible en castellano a partir de los issues de
-// Zod, sin filtrar detalles internos sensibles (solo nombres de campo y
-// mensajes de validación).
-export function zodErrorMessage(error: ZodError): string {
-  return error.issues.map((issue) => `${issue.path.join('.') || 'body'}: ${issue.message}`).join('; ');
-}
-
-export function sendZodError(res: Response, error: ZodError): void {
-  res.status(400).json({ error: `Datos inválidos: ${zodErrorMessage(error)}` });
-}
+// Errores de validación comunes (#385): una sola implementación.
+export { zodErrorMessage, sendZodError } from '../../modules/validation/zodErrors';
 
 // Campos de entrada de una transacción manual (POST /manual y PUT /:id).
 // Los campos numéricos se coaccionan con z.coerce.number() para aceptar tanto
 // number como string numérico, pero RECHAZAN cualquier valor no numérico en
 // vez de convertirlo silenciosamente a 0 (bug detectado en auditoría).
+// Id de wallet opcional: «» del formulario equivale a sin valor (#378).
+const optionalWalletId = z.preprocess(v => (v === '' ? null : v), z.uuid('debe ser un UUID válido').nullish());
+
 export const transactionFieldsSchema = z.object({
-  operationType:        z.string().min(1, 'operationType es requerido'),
+  operationType:        z.enum(DB_OPERATION_TYPES, { error: 'tipo de operación no válido' }),
   asset:                z.string().max(MAX_LENGTH_SHORT, `asset no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
   amount:               z.coerce.number().nullish(),
   amountNet:            z.coerce.number().nullish(),
@@ -29,16 +25,19 @@ export const transactionFieldsSchema = z.object({
   pricePerUnit:         z.coerce.number().nullish(),
   feeAsset:             z.string().max(MAX_LENGTH_SHORT, `feeAsset no puede superar ${MAX_LENGTH_SHORT} caracteres`).nullish(),
   feeAmount:            z.coerce.number().nullish(),
-  wallet_id:            z.string().nullish(),
-  destinationWalletId:  z.string().nullish(),
+  wallet_id:            optionalWalletId,
+  destinationWalletId:  optionalWalletId,
   timestamp:            z.string().min(1, 'timestamp es requerido'),
   notes:                z.string().max(MAX_LENGTH_LONG, `notes no puede superar ${MAX_LENGTH_LONG} caracteres`).nullish(),
 });
 
 // PUT /:id exige wallet_id igual que antes.
 export const transactionUpdateSchema = transactionFieldsSchema.extend({
-  wallet_id: z.string().min(1, 'wallet_id es requerido'),
+  wallet_id: z.uuid({ error: iss => (iss.input === undefined ? 'wallet_id es requerido' : 'debe ser un UUID válido') }),
 });
+
+/** Id de transacción en la ruta (#378): 400 en vez de un error de Postgres. */
+export const transactionIdSchema = z.uuid('id de transacción no válido');
 
 export type TransactionFields = z.infer<typeof transactionFieldsSchema>;
 

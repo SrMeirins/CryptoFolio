@@ -229,7 +229,11 @@ CREATE TABLE raw_transactions (
   remark         TEXT,
   row_hash       TEXT NOT NULL,
   transaction_id UUID,
-  UNIQUE(row_hash)
+  -- Fila tal como venía en el CSV, sin «User ID» (#374); NULL en las antiguas.
+  original_row   JSONB,
+  UNIQUE(row_hash),
+  CONSTRAINT chk_raw_transactions_original_row
+    CHECK (original_row IS NULL OR (jsonb_typeof(original_row) = 'object' AND NOT original_row ? 'User ID'))
 );
 
 CREATE INDEX idx_raw_transactions_time   ON raw_transactions(time);
@@ -270,6 +274,11 @@ CREATE TABLE transactions (
   counterparty_address    TEXT CHECK (char_length(counterparty_address) <= 128),
   counterparty_network_id UUID REFERENCES networks(id) ON DELETE SET NULL,
   tx_hash                 TEXT CHECK (char_length(tx_hash) <= 128),
+  -- Importada editada (#378): campos tal como se importaron; NULL = no modificada.
+  original_import         JSONB,
+  -- Comisión ya incluida en el coste por el exchange (#415); solo informativa.
+  included_fee_asset      TEXT,
+  included_fee_amount     NUMERIC(38, 18),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -279,6 +288,14 @@ CREATE INDEX idx_transactions_asset     ON transactions(asset);
 CREATE INDEX idx_transactions_type      ON transactions(operation_type);
 CREATE INDEX idx_transactions_wallet    ON transactions(wallet_id);
 CREATE INDEX idx_transactions_dest      ON transactions(destination_wallet_id);
+CREATE INDEX idx_transactions_editadas  ON transactions(timestamp) WHERE original_import IS NOT NULL;
+ALTER TABLE transactions ADD CONSTRAINT chk_transactions_included_fee CHECK (
+  (included_fee_asset IS NULL) = (included_fee_amount IS NULL)
+  AND (included_fee_amount IS NULL OR included_fee_amount > 0)
+  AND (included_fee_asset IS NULL OR char_length(included_fee_asset) <= 32)
+);
+ALTER TABLE transactions ADD CONSTRAINT chk_transactions_original_import
+  CHECK (original_import IS NULL OR (jsonb_typeof(original_import) = 'object' AND NOT manually_added));
 
 -- FK pendiente desde raw_transactions (creada antes que esta tabla más arriba)
 ALTER TABLE raw_transactions
@@ -346,6 +363,21 @@ CREATE INDEX idx_consumptions_lot         ON fifo_lot_consumptions(lot_id);
 CREATE INDEX idx_consumptions_transaction ON fifo_lot_consumptions(consuming_transaction_id);
 CREATE INDEX idx_consumptions_date        ON fifo_lot_consumptions(consumed_at);
 
+-- Déficits del motor FIFO (#380): operaciones que pidieron más de lo que había
+-- en lotes. Se vacía y se rehace en cada ejecución del motor.
+CREATE TABLE fifo_shortfalls (
+  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+  asset          TEXT NOT NULL CHECK (char_length(asset) <= 32),
+  wallet_id      UUID NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  requested      NUMERIC(38, 18) NOT NULL CHECK (requested > 0),
+  missing        NUMERIC(38, 18) NOT NULL CHECK (missing > 0 AND missing <= requested),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_fifo_shortfalls_tx    ON fifo_shortfalls(transaction_id);
+CREATE INDEX idx_fifo_shortfalls_asset ON fifo_shortfalls(asset);
+
 -- ============================================================
 -- TABLA: price_cache
 -- ============================================================
@@ -362,18 +394,20 @@ CREATE TABLE price_cache (
 CREATE INDEX idx_price_cache_asset ON price_cache(asset, price_date DESC);
 
 -- ============================================================
--- TABLA: price_close_madrid — cierre diario a las 00:00 Europe/Madrid (#164)
--- (también en migrations/001_price_close_madrid.sql para bases ya desplegadas)
+-- TABLA: price_close_daily: cierre diario a las 00:00 locales de cada zona
+-- (#164, #389). Antes price_close_madrid (migraciones 001 y 015).
 -- ============================================================
-CREATE TABLE price_close_madrid (
+CREATE TABLE price_close_daily (
   asset       TEXT NOT NULL,
-  close_date  DATE NOT NULL,                 -- día local (Europe/Madrid) cuyo cierre representa
+  timezone    TEXT NOT NULL,                 -- zona IANA del día local (#389)
+  close_date  DATE NOT NULL,                 -- día local cuyo cierre representa
   price_eur   NUMERIC(38, 18) NOT NULL,      -- -1 = sin precio en ninguna fuente
   source      TEXT NOT NULL,
   fetched_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (asset, close_date),
-  CONSTRAINT chk_price_close_madrid_source CHECK (source IN ('binance_1h', 'coingecko_daily', 'coinpaprika_daily', 'okx_1d', 'none')),
-  CONSTRAINT chk_price_close_madrid_price CHECK (price_eur > 0 OR (price_eur = -1 AND source = 'none'))
+  CONSTRAINT price_close_daily_pkey PRIMARY KEY (asset, timezone, close_date),
+  CONSTRAINT chk_price_close_daily_source CHECK (source IN ('binance_1h', 'coingecko_daily', 'coinpaprika_daily', 'okx_1d', 'none')),
+  CONSTRAINT chk_price_close_daily_price CHECK (price_eur > 0 OR (price_eur = -1 AND source = 'none')),
+  CONSTRAINT chk_price_close_daily_timezone CHECK (char_length(timezone) BETWEEN 1 AND 64)
 );
 
 -- ============================================================
@@ -381,13 +415,37 @@ CREATE TABLE price_close_madrid (
 -- Logos de los activos descargados por el backend y servidos desde el propio
 -- origen; 'missing' = sin logo disponible (se reintenta más adelante).
 -- ============================================================
+-- Tramos IRPF por ejercicio (#452): solo los tipos cambiados a mano; cada
+-- ejercicio parte de la escala oficial del ahorro de su año (escalasAhorro.ts).
+CREATE TABLE irpf_escalas (
+  ejercicio   INTEGER PRIMARY KEY CHECK (ejercicio BETWEEN 2000 AND 2100),
+  tipos       NUMERIC(5, 2)[] NOT NULL,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_irpf_escalas_tipos CHECK (
+    cardinality(tipos) BETWEEN 1 AND 10
+    AND 0 < ALL(tipos) AND 100 >= ALL(tipos)
+  )
+);
+
+-- Copias previas a una restauración (#453): el estado anterior, para volver atrás.
+CREATE TABLE backup_snapshots (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  schema      INTEGER NOT NULL,
+  counts      JSONB NOT NULL,
+  data        JSONB NOT NULL
+);
+
 CREATE TABLE asset_icons (
   symbol        TEXT PRIMARY KEY,
   status        TEXT NOT NULL,
   content_type  TEXT,
   data          BYTEA,
   fetched_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- De dónde salió el logo (#449): CoinGecko, el paquete local o una bandera.
+  source        TEXT,
   CONSTRAINT chk_asset_icons_status CHECK (status IN ('ok', 'missing')),
+  CONSTRAINT chk_asset_icons_source CHECK (source IS NULL OR source IN ('coingecko', 'local', 'flag')),
   CONSTRAINT chk_asset_icons_content CHECK (
     (status = 'ok' AND data IS NOT NULL AND octet_length(data) <= 262144
        AND content_type IN ('image/png', 'image/jpeg', 'image/webp'))
@@ -415,7 +473,16 @@ CREATE TABLE asset_metadata (
   -- relleno automático de pares no los vuelve a añadir (#277).
   disabled_pairs     TEXT[] NOT NULL DEFAULT '{}',
   -- Id de CoinPaprika (#337): fuente de respaldo; se busca una sola vez por activo.
-  coinpaprika_id     TEXT CHECK (char_length(coinpaprika_id) <= 100)
+  coinpaprika_id     TEXT CHECK (char_length(coinpaprika_id) <= 100),
+  -- Id de CoinGecko solo para el logo (#449), aparte de coingecko_id (precios):
+  -- resuelto por símbolo («auto») o fijado a mano en Ajustes («manual»).
+  icon_coingecko_id  TEXT,
+  icon_id_source     TEXT,
+  CONSTRAINT chk_asset_metadata_icon_id CHECK (
+    (icon_coingecko_id IS NULL) = (icon_id_source IS NULL)
+    AND (icon_coingecko_id IS NULL OR icon_coingecko_id ~ '^[a-z0-9][a-z0-9-]{0,99}$')
+    AND (icon_id_source IS NULL OR icon_id_source IN ('auto', 'manual'))
+  )
 );
 
 INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_eur_pair, price_source) VALUES

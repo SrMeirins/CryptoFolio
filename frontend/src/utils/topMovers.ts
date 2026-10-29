@@ -152,6 +152,18 @@ export function heatBackground(pct: number, cap: number): string {
   return `color-mix(in srgb, ${tone} calc(${level} * var(--cf-heat-max) * 1%), var(--cf-bg-tertiary))`
 }
 
+/**
+ * Variables del marco de intensidad del calendario (#412): `--card` con el
+ * color del signo y `--heat` con el nivel de la escala (0 a 1). El borde y el
+ * brillo de la tarjeta crecen con el nivel (clases heat-frame y heat-body).
+ */
+export function heatVars(pnl: number, cap: number): Record<'--card' | '--heat', string> {
+  return {
+    '--card': pnl > 0 ? 'var(--cf-positive)' : pnl < 0 ? 'var(--cf-negative)' : 'var(--cf-fg-subtle)',
+    '--heat': heatLevel(pnl, cap).toFixed(3),
+  }
+}
+
 /** Resumen de la vista Total: posiciones en ganancia y en pérdida, mejor y peor. */
 export function moversSummary(items: readonly MoverData[]): { gains: number; losses: number; best: MoverData | null; worst: MoverData | null } {
   return {

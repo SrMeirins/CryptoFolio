@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toDisplayAmount, localDayKey, fmtDate, fmtDateGroup, calcEurValue, calcFeeEur, valuationHint, flowSign, monthlyTableRows } from './helpers'
+import { toDisplayAmount, localDayKey, fmtDate, fmtDateGroup, calcEurValue, calcFeeEur, valuationHint, flowSign, feeSummary, walletFlow, rowFlowSign, fiatSideNote } from './helpers'
 
 describe('toDisplayAmount (#177)', () => {
   it('EUR: el importe tal cual', () => {
@@ -65,10 +65,64 @@ describe('flowSign (#346)', () => {
   })
 })
 
-describe('monthlyTableRows (#351)', () => {
-  it('cada mes con sus categorías y «Otros» como resto del total', () => {
-    const [r] = monthlyTableRows([{ mes: '2026-09', total_ops: 10, compras: 3, ventas: 2, otras_salidas: 1, ingresos: 1, transferencias: 2 }])
-    expect(r).toMatchObject({ compras: 3, ventas: 2, otrasSalidas: 1, ingresos: 1, transferencias: 2, otros: 1, total: 10 })
-    expect(r.mes).toMatch(/sept/)
+describe('feeSummary (#371)', () => {
+  const base = { fee_amount: '0.1', fee_value_eur: 2, fee_value_source: 'fifo' as const, usd_per_eur: 1.1, grouped_fees: [] }
+  const g = (value_eur: number | null, value_source: 'fifo' | 'estimado' | 'sin_precio' = 'fifo') =>
+    ({ id: String(Math.random()), asset: 'BNB', amount: '0.01', value_eur, value_source })
+
+  it('suma la comisión propia y las agrupadas', () => {
+    expect(feeSummary({ ...base, grouped_fees: [g(3), g(5)] }, 'EUR')).toEqual({ count: 3, total: 10, missing: 0, estimated: false })
+  })
+
+  it('en USD con el tipo de la fecha; sin tipo, cuentan como sin precio', () => {
+    expect(feeSummary({ ...base, grouped_fees: [g(3)] }, 'USD').total).toBeCloseTo(5.5, 10)
+    expect(feeSummary({ ...base, usd_per_eur: null, grouped_fees: [g(3)] }, 'USD')).toMatchObject({ total: null, missing: 2 })
+  })
+
+  it('sin comisión propia, solo las agrupadas; marca estimadas y sin precio', () => {
+    const s = feeSummary({ ...base, fee_amount: null, fee_value_eur: null, grouped_fees: [g(1, 'estimado'), g(null, 'sin_precio')] }, 'EUR')
+    expect(s).toEqual({ count: 2, total: 1, missing: 1, estimated: true })
+  })
+})
+
+// Sentido respecto a la wallet filtrada (#395).
+describe('walletFlow y rowFlowSign (#395)', () => {
+  const A = 'wallet-a', B = 'wallet-b'
+  const retiro = { operation_type: 'WITHDRAW', wallet_id: A, destination_wallet_id: B }
+  const transfer = { operation_type: 'TRANSFER_INTERNAL', wallet_id: A, destination_wallet_id: B }
+
+  it('desde la wallet de destino es una entrada, con +', () => {
+    expect(walletFlow(retiro, B)).toBe('entrada')
+    expect(rowFlowSign(retiro, B)).toBe('+')
+    expect(rowFlowSign(transfer, B)).toBe('+')
+  })
+
+  it('desde la wallet de origen es una salida, con -', () => {
+    expect(walletFlow(transfer, A)).toBe('salida')
+    expect(rowFlowSign(transfer, A)).toBe('−')
+    expect(rowFlowSign(retiro, A)).toBe('−')
+  })
+
+  it('sin filtro, sin destino o hacia la misma wallet manda el tipo', () => {
+    expect(walletFlow(retiro)).toBeNull()
+    expect(rowFlowSign(transfer)).toBe('')
+    expect(walletFlow({ wallet_id: A, destination_wallet_id: null }, A)).toBeNull()
+    expect(rowFlowSign({ operation_type: 'BUY', wallet_id: A, destination_wallet_id: null }, A)).toBe('+')
+    expect(walletFlow({ wallet_id: A, destination_wallet_id: A }, A)).toBeNull()
+  })
+})
+
+// Filas registradas al revés por el exchange (#416).
+describe('fiatSideNote (#416)', () => {
+  const tx = (operation_type: string, asset: string, cost_asset: string | null) => ({ operation_type, asset, cost_asset })
+  it('vender fiat es comprar la contrapartida y comprar fiat, venderla', () => {
+    expect(fiatSideNote(tx('SELL', 'EUR', 'USDC'))).toBe('compra de USDC')
+    expect(fiatSideNote(tx('BUY', 'EUR', 'ADA'))).toBe('venta de ADA')
+  })
+  it('sin aclaración en las normales o entre fiats', () => {
+    expect(fiatSideNote(tx('BUY', 'XRP', 'EUR'))).toBeNull()
+    expect(fiatSideNote(tx('SELL', 'BTC', 'USDT'))).toBeNull()
+    expect(fiatSideNote(tx('SELL', 'EUR', 'USD'))).toBeNull()
+    expect(fiatSideNote(tx('DEPOSIT_FIAT', 'EUR', null))).toBeNull()
   })
 })

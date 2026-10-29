@@ -2,12 +2,25 @@ import { Router } from 'express';
 import { db } from '../../db/client';
 import { EUR_MOVEMENTS_SQL } from '../../modules/fiat/eurMovements';
 import { currencySchema, fxSql } from '../../modules/fiat/displayCurrency';
+import { getAppTimezone } from '../../modules/time/appTimezone';
 
 const router = Router();
 
-// GET /api/fifo/summary — Resumen fiscal por año
+// GET /api/fifo/summary: resumen fiscal por año, en la zona de la aplicación
+// (#388). Mismas columnas que la vista v_fiscal_year (fija en Madrid), que se
+// conserva hasta una limpieza posterior.
 router.get('/summary', async (_req, res) => {
-  const result = await db.query('SELECT * FROM v_fiscal_year ORDER BY fiscal_year');
+  const tz = await getAppTimezone(db);
+  const result = await db.query(`
+    SELECT EXTRACT(YEAR FROM consumed_at AT TIME ZONE $1)::INTEGER AS fiscal_year,
+           SUM(gain_loss_eur) AS total_gain_loss_eur,
+           SUM(CASE WHEN gain_loss_eur > 0 THEN gain_loss_eur ELSE 0 END) AS total_gains_eur,
+           SUM(CASE WHEN gain_loss_eur < 0 THEN gain_loss_eur ELSE 0 END) AS total_losses_eur,
+           COUNT(*) AS num_operations
+    FROM fifo_lot_consumptions
+    WHERE fiscal_event_type != 'NONE'
+    GROUP BY fiscal_year
+    ORDER BY fiscal_year`, [tz]);
   res.json(result.rows);
 });
 

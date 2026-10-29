@@ -1,7 +1,7 @@
 import { formatMoney, type Currency } from './format'
 
-// Línea secundaria de las tarjetas de resumen del Dashboard (#210). Funciones
-// puras para que el texto sea el mismo en ambos temas y en EUR y USD.
+// Datos de la ayuda de las tarjetas de resumen del Dashboard (#210, #412).
+// Funciones puras para que el texto sea el mismo en ambos temas y en EUR y USD.
 
 /** «13 activos en cartera». */
 export function costSecondary(assetCount: number): string {
@@ -11,12 +11,4 @@ export function costSecondary(assetCount: number): string {
 /** «Sobre X invertidos». */
 export function returnSecondary(totalCost: number, currency: Currency): string {
   return `Sobre ${formatMoney(totalCost, currency)} invertidos`
-}
-
-/** «+X depositado» y «−Y retirado», en dos líneas. */
-export function flowSecondary(deposited: number, withdrawn: number, currency: Currency): [string, string] {
-  return [
-    `+${formatMoney(Math.abs(deposited), currency)} depositado`,
-    `−${formatMoney(Math.abs(withdrawn), currency)} retirado`,
-  ]
 }

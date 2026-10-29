@@ -4,7 +4,7 @@ import { portfolioApi, type AssetMetadata } from '../../../api/portfolio'
 import { Toggle } from '../../../components/Toggle'
 import { inputClass } from './helpers'
 import { PairInputsGrid } from './PairInputsGrid'
-import { T } from '../../../utils/colors'
+import { T, alpha, ink } from '../../../utils/colors'
 import { cardClasses, buttonClasses, iconButtonClasses } from '../../../components/ui'
 
 type DetectStatus = 'idle' | 'detecting' | 'found_binance' | 'found_coingecko' | 'notfound'
@@ -114,14 +114,14 @@ export function AddAssetDialog({ onClose, onSaved }: { onClose: () => void; onSa
 
       {status === 'found_binance' && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-positive/8 border border-positive/20 text-xs text-positive-ink">
-          <CheckCircle size={12} /> Encontrado en Binance — pares configurados automáticamente
+          <CheckCircle size={12} /> Encontrado en Binance: pares configurados automáticamente
         </div>
       )}
       {status === 'found_coingecko' && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs"
-          style={{ backgroundColor: '#8b5cf608', borderColor: '#8b5cf630', color: T.purple }}>
+          style={{ backgroundColor: alpha(T.purple, 3), borderColor: alpha(T.purple, 19), color: ink(T.purple) }}>
           <CheckCircle size={12} />
-          Encontrado en CoinGecko — precio vía <span className="font-mono font-medium">{geckoId}</span>
+          Encontrado en CoinGecko, precio vía <span className="font-mono font-medium">{geckoId}</span>
         </div>
       )}
       {status === 'notfound' && (

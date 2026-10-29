@@ -1,8 +1,8 @@
 import { X, Building2, Smartphone, Usb, Banknote, Wallet as WalletIcon, type LucideIcon } from 'lucide-react'
-import { panelEnterStyle } from '../../components/ui'
-import { formatMoney, formatPercent, pnlColor } from '../../utils/format'
+import { StatCard } from '../../components/ui'
+import { formatMoney, formatPercent } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
-import { alpha, ink } from '../../utils/colors'
+import { ink } from '../../utils/colors'
 import { assetHue } from '../../utils/assetInitials'
 import { daysSince, formatAge } from '../../utils/portfolioLots'
 import { distinctHues, type WalletSummary } from '../../utils/portfolioInventory'
@@ -54,9 +54,10 @@ function Composition({ w }: { w: WalletSummary }) {
   )
 }
 
-// Tarjetas de wallet de Portfolio (#270, #283): tipo, valor, % del total,
-// composición, P&L no realizado y antigüedad media. Pulsar una filtra la
-// tabla por esa wallet; otra vez, quita el filtro.
+// Tarjetas de wallet de Portfolio (#270, #283) con StatCard (#417): color de
+// la wallet, valor como cifra, chip con el P&L no realizado y su %, y la barra
+// de composición. Tipo, peso, activos y antigüedad van en la ayuda. Pulsar una
+// filtra la tabla por esa wallet; otra vez, quita el filtro.
 export function WalletCards({ wallets, selected, onSelect }: {
   wallets: WalletSummary[]
   selected: string | null
@@ -64,6 +65,7 @@ export function WalletCards({ wallets, selected, onSelect }: {
 }) {
   const currency = useCurrency()
   const active = wallets.find(w => w.walletId === selected)
+  const money = (v: number) => formatMoney(v, currency)
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2 min-h-6">
@@ -79,45 +81,29 @@ export function WalletCards({ wallets, selected, onSelect }: {
       <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(14rem,1fr))]" role="group" aria-label="Filtrar la tabla por wallet">
         {wallets.map((w, i) => {
           const on = w.walletId === selected
-          const Icon = KIND_ICON[w.kind] ?? (w.kind ? WalletIcon : Banknote)
           const ageDays = daysSince(w.avgOpenedAt)
+          const pnlText = w.pnl === null ? null
+            : `${w.pnl >= 0 ? '+' : ''}${money(w.pnl)}${w.pnlPct !== null ? ` · ${formatPercent(w.pnlPct, 1, true)}` : ''}`
           return (
-            <button key={w.walletId} type="button" aria-pressed={on} onClick={() => onSelect(on ? null : w.walletId)}
-              // Elevación al pasar el cursor o con el foco (#283): `translate` no choca con la animación de entrada (transform).
-              className={`panel-in text-left rounded-xl border border-border bg-background-card px-4 py-3 space-y-2.5 transition-[translate,box-shadow,border-color,opacity] duration-200
-                hover:-translate-y-0.5 focus-visible:-translate-y-0.5 motion-reduce:translate-y-0 hover:border-(--wallet) focus-visible:border-(--wallet)
-                hover:shadow-[0_10px_24px_-14px_var(--wallet)] focus-visible:shadow-[0_10px_24px_-14px_var(--wallet)]
-                focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${selected && !on ? 'opacity-60 hover:opacity-100' : ''}`}
-              style={{
-                ...panelEnterStyle(i + 3), ['--wallet' as string]: w.color,
-                borderColor: on ? w.color : undefined, backgroundColor: on ? alpha(w.color, 6) : undefined,
-              }}>
-              <span className="flex items-center gap-2 min-w-0">
-                <span className="size-7 rounded-lg grid place-items-center shrink-0" style={{ backgroundColor: alpha(w.color, 14), color: ink(w.color) }} aria-hidden="true">
-                  <Icon size={14} strokeWidth={2.2} />
-                </span>
-                <span className="text-sm font-semibold truncate" style={{ color: ink(w.color) }}>{w.name}</span>
-                <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-md border border-border/60 uppercase tracking-wider text-fg-subtle shrink-0">
-                  {KIND_LABEL[w.kind] ?? (w.kind || 'Fiat')}
-                </span>
-              </span>
-              <span className="flex items-baseline justify-between gap-2 flex-wrap">
-                <span className="mono tabular-nums text-lg font-semibold text-fg leading-tight">{formatMoney(w.value, currency)}</span>
-                <span className="mono tabular-nums text-xs text-fg-subtle">{formatPercent(w.pct, 1)} del total</span>
-              </span>
-              {w.pnl !== null && (
-                <span className={`block mono tabular-nums text-xs ${pnlColor(w.pnl)}`}>
-                  {w.pnl >= 0 ? '+' : ''}{formatMoney(w.pnl, currency)}
-                  {w.pnlPct !== null && <span> ({formatPercent(w.pnlPct, 1, true)})</span>}
-                  <span className="text-fg-subtle font-sans"> no realizado</span>
-                </span>
+            <StatCard key={w.walletId} title={w.name} icon={KIND_ICON[w.kind] ?? (w.kind ? WalletIcon : Banknote)} color={w.color}
+              value={w.value} format={money} delay={i * 60}
+              chip={pnlText && (
+                <span className={`mono text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${w.pnl! >= 0 ? 'bg-positive/10 text-positive-ink' : 'bg-negative/10 text-negative-ink'}`}>{pnlText}</span>
               )}
-              <Composition w={w} />
-              <span className="flex items-center justify-between gap-2 text-[11px] text-fg-subtle">
-                <span>{w.assetCount} {w.assetCount === 1 ? 'activo' : 'activos'}</span>
-                {ageDays !== null && <span title="Antigüedad media de los lotes, ponderada por coste">{formatAge(ageDays)}</span>}
-              </span>
-            </button>
+              footer={<Composition w={w} />}
+              onSelect={() => onSelect(on ? null : w.walletId)} active={on}
+              actionLabel={`${pnlText ? `P&L no realizado ${pnlText}. ` : ''}${on ? 'Quitar el filtro de la tabla' : 'Filtrar la tabla por esta wallet'}`}
+              helpLabel={`Detalle de la wallet ${w.name}`}
+              help={<>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+                  <dt className="text-fg-muted">Tipo</dt><dd className="text-right">{KIND_LABEL[w.kind] ?? (w.kind || 'Fiat')}</dd>
+                  <dt className="text-fg-muted">Peso en la cartera</dt><dd className="mono text-right">{formatPercent(w.pct, 1)}</dd>
+                  <dt className="text-fg-muted">Activos</dt><dd className="mono text-right">{w.assetCount}</dd>
+                  {ageDays !== null && <><dt className="text-fg-muted">Antigüedad media</dt><dd className="text-right">{formatAge(ageDays)}</dd></>}
+                </dl>
+                {pnlText && <p>P&L no realizado de sus posiciones con precio: <span className="mono">{pnlText}</span>.</p>}
+                <p className="text-fg-muted">Pulsa la tarjeta para ver solo esta wallet en la tabla.</p>
+              </>} />
           )
         })}
       </div>

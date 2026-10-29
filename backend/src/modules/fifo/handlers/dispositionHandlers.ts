@@ -238,6 +238,11 @@ export async function processTransfer(tx: Transaction, result: FifoRunResult, cl
   if (quantityToMove > FIFO_SHORTFALL_EPSILON && tx.operation_type === 'WITHDRAW') {
     result.errors.push(`TRANSFER sin lotes suficientes para ${tx.asset} tx=${tx.id} (faltan ${quantityToMove.toFixed(6)})`);
   }
+  // Para el saldo corrido (#380) cuenta también en una transferencia interna:
+  // sin efecto fiscal, pero la wallet de origen no tenía esa cantidad.
+  if (quantityToMove > FIFO_SHORTFALL_EPSILON) {
+    result.shortfalls.push({ txId: tx.id, asset: tx.asset, walletId: tx.wallet_id, requested: tx.amount, missing: quantityToMove });
+  }
 }
 
 // ── FEE ───────────────────────────────────────────────────────────────────

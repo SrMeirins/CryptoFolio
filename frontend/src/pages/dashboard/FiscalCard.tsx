@@ -5,7 +5,7 @@ import { portfolioApi, type FiscalYear } from '../../api/portfolio'
 import { formatEur, formatPercent } from '../../utils/format'
 import { EurOnlyBadge } from '../../components/EurOnlyBadge'
 import { AnimatedNumber } from '../../components/AnimatedNumber'
-import { PanelHeader, badgeClasses, cardClasses } from '../../components/ui'
+import { PanelHeader, badgeClasses, panelSurface } from '../../components/ui'
 import { fiscalSubtitle } from '../../utils/panelSubtitles'
 import { baseTramosCompensada } from '../../utils/tramosIrpf'
 import { deadlineFromHito, deadlineUrgency, estimatedTax, gainLossShares } from '../../utils/fiscalPanel'
@@ -31,7 +31,8 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
   const currentYear = new Date().getFullYear()
   const current = data.find((fy) => fy.fiscal_year === currentYear) ?? data[data.length - 1]
   const year = current?.fiscal_year
-  const tramos = useTramos()
+  // Escala del ejercicio que se muestra (#452).
+  const tramos = useTramos(year)
 
   // Mismas consultas (y caché) que la página Fiscal.
   const { data: summary } = useQuery({
@@ -69,7 +70,7 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
 
   return (
     // Misma altura que Distribución: el gráfico mensual ocupa el espacio libre (#236).
-    <div className={cardClasses('none', 'overflow-hidden h-full flex flex-col')}>
+    <div className={panelSurface('none', 'overflow-hidden h-full flex flex-col')}>
       <PanelHeader
         icon={Landmark}
         title="Fiscal"

@@ -42,7 +42,7 @@ describe('historyQuerySchema', () => {
 
   it('normaliza el activo a mayúsculas y rechaza caracteres no permitidos', () => {
     const r = parse({ asset: 'btc' });
-    expect(r.success && r.data.asset).toBe('BTC');
+    expect(r.success && r.data.asset).toEqual(['BTC']);
     expect(parse({ asset: "BTC'--" }).success).toBe(false);
   });
 
@@ -75,7 +75,7 @@ describe('buildHistoryWhere', () => {
     const { where, params } = buildHistoryWhere(f, 'Europe/Madrid');
     expect(where).not.toContain('ETH');
     expect(where).not.toContain('50');
-    expect(params).toEqual(['ETH', 'Europe/Madrid', '2026-01-01', '2026-01-31', '%50\\%%']);
+    expect(params).toEqual([['ETH'], 'Europe/Madrid', '2026-01-01', '2026-01-31', '%50\\%%']);
     expect(where).toContain("ESCAPE '\\'");
   });
 
@@ -112,5 +112,39 @@ describe('orden y exportación (#349)', () => {
       expect(buildHistoryOrderBy('valor', dir)).toMatch(/^ORDER BY \(t\.value_eur IS NULL\) ASC, t\.value_eur (ASC|DESC), t\.timestamp DESC, t\.id DESC$/);
     }
     expect(buildHistoryOrderBy('activo', 'asc')).toContain('t.id DESC');
+  });
+});
+
+describe('filtros avanzados (#366)', () => {
+  it('tipos y activos como listas separadas por comas, sin repetidos ni vacíos', () => {
+    const r = parse({ type: 'BUY, SELL,BUY,', asset: 'btc,xrp' });
+    expect(r.success && r.data.type).toEqual(['BUY', 'SELL']);
+    expect(r.success && r.data.asset).toEqual(['BTC', 'XRP']);
+  });
+
+  it('rechaza listas vacías, con un valor inválido o de más de 30', () => {
+    expect(parse({ type: ',' }).success).toBe(false);
+    expect(parse({ type: "BUY,SELL' OR '1'='1" }).success).toBe(false);
+    expect(parse({ asset: Array.from({ length: 31 }, (_, i) => `A${i}`).join(',') }).success).toBe(false);
+    expect(parse({ asset: Array.from({ length: 30 }, (_, i) => `A${i}`).join(',') }).success).toBe(true);
+  });
+
+  it('importes: positivos, con punto decimal y mínimo ≤ máximo', () => {
+    expect(parse({ value_min: '10.5', value_max: '100' }).success).toBe(true);
+    for (const v of ['-1', '1,5', 'abc', '1e9', '']) expect(parse({ value_min: v }).success, v).toBe(false);
+    expect(parse({ value_min: '200', value_max: '100' }).success).toBe(false);
+  });
+
+  it('listas con ANY sobre un array parametrizado y búsqueda en hash y archivo', () => {
+    const f = historyQuerySchema.parse({ type: 'BUY,SELL', search: 'abc' });
+    const { where, params } = buildHistoryWhere(f, 'Europe/Madrid');
+    expect(where).toContain('t.operation_type::text = ANY($1::text[])');
+    expect(where).toContain('t.tx_hash ILIKE $2');
+    expect(where).toContain('ci.filename ILIKE $2');
+    expect(params).toEqual([['BUY', 'SELL'], '%abc%']);
+  });
+
+  it('hasFilters cuenta el rango de importe', () => {
+    expect(hasFilters(historyExportSchema.parse({ value_max: '50' }))).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rankMovers } from './topMovers'
+import { rankMovers, heatVars } from './topMovers'
 import type { AssetValuation } from './portfolioValuation'
 
 // Activo cripto con valor = cantidad × precio y coste dado.
@@ -156,5 +156,17 @@ describe('heatAlpha y moversSummary (#233)', () => {
     expect(s.best?.asset).toBe('A')
     expect(s.worst?.asset).toBe('C')
     expect(moversSummary([mover('A', -1, 1)]).best).toBeNull()
+  })
+})
+
+describe('heatVars (#412)', () => {
+  it('color del signo y nivel de la escala para el marco del calendario', () => {
+    expect(heatVars(100, 100)).toEqual({ '--card': 'var(--cf-positive)', '--heat': '1.000' })
+    expect(heatVars(-25, 100)).toEqual({ '--card': 'var(--cf-negative)', '--heat': '0.560' })
+    expect(heatVars(0, 100)).toEqual({ '--card': 'var(--cf-fg-subtle)', '--heat': '0.000' })
+  })
+
+  it('más intensidad cuanto mayor el importe', () => {
+    expect(Number(heatVars(10, 100)['--heat'])).toBeLessThan(Number(heatVars(50, 100)['--heat']))
   })
 })

@@ -5,12 +5,14 @@ import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
 
 // Logos servidos desde el propio origen (#201), sin red real: la llamada a
 // CoinGecko y la descarga de cada imagen se simulan.
-const { marketsMock } = vi.hoisted(() => ({ marketsMock: vi.fn() }));
+const { marketsMock, localIconMock } = vi.hoisted(() => ({ marketsMock: vi.fn(), localIconMock: vi.fn() }));
 vi.mock('../prices/coingeckoClient', () => ({
   BASE_URL: 'https://api.coingecko.test/api/v3',
   enqueueCoinGeckoCall: (fn: () => Promise<unknown>) => fn(),
   fetchWithRetry: marketsMock,
 }));
+// Paquete local de logos (#449): vacío salvo en las pruebas que lo usan.
+vi.mock('./iconSources', async importOriginal => ({ ...(await importOriginal<typeof import('./iconSources')>()), localIcon: localIconMock }));
 
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(32)]);
 const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(32)]);
@@ -23,6 +25,7 @@ let pool: Pool;
 let icons: typeof import('./assetIcons');
 let app: import('express').Express;
 let downloads: Record<string, Buffer | 'html' | 'big'>;
+let searchResults: Record<string, Array<{ id: string; symbol: string; market_cap_rank: number | null }>>;
 
 function imageResponse(body: Buffer | 'html' | 'big'): Response {
   if (body === 'html') return new Response('<html>404</html>', { status: 404, headers: { 'content-type': 'text/html' } });
@@ -56,10 +59,16 @@ describe('assetIcons (#201)', () => {
       return imageResponse(downloads[id] ?? 'html');
     }));
     marketsMock.mockReset();
+    searchResults = {};
     marketsMock.mockImplementation(async (url: string) => {
-      const ids = new URL(url).searchParams.get('ids')!.split(',');
+      const u = new URL(url);
+      // Búsqueda por símbolo (#449): candidatos sintéticos por consulta.
+      if (u.pathname.endsWith('/search')) return { coins: searchResults[u.searchParams.get('query')!] ?? [] };
+      const ids = u.searchParams.get('ids')!.split(',');
       return ids.map(id => ({ id, image: OK_URL(id) }));
     });
+    localIconMock.mockReset();
+    localIconMock.mockReturnValue(null);
   });
 
   describe('sniffImageType', () => {
@@ -154,6 +163,55 @@ describe('assetIcons (#201)', () => {
       await expect(icons.syncAssetIcons({ force: true })).resolves.toBeUndefined();
       expect((await pool.query(`SELECT count(*)::int AS n FROM asset_icons WHERE ${CRYPTO}`)).rows[0].n).toBe(0);
       expect((await pool.query(`SELECT status FROM asset_icons WHERE symbol = 'EUR'`)).rows[0].status).toBe('ok');
+    });
+
+    describe('cadena de fuentes (#449)', () => {
+      const meta = async (symbol: string) => (await pool.query(
+        `SELECT am.coingecko_id, am.icon_coingecko_id, am.icon_id_source, ai.status, ai.source
+         FROM asset_metadata am LEFT JOIN asset_icons ai ON ai.symbol = am.symbol WHERE am.symbol = $1`, [symbol])).rows[0];
+      const sintetico = (symbol: string) => pool.query(`INSERT INTO asset_metadata (symbol, name, price_source) VALUES ($1, 'Sintético', 'eur_direct')`, [symbol]);
+
+      it('sin id, lo resuelve por símbolo solo para el logo: nunca toca coingecko_id', async () => {
+        await sintetico('SINTA');
+        searchResults = { SINTA: [{ id: 'otra', symbol: 'SINTA', market_cap_rank: 900 }, { id: 'sint-a', symbol: 'sinta', market_cap_rank: 12 }, { id: 'parecida', symbol: 'SINTAX', market_cap_rank: 1 }] };
+        downloads = { 'sint-a': PNG };
+        await icons.syncAssetIcons({ force: true });
+        expect(await meta('SINTA')).toEqual({ coingecko_id: null, icon_coingecko_id: 'sint-a', icon_id_source: 'auto', status: 'ok', source: 'coingecko' });
+      });
+
+      it('sin logo en CoinGecko usa el paquete local; sin ninguno, «sin logo»', async () => {
+        await sintetico('SINTB');
+        await sintetico('SINTC');
+        localIconMock.mockImplementation((symbol: string) => (symbol === 'SINTB' ? PNG : null));
+        await icons.syncAssetIcons({ force: true });
+        expect(await meta('SINTB')).toMatchObject({ status: 'ok', source: 'local', icon_coingecko_id: null });
+        expect(await meta('SINTC')).toMatchObject({ status: 'missing', source: null });
+      });
+
+      it('un fichero local que no es una imagen no se guarda', async () => {
+        await sintetico('SINTD');
+        localIconMock.mockReturnValue(Buffer.from('<svg onload="alert(1)"/>'));
+        await icons.syncAssetIcons({ force: true });
+        expect(await meta('SINTD')).toMatchObject({ status: 'missing' });
+      });
+
+      it('si la búsqueda falla por la red, no se marca «sin logo» y se reintenta', async () => {
+        await sintetico('SINTE');
+        marketsMock.mockRejectedValue(new Error('timeout'));
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        await icons.syncAssetIcons({ force: true });
+        expect((await meta('SINTE')).status).toBeNull();
+      });
+
+      it('el id manual del logo manda sobre el de precios', async () => {
+        await pool.query(`UPDATE asset_metadata SET icon_coingecko_id = 'bitcoin-logo', icon_id_source = 'manual' WHERE symbol = 'BTC'`);
+        downloads = { 'bitcoin-logo': PNG };
+        await icons.syncAssetIcons({ force: true });
+        const ids = marketsMock.mock.calls.flatMap(c => new URL(c[0]).searchParams.get('ids')?.split(',') ?? []);
+        expect(ids).toContain('bitcoin-logo');
+        expect(ids).not.toContain('bitcoin');
+        await pool.query(`UPDATE asset_metadata SET icon_coingecko_id = NULL, icon_id_source = NULL WHERE symbol = 'BTC'`);
+      });
     });
 
     it('las monedas fiat guardan su bandera (#246); sin bandera quedan «sin logo»', async () => {

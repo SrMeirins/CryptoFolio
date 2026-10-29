@@ -269,7 +269,7 @@
 
 /* ── Tarjetas de métricas: chip de 24h según el ancho de la tarjeta (#152) ── */
 /* El umbral se mide sobre el área de contenido de la tarjeta (sin padding). */
-.metric-card { container-type: inline-size; }
+.stat-card-body { container-type: inline-size; }
 .change24h-full { display: none; }
 @container (min-width: 180px) {
   .change24h-full { display: inline; }
@@ -348,6 +348,26 @@
 }
 .calendar-live { animation: calendarLive 2.4s ease-in-out infinite; }
 
+/* Marco de intensidad del calendario (#412): el estilo de StatCard con el
+   borde degradado y el brillo de la esquina proporcionales a --heat (0 a 1),
+   para que el mapa de calor se siga leyendo de un vistazo. */
+.heat-frame {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--card) calc(12% + var(--heat, 1) * 48%), transparent),
+    color-mix(in srgb, var(--card) calc(4% + var(--heat, 1) * 6%), transparent) 55%,
+    color-mix(in srgb, var(--card) calc(8% + var(--heat, 1) * 24%), transparent));
+}
+.heat-swatch {
+  background: color-mix(in srgb, var(--card) calc(var(--heat, 1) * 42%), var(--cf-bg-card));
+  border: 1px solid color-mix(in srgb, var(--card) calc(20% + var(--heat, 1) * 50%), transparent);
+}
+/* Fondo con la intensidad del día en toda la celda (más color cuanto mayor el
+   importe) y un brillo en la esquina, como StatCard. */
+.heat-body {
+  background-color: color-mix(in srgb, var(--card) calc(var(--heat, 1) * 42%), var(--cf-bg-card));
+  background-image: radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--card) calc(var(--heat, 1) * 22%), transparent), transparent 70%);
+}
+
 /* Entrada escalonada de los paneles (#232); el retraso lo da panelEnterStyle(). */
 @keyframes panelIn {
   from { opacity: 0; transform: translateY(8px); }
@@ -369,27 +389,68 @@
 .sparkline-reveal { transform-box: fill-box; transform-origin: left; transform: scaleX(0); animation: sparkReveal 0.9s ease-out 0.15s forwards; }
 @keyframes sparkReveal { to { transform: scaleX(1); } }
 
-/* ── Microinteracciones (#255) ─────────────────────────────────────────── */
-/* Brillo de borde con el acento del tema al pasar el cursor o al navegar con
-   teclado dentro del panel (solo foco visible, no al hacer clic). */
-.panel-glow {
-  transition: box-shadow 0.25s ease-out, transform 0.25s ease-out;
+/* ── Ajustes (#445) ────────────────────────────────────────────────────────
+   Cambio de sección con fundido y desplazamiento corto; marca de guardado que
+   aparece y se desvanece. Quietos con «Reducir movimiento» (regla global). */
+@keyframes settingsSectionIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.settings-section-in { animation: settingsSectionIn 0.24s ease-out both; }
+@keyframes savedMark {
+  0%   { opacity: 0; transform: scale(0.8); }
+  15%  { opacity: 1; transform: scale(1); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
 }
-.panel-glow:hover,
-.panel-glow:has(:focus-visible) {
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--cf-brand) 32%, transparent),
-    0 10px 28px -14px color-mix(in srgb, var(--cf-brand) 55%, transparent);
+.saved-mark { animation: savedMark 2.2s ease-out both; }
+/* Sin movimiento, la marca se queda fija en lugar de desvanecerse al instante. */
+@media (prefers-reduced-motion: reduce) { .saved-mark { animation: none; } }
+.settings-nav-indicator { transition: transform 0.25s ease-out, width 0.25s ease-out, height 0.25s ease-out; }
+
+/* ── Paneles grandes en versión ligera (#255, #419) ──────────────────────
+   Una sola clase para gráficos y tablas: brillo suave en la esquina con el
+   acento del panel (--panel, marca por defecto) y borde iluminado al pasar el
+   cursor o al navegar con teclado dentro (solo foco visible). Sin elevación ni
+   borde degradado: eso es de las tarjetas de métricas. */
+.panel-soft {
+  background-image: radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--panel, var(--cf-brand)) 7%, transparent), transparent 45%);
+  transition: border-color 0.25s ease-out, box-shadow 0.25s ease-out;
 }
-/* Tooltip translúcido del gráfico de evolución: deja intuir la curva detrás. */
-.glass-tooltip {
-  background: color-mix(in srgb, var(--cf-tooltip-bg) 78%, transparent);
-  border: 1px solid color-mix(in srgb, var(--cf-brand) 18%, var(--cf-border));
-  box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.45);
-  backdrop-filter: blur(10px) saturate(1.4);
-  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+.panel-soft:hover,
+.panel-soft:has(:focus-visible) {
+  border-color: color-mix(in srgb, var(--panel, var(--cf-brand)) 38%, var(--cf-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--panel, var(--cf-brand)) 14%, transparent);
 }
 
 /* ── Panel lateral (#272): entra desde la derecha ─────────────────────────── */
 @keyframes drawerIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 .drawer-in { animation: drawerIn 0.22s ease-out both; }
+
+/* ── Tarjetas de métricas (#407, #410) ─────────────────────────────────────
+   StatCard (components/ui): borde degradado del color de la tarjeta (--card),
+   brillo y elevación al pasar el cursor o con foco, y entrada escalonada.
+   «Reducir movimiento» las deja quietas (regla global de arriba). */
+.stat-card {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--card) 55%, transparent),
+    color-mix(in srgb, var(--card) 8%, transparent) 55%,
+    color-mix(in srgb, var(--card) 28%, transparent));
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+.stat-card:hover,
+.stat-card:has(> button:focus-visible) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--card) 35%, transparent),
+    0 14px 30px -16px color-mix(in srgb, var(--card) 70%, transparent);
+}
+.stat-card[data-active='true'] {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--card) 70%, transparent);
+}
+.stat-card-body {
+  background-color: var(--cf-bg-card);
+  background-image: radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--card) 16%, transparent), transparent 65%);
+}
+@keyframes statCardIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.stat-card-in { animation: statCardIn 0.35s ease-out both; }

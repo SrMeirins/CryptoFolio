@@ -1,4 +1,5 @@
 import { HIDDEN_AMOUNT, amountsAreHidden, formatNumber } from './format'
+import { zonedFormat } from './zonedFormat'
 
 // Tabla de operaciones de Fiscal (#295): tipos en castellano, fechas en hora
 // de Madrid y cantidades sin notación científica. Funciones puras.
@@ -31,15 +32,15 @@ export function formatFiscalDate(fecha: string): string {
   return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}`
 }
 
-const DETAIL_DAY = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: 'Europe/Madrid' })
-const DETAIL_TIME = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })
+const DETAIL_DAY = () => zonedFormat('es-ES', { dateStyle: 'long' })
+const DETAIL_TIME = () => zonedFormat('es-ES', { hour: '2-digit', minute: '2-digit' })
 
 /** Tooltip con la hora de Madrid: «1 de enero de 2026, 00:30». */
 export function fiscalDateDetail(iso: string | undefined): string | undefined {
   if (!iso) return undefined
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return undefined
-  return `${DETAIL_DAY.format(d)}, ${DETAIL_TIME.format(d)}`
+  return `${DETAIL_DAY().format(d)}, ${DETAIL_TIME().format(d)}`
 }
 
 /** Cantidad sin notación científica: 3 cifras significativas por debajo de 0,01. Oculta en modo privacidad. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adjacentYear, cuotaAhorro, madridMonthDay, parseVista, yearComparison } from './fiscalHeader'
+import { adjacentYear, cuotaAhorro, localMonthDay, parseVista, yearComparison } from './fiscalHeader'
 
 // Cabecera y navegación de Fiscal (#297). Datos sintéticos.
 describe('parseVista', () => {
@@ -33,11 +33,11 @@ describe('cuotaAhorro', () => {
   })
 })
 
-describe('madridMonthDay', () => {
+describe('localMonthDay', () => {
   it('el día de Madrid, no el de UTC', () => {
-    expect(madridMonthDay(new Date('2026-06-14T21:30:00Z'))).toBe('06-14')
-    expect(madridMonthDay(new Date('2026-06-14T22:30:00Z'))).toBe('06-15')
-    expect(madridMonthDay(new Date('2025-12-31T23:30:00Z'))).toBe('01-01')
+    expect(localMonthDay(new Date('2026-06-14T21:30:00Z'))).toBe('06-14')
+    expect(localMonthDay(new Date('2026-06-14T22:30:00Z'))).toBe('06-15')
+    expect(localMonthDay(new Date('2025-12-31T23:30:00Z'))).toBe('01-01')
   })
 })
 

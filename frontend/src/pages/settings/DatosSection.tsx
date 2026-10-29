@@ -1,14 +1,20 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
-import { RefreshCw, Trash2, Zap, Download } from 'lucide-react'
+import { RefreshCw, Trash2, Zap, ArrowLeftRight, Layers, FileUp, Tag, Wallet, Coins, BarChart3, Wrench, AlertTriangle, HardDrive, Upload, Calculator, CalendarClock, type LucideIcon } from 'lucide-react'
 import { useToast } from '../../hooks/useToast'
-import { useRunFifo } from '../../hooks/useRunFifo'
+import { useRunFifoStream } from '../../hooks/useRunFifoStream'
 import { T } from '../../utils/colors'
-import { cardClasses, buttonClasses, fieldClasses } from '../../components/ui'
+import { buttonClasses, fieldClasses, StatCard } from '../../components/ui'
+import { SettingsCard } from './SettingsCard'
 import { formatNumber } from '../../utils/format'
+import { BackupCard } from './backup/BackupCard'
+import { AutoBackupCard } from './backup/AutoBackupCard'
+import { FifoRunPanel } from './FifoRunPanel'
+import { healthCards, type HealthCard } from '../../utils/dataHealth'
 
 const CONFIRM_WORD = 'CONFIRMAR'
+const HEALTH_ICON: Record<HealthCard['key'], LucideIcon> = { size: HardDrive, import: Upload, fifo: Calculator, backup: CalendarClock }
 
 export function DatosSection() {
   const queryClient = useQueryClient()
@@ -20,8 +26,7 @@ export function DatosSection() {
   })
   const [clearingCache, setClearingCache] = useState(false)
   const [cacheResult, setCacheResult]     = useState<number | null>(null)
-  const { running: runningFifo, result: fifoResult, run: handleRunFifo } = useRunFifo()
-  const [exporting, setExporting]         = useState(false)
+  const { state: fifoState, running: runningFifo, run: handleRunFifo } = useRunFifoStream()
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [resetInput, setResetInput]       = useState('')
   const [resetting, setResetting]         = useState(false)
@@ -40,20 +45,6 @@ export function DatosSection() {
     }
   }
 
-  async function handleExport() {
-    setExporting(true)
-    try {
-      const data = await portfolioApi.exportBackup()
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const url  = URL.createObjectURL(blob)
-      const a    = document.createElement('a')
-      a.href     = url
-      a.download = `cryptotracker-backup-${new Date().toISOString().slice(0, 10)}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-    } finally { setExporting(false) }
-  }
-
   async function handleReset() {
     if (resetInput !== CONFIRM_WORD) return
     setResetting(true)
@@ -70,36 +61,47 @@ export function DatosSection() {
     }
   }
 
-  const statCards = [
-    { label: 'Transacciones',    value: stats?.transactions, color: T.brand },
-    { label: 'Lotes FIFO',       value: stats?.fifoLots,     color: T.positive },
-    { label: 'Importaciones',    value: stats?.imports,      color: T.warning },
-    { label: 'Precios en caché', value: stats?.priceCache,   color: T.info },
-    { label: 'Wallets',          value: stats?.wallets,      color: T.purple },
-    { label: 'Activos',          value: stats?.assets,       color: '#ec4899' },
+  // Estadísticas como StatCard compactas (#445), con su definición en la ayuda.
+  const statCards: { label: string; value: number | undefined; color: string; icon: LucideIcon; help: string }[] = [
+    { label: 'Transacciones',    value: stats?.transactions, color: T.brand,    icon: ArrowLeftRight, help: 'Operaciones guardadas, importadas o manuales.' },
+    { label: 'Lotes FIFO',       value: stats?.fifoLots,     color: T.positive, icon: Layers,         help: 'Lotes de compra que calcula el motor FIFO, abiertos y cerrados.' },
+    { label: 'Importaciones',    value: stats?.imports,      color: T.warning,  icon: FileUp,         help: 'Archivos CSV importados.' },
+    { label: 'Precios en caché', value: stats?.priceCache,   color: T.info,     icon: Tag,            help: 'Precios históricos guardados para no volver a pedirlos.' },
+    { label: 'Wallets',          value: stats?.wallets,      color: T.purple,   icon: Wallet,         help: 'Wallets configuradas, incluidas las del sistema.' },
+    { label: 'Activos',          value: stats?.assets,       color: T.muted,    icon: Coins,          help: 'Activos con sus pares de precio configurados.' },
   ]
 
+  // Salud (#454): tamaño y lo último hecho; lo que conviene revisar lleva su motivo.
+  const health = stats ? healthCards(stats, new Date()) : []
+
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-4 max-w-3xl">
 
       {/* Stats */}
-      <div className={cardClasses('md', 'space-y-4')}>
-        <h3 className="font-semibold text-sm">Estadísticas de la base de datos</h3>
-        <div className="grid grid-cols-3 gap-3">
-          {statCards.map(s => (
-            <div key={s.label} className="rounded-lg bg-background-tertiary p-3 space-y-1" style={{ borderLeft: `3px solid ${s.color}` }}>
-              <p className="text-xl font-bold mono">
-                {statsLoading ? '—' : formatNumber(s.value ?? 0, 0)}
-              </p>
-              <p className="text-xs text-fg-subtle">{s.label}</p>
-            </div>
+      <SettingsCard index={0} icon={BarChart3} title="Estadísticas de la base de datos">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {statCards.map((s, i) => (
+            <StatCard key={s.label} compact title={s.label} icon={s.icon} color={s.color} delay={i * 40}
+              value={s.value ?? 0} format={v => formatNumber(v, 0)} loading={statsLoading}
+              help={<p>{s.help}</p>} helpLabel={`Qué cuenta ${s.label}`} />
           ))}
         </div>
-      </div>
+        <div className="grid grid-cols-2 gap-2" aria-label="Salud de los datos" role="group">
+          {health.map((h, i) => (
+            <StatCard key={h.key} compact title={h.label} icon={HEALTH_ICON[h.key]} color={h.warning ? T.warning : T.muted} delay={(i + 6) * 40}
+              value={h.value} loading={statsLoading}
+              chip={h.warning && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-warning/12 text-warning-ink whitespace-nowrap">{h.warning}</span>}
+              help={<p>{h.help}</p>} helpLabel={`Qué indica ${h.label}`} />
+          ))}
+        </div>
+      </SettingsCard>
+
+      {/* Copias de seguridad (#453) y automáticas (#454) */}
+      <BackupCard index={1} />
+      <AutoBackupCard index={2} />
 
       {/* Mantenimiento */}
-      <div className={cardClasses('md', 'space-y-3')}>
-        <h3 className="font-semibold text-sm">Mantenimiento</h3>
+      <SettingsCard index={3} icon={Wrench} title="Mantenimiento">
         <div className="space-y-2">
 
           {/* Limpiar caché */}
@@ -120,46 +122,27 @@ export function DatosSection() {
             </div>
           </div>
 
-          {/* Re-ejecutar FIFO */}
-          <div className="flex items-center justify-between py-3 border-b border-border/50">
-            <div>
-              <p className="text-sm font-medium">Re-ejecutar motor FIFO</p>
-              <p className="text-xs text-fg-subtle mt-0.5">Recalcula todos los lotes y plusvalías desde cero.</p>
-            </div>
-            <div className="flex items-center gap-3">
-              {fifoResult && (
-                <span className={`text-xs ${fifoResult.startsWith('Error') ? 'text-negative' : 'text-positive'}`}>
-                  {fifoResult}
-                </span>
-              )}
-              <button type="button" onClick={handleRunFifo} disabled={runningFifo}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                style={{ backgroundColor: '#6366f118', color: T.brand }}>
-                {runningFifo ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
-                Ejecutar
+          {/* Re-ejecutar FIFO con progreso y resumen (#454) */}
+          <div className="py-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Re-ejecutar motor FIFO</p>
+                <p className="text-xs text-fg-subtle mt-0.5">Recalcula todos los lotes y plusvalías desde cero y compara con lo anterior.</p>
+              </div>
+              <button type="button" onClick={() => void handleRunFifo()} disabled={runningFifo}
+                className={buttonClasses('secondary', 'md', 'flex')}>
+                {runningFifo ? <RefreshCw size={13} aria-hidden="true" className="animate-spin" /> : <Zap size={13} aria-hidden="true" />}
+                {runningFifo ? 'Calculando...' : 'Ejecutar'}
               </button>
             </div>
-          </div>
-
-          {/* Exportar backup */}
-          <div className="flex items-center justify-between py-3">
-            <div>
-              <p className="text-sm font-medium">Exportar backup</p>
-              <p className="text-xs text-fg-subtle mt-0.5">Descarga un JSON con todas las transacciones, wallets y configuración.</p>
-            </div>
-            <button type="button" onClick={handleExport} disabled={exporting}
-              className={buttonClasses('secondary', 'md', 'flex')}>
-              {exporting ? <RefreshCw size={13} className="animate-spin" /> : <Download size={13} />}
-              Descargar
-            </button>
+            <FifoRunPanel state={fifoState} />
           </div>
 
         </div>
-      </div>
+      </SettingsCard>
 
       {/* Zona de peligro */}
-      <div className="rounded-xl border border-negative/30 bg-negative/5 p-5 space-y-3">
-        <h3 className="font-semibold text-sm text-negative">Zona de peligro</h3>
+      <SettingsCard index={4} icon={AlertTriangle} title="Zona de peligro" tone="danger">
 
         {!showResetConfirm ? (
           <div className="flex items-center justify-between">
@@ -203,8 +186,7 @@ export function DatosSection() {
             </div>
           </div>
         )}
-      </div>
-
+      </SettingsCard>
     </div>
   )
 }

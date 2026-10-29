@@ -2,22 +2,18 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../../db/client';
 import { runFifoEngine } from '../../modules/fifo/engine';
-import { avisoCalendario } from '../../modules/fiscal/calendarioFiscal';
-import { obligaciones721 } from '../../modules/fiscal/obligacion721';
 import { getHistoricalPriceEur } from '../../modules/prices/binance';
 import { requireConfirm, sendZodError } from './settingsShared';
 import { sendInternalError } from '../../middleware/errorHandler';
+import { collectNotifications } from '../../modules/notifications/collect';
+import { dismissWith, notificationState, readNotificationPrefs, saveDismissed, visibleNotifications } from '../../modules/notifications/preferences';
 
-import { coberturaActual } from '../../modules/csv/coberturaDb';
-import { avisosCobertura } from '../../modules/csv/coberturaAvisos';
-import { avisosVerificacion } from '../../modules/walletSync/avisos';
-import { getLivePrice } from '../../modules/prices/liveFeed';
 const router = Router();
 
 const bulkSetCostsSchema = z.object({
   updates: z.array(z.object({
     id:           z.string().min(1, 'id es requerido'),
-    pricePerUnit: z.number({ message: 'pricePerUnit debe ser un número' }),
+    pricePerUnit: z.number({ error: 'pricePerUnit debe ser un número' }),
   })).min(1, 'updates no puede estar vacío'),
 });
 
@@ -25,6 +21,8 @@ const bulkSetCostsSchema = z.object({
 // Convierte a LOST los WITHDRAW+destination_pending=TRUE cuya operación CSV
 // original era "Asset Recovery" o "Token Swap - Distribution" con change < 0.
 // Binance fuerza estos retiros (delisting): no van a ninguna wallet, son pérdidas.
+// La operación original sale de la fila del CSV (#374): las columnas fijas de
+// raw_transactions guardan el tipo ya normalizado y nunca coincidían.
 router.post('/transactions/fix-stale-withdrawals', async (_req: Request, res: Response) => {
   try {
     const result = await db.query(
@@ -33,13 +31,14 @@ router.post('/transactions/fix-stale-withdrawals', async (_req: Request, res: Re
            destination_wallet_id = NULL,
            destination_pending   = FALSE,
            notes = COALESCE(t.notes,
-             rt.operation || ' — activo retirado por Binance')
+             (rt.original_row->>'Operation') || ' — activo retirado por Binance')
        FROM raw_transactions rt
        WHERE rt.transaction_id = t.id
          AND t.operation_type = 'WITHDRAW'
          AND t.destination_pending = TRUE
-         AND rt.operation IN ('Asset Recovery', 'Token Swap - Distribution')
-         AND rt.change < 0
+         AND t.original_import IS NULL  -- las editadas a mano no se tocan (#378)
+         AND rt.original_row->>'Operation' IN ('Asset Recovery', 'Token Swap - Distribution')
+         AND rt.original_row->>'Change' LIKE '-%'
        RETURNING t.id, t.asset, t.timestamp`
     );
     res.json({ fixed: result.rows.length, records: result.rows });
@@ -78,116 +77,33 @@ router.delete('/price-cache/failed', async (req: Request, res: Response) => {
 
 // ── GET /api/settings/notifications ───────────────────────────────────────
 // Recopila avisos del sistema clasificados por severidad
-router.get('/notifications', async (_req: Request, res: Response) => {
-  const notifications: Array<{
-    id: string; type: 'error' | 'warning' | 'info'; category: string; message: string; count?: number;
-  }> = [];
-
-  // 1. Activos sin precio: sin fuente configurada, o en cartera sin precio en vivo
-  //    de ninguna fuente aunque la tengan (p. ej. par retirado) (#337).
-  const candidatosRes = await db.query(
-    `SELECT am.symbol, am.price_source,
-            EXISTS (SELECT 1 FROM fifo_lots fl WHERE fl.asset = am.symbol AND NOT fl.is_closed) AS en_cartera
-     FROM asset_metadata am
-     WHERE am.is_stablecoin = FALSE AND am.price_source <> 'fiat'
-     ORDER BY am.symbol`
-  );
-  const sinPrecio = (candidatosRes.rows as { symbol: string; price_source: string; en_cartera: boolean }[])
-    .filter(r => r.price_source === 'unknown' || (r.en_cartera && getLivePrice(r.symbol) === null))
-    .map(r => r.symbol);
-  if (sinPrecio.length > 0) {
-    notifications.push({
-      id: 'no-price',
-      type: 'warning',
-      category: 'Precios',
-      message: `${sinPrecio.length} activo${sinPrecio.length > 1 ? 's' : ''} sin precio: ${sinPrecio.join(', ')}. Revísalos en Ajustes › Activos con el filtro «Sin precio».`,
-      count: sinPrecio.length,
-    });
+router.get('/notifications', async (req: Request, res: Response) => {
+  // Filtrados según las preferencias (#447); con ?incluir=todas, todos con sus marcas.
+  const all = await collectNotifications();
+  const prefs = await readNotificationPrefs(db);
+  if (req.query.incluir === 'todas') {
+    res.json(all.map(n => ({ ...n, ...notificationState(n, prefs) })));
+    return;
   }
+  res.json(visibleNotifications(all, prefs));
+});
 
-  // 2. Retiros sin wallet destino asignada (solo WITHDRAWs reales; otros types con el flag son datos corruptos)
-  const pendingRes = await db.query(
-    `SELECT asset, COUNT(*) as cnt FROM transactions
-     WHERE destination_pending = TRUE AND operation_type = 'WITHDRAW'
-     GROUP BY asset ORDER BY asset`
-  );
-  if (pendingRes.rows.length > 0) {
-    const total = pendingRes.rows.reduce((s: number, r: {cnt: string}) => s + parseInt(r.cnt), 0);
-    const assets = pendingRes.rows.map((r: {asset: string}) => r.asset).join(', ');
-    notifications.push({
-      id: 'pending-withdrawals',
-      type: 'warning',
-      category: 'Retiros',
-      message: `${total} retiro${total > 1 ? 's' : ''} sin wallet destino asignada (${assets}). Ve a Historial para asignarlos.`,
-      count: total,
-    });
+// ── POST /api/settings/notifications/dismiss ─────────────────────────────
+// Descarta avisos (#447) hasta que cambie su contenido: guarda la huella de
+// los indicados, o de todos los visibles si no se indica ninguno.
+const dismissSchema = z.object({ ids: z.array(z.string().min(1).max(80)).max(50).optional() });
+router.post('/notifications/dismiss', async (req: Request, res: Response) => {
+  const validation = dismissSchema.safeParse(req.body ?? {});
+  if (!validation.success) {
+    sendZodError(res, validation.error);
+    return;
   }
-
-  // 3. Depósitos de cripto externo sin coste de adquisición — bloquean el FIFO
-  const cryptoDepositRes = await db.query(
-    `SELECT COUNT(*) AS cnt FROM transactions
-     WHERE notes LIKE '%Depósito de cripto externo%'
-       AND price_per_unit IS NULL`
-  );
-  const cryptoDepositCount = parseInt(cryptoDepositRes.rows[0].cnt);
-  if (cryptoDepositCount > 0) {
-    notifications.push({
-      id: 'crypto-deposits',
-      type: 'warning',
-      category: 'Depósitos',
-      message: `${cryptoDepositCount} depósito${cryptoDepositCount > 1 ? 's' : ''} de cripto externo sin coste de adquisición. Revísalos en Importación antes de importar nuevos datos.`,
-      count: cryptoDepositCount,
-    });
-  }
-
-  // 4. Lotes FIFO con activo sin precio (no se puede valorar el portfolio)
-  const noLotPriceRes = await db.query(
-    `SELECT DISTINCT fl.asset
-     FROM fifo_lots fl
-     LEFT JOIN asset_metadata am ON am.symbol = fl.asset
-     WHERE fl.is_closed = FALSE
-       AND fl.quantity_remaining > 0
-       AND (am.price_source = 'unknown' OR am.symbol IS NULL)
-       AND (am.is_stablecoin = FALSE OR am.symbol IS NULL)
-     ORDER BY fl.asset`
-  );
-  if (noLotPriceRes.rows.length > 0) {
-    const assets = noLotPriceRes.rows.map((r: {asset: string}) => r.asset).join(', ');
-    notifications.push({
-      id: 'lots-no-price',
-      type: 'error',
-      category: 'Portfolio',
-      message: `Activos en cartera sin precio de mercado: ${assets}. El valor del portfolio puede estar incompleto.`,
-      count: noLotPriceRes.rows.length,
-    });
-  }
-
-  // Recordatorio del calendario fiscal (#309): a 30 días del próximo hito, información; a 7, aviso.
-  // Sin la obligación del 721 (p. ej. si falla la valoración) el aviso no se pierde: se asume desconocida.
-  const obligado = await obligaciones721().catch(() => () => null);
-  const avisoFiscal = avisoCalendario(new Date(), obligado);
-  if (avisoFiscal) {
-    notifications.push({ id: 'fiscal-calendar', type: avisoFiscal.type, category: 'Fiscal', message: avisoFiscal.message });
-  }
-
-  // Verificación on-chain de las direcciones (#336): última comprobación de cada activo.
-  const verif = await db.query(
-    `SELECT DISTINCT ON (bsl.wallet_address_id, bsl.asset)
-            bsl.asset, bsl.status, bsl.error, bsl.onchain_balance, bsl.expected_balance,
-            w.name AS wallet, COALESCE(n.name, wa.custom_network) AS red
-     FROM balance_sync_log bsl
-     JOIN wallet_addresses wa ON wa.id = bsl.wallet_address_id
-     JOIN wallets w ON w.id = wa.wallet_id
-     LEFT JOIN networks n ON n.id = wa.network_id
-     ORDER BY bsl.wallet_address_id, bsl.asset, bsl.checked_at DESC`,
-  );
-  notifications.push(...avisosVerificacion(verif.rows));
-
-  // Cobertura de importaciones (#328): exchanges sin importar hace más de 60 días y huecos sin revisar.
-  const { despues: coberturas } = await coberturaActual();
-  notifications.push(...avisosCobertura(coberturas));
-
-  res.json(notifications);
+  const all = await collectNotifications();
+  const prefs = await readNotificationPrefs(db);
+  const ids = validation.data.ids;
+  const targets = visibleNotifications(all, prefs).filter(n => !ids || ids.includes(n.id));
+  await saveDismissed(db, dismissWith(prefs.dismissed, targets, all));
+  res.json({ dismissed: targets.length });
 });
 
 // ── GET /api/settings/pending-deposits ───────────────────────────────────
@@ -238,38 +154,6 @@ router.post('/bulk-set-costs', async (req: Request, res: Response) => {
   });
   const fifo = await runFifoEngine();
   res.json({ success: true, updated: updates.length, fifo });
-});
-
-// ── GET /api/settings/backup ──────────────────────────────────────────────
-router.get('/backup', async (_req: Request, res: Response) => {
-  const [txs, walletsRes, assets, config, imports] = await Promise.all([
-    db.query('SELECT * FROM transactions ORDER BY timestamp ASC'),
-    db.query(`
-      SELECT w.*, COALESCE(json_agg(
-        json_build_object(
-          'id', a.id, 'network_name', n.name, 'network_native_asset', n.native_asset,
-          'custom_network', a.custom_network, 'address', a.address, 'explorer_url',
-          COALESCE(a.custom_explorer_url, n.explorer_url)
-        )
-      ) FILTER (WHERE a.id IS NOT NULL), '[]') AS addresses
-      FROM wallets w
-      LEFT JOIN wallet_addresses a ON a.wallet_id = w.id
-      LEFT JOIN networks n ON n.id = a.network_id
-      GROUP BY w.id ORDER BY w.created_at
-    `),
-    db.query('SELECT * FROM asset_metadata ORDER BY symbol'),
-    db.query('SELECT * FROM app_config'),
-    db.query('SELECT id, filename, imported_at, row_count, skipped_count FROM csv_imports ORDER BY imported_at'),
-  ]);
-  res.json({
-    version:      '1.0',
-    exported_at:  new Date().toISOString(),
-    transactions: txs.rows,
-    wallets:      walletsRes.rows,
-    assets:       assets.rows,
-    config:       config.rows,
-    imports:      imports.rows,
-  });
 });
 
 // ── DELETE /api/settings/data/transactions ────────────────────────────────

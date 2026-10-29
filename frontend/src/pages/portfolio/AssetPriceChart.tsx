@@ -9,6 +9,7 @@ import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { formatAmount, formatPercent, formatPrice, type Currency } from '../../utils/format'
 import { zeroSplit } from '../../utils/zeroSplit'
 import { axisPrice, chartMarkers, labelSide, priceSeries, rangeDays, rangeStats, type ChartMarker, type ChartPoint, type ChartRange } from '../../utils/assetPriceChart'
+import { zonedFormat } from '../../utils/zonedFormat'
 
 // Gráfico de precio del panel de detalle (#284): cierres diarios y precio en
 // vivo, línea del precio medio con zona de beneficio/pérdida, compras de los
@@ -25,10 +26,10 @@ const SIDE_POSITION = {
   top: { left: 'insideTopRight', right: 'insideTopLeft', center: 'top' },
   bottom: { left: 'insideBottomRight', right: 'insideBottomLeft', center: 'bottom' },
 } as const
-const DAY = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', timeZone: 'Europe/Madrid' })
-const DAY_YEAR = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Madrid' })
-const fmtDay = (t: number) => DAY.format(t).replace('.', '')
-const fmtDayYear = (t: number) => DAY_YEAR.format(t).replace('.', '')
+const DAY = () => zonedFormat('es-ES', { day: 'numeric', month: 'short' })
+const DAY_YEAR = () => zonedFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+const fmtDay = (t: number) => DAY().format(t).replace('.', '')
+const fmtDayYear = (t: number) => DAY_YEAR().format(t).replace('.', '')
 
 function PriceTooltip({ active, payload, currency }: { active?: boolean; payload?: { payload: ChartPoint }[]; currency: Currency }) {
   if (!active || !payload?.[0]) return null

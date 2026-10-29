@@ -3,10 +3,12 @@ import { z } from 'zod';
 import { compararCifras, type CifrasRenta } from '../../modules/fiscal/declaraciones';
 import { borrarDeclaracion, cifrasRenta, guardarDeclaracion, listarDeclaraciones } from '../../modules/fiscal/declaracionesRepo';
 import { getUmbral721, sumaValorCustodiaExchange, valorizarLotesEnFecha } from '../../modules/fiscal/lotesValoracion';
-import { endOfYearMadrid, madridYearMonth } from '../../modules/fiscal/madridTime';
 import { parseYear, sendZodError } from './fiscalShared';
 import { sendInternalError } from '../../middleware/errorHandler';
 import { resetObligaciones721Cache } from '../../modules/fiscal/obligacion721';
+import { endOfLocalYear, localYearMonth } from '../../modules/time/localTime';
+import { getAppTimezone } from '../../modules/time/appTimezone';
+import { db } from '../../db/client';
 
 // Ejercicios declarados (#311): marcar la Renta o el Modelo 721 de un
 // ejercicio cerrado, consultar las marcas (con los cambios de la Renta desde
@@ -14,14 +16,14 @@ import { resetObligaciones721Cache } from '../../modules/fiscal/obligacion721';
 const router = Router();
 
 const tipoSchema = z.enum(['renta', 'modelo721']);
-const vacio = z.object({}).strict();
-const modelo721Schema = z.object({ valor: z.number().finite().min(0).max(1e12).optional() }).strict();
+const vacio = z.strictObject({});
+const modelo721Schema = z.strictObject({ valor: z.number().min(0).max(1e12).optional() });
 
 /** Solo ejercicios cerrados: el año en curso aún no se ha declarado. */
-function ejercicioCerrado(raw: string, res: Response): number | null {
+function ejercicioCerrado(raw: string, res: Response, tz: string): number | null {
   const year = parseYear(raw);
   if (!year) { res.status(400).json({ error: 'Año inválido' }); return null; }
-  if (year >= madridYearMonth().year) { res.status(400).json({ error: 'Solo se pueden marcar ejercicios cerrados' }); return null; }
+  if (year >= localYearMonth(tz).year) { res.status(400).json({ error: 'Solo se pueden marcar ejercicios cerrados' }); return null; }
   return year;
 }
 
@@ -40,7 +42,8 @@ router.get('/declaraciones', async (_req: Request, res: Response) => {
 
 // PUT /api/fiscal/:year/declaracion/renta — guarda (o actualiza) las cifras actuales
 router.put('/:year/declaracion/renta', async (req: Request, res: Response) => {
-  const year = ejercicioCerrado(req.params.year, res);
+  const tz = await getAppTimezone(db);
+  const year = ejercicioCerrado(req.params.year, res, tz);
   if (!year) return;
   const parsed = vacio.safeParse(req.body ?? {});
   if (!parsed.success) return sendZodError(res, parsed.error);
@@ -53,14 +56,15 @@ router.put('/:year/declaracion/renta', async (req: Request, res: Response) => {
 
 // PUT /api/fiscal/:year/declaracion/modelo721 — valor declarado (por defecto, el de 31 dic)
 router.put('/:year/declaracion/modelo721', async (req: Request, res: Response) => {
-  const year = ejercicioCerrado(req.params.year, res);
+  const tz = await getAppTimezone(db);
+  const year = ejercicioCerrado(req.params.year, res, tz);
   if (!year) return;
   const parsed = modelo721Schema.safeParse(req.body ?? {});
   if (!parsed.success) return sendZodError(res, parsed.error);
   try {
     let valor = parsed.data.valor;
     if (valor === undefined) {
-      const { activos } = await valorizarLotesEnFecha(endOfYearMadrid(year));
+      const { activos } = await valorizarLotesEnFecha(endOfLocalYear(tz, year));
       valor = Math.round(sumaValorCustodiaExchange(activos) * 100) / 100;
     }
     const guardada = await guardarDeclaracion(year, 'modelo721', { valor, umbral: await getUmbral721() });

@@ -165,6 +165,8 @@ export function PreviewStage({
 
   if (nadaQueImportar(preview)) {
     const range = preview.validation.dateRange
+    // Filas importadas antes de #374 que este archivo puede completar.
+    const faltan = preview.originalRowsMissing ?? 0
     return (
       <div className="space-y-4">
         <div className={cardClasses('md', 'text-center space-y-4 py-10')} role="status">
@@ -176,8 +178,16 @@ export function PreviewStage({
               Las {preview.duplicateCount} transacciones de {esLote ? 'estos archivos' : 'este archivo'}{range ? ` (${range.from} – ${range.to})` : ''} ya estaban en tu historial. No hay nada nuevo que importar.
             </p>
           </div>
+          {faltan > 0 && (
+            <p className="text-sm text-fg-muted">
+              {faltan === 1 ? 'Una fila se importó' : `${faltan} filas se importaron`} antes de guardar las filas originales del archivo. Puedes completarlas sin importar nada nuevo.
+            </p>
+          )}
           <div className="flex items-center justify-center gap-2 flex-wrap">
-            <button type="button" onClick={onReset} className={buttonClasses('primary', 'sm', 'flex gap-1.5')}><Upload size={13} aria-hidden="true" /> Subir otro archivo</button>
+            {faltan > 0 && (
+              <button type="button" onClick={onConfirm} className={buttonClasses('primary', 'sm', 'flex gap-1.5')}>Completar filas originales</button>
+            )}
+            <button type="button" onClick={onReset} className={buttonClasses(faltan > 0 ? 'secondary' : 'primary', 'sm', 'flex gap-1.5')}><Upload size={13} aria-hidden="true" /> Subir otro archivo</button>
             <button type="button" onClick={onVerHistorial} className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}><History size={13} aria-hidden="true" /> Ver en Historial</button>
           </div>
         </div>

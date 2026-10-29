@@ -150,6 +150,41 @@ describe('routes/settings — mantenimiento', () => {
     });
   });
 
+  describe('avisos: descartar y silenciar (#447)', () => {
+    const ids = async (q = '') => ((await request(app).get(`/api/settings/notifications${q}`)).body as Array<{ id: string; muted?: boolean; dismissed?: boolean }>);
+
+    it('descartar oculta el aviso hasta que cambia; silenciar oculta su categoría', async () => {
+      await pool.query(`INSERT INTO asset_metadata (symbol, name, price_source) VALUES ('SINTNP1', 'Sintético 1', 'unknown')`);
+      expect((await ids()).map(n => n.id)).toContain('no-price');
+
+      const dis = await request(app).post('/api/settings/notifications/dismiss').send({ ids: ['no-price'] });
+      expect(dis.status).toBe(200);
+      expect(dis.body.dismissed).toBe(1);
+      expect((await ids()).map(n => n.id)).not.toContain('no-price');
+      expect((await ids('?incluir=todas')).find(n => n.id === 'no-price')).toMatchObject({ dismissed: true, muted: false });
+
+      // Otro activo sin precio: el aviso cambia y vuelve a salir.
+      await pool.query(`INSERT INTO asset_metadata (symbol, name, price_source) VALUES ('SINTNP2', 'Sintético 2', 'unknown')`);
+      expect((await ids()).map(n => n.id)).toContain('no-price');
+
+      await pool.query(`INSERT INTO app_config (key, value) VALUES ('notifications_muted', '["precios"]')
+                        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`);
+      expect((await ids()).map(n => n.id)).not.toContain('no-price');
+      expect((await ids('?incluir=todas')).find(n => n.id === 'no-price')).toMatchObject({ muted: true });
+      await pool.query(`DELETE FROM app_config WHERE key = 'notifications_muted'`);
+    });
+
+    it('sin ids descarta todos los visibles; ids no válidos dan 400', async () => {
+      const visibles = (await ids()).length;
+      const res = await request(app).post('/api/settings/notifications/dismiss').send({});
+      expect(res.body.dismissed).toBe(visibles);
+      expect(await ids()).toEqual([]);
+      for (const body of [{ ids: 'no-price' }, { ids: [1] }, { ids: Array.from({ length: 51 }, (_, i) => `x${i}`) }]) {
+        expect((await request(app).post('/api/settings/notifications/dismiss').send(body)).status).toBe(400);
+      }
+    });
+  });
+
   describe('GET /pending-deposits', () => {
     it('devuelve un array (posiblemente vacío)', async () => {
       const res = await request(app).get('/api/settings/pending-deposits');
@@ -158,13 +193,38 @@ describe('routes/settings — mantenimiento', () => {
     });
   });
 
-  describe('GET /backup', () => {
-    it('devuelve las 5 secciones esperadas', async () => {
-      const res = await request(app).get('/api/settings/backup');
+  describe('POST /transactions/fix-stale-withdrawals (#374)', () => {
+    // Datos sintéticos: dos retiros pendientes importados. Solo el que viene de
+    // un «Asset Recovery» (según la fila original del CSV) pasa a pérdida.
+    async function retiro(hash: string, original: Record<string, string> | null): Promise<string> {
+      const w = (await pool.query(`INSERT INTO wallets (name, type) VALUES ($1, 'exchange') RETURNING id`, [`Mant ${hash}`])).rows[0].id;
+      const imp = (await pool.query(
+        `INSERT INTO csv_imports (filename, file_hash, row_count, exchange) VALUES ('sint.csv', $1, 1, 'binance') RETURNING id`, [`fh-${hash}`])).rows[0].id;
+      const tx = (await pool.query(
+        `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id, destination_pending, import_id)
+         VALUES ('WITHDRAW', '2024-05-01T10:00:00Z', 'SINT', 5, 5, $1, TRUE, $2) RETURNING id`, [w, imp])).rows[0].id;
+      await pool.query(
+        `INSERT INTO raw_transactions (import_id, user_id, time, account, operation, coin, change, remark, row_hash, transaction_id, original_row)
+         VALUES ($1, '', '2024-05-01T10:00:00Z', 'Spot', 'WITHDRAW', 'SINT', 5, '', $2, $3, $4::jsonb)`,
+        [imp, hash, tx, original ? JSON.stringify(original) : null]);
+      return tx;
+    }
+
+    it('reclasifica a LOST según la operación original del CSV y deja el resto', async () => {
+      const forzado = await retiro('h-recovery', { Time: '24-05-01 10:00:00', Account: 'Spot', Operation: 'Asset Recovery', Coin: 'SINT', Change: '-5', Remark: '' });
+      const normal = await retiro('h-normal', { Time: '24-05-01 10:00:00', Account: 'Spot', Operation: 'Withdraw', Coin: 'SINT', Change: '-5', Remark: '' });
+      const antiguo = await retiro('h-antiguo', null);
+
+      const res = await request(app).post('/api/settings/transactions/fix-stale-withdrawals');
       expect(res.status).toBe(200);
-      expect(Object.keys(res.body).sort()).toEqual(
-        ['assets', 'config', 'exported_at', 'imports', 'transactions', 'version', 'wallets'].sort()
-      );
+      expect(res.body.records.map((r: { id: string }) => r.id)).toEqual([forzado]);
+
+      const tipos = (await pool.query(
+        `SELECT id, operation_type::text AS t, notes FROM transactions WHERE id = ANY($1)`, [[forzado, normal, antiguo]])).rows;
+      const por = Object.fromEntries(tipos.map(r => [r.id, r]));
+      expect(por[forzado]).toMatchObject({ t: 'LOST', notes: 'Asset Recovery — activo retirado por Binance' });
+      expect(por[normal].t).toBe('WITHDRAW');
+      expect(por[antiguo].t).toBe('WITHDRAW');
     });
   });
 });

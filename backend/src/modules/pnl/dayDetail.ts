@@ -1,6 +1,8 @@
 import { getDailyPnl, previousDay } from './pnlService';
 import { loadPositionEvents, holdingsAtInstants } from './positions';
-import { getCachedCloses, madridCloseInstant, madridDateOf } from '../prices/closePrices';
+import { closeInstant, getCachedCloses, localDateOf } from '../prices/closePrices';
+import { db } from '../../db/client';
+import { getAppTimezone } from '../time/appTimezone';
 import { PRICE_ALIASES } from '../prices/priceAliases';
 import { getAllLivePrices } from '../prices/liveFeed';
 import type { DisplayCurrency } from '../fiat/displayCurrency';
@@ -63,17 +65,18 @@ export function priceContributions(
 
 /** Detalle del día; null si no hay actividad ese día (anterior a la primera operación). */
 export async function getDayDetail(date: string, currency: DisplayCurrency = 'EUR', now = Date.now()): Promise<DayDetail | null> {
-  const today = madridDateOf(now);
+  const tz = await getAppTimezone(db);
+  const today = localDateOf(tz, now);
   const [daily, events] = await Promise.all([getDailyPnl({ from: date, to: date, currency }), loadPositionEvents()]);
   const day = daily.days.find(d => d.date === date);
   if (!day) return null;
 
   const prevDay = previousDay(date);
-  const [holdings] = holdingsAtInstants(events, [madridCloseInstant(prevDay).getTime()]);
+  const [holdings] = holdingsAtInstants(events, [closeInstant(tz, prevDay).getTime()]);
   const assets = new Set<string>();
   for (const a of holdings.keys()) if (a !== 'EUR') assets.add(priceAsset(a));
   if (currency === 'USD') assets.add('USDT');
-  const closes = await getCachedCloses([...assets], prevDay, date);
+  const closes = await getCachedCloses([...assets], prevDay, date, tz);
   const live = getAllLivePrices();
 
   const price = (asset: string, when: 'prev' | 'day'): number | null => {

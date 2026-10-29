@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
 
 // P&L diario de extremo a extremo (#165): transacciones de prueba procesadas
-// por el motor FIFO real, cierres sembrados en price_close_madrid y sin red.
+// por el motor FIFO real, cierres sembrados en price_close_daily (Madrid) y sin red.
 vi.mock('../prices/binance', () => ({
   getHistoricalPriceEur: vi.fn(() => Promise.resolve(1)),
 }));
@@ -37,7 +37,7 @@ async function tx(operation_type: string, timestamp: string, asset: string, amou
 async function closes(asset: string, prices: Record<string, number>) {
   for (const [day, price] of Object.entries(prices)) {
     await db.query(
-      `INSERT INTO price_close_madrid (asset, close_date, price_eur, source) VALUES ($1, $2, $3, 'binance_1h')`,
+      `INSERT INTO price_close_daily (asset, timezone, close_date, price_eur, source) VALUES ($1, 'Europe/Madrid', $2, $3, 'binance_1h')`,
       [asset, day, price],
     );
   }
@@ -47,7 +47,7 @@ async function reset() {
   await db.query('DELETE FROM fifo_lot_consumptions');
   await db.query('DELETE FROM fifo_lots');
   await db.query('DELETE FROM transactions');
-  await db.query('DELETE FROM price_close_madrid');
+  await db.query('DELETE FROM price_close_daily');
 }
 
 beforeAll(async () => {

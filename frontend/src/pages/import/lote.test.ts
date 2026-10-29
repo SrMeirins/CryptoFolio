@@ -33,4 +33,11 @@ describe('lote', () => {
     expect(indicesAConfirmar([arch(0, 'no_reconocido'), arch(1, 'sin_novedades')])).toEqual([1])
     expect(indicesAConfirmar([arch(0, 'no_reconocido')])).toEqual([])
   })
+
+  it('también confirma los archivos sin novedades que completan filas originales (#374)', () => {
+    const completa = (i: number) => ({ ...arch(i, 'sin_novedades'), faltanOriginales: 3 })
+    expect(indicesAConfirmar([completa(0), arch(1, 'sin_novedades'), completa(2)])).toEqual([0, 2])
+    expect(indicesAConfirmar([arch(0, 'listo'), completa(1)])).toEqual([0, 1])
+    expect(indicesAConfirmar([{ ...arch(0, 'no_reconocido'), faltanOriginales: 3 }])).toEqual([])
+  })
 })
