@@ -10,6 +10,7 @@ import { syncAssetIcons } from './modules/assets/assetIcons';
 import { startPairCompletion } from './modules/prices/pairCompletion';
 import { repairMissingCoinGeckoIds } from './modules/prices/coingecko';
 import { scheduleWalletSync } from './modules/walletSync/scheduler';
+import { scheduleAutoBackups } from './modules/backup/autoBackup';
 
 const server = createServer(app);
 const PORT = parseInt(process.env.BACKEND_PORT || '3001', 10);
@@ -36,6 +37,8 @@ async function bootstrap() {
     await runMigrations();
     setupPricesWebSocket(server);
     scheduleWalletSync();
+    // Copias automáticas cifradas con la clave del equipo (#454).
+    scheduleAutoBackups();
 
     // BACKEND_HOST lo fija electron/backend-manager.ts a '127.0.0.1' para no
     // exponer el puerto a la LAN en la app de escritorio (app single-user, sin

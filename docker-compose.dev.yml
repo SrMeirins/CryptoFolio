@@ -113,12 +113,20 @@ services:
       PRICE_REFRESH_INTERVAL_MS: ${PRICE_REFRESH_INTERVAL_MS:-60000}
       # Zona horaria de la aplicación (#388): vacía, Europe/Madrid; la de Ajustes prevalece.
       APP_TIMEZONE: ${APP_TIMEZONE:-}
+      # Copias automáticas cifradas con la clave del equipo (#454), en la
+      # subcarpeta app/ de la carpeta de copias del host. Sin
+      # WALLET_SYNC_ENCRYPTION_KEY no se hacen (nunca en claro).
+      AUTO_BACKUP_DIR: /backups/app
     command: ["npx", "tsx", "watch", "--clear-screen=false", "src/index.ts"]
     volumes:
       # Hot reload: tsx watch lee directamente src/ (no usa dist/)
       - ./backend/src:/app/src
       # Carpeta para subida de CSVs (persiste entre reinicios)
       - csv_uploads:/app/uploads
+      # Carpeta de copias del host (la misma del sidecar db-backup). El
+      # backend corre como node (uid 1000): si tu HOST_UID es otro, la
+      # copia falla con un aviso de permisos en la campana.
+      - ${BACKUP_HOST_DIR_DEV:-~/.local/share/CryptoFolio/backups-dev}:/backups
     ports:
       - "127.0.0.1:${BACKEND_HOST_PORT:-43001}:3001"
     healthcheck:

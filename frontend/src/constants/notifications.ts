@@ -18,6 +18,9 @@ export const NOTIFICATION_ROUTES: Record<string, string> = {
   // Verificación on-chain de direcciones (#336)
   'wallet-discrepancia':  '/settings?tab=wallets',
   'wallet-verificacion':  '/settings?tab=wallets',
+  // Copias automáticas (#454)
+  'backup-failed':        '/settings?tab=datos',
+  'backup-unavailable':   '/settings?tab=datos',
 }
 
 /** Texto del botón que lleva al sitio donde se resuelve cada aviso (#447). */
@@ -32,6 +35,8 @@ export const NOTIFICATION_ACTIONS: Record<string, string> = {
   'import-huecos': 'Ir a Importar',
   'wallet-discrepancia': 'Ir a Wallets',
   'wallet-verificacion': 'Ir a Wallets',
+  'backup-failed': 'Ir a Datos',
+  'backup-unavailable': 'Ir a Datos',
 }
 
 // Metadata visual por tipo de aviso — antes TopBar.tsx y GeneralSection.tsx
@@ -53,6 +58,7 @@ export const NOTIFICATION_CATEGORIES = [
   { key: 'wallets', label: 'Wallets', hint: 'Verificación de saldos en la blockchain' },
   { key: 'importar', label: 'Importar', hint: 'Exchanges sin importar o con huecos' },
   { key: 'fiscal', label: 'Fiscal', hint: 'Plazos de la Renta y del Modelo 721' },
+  { key: 'copias', label: 'Copias', hint: 'Copias automáticas fallidas o sin hacer' },
 ] as const
 export type NotificationCategory = typeof NOTIFICATION_CATEGORIES[number]['key']
 

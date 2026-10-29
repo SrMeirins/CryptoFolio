@@ -14,6 +14,8 @@ interface BackendOptions {
   // funcionando normalmente, solo la verificación de saldos on-chain queda
   // deshabilitada (falla de forma controlada al intentar guardar una key).
   walletSyncEncryptionKey?: string;
+  // Carpeta de las copias automáticas cifradas del backend (#454).
+  autoBackupDir?: string;
 }
 
 export class BackendManager {
@@ -22,6 +24,7 @@ export class BackendManager {
   private readonly port: number;
   private readonly onCrash?: (detail: string) => void;
   private readonly walletSyncEncryptionKey?: string;
+  private readonly autoBackupDir?: string;
   private recentStderr: string[] = [];
   private running = false;
 
@@ -33,6 +36,7 @@ export class BackendManager {
     this.port = opts.port ?? BACKEND_PORT_BASE;
     this.onCrash = opts.onCrash;
     this.walletSyncEncryptionKey = opts.walletSyncEncryptionKey;
+    this.autoBackupDir = opts.autoBackupDir;
   }
 
   /** Ruta al entry point del backend compilado (#396). */
@@ -61,6 +65,7 @@ export class BackendManager {
         ...(this.walletSyncEncryptionKey
           ? { WALLET_SYNC_ENCRYPTION_KEY: this.walletSyncEncryptionKey }
           : {}),
+        ...(this.autoBackupDir ? { AUTO_BACKUP_DIR: this.autoBackupDir } : {}),
       },
       stdio: 'pipe',
     });

@@ -811,6 +811,8 @@ export const portfolioApi = {
   getStats: () => api.get<{
     transactions: number; fifoLots: number; imports: number
     priceCache: number; wallets: number; assets: number
+    /** Salud (#454): tamaño en disco y fechas ISO de lo último hecho, o null. */
+    dbSizeBytes: number; lastImportAt: string | null; lastFifoAt: string | null; lastBackupAt: string | null
   }>('/settings/stats'),
   // El backend exige { confirm: true } en estos dos borrados destructivos de
   // alcance amplio (ver routes/settings/settingsShared.ts, requireConfirm) —

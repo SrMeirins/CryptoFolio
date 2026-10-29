@@ -6,6 +6,8 @@ import { DISPLAY_CURRENCIES } from '../../modules/fiat/displayCurrency';
 import { sendZodError } from './settingsShared';
 import { VIEWS_KEY } from '../../modules/history/savedViews';
 import { preferenceSchemas } from '../../modules/settings/preferences';
+import { autoBackupAvailability } from '../../modules/backup/autoBackup';
+import { listAutoBackups } from '../../modules/backup/autoBackupStore';
 import { DISMISSED_KEY } from '../../modules/notifications/preferences';
 import { DEFAULT_TIMEZONE, TIMEZONE_CONFIG_KEY, getTimezoneInfo, invalidateTimezoneCache, isValidTimeZone } from '../../modules/time/appTimezone';
 
@@ -80,14 +82,22 @@ router.get('/timezone', async (_req: Request, res: Response) => {
 
 // ── GET /api/settings/stats ────────────────────────────────────────────────
 router.get('/stats', async (_req: Request, res: Response) => {
-  const [txs, lots, imports, cache, wallets, assets] = await Promise.all([
+  const [txs, lots, imports, cache, wallets, assets, health] = await Promise.all([
     db.query('SELECT COUNT(*) FROM transactions'),
     db.query('SELECT COUNT(*) FROM fifo_lots'),
     db.query('SELECT COUNT(*) FROM csv_imports'),
     db.query('SELECT COUNT(*) FROM price_cache'),
     db.query('SELECT COUNT(*) FROM wallets'),
     db.query('SELECT COUNT(*) FROM asset_metadata'),
+    // Salud (#454): tamaño en disco, última importación y último FIFO (los
+    // lotes se recrean en cada ejecución, así que su fecha es la del FIFO).
+    db.query(`SELECT pg_database_size(current_database()) AS size,
+                     (SELECT MAX(imported_at) FROM csv_imports) AS last_import,
+                     (SELECT MAX(created_at) FROM fifo_lots) AS last_fifo`),
   ]);
+  const av = autoBackupAvailability();
+  const [lastBackup] = av.available ? await listAutoBackups(av.dir).catch(() => []) : [];
+  const h = health.rows[0];
   res.json({
     transactions: parseInt(txs.rows[0].count),
     fifoLots:     parseInt(lots.rows[0].count),
@@ -95,6 +105,10 @@ router.get('/stats', async (_req: Request, res: Response) => {
     priceCache:   parseInt(cache.rows[0].count),
     wallets:      parseInt(wallets.rows[0].count),
     assets:       parseInt(assets.rows[0].count),
+    dbSizeBytes:  Number(h.size),
+    lastImportAt: h.last_import ? new Date(h.last_import).toISOString() : null,
+    lastFifoAt:   h.last_fifo ? new Date(h.last_fifo).toISOString() : null,
+    lastBackupAt: lastBackup?.created_at ?? null,
   });
 });
 

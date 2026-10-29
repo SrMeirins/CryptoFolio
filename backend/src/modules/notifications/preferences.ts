@@ -18,6 +18,7 @@ export const NOTIFICATION_CATEGORIES = {
   wallets: 'Wallets',
   importar: 'Importar',
   fiscal: 'Fiscal',
+  copias: 'Copias',
 } as const;
 export type CategoryKey = keyof typeof NOTIFICATION_CATEGORIES;
 const CATEGORY_KEYS = Object.keys(NOTIFICATION_CATEGORIES) as CategoryKey[];
