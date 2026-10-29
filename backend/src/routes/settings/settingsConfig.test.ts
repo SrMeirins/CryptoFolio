@@ -140,13 +140,14 @@ describe('routes/settings — config y stats', () => {
   });
 
   describe('GET /stats', () => {
-    it('devuelve los 6 contadores esperados', async () => {
+    it('devuelve los 6 contadores y la salud de la base (#454)', async () => {
       const res = await request(app).get('/api/settings/stats');
       expect(res.status).toBe(200);
       expect(Object.keys(res.body).sort()).toEqual(
-        ['assets', 'fifoLots', 'imports', 'priceCache', 'transactions', 'wallets'].sort()
+        ['assets', 'dbSizeBytes', 'fifoLots', 'imports', 'lastBackupAt', 'lastFifoAt', 'lastImportAt', 'priceCache', 'transactions', 'wallets'].sort()
       );
       expect(typeof res.body.transactions).toBe('number');
+      expect(res.body.dbSizeBytes).toBeGreaterThan(0);
     });
   });
 });

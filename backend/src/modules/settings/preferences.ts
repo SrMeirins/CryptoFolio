@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MUTED_KEY, mutedSchema } from '../notifications/preferences';
+import { autoBackupSchemas } from '../backup/autoBackupSettings';
 
 // Preferencias de General (#446): claves de app_config con un conjunto cerrado
 // de valores. El PUT genérico las valida antes de guardarlas.
@@ -22,4 +23,6 @@ export const preferenceSchemas: Record<string, z.ZodType<string>> = {
   [START_PAGE_KEY]: z.enum(START_PAGES, { error: 'start_page debe ser una de las páginas de inicio permitidas' }),
   // Categorías de avisos silenciadas (#447).
   [MUTED_KEY]: mutedSchema,
+  // Copias automáticas (#454).
+  ...autoBackupSchemas,
 };

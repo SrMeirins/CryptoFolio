@@ -1,16 +1,20 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
-import { RefreshCw, Trash2, Zap, ArrowLeftRight, Layers, FileUp, Tag, Wallet, Coins, BarChart3, Wrench, AlertTriangle, type LucideIcon } from 'lucide-react'
+import { RefreshCw, Trash2, Zap, ArrowLeftRight, Layers, FileUp, Tag, Wallet, Coins, BarChart3, Wrench, AlertTriangle, HardDrive, Upload, Calculator, CalendarClock, type LucideIcon } from 'lucide-react'
 import { useToast } from '../../hooks/useToast'
-import { useRunFifo } from '../../hooks/useRunFifo'
+import { useRunFifoStream } from '../../hooks/useRunFifoStream'
 import { T } from '../../utils/colors'
 import { buttonClasses, fieldClasses, StatCard } from '../../components/ui'
 import { SettingsCard } from './SettingsCard'
 import { formatNumber } from '../../utils/format'
 import { BackupCard } from './backup/BackupCard'
+import { AutoBackupCard } from './backup/AutoBackupCard'
+import { FifoRunPanel } from './FifoRunPanel'
+import { healthCards, type HealthCard } from '../../utils/dataHealth'
 
 const CONFIRM_WORD = 'CONFIRMAR'
+const HEALTH_ICON: Record<HealthCard['key'], LucideIcon> = { size: HardDrive, import: Upload, fifo: Calculator, backup: CalendarClock }
 
 export function DatosSection() {
   const queryClient = useQueryClient()
@@ -22,7 +26,7 @@ export function DatosSection() {
   })
   const [clearingCache, setClearingCache] = useState(false)
   const [cacheResult, setCacheResult]     = useState<number | null>(null)
-  const { running: runningFifo, result: fifoResult, run: handleRunFifo } = useRunFifo()
+  const { state: fifoState, running: runningFifo, run: handleRunFifo } = useRunFifoStream()
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [resetInput, setResetInput]       = useState('')
   const [resetting, setResetting]         = useState(false)
@@ -67,6 +71,9 @@ export function DatosSection() {
     { label: 'Activos',          value: stats?.assets,       color: T.muted,    icon: Coins,          help: 'Activos con sus pares de precio configurados.' },
   ]
 
+  // Salud (#454): tamaño y lo último hecho; lo que conviene revisar lleva su motivo.
+  const health = stats ? healthCards(stats, new Date()) : []
+
   return (
     <div className="space-y-4 max-w-3xl">
 
@@ -79,13 +86,22 @@ export function DatosSection() {
               help={<p>{s.help}</p>} helpLabel={`Qué cuenta ${s.label}`} />
           ))}
         </div>
+        <div className="grid grid-cols-2 gap-2" aria-label="Salud de los datos" role="group">
+          {health.map((h, i) => (
+            <StatCard key={h.key} compact title={h.label} icon={HEALTH_ICON[h.key]} color={h.warning ? T.warning : T.muted} delay={(i + 6) * 40}
+              value={h.value} loading={statsLoading}
+              chip={h.warning && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-warning/12 text-warning-ink whitespace-nowrap">{h.warning}</span>}
+              help={<p>{h.help}</p>} helpLabel={`Qué indica ${h.label}`} />
+          ))}
+        </div>
       </SettingsCard>
 
-      {/* Copias de seguridad (#453) */}
+      {/* Copias de seguridad (#453) y automáticas (#454) */}
       <BackupCard index={1} />
+      <AutoBackupCard index={2} />
 
       {/* Mantenimiento */}
-      <SettingsCard index={2} icon={Wrench} title="Mantenimiento">
+      <SettingsCard index={3} icon={Wrench} title="Mantenimiento">
         <div className="space-y-2">
 
           {/* Limpiar caché */}
@@ -106,31 +122,27 @@ export function DatosSection() {
             </div>
           </div>
 
-          {/* Re-ejecutar FIFO */}
-          <div className="flex items-center justify-between py-3">
-            <div>
-              <p className="text-sm font-medium">Re-ejecutar motor FIFO</p>
-              <p className="text-xs text-fg-subtle mt-0.5">Recalcula todos los lotes y plusvalías desde cero.</p>
-            </div>
-            <div className="flex items-center gap-3">
-              {fifoResult && (
-                <span className={`text-xs ${fifoResult.startsWith('Error') ? 'text-negative' : 'text-positive'}`}>
-                  {fifoResult}
-                </span>
-              )}
-              <button type="button" onClick={handleRunFifo} disabled={runningFifo}
+          {/* Re-ejecutar FIFO con progreso y resumen (#454) */}
+          <div className="py-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Re-ejecutar motor FIFO</p>
+                <p className="text-xs text-fg-subtle mt-0.5">Recalcula todos los lotes y plusvalías desde cero y compara con lo anterior.</p>
+              </div>
+              <button type="button" onClick={() => void handleRunFifo()} disabled={runningFifo}
                 className={buttonClasses('secondary', 'md', 'flex')}>
-                {runningFifo ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
-                Ejecutar
+                {runningFifo ? <RefreshCw size={13} aria-hidden="true" className="animate-spin" /> : <Zap size={13} aria-hidden="true" />}
+                {runningFifo ? 'Calculando...' : 'Ejecutar'}
               </button>
             </div>
+            <FifoRunPanel state={fifoState} />
           </div>
 
         </div>
       </SettingsCard>
 
       {/* Zona de peligro */}
-      <SettingsCard index={3} icon={AlertTriangle} title="Zona de peligro" tone="danger">
+      <SettingsCard index={4} icon={AlertTriangle} title="Zona de peligro" tone="danger">
 
         {!showResetConfirm ? (
           <div className="flex items-center justify-between">

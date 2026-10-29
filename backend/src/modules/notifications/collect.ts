@@ -6,6 +6,7 @@ import { coberturaActual } from '../csv/coberturaDb';
 import { avisosCobertura } from '../csv/coberturaAvisos';
 import { avisosVerificacion } from '../walletSync/avisos';
 import { getLivePrice } from '../prices/liveFeed';
+import { avisosCopias } from '../backup/autoBackupNotices';
 
 // Avisos del sistema (#447): se reúnen aquí y la ruta solo los filtra según las
 // preferencias (categorías silenciadas y avisos descartados) y los devuelve.
@@ -124,6 +125,9 @@ export async function collectNotifications(): Promise<SystemNotification[]> {
   // Cobertura de importaciones (#328): exchanges sin importar hace más de 60 días y huecos sin revisar.
   const { despues: coberturas } = await coberturaActual();
   notifications.push(...avisosCobertura(coberturas));
+
+  // Copias automáticas (#454): la última falló, o no se pueden hacer.
+  notifications.push(...await avisosCopias());
 
   return notifications;
 }

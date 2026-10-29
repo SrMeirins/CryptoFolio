@@ -60,8 +60,8 @@ describe('routes/settings — copias de seguridad (#453)', () => {
     if (testDb) await testDb.teardown();
   });
 
-  it('GET /backup: copia en claro con todas las tablas no recalculables', async () => {
-    const res = await request(app).get('/api/settings/backup');
+  it('POST /backup sin contraseña: copia en claro con todas las tablas no recalculables', async () => {
+    const res = await request(app).post('/api/settings/backup').send({});
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ format: 'cryptofolio-backup', encrypted: false });
     expect(Object.keys(res.body.data).sort()).toEqual([
@@ -94,7 +94,7 @@ describe('routes/settings — copias de seguridad (#453)', () => {
   });
 
   it('un valor que la base no acepta se rechaza y deja los datos como estaban', async () => {
-    const file = (await request(app).get('/api/settings/backup')).body;
+    const file = (await request(app).post('/api/settings/backup').send({})).body;
     file.data.transactions[0].operation_type = 'NO_EXISTE';
     const res = await request(app).post('/api/settings/backup/restore').send({ backup: file, confirm: true });
     expect(res.status).toBe(400);
@@ -104,7 +104,7 @@ describe('routes/settings — copias de seguridad (#453)', () => {
   });
 
   it('una columna que la versión actual no conoce se rechaza', async () => {
-    const file = (await request(app).get('/api/settings/backup')).body;
+    const file = (await request(app).post('/api/settings/backup').send({})).body;
     file.data.wallets[0].columna_rara = 1;
     const res = await request(app).post('/api/settings/backup/restore').send({ backup: file, confirm: true });
     expect(res.status).toBe(400);
@@ -123,7 +123,7 @@ describe('routes/settings — copias de seguridad (#453)', () => {
 
   it('restaurar en otro equipo: casa las wallets del sistema por nombre, guarda el estado previo y permite volver', async () => {
     const original = (await request(app).post('/api/settings/backup').send({ password: 'contrasena-larga' })).body;
-    const enClaro = (await request(app).get('/api/settings/backup')).body;
+    const enClaro = (await request(app).post('/api/settings/backup').send({})).body;
 
     // Simula otra instalación: ids distintos para wallets del sistema y redes,
     // otra wallet propia y sin operaciones.

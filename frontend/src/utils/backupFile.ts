@@ -1,5 +1,6 @@
 import type { BackupTable } from '../api/backup'
 import { zonedFormat } from './zonedFormat'
+import { formatNumber } from './format'
 
 // Utilidades del fichero de copia (#453): leerlo en el navegador antes de
 // enviarlo, validar la contraseña al exportar y nombrar cada tabla.
@@ -73,4 +74,13 @@ export function downloadJson(data: unknown, filename: string): void {
 /** Fecha y hora de una copia en la zona de la app. */
 export function formatBackupDate(iso: string): string {
   return zonedFormat('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
+}
+
+/** Tamaño legible en base 1024: 512 B, 2,5 MB... */
+export function formatBytes(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let v = Math.max(0, bytes)
+  let i = 0
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++ }
+  return `${formatNumber(v, i === 0 ? 0 : 1)}\u00a0${units[i]}`
 }

@@ -101,6 +101,10 @@ services:
       PRICE_REFRESH_INTERVAL_MS: ${PRICE_REFRESH_INTERVAL_MS:-60000}
       # Zona horaria de la aplicación (#388): vacía, Europe/Madrid; la de Ajustes prevalece.
       APP_TIMEZONE: ${APP_TIMEZONE:-}
+      # Copias automáticas cifradas con la clave del equipo (#454), en la
+      # subcarpeta app/ de la carpeta de copias del host. Sin
+      # WALLET_SYNC_ENCRYPTION_KEY no se hacen (nunca en claro).
+      AUTO_BACKUP_DIR: /backups/app
       # Verificación de saldos on-chain (backend/src/modules/walletSync) —
       # todo opcional: sin WALLET_SYNC_ENCRYPTION_KEY, el resto de la app
       # funciona con normalidad; solo falla si intentas guardar una API key
@@ -114,6 +118,10 @@ services:
     # red interna.
     volumes:
       - csv_uploads:/app/uploads
+      # Carpeta de copias del host (la misma del sidecar db-backup). El
+      # backend corre como node (uid 1000): si tu HOST_UID es otro, la
+      # copia falla con un aviso de permisos en la campana.
+      - ${BACKUP_HOST_DIR:-~/.local/share/CryptoFolio/backups}:/backups
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health || exit 1"]
       interval: 10s

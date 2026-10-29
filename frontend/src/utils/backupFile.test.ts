@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_BACKUP_BYTES, exportPasswordError, parseBackupText } from './backupFile'
+import { MAX_BACKUP_BYTES, exportPasswordError, formatBytes, parseBackupText } from './backupFile'
 
 // Reconocer el fichero de copia antes de enviarlo (#453). Datos sintéticos.
 const HEAD = { format: 'cryptofolio-backup', schema: 20, exported_at: '2026-01-02T03:04:05.000Z' }
@@ -26,5 +26,13 @@ describe('exportPasswordError', () => {
     expect(exportPasswordError('corta', 'corta')).toBe('Al menos 8 caracteres.')
     expect(exportPasswordError('suficiente', 'distinta1')).toBe('Las contraseñas no coinciden.')
     expect(exportPasswordError('suficiente', 'suficiente')).toBeNull()
+  })
+})
+
+describe('formatBytes (#454)', () => {
+  it('en base 1024 con un decimal', () => {
+    expect(formatBytes(512)).toBe('512\u00a0B')
+    expect(formatBytes(2.5 * 1024 * 1024)).toBe('2,5\u00a0MB')
+    expect(formatBytes(3 * 1024 ** 3)).toBe('3\u00a0GB')
   })
 })

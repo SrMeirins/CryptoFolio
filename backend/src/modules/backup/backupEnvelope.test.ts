@@ -3,6 +3,8 @@ import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { BACKUP_FORMAT, BACKUP_SCHEMA, BackupFormatError, buildBackup, openBackup, validatePassword } from './backupEnvelope';
 import { BACKUP_TABLE_NAMES, type BackupData } from './backupTables';
+import { randomBytes } from 'crypto';
+import { machineKey } from './backupCrypto';
 
 // Datos sintéticos mínimos: una wallet y un ajuste.
 function sample(): BackupData {
@@ -24,7 +26,7 @@ describe('backupEnvelope (#453)', () => {
   });
 
   it('sin contraseña: copia en claro con recuento, que se lee igual', async () => {
-    const file = await buildBackup(sample(), undefined, new Date('2026-01-02T03:04:05Z'));
+    const file = await buildBackup(sample(), {}, new Date('2026-01-02T03:04:05Z'));
     expect(file).toMatchObject({ format: BACKUP_FORMAT, schema: BACKUP_SCHEMA, encrypted: false, exported_at: '2026-01-02T03:04:05.000Z' });
     const opened = await openBackup(JSON.parse(JSON.stringify(file)));
     expect(opened.counts.wallets).toBe(1);
@@ -32,19 +34,19 @@ describe('backupEnvelope (#453)', () => {
   });
 
   it('con contraseña: no deja nada legible y solo se abre con ella', async () => {
-    const file = JSON.parse(JSON.stringify(await buildBackup(sample(), 'contrasena-larga')));
+    const file = JSON.parse(JSON.stringify(await buildBackup(sample(), { password: 'contrasena-larga' })));
     expect(JSON.stringify(file)).not.toContain('sintética');
     expect(file.data).toBeUndefined();
     expect(file.counts).toBeUndefined();
     expect(await codeOf(openBackup(file))).toBe('contrasena');
-    expect(await codeOf(openBackup(file, 'otra-contrasena'))).toBe('contrasena');
-    expect((await openBackup(file, 'contrasena-larga')).data.wallets[0].name).toBe('Wallet sintética');
+    expect(await codeOf(openBackup(file, { password: 'otra-contrasena' }))).toBe('contrasena');
+    expect((await openBackup(file, { password: 'contrasena-larga' })).data.wallets[0].name).toBe('Wallet sintética');
   });
 
   it('cambiar la cabecera de una copia cifrada invalida la etiqueta', async () => {
-    const file = JSON.parse(JSON.stringify(await buildBackup(sample(), 'contrasena-larga')));
-    expect(await codeOf(openBackup({ ...file, exported_at: '2020-01-01T00:00:00.000Z' }, 'contrasena-larga'))).toBe('contrasena');
-    expect(await codeOf(openBackup({ ...file, schema: 1 }, 'contrasena-larga'))).toBe('contrasena');
+    const file = JSON.parse(JSON.stringify(await buildBackup(sample(), { password: 'contrasena-larga' })));
+    expect(await codeOf(openBackup({ ...file, exported_at: '2020-01-01T00:00:00.000Z' }, { password: 'contrasena-larga' }))).toBe('contrasena');
+    expect(await codeOf(openBackup({ ...file, schema: 1 }, { password: 'contrasena-larga' }))).toBe('contrasena');
   });
 
   it('rechaza una versión más nueva, el formato anterior y ficheros ajenos', async () => {
@@ -70,5 +72,30 @@ describe('backupEnvelope (#453)', () => {
     expect(validatePassword(undefined)).toBeNull();
     expect(validatePassword('corta')).toMatch(/8 caracteres/);
     expect(validatePassword('suficiente')).toBeNull();
+  });
+
+  describe('clave del equipo (#454)', () => {
+    const env = randomBytes(32).toString('base64');
+    const otra = randomBytes(32).toString('base64');
+
+    it('deriva una clave estable de 32 bytes, distinta de la original, y nada sin una clave válida', () => {
+      const k = machineKey(env);
+      expect(k).toHaveLength(32);
+      expect(k?.equals(machineKey(env) as Buffer)).toBe(true);
+      expect(k?.equals(Buffer.from(env, 'base64'))).toBe(false);
+      expect(machineKey('')).toBeNull();
+      expect(machineKey(randomBytes(16).toString('base64'))).toBeNull();
+    });
+
+    it('solo se abre con la clave del mismo equipo', async () => {
+      const file = JSON.parse(JSON.stringify(await buildBackup(sample(), { machineKey: machineKey(env) })));
+      expect(file.kdf).toEqual({ name: 'equipo', info: expect.any(String) });
+      expect(JSON.stringify(file)).not.toContain('sintética');
+      expect((await openBackup(file, { machineKey: machineKey(env) })).data.wallets).toHaveLength(1);
+      expect(await codeOf(openBackup(file, { machineKey: machineKey(otra) }))).toBe('equipo');
+      expect(await codeOf(openBackup(file))).toBe('equipo');
+      expect(await codeOf(openBackup(file, { password: 'contrasena-larga' }))).toBe('equipo');
+      expect(await codeOf(openBackup({ ...file, exported_at: '2020-01-01T00:00:00.000Z' }, { machineKey: machineKey(env) }))).toBe('equipo');
+    });
   });
 });

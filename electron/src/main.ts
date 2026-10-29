@@ -3,7 +3,6 @@ import path from 'path';
 import { PostgresManager } from './postgres-manager';
 import { BackendManager } from './backend-manager';
 import { SecretsManager } from './secrets-manager';
-import { BackupManager } from './backup-manager';
 import { createSplash, setSplashStatus, closeSplash } from './splash';
 import { createWindow } from './window';
 import { registerUpdateIpcHandlers, checkForUpdateOnStartup, schedulePeriodicUpdateCheck, UpdaterDeps } from './updater';
@@ -20,7 +19,6 @@ process.stderr.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'E
 let mainWindow:   BrowserWindow | null = null;
 let postgresManager: PostgresManager;
 let backendManager:  BackendManager;
-let backupManager:   BackupManager;
 // Puerto real del backend, resuelto una vez en startup() — 'activate'
 // (macOS) reabre ventana reusando el mismo backend ya arrancado, así que
 // necesita el mismo puerto, no uno nuevo.
@@ -42,7 +40,6 @@ let handlingStartupError = false;
 
 async function shutdown(): Promise<void> {
   console.log('[app] Cerrando...');
-  backupManager?.stop();
   backendManager?.stop();
   await postgresManager?.stop();
 }
@@ -83,6 +80,9 @@ async function startup(): Promise<void> {
     port: backendPort,
     databaseUrl: postgresManager.connectionString,
     walletSyncEncryptionKey: secretsManager.walletSyncEncryptionKey,
+    // Copias automáticas cifradas con la clave del equipo (#454). Sustituyen a
+    // la copia semanal en JSON sin cifrar que se hacía desde aquí.
+    autoBackupDir: path.join(app.getPath('userData'), 'backups', 'app'),
     onCrash: async (detail) => {
       await dialog.showMessageBox({
         type: 'error',
@@ -96,21 +96,6 @@ async function startup(): Promise<void> {
   });
   await backendManager.start();
   console.log('[app] Backend listo.');
-
-  // Backup automático semanal — mismo criterio (cantidad, no antigüedad) y
-  // cadencia que el sidecar db-backup del stack Docker. El embedded-postgres
-  // de escritorio no trae pg_dump, así que reutiliza el mismo endpoint que
-  // ya usa el botón manual "Exportar backup" de Settings (backup lógico de
-  // datos de la app, no un dump binario). Ver backup-manager.ts.
-  backupManager = new BackupManager(
-    path.join(app.getPath('userData'), 'backups'),
-    async () => {
-      const res = await fetch(`http://127.0.0.1:${backendPort}/api/settings/backup`);
-      if (!res.ok) throw new Error(`Backup falló: HTTP ${res.status}`);
-      return res.json();
-    },
-  );
-  backupManager.start();
 
   setSplashStatus('');
 }

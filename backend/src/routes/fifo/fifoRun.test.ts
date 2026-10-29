@@ -78,4 +78,41 @@ describe('POST /api/fifo/run', () => {
     expect(res.body.error).toBe('Internal server error');
     expect(res.body.error).not.toContain('detalle interno sensible');
   });
+
+  describe('POST /run/stream (#454)', () => {
+    function events(text: string): Array<Record<string, unknown>> {
+      return text.split('\n').filter(l => l.startsWith('data: ')).map(l => JSON.parse(l.slice(6)));
+    }
+
+    it('emite el avance y, al acabar, el resumen antes y después', async () => {
+      await pool.query(
+        `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id)
+         VALUES ('DEPOSIT_CRYPTO', NOW(), 'ETH', 2, 2, $1)`, [walletId]);
+      await pool.query('DELETE FROM fifo_lots');
+      const res = await request(app).post('/api/fifo/run/stream').buffer(true).parse((r, cb) => {
+        let data = ''; r.on('data', (c: Buffer) => { data += c.toString(); }); r.on('end', () => cb(null, data));
+      });
+      expect(res.headers['content-type']).toContain('text/event-stream');
+      const evs = events(res.body as string);
+      expect(evs[0]).toEqual({ phase: 'precios' });
+      const progreso = evs.filter(e => e.phase === 'fifo');
+      expect(progreso.length).toBeGreaterThan(0);
+      expect(progreso.at(-1)).toMatchObject({ done: progreso.at(-1)?.total });
+      const done = evs.at(-1) as { phase: string; before: { lots: number }; after: { lots: number }; diff: { lots: number } };
+      expect(done.phase).toBe('done');
+      expect(done.before.lots).toBe(0);
+      expect(done.after.lots).toBeGreaterThanOrEqual(2);
+      expect(done.diff.lots).toBe(done.after.lots - done.before.lots);
+    });
+
+    it('un fallo termina con un evento de error genérico', async () => {
+      loadAssetMetadataMock.mockRejectedValueOnce(new Error('detalle interno sensible'));
+      const res = await request(app).post('/api/fifo/run/stream').buffer(true).parse((r, cb) => {
+        let data = ''; r.on('data', (c: Buffer) => { data += c.toString(); }); r.on('end', () => cb(null, data));
+      });
+      const last = events(res.body as string).at(-1);
+      expect(last).toEqual({ phase: 'error', message: 'No se pudo recalcular el FIFO' });
+      expect(res.body).not.toContain('detalle interno sensible');
+    });
+  });
 });
