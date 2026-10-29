@@ -44,7 +44,7 @@ export const backupApi = {
     api.post<{ restored: BackupCounts; snapshotId: string; fifo: boolean }>('/settings/backup/restore', { backup, password, confirm: true }),
   snapshots: () => api.get<BackupSnapshot[]>('/settings/backup/snapshots'),
   auto: () => api.get<AutoBackupStatus>('/settings/backup/auto'),
-  autoRun: () => api.post<{ name: string; rotated: number }>('/settings/backup/auto/run'),
+  autoRun: () => api.post<{ name: string; rotated: number }>('/settings/backup/auto/run', { confirm: true }),
   /** La copia automática se descarga recifrada con la contraseña: así sirve en otro equipo. */
   autoDownload: (name: string, password: string) =>
     api.post<Record<string, unknown>>(`/settings/backup/auto/${encodeURIComponent(name)}/download`, { password }),

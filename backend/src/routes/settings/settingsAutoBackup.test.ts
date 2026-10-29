@@ -18,6 +18,7 @@ let pool: Pool;
 let app: import('express').Express;
 let dir: string;
 let auto: typeof import('../../modules/backup/autoBackup');
+let resetLimit: () => void;
 
 async function names(): Promise<string[]> {
   return (await fs.readdir(dir)).filter(n => n.startsWith('cryptofolio-auto-')).sort();
@@ -33,13 +34,15 @@ describe('routes/settings — copias automáticas (#454)', () => {
     pool = new Pool({ connectionString: testDb.connectionString });
     await pool.query(`INSERT INTO wallets (name, type) VALUES ('Wallet automática sintética', 'hardware')`);
     auto = await import('../../modules/backup/autoBackup');
-    const { default: router } = await import('./settingsAutoBackup');
+    const mod = await import('./settingsAutoBackup');
+    const router = mod.default;
+    resetLimit = mod.resetManualRunLimit;
     app = express();
     app.use(express.json());
     app.use('/api/settings', router);
   });
 
-  beforeEach(() => auto.resetAutoBackupState());
+  beforeEach(() => { auto.resetAutoBackupState(); resetLimit(); });
 
   afterAll(async () => {
     await pool.end();
@@ -48,13 +51,24 @@ describe('routes/settings — copias automáticas (#454)', () => {
   });
 
   it('hace una copia cifrada con la clave del equipo, sin datos legibles', async () => {
-    const res = await request(app).post('/api/settings/backup/auto/run');
+    const res = await request(app).post('/api/settings/backup/auto/run').send({ confirm: true });
     expect(res.status).toBe(200);
     const [name] = await names();
     expect(res.body.name).toBe(name);
     const text = await fs.readFile(path.join(dir, name), 'utf8');
     expect(text).not.toContain('sintética');
     expect(JSON.parse(text)).toMatchObject({ encrypted: true, kdf: { name: 'equipo' } });
+  });
+
+  it('hacer una ahora exige confirmación en JSON y como mucho una por minuto', async () => {
+    const before = await names();
+    expect((await request(app).post('/api/settings/backup/auto/run')).status).toBe(400);
+    expect((await request(app).post('/api/settings/backup/auto/run').send({})).status).toBe(400);
+    expect(await names()).toEqual(before);
+    expect((await request(app).post('/api/settings/backup/auto/run').send({ confirm: true })).status).toBe(200);
+    const again = await request(app).post('/api/settings/backup/auto/run').send({ confirm: true });
+    expect(again.status).toBe(429);
+    expect(again.body.retry_in_ms).toBeGreaterThan(0);
   });
 
   it('la rotación conserva exactamente las N últimas', async () => {
@@ -82,7 +96,7 @@ describe('routes/settings — copias automáticas (#454)', () => {
     const before = await names();
     await fs.chmod(dir, 0o500);
     try {
-      const res = await request(app).post('/api/settings/backup/auto/run');
+      const res = await request(app).post('/api/settings/backup/auto/run').send({ confirm: true });
       // Como root (algunos CI) los permisos no impiden escribir: entonces la copia sale bien.
       if (res.status === 500) {
         expect(res.body.error).toBe('Sin permiso para escribir en la carpeta de copias.');
@@ -128,7 +142,7 @@ describe('routes/settings — copias automáticas (#454)', () => {
     const key = process.env.WALLET_SYNC_ENCRYPTION_KEY;
     delete process.env.WALLET_SYNC_ENCRYPTION_KEY;
     try {
-      const res = await request(app).post('/api/settings/backup/auto/run');
+      const res = await request(app).post('/api/settings/backup/auto/run').send({ confirm: true });
       expect(res.status).toBe(409);
       expect(res.body.code).toBe('sin-clave');
       expect((await request(app).get('/api/settings/backup/auto')).body).toMatchObject({ available: false, reason: 'sin-clave', files: [] });

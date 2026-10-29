@@ -29,9 +29,18 @@ router.get('/backup/auto', async (_req: Request, res: Response) => {
 });
 
 // ── POST /api/settings/backup/auto/run ────────────────────────────────────
-router.post('/backup/auto/run', async (_req: Request, res: Response) => {
+// Cada copia nueva rota y borra la más antigua que sobre: exige { confirm: true }
+// en JSON (así una web ajena no puede lanzarla sin pasar por CORS) y una como
+// mucho por minuto.
+const RUN_MIN_INTERVAL_MS = 60_000;
+let lastManualRun = 0;
+router.post('/backup/auto/run', async (req: Request, res: Response) => {
+  if (!requireConfirm(res, req.body)) return;
+  const wait = lastManualRun + RUN_MIN_INTERVAL_MS - Date.now();
+  if (wait > 0) { res.status(429).json({ error: 'Espera un minuto antes de hacer otra copia.', retry_in_ms: wait }); return; }
   const av = autoBackupAvailability();
   if (!av.available) { res.status(409).json({ error: 'Las copias automáticas no están disponibles en este equipo.', code: av.reason }); return; }
+  lastManualRun = Date.now();
   try {
     const { name, rotated } = await runAutoBackup();
     res.json({ name, rotated: rotated.length });
@@ -85,5 +94,10 @@ router.post('/backup/auto/:name/restore', async (req: Request, res: Response) =>
     }
   });
 });
+
+/** Solo para tests. */
+export function resetManualRunLimit(): void {
+  lastManualRun = 0;
+}
 
 export default router;
