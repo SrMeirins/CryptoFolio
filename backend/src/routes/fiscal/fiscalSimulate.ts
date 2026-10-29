@@ -11,7 +11,7 @@ const router = Router();
 // FIFO por wallet; sin ella, la de mayor cantidad) y comisión de venta en %.
 const base = {
   asset:    z.string().min(1, 'asset es requerido'),
-  walletId: z.string().uuid('walletId inválido').optional(),
+  walletId: z.uuid('walletId inválido').optional(),
   feePct:   z.number().min(0).max(10, 'feePct debe estar entre 0 y 10').optional(),
 };
 

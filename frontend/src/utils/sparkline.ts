@@ -31,3 +31,25 @@ export function sparklineChange(values: readonly number[]): number | null {
   if (values.length < 2 || values[0] === 0) return null
   return ((values[values.length - 1] - values[0]) / Math.abs(values[0])) * 100
 }
+
+/**
+ * P&L de los últimos `days` días para la mini gráfica de la tarjeta P&L (#412):
+ * se reconstruye hacia atrás desde la cifra actual restando el P&L de cada día,
+ * así que la punta coincide con la tarjeta. Solo da la forma de la tendencia.
+ */
+export function pnlSparkline(series: readonly { pnl: number }[], current: number | null, days = 30): number[] {
+  if (current === null) return []
+  const tail = series.slice(-days)
+  const out = new Array<number>(tail.length)
+  let acc = current
+  for (let i = tail.length - 1; i >= 0; i--) {
+    out[i] = acc
+    acc -= tail[i].pnl
+  }
+  return out
+}
+
+/** Rentabilidad acumulada de los últimos `days` días, para la tarjeta Rentabilidad (#412). */
+export function returnSparkline(series: readonly { cumulativePct: number }[], days = 30): number[] {
+  return series.slice(-days).map(d => d.cumulativePct)
+}

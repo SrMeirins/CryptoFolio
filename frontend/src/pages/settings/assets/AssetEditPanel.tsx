@@ -5,12 +5,15 @@ import { portfolioApi, type AssetMetadata } from '../../../api/portfolio'
 import { Toggle } from '../../../components/Toggle'
 import { PairInputsGrid } from './PairInputsGrid'
 import { CoinGeckoIdEditor } from './CoinGeckoIdEditor'
-import { T } from '../../../utils/colors'
+import { AssetLogoEditor } from './AssetLogoEditor'
+import { T, alpha } from '../../../utils/colors'
 import { buttonClasses, fieldClasses } from '../../../components/ui'
 import { formatNumber } from '../../../utils/format'
 
-export function AssetEditPanel({ asset, onSaved, onCancel }: {
+export function AssetEditPanel({ asset, onSaved, onCancel, embedded = false }: {
   asset: AssetMetadata; onSaved: () => void; onCancel: () => void
+  /** Dentro del panel lateral (#450): sin el borde ni el fondo de la fila desplegada. */
+  embedded?: boolean
 }) {
   const queryClient = useQueryClient()
   const [eurPair,     setEurPair]     = useState(asset.binance_eur_pair  ?? '')
@@ -60,12 +63,15 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
   const isCoinGeckoSource = asset.price_source === 'coingecko'
 
   return (
-    <div className="border-t border-border bg-background-tertiary/20 px-4 py-4 space-y-4">
+    <div className={embedded ? 'space-y-4' : 'border-t border-border bg-background-tertiary/20 px-4 py-4 space-y-4'}>
+      {/* Logo (#449): de dónde sale y corrección solo para el logo */}
+      <AssetLogoEditor asset={asset} />
+
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-fg-muted">Editar pares — <span className="mono">{asset.symbol}</span></p>
+        <p className="text-xs font-medium text-fg-muted">Editar pares de <span className="mono">{asset.symbol}</span></p>
         <button type="button" onClick={handleDetect} disabled={detecting}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-          style={{ backgroundColor: '#6366f118', color: T.brand }}>
+          style={{ backgroundColor: alpha(T.brand, 9), color: T.brand }}>
           {detecting ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}
           Auto-detectar
         </button>
@@ -88,15 +94,15 @@ export function AssetEditPanel({ asset, onSaved, onCancel }: {
             onKeyDown={e => e.key === 'Enter' && handleTest()}
             placeholder={`${asset.symbol}EUR, ${asset.symbol}USDT...`}
             className={fieldClasses('md', false, 'flex-1 mono')} />
-          <button type="button" onClick={handleTest} disabled={testLoading || !testPairVal}
+          <button type="button" onClick={handleTest} disabled={testLoading || !testPairVal} aria-label="Probar el par en Binance" title="Probar el par en Binance"
             className="px-3 py-2 bg-background-tertiary hover:bg-border disabled:opacity-50 rounded-lg text-sm transition-colors">
-            {testLoading ? <RefreshCw size={13} className="animate-spin" /> : <Search size={13} />}
+            {testLoading ? <RefreshCw size={13} aria-hidden="true" className="animate-spin" /> : <Search size={13} aria-hidden="true" />}
           </button>
         </div>
         {testResult && (
           <div className={`flex items-center gap-2 text-xs ${testResult.exists ? 'text-positive' : 'text-negative'}`}>
             {testResult.exists
-              ? <><CheckCircle size={12} /> Existe — precio: <span className="mono font-medium">{formatNumber(testResult.price ?? 0, 6, 6)} EUR</span></>
+              ? <><CheckCircle size={12} /> Existe, precio: <span className="mono font-medium">{formatNumber(testResult.price ?? 0, 6, 6)} EUR</span></>
               : <><XCircle size={12} /> Par no encontrado en Binance</>
             }
           </div>

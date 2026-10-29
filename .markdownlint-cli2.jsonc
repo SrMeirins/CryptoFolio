@@ -1,0 +1,6 @@
+{
+  // Opciones de markdownlint-cli2 (#368); las reglas siguen en .markdownlint.jsonc.
+  // Respeta .gitignore: las notas locales no versionadas no se revisan, igual
+  // que en el CI, que no las tiene.
+  "gitignore": true
+}

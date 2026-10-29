@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync, rmSyn
 import { tmpdir } from 'os';
 import path from 'path';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { copyDbAssets } = require('../../scripts/copy-db-assets.js') as { copyDbAssets: (root: string) => number };
+const { copyDbAssets, copyIconAssets } = require('../../scripts/copy-db-assets.js') as { copyDbAssets: (root: string) => number; copyIconAssets: (root: string) => number };
 
 // Copia multiplataforma de los SQL a dist/ (#114, #205): sin mkdir/cp/find, que
 // rompían el build de Windows.
@@ -35,5 +35,20 @@ describe('copyDbAssets', () => {
     writeFileSync(path.join(root, 'src', 'db', 'schema.sql'), 'v2');
     copyDbAssets(root);
     expect(readFileSync(path.join(root, 'dist', 'db', 'schema.sql'), 'utf8')).toBe('v2');
+  });
+
+  it('copia los PNG del paquete local de logos a dist/assets (#449)', () => {
+    root = mkdtempSync(path.join(tmpdir(), 'cf-icon-assets-'));
+    const icons = path.join(root, 'src', 'assets', 'crypto-icons');
+    mkdirSync(icons, { recursive: true });
+    writeFileSync(path.join(icons, 'btc.png'), 'png');
+    writeFileSync(path.join(icons, 'README.md'), 'no se copia');
+    expect(copyIconAssets(root)).toBe(1);
+    expect(readdirSync(path.join(root, 'dist', 'assets', 'crypto-icons'))).toEqual(['btc.png']);
+  });
+
+  it('sin paquete local no falla', () => {
+    root = mkdtempSync(path.join(tmpdir(), 'cf-icon-assets-'));
+    expect(copyIconAssets(root)).toBe(0);
   });
 });

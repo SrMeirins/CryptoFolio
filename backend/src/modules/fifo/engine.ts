@@ -1,8 +1,9 @@
 import { PoolClient } from 'pg';
 import { db } from '../../db/client';
-import { Transaction, FifoRunResult } from './constants';
+import { Transaction, FifoRunResult, FifoShortfall } from './constants';
 import { getOpenLots } from './lotPrimitives';
 import { reorderTransactions } from './ordering';
+import { fifoOrderBy } from './orderSql';
 import { processBuy, processIncome, processFork } from './handlers/acquisitionHandlers';
 import { processSell, processLost, processMarginRepay, processTransfer, processFee } from './handlers/dispositionHandlers';
 
@@ -28,6 +29,7 @@ export async function runFifoEngine(onProgress?: (done: number, total: number) =
     errors: [],
     warnings: [],
     pendingWithdrawals: 0,
+    shortfalls: [],
   };
 
   return db.transaction(async (client) => {
@@ -36,6 +38,7 @@ export async function runFifoEngine(onProgress?: (done: number, total: number) =
     // entrelazar sus DELETE/INSERT sobre las mismas filas.
     await client.query(`SELECT pg_advisory_xact_lock(hashtext(${FIFO_ENGINE_LOCK_KEY}))`);
 
+    await client.query('DELETE FROM fifo_shortfalls');
     await client.query('DELETE FROM fifo_lot_consumptions');
     await client.query('DELETE FROM fifo_lots');
 
@@ -45,45 +48,7 @@ export async function runFifoEngine(onProgress?: (done: number, total: number) =
             fee_asset, fee_amount,
             wallet_id, destination_wallet_id, destination_pending
      FROM transactions
-     ORDER BY timestamp ASC, created_at ASC,
-       -- Dentro del mismo segundo, abrir lotes antes de consumirlos.
-       -- BUY/INCOME primero → luego SELL/FEE_EXCHANGE que necesitan esos lotes.
-       CASE operation_type
-         -- Prioridad 0: préstamos → lote abierto antes que cualquier venta del activo prestado
-         WHEN 'MARGIN_BORROW'   THEN 0
-         -- Prioridad 1: ingresos puros (solo crean lotes, no consumen)
-         WHEN 'AIRDROP'         THEN 1
-         WHEN 'DEPOSIT_CRYPTO'  THEN 1
-         WHEN 'STAKING_REWARD'  THEN 1
-         WHEN 'MINING_REWARD'   THEN 1
-         WHEN 'LENDING_INTEREST'        THEN 1
-         WHEN 'LENDING_INTEREST_LOCKED' THEN 1
-         WHEN 'CASHBACK'        THEN 1
-         WHEN 'FORK'            THEN 1
-         -- Prioridad 2: transferencias internas → mueven/crean lotes entre wallets ANTES de
-         -- que SELL o BUY intenten consumirlos (p.ej. Spot→Strategy al mismo timestamp que
-         -- una venta o compra en Strategy — antes solo se protegía el caso BUY, no SELL)
-         WHEN 'TRANSFER_INTERNAL' THEN 2
-         -- Prioridad 3: ventas → consumen lotes del activo vendido Y crean lotes del recibido (p.ej. USDT)
-         WHEN 'SELL'            THEN 3
-         WHEN 'SELL_FIAT'       THEN 3
-         WHEN 'SELL_CRYPTO'     THEN 3
-         WHEN 'GIFT_SENT'       THEN 3
-         WHEN 'LOST'            THEN 3
-         -- Prioridad 4: compras → crean lote del activo recibido y consumen el cost_asset (p.ej. USDT)
-         WHEN 'BUY'             THEN 4
-         WHEN 'BUY_FIAT'        THEN 4
-         WHEN 'BUY_CRYPTO'      THEN 4
-         -- Prioridad 5: retiros externos
-         WHEN 'WITHDRAW'        THEN 5
-         -- Prioridad 6: fees → siempre al final (consumen lotes del activo de fee)
-         WHEN 'FEE_EXCHANGE'    THEN 6
-         WHEN 'FEE'             THEN 6
-         WHEN 'FEE_NETWORK'     THEN 6
-         -- Prioridad 7: devolución de préstamo → cierra los lotes de MARGIN_BORROW
-         WHEN 'MARGIN_REPAY'    THEN 7
-         ELSE 7
-       END`
+     ORDER BY ${fifoOrderBy()}`
     );
 
     const transactions: Transaction[] = txRes.rows.map((r: Record<string, unknown>) => ({
@@ -170,8 +135,29 @@ export async function runFifoEngine(onProgress?: (done: number, total: number) =
     }
     onProgress?.(transactions.length, transactions.length);
 
+    // Déficits de esta ejecución (#380), en la misma transacción que los lotes.
+    await saveShortfalls(result.shortfalls, client);
+
     return result;
   });
+}
+
+/** Guarda los déficits en lotes de 500 filas (consultas parametrizadas). */
+async function saveShortfalls(shortfalls: readonly FifoShortfall[], client: PoolClient): Promise<void> {
+  const CHUNK = 500;
+  for (let i = 0; i < shortfalls.length; i += CHUNK) {
+    const chunk = shortfalls.slice(i, i + CHUNK);
+    const params: unknown[] = [];
+    const values = chunk.map(s => {
+      params.push(s.txId, s.asset, s.walletId, s.requested, Math.min(s.missing, s.requested));
+      const b = params.length - 5;
+      return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5})`;
+    });
+    await client.query(
+      `INSERT INTO fifo_shortfalls (transaction_id, asset, wallet_id, requested, missing) VALUES ${values.join(', ')}`,
+      params,
+    );
+  }
 }
 
 async function processTransaction(tx: Transaction, result: FifoRunResult, marginDebt: Map<string, number>, client: PoolClient): Promise<void> {

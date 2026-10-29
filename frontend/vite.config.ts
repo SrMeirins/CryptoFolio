@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { appVersionDefine } from './appVersion'
 
 // 'backend' resuelve por DNS de Docker Compose dentro de la red del stack de
 // dev (docker-compose.dev.yml) — solo funciona corriendo `vite` DENTRO de
@@ -12,6 +13,8 @@ const BACKEND_HOST = process.env.BACKEND_PROXY_HOST || 'backend:3001'
 
 export default defineConfig({
   plugins: [react()],
+  // Versión real en Acerca de (#444).
+  define: appVersionDefine,
   server: {
     host: '0.0.0.0',
     port: 5173,

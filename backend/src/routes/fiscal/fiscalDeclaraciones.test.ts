@@ -2,13 +2,14 @@ import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
-import { madridYearMonth } from '../../modules/fiscal/madridTime';
+import { localYearMonth } from '../../modules/time/localTime';
+import { DEFAULT_TIMEZONE } from '../../modules/time/appTimezone';
 
 // Ejercicios declarados (#311). Datos sintéticos.
 let testDb: TestDatabase;
 let pool: Pool;
 let app: import('express').Express;
-const Y = madridYearMonth().year;
+const Y = localYearMonth(DEFAULT_TIMEZONE).year;
 let walletId: string;
 
 // El lote se abre el mismo año de la venta: así no hay cartera que valorar a

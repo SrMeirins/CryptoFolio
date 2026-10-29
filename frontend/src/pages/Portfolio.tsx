@@ -11,13 +11,13 @@ import { usePricesStore } from '../store/pricesStore'
 import { WalletCards } from './portfolio/WalletCards'
 import { WalletSections } from './portfolio/WalletSections'
 import { DustSection } from './portfolio/DustSection'
-import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState, PageHeader, SegmentedControl, Dropdown, cardClasses, panelClasses, panelEnterStyle } from '../components/ui'
+import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState, PageHeader, SegmentedControl, Dropdown, panelClasses, panelEnterStyle, panelSurface } from '../components/ui'
 import { AssetTable } from '../components/AssetTable'
 import { navIcon } from '../constants/navigation'
 import { portfolioSubtitle } from '../utils/panelSubtitles'
 import { portfolioSections } from '../utils/portfolioSections'
 import { portfolioInventory } from '../utils/portfolioInventory'
-import { assetView, filterByPnl, type PnlFilter, type PortfolioView } from '../utils/portfolioView'
+import { assetView, filterByPnl, walletParam, type PnlFilter, type PortfolioView } from '../utils/portfolioView'
 import { isSearchShortcut, readDensity, readDustOpen, readView, saveDensity, saveDustOpen, saveView, type Density } from '../utils/portfolioPrefs'
 
 const VIEW_OPTIONS = [
@@ -62,7 +62,8 @@ export function Portfolio() {
   const [density, setDensity] = useState<Density>(readDensity)
   const [dustOpen, setDustOpen] = useState(readDustOpen)
   // Wallet elegida en las tarjetas (#270): filtra la tabla; null = todas.
-  const [walletFilter, setWalletFilter] = useState<string | null>(null)
+  // ?wallet=<id> llega desde Ajustes (#448); solo se acepta un UUID.
+  const [walletFilter, setWalletFilter] = useState<string | null>(() => walletParam(params.get('wallet')))
   // Vista de la tabla (recordada) y filtro de resultado (#271).
   const [view, setView] = useState<PortfolioView>(readView)
   const [pnlFilter, setPnlFilter] = useState<PnlFilter>('all')
@@ -260,7 +261,7 @@ export function Portfolio() {
       ) : (
         <>
           {view === 'asset' ? (
-            <section aria-label="Posiciones" className={panelClasses(cardClasses('none', 'overflow-clip'))} style={panelEnterStyle(1)}>
+            <section aria-label="Posiciones" className={panelClasses(panelSurface('none', 'overflow-clip'))} style={panelEnterStyle(1)}>
               <AssetTable rows={assetRows} portfolioTotal={all.total} compact={compact}
                 onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} onOpen={setDetailAsset} exportName="posiciones"
                 header={<>
@@ -270,11 +271,11 @@ export function Portfolio() {
             </section>
           ) : (
             <WalletSections sections={walletSections} total={all.total} compact={compact}
-              onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} />
+              onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} onOpen={setDetailAsset} />
           )}
           <DustSection rows={dust.rows} value={dust.value} total={all.total} threshold={market.dustThreshold}
             compact={compact} open={dustOpen || (mainCount === 0 && dust.rows.length > 0)} onToggle={toggleDust}
-            index={mainCount + 1} />
+            index={mainCount + 1} onOpen={setDetailAsset} />
         </>
       )}
     </div>

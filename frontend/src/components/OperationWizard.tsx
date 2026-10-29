@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   TrendingUp, TrendingDown, ArrowLeftRight, Coins, Receipt, Settings,
@@ -20,6 +20,10 @@ interface OperationWizardProps {
   initialValues?: { operationTypeId: string; fields: Record<string, unknown> }
   onComplete: (result: WizardResult) => void
   onCancel: () => void
+  /** id del título, para nombrar el diálogo que lo contiene. */
+  titleId?: string
+  /** Aviso bajo el título (p. ej. al editar una importada, #378). */
+  notice?: ReactNode
 }
 
 export interface WizardResult {
@@ -74,8 +78,9 @@ export function OperationWizard(props: OperationWizardProps) {
   return <OperationWizardForm {...props} catalog={catalog} />
 }
 
-function OperationWizardForm({ catalog, unknownOperation, initialValues, onComplete, onCancel }: OperationWizardProps & { catalog: CatalogData }) {
-  // Modo edición: tipo y campos precargados desde initialValues.
+function OperationWizardForm({ catalog, unknownOperation, initialValues, onComplete, onCancel, titleId, notice }: OperationWizardProps & { catalog: CatalogData }) {
+  // Modo edición: tipo y campos precargados desde initialValues. Si el tipo
+  // no tiene formulario, se empieza en «Tipo» sin perder los campos (#394).
   const initialType = initialValues
     ? catalog.operations.find(op => op.id === initialValues.operationTypeId) ?? null
     : null
@@ -83,7 +88,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
   const [selectedType, setSelectedType] = useState<OperationType | null>(initialType)
   const [expandedCat, setExpandedCat]   = useState<string | null>('ACQUISITION')
   const [fieldValues, setFieldValues]   = useState<Record<string, unknown>>(
-    () => buildInitialFields(initialType && initialValues ? initialValues.fields : {}, unknownOperation),
+    () => buildInitialFields(initialValues?.fields ?? {}, unknownOperation),
   )
   const [showHelper, setShowHelper]     = useState(false)
   const [applyToAll, setApplyToAll]     = useState(false)
@@ -162,9 +167,10 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
         <div>
-          <h2 className="font-semibold text-lg">
+          <h2 id={titleId} className="font-semibold text-lg">
             {unknownOperation ? 'Catalogar operación' : initialValues ? 'Editar transacción' : 'Nueva transacción'}
           </h2>
+          {notice}
           {unknownOperation && (
             <p className="text-xs text-fg-subtle mt-0.5">
               Original: <span className="text-warning mono">{unknownOperation.originalLabel}</span>
@@ -224,7 +230,7 @@ function OperationWizardForm({ catalog, unknownOperation, initialValues, onCompl
             {CATEGORIES_ORDER.map(catKey => {
               const meta = catalog.categories[catKey]
               if (!meta) return null
-              const ops = catalog.operations.filter(op => op.category === catKey)
+              const ops = catalog.operations.filter(op => op.category === catKey && !op.editOnly)
               if (ops.length === 0) return null
               const isOpen = expandedCat === catKey
               const color  = CATEGORY_COLORS[catKey]

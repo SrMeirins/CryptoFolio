@@ -69,3 +69,11 @@ export function etiquetaEstado(status: EstadoSync, detalles: readonly { diagnost
 export function hayPendientes(wallets: readonly { addresses?: readonly { address: string | null; sync_status: EstadoSync }[] }[]): boolean {
   return wallets.some(w => (w.addresses ?? []).some(a => a.address && a.sync_status === 'pending'))
 }
+
+/** Tipos de wallet que se pueden elegir al crearla o editarla (#448). */
+export const WALLET_TYPE_OPTIONS = [
+  { value: 'hardware', label: 'Hardware wallet' },
+  { value: 'software', label: 'Software wallet' },
+  { value: 'exchange', label: 'Exchange' },
+  { value: 'bank', label: 'Banco / Fiat' },
+] as const

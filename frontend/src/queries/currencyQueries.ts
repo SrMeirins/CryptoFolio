@@ -35,8 +35,3 @@ export const intradayPnlQuery = (currency: Currency) => queryOptions({
   staleTime: 60_000,
 })
 
-export const txStatsQuery = (currency: Currency) => queryOptions({
-  queryKey: ['tx-stats', currency],
-  queryFn: () => portfolioApi.getTransactionStats(currency),
-  staleTime: CURRENCY_STALE_MS,
-})

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { currencySchema } from '../fiat/displayCurrency';
-import { DB_OPERATION_TYPES } from './operationGroups';
+import { DB_OPERATION_TYPES, MARGIN_ACCOUNTS } from './operationGroups';
+import { SUMMARY_CARDS, cardPredicate, marginSql } from './summaryCards';
 import { operationLabelRankSql } from './operationLabels';
 
 // Filtros de GET /transactions validados con zod (#346). Antes llegaban sin
@@ -24,39 +25,69 @@ const intParam = (min: number, max: number, def: number) =>
 export const SORT_KEYS = ['fecha', 'valor', 'activo', 'tipo'] as const;
 export type SortKey = typeof SORT_KEYS[number];
 
+export const MAX_LIST_VALUES = 30;
+const MAX_AMOUNT = 1e12;
+
+/** Lista separada por comas (#366): sin vacíos ni repetidos, como mucho MAX_LIST_VALUES. */
+const csvList = <T extends z.ZodType<unknown, string>>(item: T, what: string) =>
+  z.string()
+    .transform(v => [...new Set(v.split(',').map(x => x.trim()).filter(Boolean))])
+    .pipe(z.array(item, { error: `${what} no válido` }).min(1, `indica al menos un ${what}`).max(MAX_LIST_VALUES, `como mucho ${MAX_LIST_VALUES} valores`));
+
+/** Importe ≥ 0 con hasta 8 decimales y punto decimal. */
+const amount = z.string().regex(/^\d{1,13}(\.\d{1,8})?$/, 'debe ser un importe positivo con punto decimal')
+  .transform(Number).pipe(z.number().min(0).max(MAX_AMOUNT));
+
 // Filtros y orden comunes al listado y a la exportación CSV (#349).
 const filtersShape = {
   currency:       currencySchema,
-  asset:          z.string().trim().regex(/^[A-Za-z0-9._-]{1,32}$/, 'activo no válido').transform(v => v.toUpperCase()).optional(),
-  type:           z.enum(DB_OPERATION_TYPES, { message: 'tipo de operación no válido' }).optional(),
-  wallet_id:      z.string().uuid('debe ser un UUID válido').optional(),
-  import_id:      z.string().uuid('debe ser un UUID válido').optional(),
+  // Listas separadas por comas (#366): varios activos o tipos a la vez.
+  asset:          csvList(z.string().regex(/^[A-Za-z0-9._-]{1,32}$/, 'activo no válido').transform(v => v.toUpperCase()), 'activo').optional(),
+  type:           csvList(z.enum(DB_OPERATION_TYPES, { error: 'tipo de operación no válido' }), 'tipo de operación').optional(),
+  // Rango del valor de la operación en la moneda pedida (currency).
+  value_min:      amount.optional(),
+  value_max:      amount.optional(),
+  wallet_id:      z.uuid('debe ser un UUID válido').optional(),
+  import_id:      z.uuid('debe ser un UUID válido').optional(),
   account:        z.string().trim().min(1).max(64, 'no puede superar 64 caracteres').optional(),
   date_from:      isoDay.optional(),
   date_to:        isoDay.optional(),
   search:         z.string().max(100, 'no puede superar 100 caracteres').optional(),
-  manually_added: z.enum(['true', 'false'], { message: 'debe ser true o false' }).transform(v => v === 'true').optional(),
-  sort:           z.enum(SORT_KEYS, { message: `debe ser uno de: ${SORT_KEYS.join(', ')}` }).default('fecha'),
-  dir:            z.enum(['asc', 'desc'], { message: 'debe ser asc o desc' }).default('desc'),
+  manually_added: z.enum(['true', 'false'], { error: 'debe ser true o false' }).transform(v => v === 'true').optional(),
+  // Importadas editadas (#378): «true» solo las editadas, «false» sin ellas.
+  edited:         z.enum(['true', 'false'], { error: 'debe ser true o false' }).transform(v => v === 'true').optional(),
+  // Comisiones agrupadas con su operación (#371): «false» las muestra como filas.
+  group_fees:     z.enum(['true', 'false'], { error: 'debe ser true o false' }).transform(v => v === 'true').optional(),
+  // Operaciones que suma una tarjeta del resumen (#407).
+  tarjeta:        z.enum(SUMMARY_CARDS, { error: `debe ser una de: ${SUMMARY_CARDS.join(', ')}` }).optional(),
+  // Margen del resumen (#403): en la lista solo cuenta con una tarjeta, como en ella.
+  incluir_margen: z.enum(['true', 'false'], { error: 'incluir_margen debe ser true o false' }).transform(v => v === 'true').optional(),
+  sort:           z.enum(SORT_KEYS, { error: `debe ser uno de: ${SORT_KEYS.join(', ')}` }).default('fecha'),
+  dir:            z.enum(['asc', 'desc'], { error: 'debe ser asc o desc' }).default('desc'),
 };
 const datesInOrder = (f: { date_from?: string; date_to?: string }) => !f.date_from || !f.date_to || f.date_from <= f.date_to;
-const datesMessage = { message: 'date_from no puede ser posterior a date_to', path: ['date_from'] };
+const datesMessage = { error: 'date_from no puede ser posterior a date_to', path: ['date_from'] };
+const amountsInOrder = (f: { value_min?: number; value_max?: number }) =>
+  f.value_min === undefined || f.value_max === undefined || f.value_min <= f.value_max;
+const amountsMessage = { error: 'value_min no puede ser mayor que value_max', path: ['value_min'] };
 
-export const historyQuerySchema = z.object({
+export const historyQuerySchema = z.strictObject({
   ...filtersShape,
   limit:  intParam(1, MAX_PAGE_SIZE, 50),
   offset: intParam(0, MAX_OFFSET, 0),
-}).strict().refine(datesInOrder, datesMessage);
+}).refine(datesInOrder, datesMessage).refine(amountsInOrder, amountsMessage);
 export type HistoryQuery = z.infer<typeof historyQuerySchema>;
 
 /** Exportación CSV: los mismos filtros y orden, sin paginación. */
-export const historyExportSchema = z.object(filtersShape).strict().refine(datesInOrder, datesMessage);
+export const historyExportSchema = z.strictObject(filtersShape)
+  .refine(datesInOrder, datesMessage).refine(amountsInOrder, amountsMessage);
 export type HistoryFilters = z.infer<typeof historyExportSchema>;
 
 /** ¿Hay algún filtro aplicado (no cuentan orden ni moneda)? */
 export function hasFilters(f: HistoryFilters): boolean {
-  return !!(f.asset || f.type || f.wallet_id || f.import_id || f.account || f.date_from || f.date_to
-    || f.search || f.manually_added !== undefined);
+  return !!(f.asset?.length || f.type?.length || f.wallet_id || f.import_id || f.account || f.date_from || f.date_to
+    || f.search || f.manually_added !== undefined || f.edited !== undefined || f.value_min !== undefined || f.value_max !== undefined
+    || f.tarjeta);
 }
 
 /**
@@ -90,9 +121,13 @@ export function buildHistoryWhere(f: HistoryFilters, tz: string): { where: strin
   const p = (v: unknown) => { params.push(v); return `$${params.length}`; };
 
   if (f.import_id)      conds.push(`t.import_id = ${p(f.import_id)}`);
-  if (f.asset)          conds.push(`t.asset = ${p(f.asset)}`);
-  if (f.type)           conds.push(`t.operation_type = ${p(f.type)}`);
-  if (f.wallet_id)      conds.push(`t.wallet_id = ${p(f.wallet_id)}`);
+  if (f.asset?.length)  conds.push(`t.asset = ANY(${p(f.asset)}::text[])`);
+  if (f.type?.length)   conds.push(`t.operation_type::text = ANY(${p(f.type)}::text[])`);
+  // Wallet de origen o de destino (#395): una transferencia a la wallet también es suya.
+  if (f.wallet_id) {
+    const w = p(f.wallet_id);
+    conds.push(`(t.wallet_id = ${w} OR t.destination_wallet_id = ${w})`);
+  }
   if (f.account)        conds.push(`t.account = ${p(f.account)}`);
   if (f.date_from || f.date_to) {
     const zone = p(tz);
@@ -101,9 +136,17 @@ export function buildHistoryWhere(f: HistoryFilters, tz: string): { where: strin
   }
   if (f.search) {
     const s = p(`%${escapeLike(f.search)}%`);
-    conds.push(`(t.notes ILIKE ${s} ESCAPE '\\' OR t.asset ILIKE ${s} ESCAPE '\\')`);
+    // Activo, nota, hash on-chain y nombre del archivo de origen (#366).
+    conds.push(`(t.notes ILIKE ${s} ESCAPE '\\' OR t.asset ILIKE ${s} ESCAPE '\\' OR t.tx_hash ILIKE ${s} ESCAPE '\\'`
+      + ` OR t.import_id IN (SELECT ci.id FROM csv_imports ci WHERE ci.filename ILIKE ${s} ESCAPE '\\'))`);
   }
   if (f.manually_added !== undefined) conds.push(`t.manually_added = ${p(f.manually_added)}`);
+  if (f.edited !== undefined) conds.push(`t.original_import IS ${f.edited ? 'NOT ' : ''}NULL`);
+  // Tarjeta del resumen (#407): lo mismo que suma, con su mismo criterio de margen.
+  if (f.tarjeta) {
+    conds.push(cardPredicate(f.tarjeta, 't'));
+    if (!f.incluir_margen) conds.push(`NOT ${marginSql('t', `${p([...MARGIN_ACCOUNTS])}::text[]`)}`);
+  }
 
   return { where: conds.length ? `WHERE ${conds.join(' AND ')}` : '', params };
 }

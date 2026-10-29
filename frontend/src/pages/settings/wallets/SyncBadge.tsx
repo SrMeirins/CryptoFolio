@@ -26,9 +26,9 @@ export function SyncBadge({ addr, onSync, syncing }: { addr: WalletAddress; onSy
           {addr.sync_details.map(d => (
             <div key={d.asset} className="text-xs text-fg-muted space-y-0.5">
               <p>
-                <span className="font-medium text-fg">{d.asset}</span> — Real: {d.onchain_balance ?? '—'} · App: {d.expected_balance}
+                <span className="font-medium text-fg">{d.asset}</span>: en la red {d.onchain_balance ?? '—'} · en la app {d.expected_balance}
                 {d.status === 'discrepancy' && d.onchain_balance !== null && (
-                  <span className="text-warning"> · Diferencia: {formatNumber(d.onchain_balance - d.expected_balance, 6, 6)}</span>
+                  <span className="text-warning"> · diferencia: {formatNumber(d.onchain_balance - d.expected_balance, 6, 6)}</span>
                 )}
               </p>
               {/* Qué significa y qué hacer (#336) */}

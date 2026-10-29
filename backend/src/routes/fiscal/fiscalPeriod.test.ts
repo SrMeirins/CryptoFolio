@@ -4,7 +4,7 @@ import { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
 // clampDay viene de un módulo sin BD: importar el router aquí cargaría
 // db/client antes de fijar DATABASE_URL y leería la base de desarrollo.
-import { clampDay } from '../../modules/fiscal/madridTime';
+import { clampDay } from '../../modules/time/localTime';
 
 // Neto de un ejercicio hasta una fecha de Madrid (#297). Datos sintéticos.
 let testDb: TestDatabase;

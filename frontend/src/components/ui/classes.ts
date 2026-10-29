@@ -168,7 +168,11 @@ export function stateClasses(compact = false, extra = ''): string {
 export function panelEnterStyle(index: number): { animationDelay: string } {
   return { animationDelay: `${Math.max(0, Math.min(index, 12)) * 60}ms` }
 }
-/** Panel con entrada animada y elevación suave al pasar el cursor. */
+/** Envoltorio de panel con entrada animada; el acabado lo da `panelSurface` (#419). */
 export function panelClasses(extra = ''): string {
-  return twMerge('panel-in panel-glow', extra)
+  return twMerge('panel-in', extra)
+}
+/** Superficie de los paneles grandes (gráficos y tablas) en versión ligera (#419). */
+export function panelSurface(padding: CardPadding = 'md', extra = ''): string {
+  return cardClasses(padding, twMerge('panel-soft', extra))
 }

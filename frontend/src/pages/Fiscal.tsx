@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { FileText, Info } from 'lucide-react'
 import { portfolioApi } from '../api/portfolio'
 import { FISCAL_STALE_TIME } from './fiscal/constants'
 import { fiscalYearQueries, prefetchOrder } from './fiscal/fiscalYearQueries'
 import { baseTramosCompensada } from '../utils/tramosIrpf'
-import { adjacentYear, cuotaAhorro, FISCAL_VISTAS, madridMonthDay, parseVista, yearComparison, type FiscalVista } from '../utils/fiscalHeader'
+import { adjacentYear, cuotaAhorro, FISCAL_VISTAS, localMonthDay, parseVista, yearComparison, type FiscalVista } from '../utils/fiscalHeader'
 import { useTramos } from '../hooks/useTramos'
 import { ComparativaAnual } from './fiscal/charts/ComparativaAnual'
 import { EvolucionMensual } from './fiscal/charts/EvolucionMensual'
@@ -20,6 +20,7 @@ import { TablaEventos } from './fiscal/TablaEventos'
 import { TablaRendimientos } from './fiscal/TablaRendimientos'
 import { ExportPanel } from './fiscal/ExportPanel'
 import { YearTabs } from './fiscal/YearTabs'
+import { historyYearLink } from './history/keyboard/yearNav'
 import { FiscalHero, FiscalHeroSkeleton } from './fiscal/FiscalHero'
 import { PlanificadorTab } from './fiscal/PlanificadorTab'
 import { CalendarioFiscal } from './fiscal/CalendarioFiscal'
@@ -48,7 +49,6 @@ export function Fiscal() {
   })
   const vista = parseVista(searchParams.get('vista'))
   const queryClient = useQueryClient()
-  const tramos = useTramos()
 
   const { data: years = [] } = useQuery({ queryKey: ['fiscal-years'], queryFn: portfolioApi.getFiscalYears })
   const { data: overview = [] } = useQuery({ queryKey: ['fiscal-overview'], queryFn: portfolioApi.getFiscalOverview, staleTime: FISCAL_STALE_TIME })
@@ -58,6 +58,9 @@ export function Fiscal() {
   const { data: declaraciones = [] } = useQuery({ queryKey: ['fiscal-declaraciones'], queryFn: portfolioApi.getDeclaraciones })
 
   const activeYear = selectedYear ?? (years.length > 0 ? years[0] : null)
+  // Escala del ahorro de cada ejercicio (#452): la del activo y la del anterior, para compararlos.
+  const tramos = useTramos(activeYear ?? undefined)
+  const tramosPrev = useTramos((activeYear ?? new Date().getFullYear()) - 1)
 
   // Al cambiar de año se mantiene el anterior (atenuado) mientras llega el
   // nuevo, en vez de vaciar la página (#295). Con year 0 la consulta está
@@ -72,7 +75,7 @@ export function Fiscal() {
 
   // Año en curso: el anterior «a estas alturas» (mismo día de Madrid) (#297).
   const enCurso = !!summary?.esAnioEnCurso && !switching
-  const hasta = madridMonthDay()
+  const hasta = localMonthDay()
   const { data: prevPeriod } = useQuery({
     queryKey: ['fiscal-neto-hasta', (activeYear ?? 0) - 1, hasta],
     queryFn: () => portfolioApi.getFiscalNetoHasta((activeYear ?? 0) - 1, hasta),
@@ -107,7 +110,7 @@ export function Fiscal() {
   const setVista = useCallback((v: FiscalVista) => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev)
-      for (const k of ['desde', 'hasta', 'activo']) next.delete(k)
+      for (const k of ['desde', 'hasta', 'activo', 'resultado', 'seccion']) next.delete(k)
       if (v === 'resumen') next.delete('vista')
       else next.set('vista', v)
       return next
@@ -118,6 +121,17 @@ export function Fiscal() {
     setSearchParams({ vista: 'operaciones', ...filters })
   }, [setSearchParams])
   const urlFilters = filtersFromUrl(searchParams)
+
+  // Tarjeta Rendimientos (#418): en Operaciones, baja a su tabla y le pasa el
+  // foco en cuanto está pintada.
+  const seccion = searchParams.get('seccion')
+  useEffect(() => {
+    if (vista !== 'operaciones' || seccion !== 'rendimientos' || !events) return
+    const el = document.getElementById('fiscal-rendimientos')
+    if (!el) return
+    el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+    el.focus({ preventScroll: true })
+  }, [vista, seccion, events])
 
   // En pantallas estrechas la fila de pestañas se desplaza: la activa siempre a la vista.
   useEffect(() => {
@@ -173,7 +187,7 @@ export function Fiscal() {
   // Comparación con el año anterior: mismo periodo en el año en curso; año completo si está cerrado.
   const ovPrev = overview.find(o => o.year === activeYear - 1)
   const cfPrev = carryforward?.detalle.find(d => d.year === activeYear - 1)
-  const prevCuota = ovPrev ? cuotaAhorro(baseTramosCompensada(cfPrev, ovPrev.netoPatrimonial, ovPrev.totalRendimientos), tramos).cuota : null
+  const prevCuota = ovPrev ? cuotaAhorro(baseTramosCompensada(cfPrev, ovPrev.netoPatrimonial, ovPrev.totalRendimientos), tramosPrev).cuota : null
   const comparison = summary ? yearComparison({
     year: activeYear,
     esAnioEnCurso: summary.esAnioEnCurso,
@@ -201,6 +215,13 @@ export function Fiscal() {
       />
 
       <YearTabs years={years} activeYear={activeYear} overview={overview} onSelect={setSelectedYear} />
+      {activeYear && (
+        <p className="text-xs text-right -mt-2">
+          <Link to={historyYearLink(activeYear)} className="text-brand-ink hover:underline rounded focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
+            Ver las operaciones de {activeYear} en Historial
+          </Link>
+        </p>
+      )}
 
       <Tabs items={TAB_ITEMS} value={vista} onChange={setVista} label="Secciones de Fiscal" idBase={ID_BASE} variant="underline"
         className="overflow-x-auto [scrollbar-width:none] [&>button]:shrink-0 max-sm:[&>button]:px-3" />
@@ -220,7 +241,7 @@ export function Fiscal() {
         ) : summary && vista === 'resumen' ? (
           <>
             <FiscalHero summary={summary} cuota={cuota} tipoMedio={tipoMedio} comparison={comparison} aviso={caducan && <AvisoCaducidad {...caducan} compact />}
-              declarada={!!rentaDeclarada} />
+              declarada={!!rentaDeclarada} onOpen={openOperaciones} />
             {!summary.esAnioEnCurso && <Block i={1}><DeclaracionRenta year={activeYear} declaracion={rentaDeclarada} /></Block>}
             {calendario && (
               <Block i={1}>
@@ -234,7 +255,7 @@ export function Fiscal() {
             {breakdown.length > 0 && <Block i={3}><DesglosePorActivo data={breakdown} onSelectAsset={a => openOperaciones({ activo: a })} /></Block>}
             {baseCompensada > 0 && (
               <Block i={4}>
-                <TramosIRPF base={baseCompensada} label={`Tramos IRPF — estimación ${activeYear}${huboCompensacion ? ' (tras compensar pérdidas)' : ''}`} />
+                <TramosIRPF base={baseCompensada} year={activeYear} label={`Tramos IRPF — estimación ${activeYear}${huboCompensacion ? ' (tras compensar pérdidas)' : ''}`} />
               </Block>
             )}
             {carryforward && <Block i={5}><PerdidasPendientes data={carryforward} /></Block>}

@@ -3,7 +3,7 @@ import { CalendarClock, ChevronDown } from 'lucide-react'
 import type { FiscalCalendar, FiscalHito } from '../../api/portfolio'
 import { formatEur } from '../../utils/format'
 import { formatFiscalDate } from '../../utils/fiscalTable'
-import { buttonClasses } from '../../components/ui'
+import { buttonClasses, panelSurface } from '../../components/ui'
 
 // Calendario fiscal (#309): franja con el próximo hito que se despliega en la
 // línea de tiempo del ciclo (cierre → 721 → Renta). Fechas y estado vienen del
@@ -39,7 +39,7 @@ export function CalendarioFiscal({ data, netoPorAnio, onGo }: {
   const urgent = p.estado === 'en-curso' && p.diasRestantes <= 7
   const soon = p.estado === 'en-curso' && p.diasRestantes <= 30
   return (
-    <section aria-label="Calendario fiscal" className="rounded-xl border border-border bg-background-card">
+    <section aria-label="Calendario fiscal" className={panelSurface('none')}>
       <div className="flex items-center gap-3 flex-wrap px-4 py-2.5">
         <CalendarClock size={15} className={urgent ? 'text-negative' : soon ? 'text-warning' : 'text-brand'} aria-hidden="true" />
         <p className="text-sm text-fg-muted flex-1 min-w-[14rem]">

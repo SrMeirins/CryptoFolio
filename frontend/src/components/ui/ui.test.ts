@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  badgeClasses, buttonClasses, cardClasses, fieldClasses, iconButtonClasses, modalOverlayClasses, modalPanelClasses, panelClasses, panelEnterStyle, segmentClasses, segmentThumbClasses,
+  badgeClasses, buttonClasses, cardClasses, fieldClasses, iconButtonClasses, modalOverlayClasses, modalPanelClasses, panelClasses, panelEnterStyle, panelSurface, segmentClasses, segmentThumbClasses,
   skeletonClasses, stateClasses, tabClasses, tabId, tabPanelId, tableFootRowClasses, tableHeadRowClasses, tableRowClasses,
 } from './classes'
 
@@ -188,10 +188,17 @@ describe('paneles (#232)', () => {
     expect(panelEnterStyle(99)).toEqual({ animationDelay: '720ms' })
     expect(panelEnterStyle(-2)).toEqual({ animationDelay: '0ms' })
   })
-  it('animación de entrada y brillo de borde al pasar el cursor (#255), con clases extra', () => {
+  it('envoltorio con la animación de entrada y clases extra, sin acabado propio (#419)', () => {
     const c = panelClasses('rounded-xl lg:col-span-2')
     expect(c).toContain('panel-in')
-    expect(c).toContain('panel-glow')
+    expect(c).not.toContain('panel-glow')
     expect(c).toContain('lg:col-span-2')
+  })
+  it('superficie de panel: la de las tarjetas base más la clase ligera única (#419)', () => {
+    const c = panelSurface('none', 'overflow-hidden')
+    expect(c).toContain('bg-background-card')
+    expect(c).toContain('panel-soft')
+    expect(c).toContain('overflow-hidden')
+    expect(panelSurface()).toContain('p-')
   })
 })

@@ -1,7 +1,9 @@
 import { getUmbral721, sumaValorCustodiaExchange, valorizarLotesEnFecha } from './lotesValoracion';
 import { obligacion721 } from './declaraciones';
 import { ultimaPresentacion721 } from './declaracionesRepo';
-import { endOfYearMadrid, madridDate, madridYearMonth } from './madridTime';
+import { endOfLocalYear, localDate, localYearMonth } from '../time/localTime';
+import { getAppTimezone } from '../time/appTimezone';
+import { db } from '../../db/client';
 import type { Obligacion721 } from './calendarioFiscal';
 
 // Obligación del Modelo 721 para el calendario fiscal (#309): la del ejercicio
@@ -9,7 +11,7 @@ import type { Obligacion721 } from './calendarioFiscal';
 // Valorar la cartera cuesta precios históricos y la campana consulta cada
 // minuto: se calcula como mucho una vez al día.
 
-let cache: { dia: string; valor: Promise<Map<number, boolean | null>> } | null = null;
+let cache: { dia: string; tz: string; valor: Promise<Map<number, boolean | null>> } | null = null;
 // Marcar o desmarcar un 721 cambia la regla: los endpoints de declaraciones vacían la caché.
 
 async function obligacionA(ejercicio: number, fecha: Date): Promise<boolean | null> {
@@ -21,14 +23,16 @@ async function obligacionA(ejercicio: number, fecha: Date): Promise<boolean | nu
 }
 
 export async function obligaciones721(now: Date = new Date()): Promise<Obligacion721> {
-  const dia = madridDate(now);
-  if (!cache || cache.dia !== dia) {
-    const y = madridYearMonth(now).year;
-    const valor = Promise.all([obligacionA(y - 1, endOfYearMadrid(y - 1)), obligacionA(y, now)])
+  // Día y ejercicio en la zona de la aplicación (#388); otra zona invalida la caché.
+  const tz = await getAppTimezone(db);
+  const dia = localDate(tz, now);
+  if (!cache || cache.dia !== dia || cache.tz !== tz) {
+    const y = localYearMonth(tz, now).year;
+    const valor = Promise.all([obligacionA(y - 1, endOfLocalYear(tz, y - 1)), obligacionA(y, now)])
       .then(([anterior, actual]) => new Map([[y - 1, anterior], [y, actual]]));
     // Si falla, no se queda en caché: el siguiente intento lo repite.
     valor.catch(() => { if (cache?.valor === valor) cache = null; });
-    cache = { dia, valor };
+    cache = { dia, tz, valor };
   }
   const map = await cache.valor;
   return ejercicio => map.get(ejercicio) ?? null;

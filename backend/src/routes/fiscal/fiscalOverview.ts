@@ -1,22 +1,24 @@
 import { Router, Request, Response } from 'express';
 import { cargarAniosFiscales, compensarPerdidas } from '../../modules/fiscal/carryforward';
 import { db } from '../../db/client';
+import { localYearMonth } from '../../modules/time/localTime';
+import { getAppTimezone } from '../../modules/time/appTimezone';
 
-import { madridYearMonth } from '../../modules/fiscal/madridTime';
 
 const router = Router();
 
 // ── GET /api/fiscal/years ──────────────────────────────────────────────────
 router.get('/years', async (_req: Request, res: Response) => {
+  const tz = await getAppTimezone(db);
   const result = await db.query(`
-    SELECT DISTINCT EXTRACT(YEAR FROM consumed_at AT TIME ZONE 'Europe/Madrid')::int AS year
+    SELECT DISTINCT EXTRACT(YEAR FROM consumed_at AT TIME ZONE $1)::int AS year
     FROM fifo_lot_consumptions
     UNION
-    SELECT DISTINCT EXTRACT(YEAR FROM timestamp AT TIME ZONE 'Europe/Madrid')::int AS year
+    SELECT DISTINCT EXTRACT(YEAR FROM timestamp AT TIME ZONE $1)::int AS year
     FROM transactions
     WHERE operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
     ORDER BY year DESC
-  `);
+  `, [tz]);
   res.json(result.rows.map((r: { year: number }) => r.year));
 });
 
@@ -24,15 +26,16 @@ router.get('/years', async (_req: Request, res: Response) => {
 // Devuelve resumen de todos los años disponibles en una sola llamada.
 // Usado para la comparativa interanual y el carryforward de pérdidas.
 router.get('/overview', async (_req: Request, res: Response) => {
+  const tz = await getAppTimezone(db);
   const yearsRes = await db.query(`
-    SELECT DISTINCT EXTRACT(YEAR FROM consumed_at AT TIME ZONE 'Europe/Madrid')::int AS year
+    SELECT DISTINCT EXTRACT(YEAR FROM consumed_at AT TIME ZONE $1)::int AS year
     FROM fifo_lot_consumptions
     UNION
-    SELECT DISTINCT EXTRACT(YEAR FROM timestamp AT TIME ZONE 'Europe/Madrid')::int AS year
+    SELECT DISTINCT EXTRACT(YEAR FROM timestamp AT TIME ZONE $1)::int AS year
     FROM transactions
     WHERE operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
     ORDER BY year ASC
-  `);
+  `, [tz]);
 
   const years: number[] = yearsRes.rows.map((r: { year: number }) => r.year);
 
@@ -44,20 +47,20 @@ router.get('/overview', async (_req: Request, res: Response) => {
         COALESCE(SUM(flc.gain_loss_eur), 0) AS neto,
         COUNT(*) AS num_operaciones
       FROM fifo_lot_consumptions flc
-      WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE 'Europe/Madrid') = $1
+      WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE $2) = $1
         AND flc.fiscal_event_type != 'NONE'
-    `, [year]);
+    `, [year, tz]);
 
     const rendRes = await db.query(`
       SELECT COALESCE(SUM(t.amount_net * COALESCE(t.price_per_unit, 0)), 0) AS total_rendimientos
       FROM transactions t
-      WHERE EXTRACT(YEAR FROM t.timestamp AT TIME ZONE 'Europe/Madrid') = $1
+      WHERE EXTRACT(YEAR FROM t.timestamp AT TIME ZONE $2) = $1
         AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
-    `, [year]);
+    `, [year, tz]);
 
     return {
       year,
-      esAnioEnCurso: year === madridYearMonth().year,
+      esAnioEnCurso: year === localYearMonth(tz).year,
       totalGanancias:  parseFloat(gpRes.rows[0]?.total_ganancias ?? '0'),
       totalPerdidas:   parseFloat(gpRes.rows[0]?.total_perdidas ?? '0'),
       netoPatrimonial: parseFloat(gpRes.rows[0]?.neto ?? '0'),
@@ -75,7 +78,8 @@ router.get('/overview', async (_req: Request, res: Response) => {
 // patrimoniales sin límite, y contra rendimientos del capital mobiliario
 // con límite del 25% de los rendimientos positivos del año.
 router.get('/carryforward', async (_req: Request, res: Response) => {
-  const rows = await cargarAniosFiscales(madridYearMonth().year);
+  const tz = await getAppTimezone(db);
+  const rows = await cargarAniosFiscales(localYearMonth(tz).year);
   res.json(compensarPerdidas(rows));
 });
 

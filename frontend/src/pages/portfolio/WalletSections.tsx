@@ -1,5 +1,5 @@
 import { AssetTable } from '../../components/AssetTable'
-import { cardClasses, panelClasses, panelEnterStyle } from '../../components/ui'
+import { panelClasses, panelEnterStyle, panelSurface } from '../../components/ui'
 import { formatMoney, formatPercent } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
 import { ink } from '../../utils/colors'
@@ -16,11 +16,13 @@ const KIND_LABEL: Record<string, string> = {
 // Una tarjeta por wallet con sus posiciones (#269): autocustodia primero,
 // exchanges después. Las wallets que solo tienen polvo no aparecen aquí (su
 // polvo va a la sección común) y el chip de la wallet no se repite en cada fila.
-export function WalletSections({ sections, total, compact, onSimulate }: {
+export function WalletSections({ sections, total, compact, onSimulate, onOpen }: {
   sections: WalletSection[]
   total: number
   compact: boolean
   onSimulate: (asset: string, qty: number, price: number) => void
+  /** Abre el detalle del activo (#460), como en la vista «Por activo». */
+  onOpen: (asset: string) => void
 }) {
   const currency = useCurrency()
   return (
@@ -29,8 +31,8 @@ export function WalletSections({ sections, total, compact, onSimulate }: {
         const value = s.rows.reduce((sum, r) => sum + r.value, 0)
         return (
           <section key={s.walletId} aria-label={`Wallet ${s.name}`}
-            className={panelClasses(cardClasses('none', 'overflow-clip'))} style={panelEnterStyle(i + 1)}>
-            <AssetTable rows={s.rows} portfolioTotal={total} compact={compact} hideWalletChips onSimulate={onSimulate}
+            className={panelClasses(panelSurface('none', 'overflow-clip'))} style={panelEnterStyle(i + 1)}>
+            <AssetTable rows={s.rows} portfolioTotal={total} compact={compact} hideWalletChips onSimulate={onSimulate} onOpen={onOpen}
               header={
                 <>
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} aria-hidden="true" />

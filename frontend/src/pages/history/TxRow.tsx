@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
-import { Trash2, PenLine, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react'
+import { Trash2, PenLine, PanelRightOpen, ArrowRight } from 'lucide-react'
 import type { Transaction } from '../../api/portfolio'
-import { CopyButton } from '../../components/CopyButton'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import { formatMoney, formatAmount, type Currency, formatNumber } from '../../utils/format'
+import { formatMoney, formatAmount, type Currency } from '../../utils/format'
 import { OP_META } from '../../constants/operations'
-import { fmtDate, calcEurValue, calcFeeEur, formatPriceLine, toDisplayAmount, valuationHint, flowSign } from './helpers'
-import { APP_TIMEZONE } from '../../constants/timezone'
+import { fmtDate, calcEurValue, formatPriceLine, toDisplayAmount, valuationHint, rowFlowSign, walletFlow, fiatSideNote } from './helpers'
 import { T, alpha, ink } from '../../utils/colors'
 import { iconButtonClasses } from '../../components/ui'
 import { DeleteConfirm } from './DeleteConfirm'
+import { FeeCell } from './FeeCell'
+import { BalanceCell } from './balance/BalanceCell'
 
 function Highlight({ text, query }: { text: string; query: string }) {
   if (!query.trim()) return <>{text}</>
@@ -23,8 +23,6 @@ function Highlight({ text, query }: { text: string; query: string }) {
     </>
   )
 }
-
-const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', year: 'numeric', timeZone: APP_TIMEZONE }
 
 /** Importe con su marca de estimación (≈) o «—» sin precio, con el motivo como texto accesible (#346). */
 function ValuedAmount({ value, hint, currency, className }: {
@@ -59,23 +57,34 @@ function OpChip({ type }: { type: string }) {
 }
 
 export function TxRow({
-  tx, onDelete, onEdit, isDeleting, searchTerm, currency, defaultExpanded = false,
+  tx, onDelete, onEdit, onOpen, onPrefetch, isDeleting, searchTerm, currency, selected = false, balance, rowIndex, tabbable = true, onActivate, walletId,
 }: {
   tx: Transaction
   currency: Currency
-  /** Abierta y visible al cargar (enlace desde la actividad del Dashboard, #237). */
-  defaultExpanded?: boolean
+  /** Wallet filtrada (#395): da el sentido de las operaciones entre wallets. */
+  walletId?: string
+  /** Su detalle está abierto en el panel (#373); visible al cargar si viene de un enlace (#237). */
+  selected?: boolean
+  /** Saldo del activo filtrado tras la operación (#380); sin él no hay columna. */
+  balance?: { asset: string; value: { balance: number; missing: number | null } | undefined }
+  /** Foco itinerante de la tabla (#382): posición, si es la fila activa y aviso al enfocarla. */
+  rowIndex?: number
+  tabbable?: boolean
+  onActivate?: (id: string) => void
+  /** Abre el panel de detalle (#373). */
+  onOpen: (id: string) => void
+  /** Precarga el detalle al pasar el ratón o el foco (#373). */
+  onPrefetch: (id: string) => void
   onDelete: (id: string) => void
   onEdit:   (tx: Transaction) => void
   isDeleting: boolean
   searchTerm: string
 }) {
-  const [expanded, setExpanded]           = useState(defaultExpanded)
   const rowRef = useRef<HTMLTableRowElement>(null)
-  useEffect(() => { if (defaultExpanded) rowRef.current?.scrollIntoView({ block: 'center' }) }, [defaultExpanded])
+  // Mantiene visible la fila cuyo detalle está abierto (enlace o Anterior/Siguiente).
+  useEffect(() => { if (selected) rowRef.current?.scrollIntoView({ block: 'nearest' }) }, [selected])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const deleteRef = useRef<HTMLButtonElement>(null)
-  const detailId = `tx-detalle-${tx.id}`
   function cancelDelete() {
     setConfirmDelete(false)
     // Devuelve el foco al botón de origen cuando vuelve a existir.
@@ -83,24 +92,30 @@ export function TxRow({
   }
 
   const meta   = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: T.muted, group: 'other', rowBg: 'transparent' }
-  const sign = flowSign(tx.operation_type)
+  const sign = rowFlowSign(tx, walletId)
+  const sideNote = fiatSideNote(tx)
+  const flow = walletFlow(tx, walletId)
   const amountColor = sign === '+' ? 'text-positive' : sign === '−' && meta.group === 'sell' ? 'text-negative' : 'text-fg'
 
   const { date, time } = fmtDate(tx.timestamp)
-  // Valor y comisión en la moneda de visualización, con el tipo de la fecha de la operación (#177).
+  // Valor en la moneda de visualización, con el tipo de la fecha de la operación (#177).
   const eurValue = toDisplayAmount(calcEurValue(tx), tx, currency)
-  const feeEur   = toDisplayAmount(calcFeeEur(tx), tx, currency)
   const priceLine = formatPriceLine(tx)
   const valueHint = valuationHint(tx.value_source)
-  const feeHint   = valuationHint(tx.fee_value_source)
 
   return (
     <>
       <tr
         ref={rowRef}
-        className={`group border-b border-border/40 transition-colors cursor-pointer ${expanded ? 'bg-background-tertiary/50' : ''}`}
-        style={{ backgroundColor: expanded ? undefined : meta.rowBg }}
-        onClick={() => setExpanded(e => !e)}
+        className={`group border-b border-border/40 transition-colors cursor-pointer focus:outline-hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand ${selected ? 'bg-background-tertiary/50' : ''}`}
+        style={{ backgroundColor: selected ? undefined : meta.rowBg }}
+        aria-current={selected ? 'true' : undefined}
+        data-row-index={rowIndex}
+        tabIndex={rowIndex === undefined ? undefined : tabbable ? 0 : -1}
+        onClick={() => onOpen(tx.id)}
+        onMouseEnter={() => onPrefetch(tx.id)}
+        onFocus={() => { onPrefetch(tx.id); onActivate?.(tx.id) }}
+        onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) { e.preventDefault(); onOpen(tx.id) } }}
       >
         {/* Fecha */}
         <td className="px-4 py-2.5 whitespace-nowrap align-middle">
@@ -117,7 +132,14 @@ export function TxRow({
                 <span aria-hidden="true">M</span><span className="sr-only">Añadida manualmente</span>
               </span>
             )}
+            {tx.original_import && (
+              <span className="text-xs px-1 py-0.5 rounded-lg bg-warning/15 text-warning-ink font-bold shrink-0" title="Importada y editada a mano">
+                <span aria-hidden="true">E</span><span className="sr-only">Importada y editada a mano</span>
+              </span>
+            )}
           </div>
+          {/* Registrada al revés por el exchange (#416): qué es en realidad. */}
+          {sideNote && <div className="text-[11px] text-fg-subtle mt-0.5">{sideNote}</div>}
         </td>
 
         {/* Activo + cantidad */}
@@ -149,29 +171,21 @@ export function TxRow({
           {eurValue != null && priceLine && <div className="text-xs text-fg-subtle mono mt-0.5">@ {priceLine}</div>}
         </td>
 
-        {/* Fee */}
+        {/* Fee: propia y agrupadas (#371) */}
         <td className="px-3 py-2.5 align-middle">
-          {tx.fee_asset && tx.fee_amount ? (
-            <div className="flex items-center gap-1.5">
-              <CryptoIcon symbol={tx.fee_asset} size={14} />
-              <div>
-                <div className="text-xs mono text-fg-muted">
-                  {formatAmount(tx.fee_amount, 6)} <span className="text-fg-subtle text-xs">{tx.fee_asset}</span>
-                </div>
-                {feeEur != null && (
-                  <div><ValuedAmount value={feeEur} hint={feeHint} currency={currency} className="text-xs text-fg-subtle mono" /></div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <span className="text-fg-subtle text-xs">—</span>
-          )}
+          <FeeCell tx={tx} currency={currency} paidElsewhere={flow === 'entrada'} />
         </td>
 
         {/* Wallet */}
         <td className="px-3 py-2.5 align-middle">
-          {tx.operation_type === 'TRANSFER_INTERNAL' && tx.destination_wallet_name ? (
+          {/* Origen y destino en cualquier operación hacia una wallet propia (#395). */}
+          {tx.destination_wallet_name ? (
             <div className="flex items-center gap-1 flex-wrap">
+              {flow && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-lg font-medium bg-background-tertiary ${flow === 'entrada' ? 'text-positive' : 'text-fg-muted'}`}>
+                  {flow === 'entrada' ? 'Entrada' : 'Salida'}
+                </span>
+              )}
               <span className="text-xs px-2 py-0.5 rounded-lg font-semibold"
                 style={{ backgroundColor: `${alpha(tx.wallet_color, 9)}`, color: ink(tx.wallet_color) }}>
                 {tx.wallet_name}
@@ -193,6 +207,9 @@ export function TxRow({
           )}
         </td>
 
+        {/* Saldo del activo filtrado (#380) */}
+        {balance && <BalanceCell value={balance.value} asset={balance.asset} />}
+
         {/* Acciones */}
         <td className="px-3 py-2.5 align-middle" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-end gap-0.5">
@@ -200,13 +217,13 @@ export function TxRow({
               // Ocultas en reposo, pero visibles con hover, con foco dentro de la
               // fila y siempre en pantallas táctiles, donde no hay hover (#351).
               <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity flex gap-0.5">
-                <button type="button" onClick={() => onEdit(tx)}
+                <button type="button" onClick={() => onEdit(tx)} tabIndex={tabbable ? undefined : -1}
                   className={iconButtonClasses('md', false, '', 'brand')}
                   title="Editar transacción" aria-label="Editar transacción">
                   <PenLine size={12} aria-hidden="true" />
                 </button>
                 {tx.manually_added && (
-                  <button type="button" ref={deleteRef} onClick={() => setConfirmDelete(true)}
+                  <button type="button" ref={deleteRef} onClick={() => setConfirmDelete(true)} tabIndex={tabbable ? undefined : -1}
                     className={iconButtonClasses('md', false, '', 'danger')}
                     title="Eliminar transacción" aria-label="Eliminar transacción">
                     <Trash2 size={12} aria-hidden="true" />
@@ -217,71 +234,14 @@ export function TxRow({
             {tx.manually_added && confirmDelete && (
               <DeleteConfirm onConfirm={() => onDelete(tx.id)} onCancel={cancelDelete} isDeleting={isDeleting} />
             )}
-            <button type="button" onClick={() => setExpanded(e => !e)}
-              aria-expanded={expanded} aria-controls={expanded ? detailId : undefined}
-              className={iconButtonClasses('sm')} aria-label={expanded ? 'Contraer detalle' : 'Expandir detalle'}>
-              {expanded ? <ChevronUp size={12} aria-hidden="true" /> : <ChevronDown size={12} aria-hidden="true" />}
+            <button type="button" onClick={() => onOpen(tx.id)} aria-haspopup="dialog" tabIndex={tabbable ? undefined : -1}
+              className={iconButtonClasses('sm')} title="Ver detalle" aria-label="Ver detalle">
+              <PanelRightOpen size={12} aria-hidden="true" />
             </button>
           </div>
         </td>
       </tr>
 
-      {/* Fila expandida */}
-      {expanded && (
-        <tr id={detailId} className="bg-background-tertiary/15">
-          <td colSpan={7} className="px-6 py-3 border-b border-border">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-              <div>
-                <div className="text-[11px] text-fg-subtle uppercase tracking-widest mb-1">ID</div>
-                <div className="mono text-fg-subtle text-xs break-all flex items-center gap-1">
-                  {tx.id}
-                  <CopyButton text={tx.id} size={10} title="Copiar ID" className="ml-1" />
-                </div>
-              </div>
-              {tx.price_per_unit && (
-                <div>
-                  <div className="text-[11px] text-fg-subtle uppercase tracking-widest mb-1">Precio unitario</div>
-                  <div className="mono text-fg">{formatNumber(parseFloat(tx.price_per_unit), 8, 8)} {tx.cost_asset ?? 'EUR'}</div>
-                </div>
-              )}
-              {tx.destination_wallet_name && (
-                <div>
-                  <div className="text-[11px] text-fg-subtle uppercase tracking-widest mb-1">Destino</div>
-                  <span className="text-xs px-2 py-0.5 rounded-lg font-semibold"
-                    style={{ backgroundColor: `${alpha(tx.destination_wallet_color ?? T.muted, 9)}`, color: ink(tx.destination_wallet_color ?? T.muted) }}>
-                    {tx.destination_wallet_name}
-                  </span>
-                </div>
-              )}
-              <div>
-                <div className="text-[11px] text-fg-subtle uppercase tracking-widest mb-1">Importado</div>
-                <div className="text-fg-subtle text-xs">
-                  {new Date(tx.created_at).toLocaleDateString('es-ES', SHORT_DATE)}
-                  {tx.manually_added && <span className="ml-1.5 text-brand font-medium">· Manual</span>}
-                </div>
-              </div>
-              {tx.linked_tx_id && tx.linked_tx_timestamp && (
-                <div className="col-span-2">
-                  <div className="text-[11px] text-fg-subtle uppercase tracking-widest mb-1">
-                    {tx.operation_type === 'STAKING_UNLOCK' ? 'Bloqueo de staking vinculado' : 'Desbloqueo de staking vinculado'}
-                  </div>
-                  <div className="text-xs text-warning/80 mono">
-                    {new Date(tx.linked_tx_timestamp).toLocaleDateString('es-ES', SHORT_DATE)}
-                    {' · '}
-                    {tx.linked_tx_amount ? formatNumber(parseFloat(tx.linked_tx_amount), 6, 6) : ''} {tx.linked_tx_asset}
-                  </div>
-                </div>
-              )}
-              {tx.notes && (
-                <div className="col-span-2">
-                  <div className="text-[11px] text-fg-subtle uppercase tracking-widest mb-1">Notas</div>
-                  <div className="text-fg-muted">{tx.notes}</div>
-                </div>
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
     </>
   )
 }

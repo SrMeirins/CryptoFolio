@@ -24,3 +24,10 @@ describe('orden del Historial (#349)', () => {
     expect(exportCsvUrl({ limit: '50' })).toBe('/api/transactions/export.csv')
   })
 })
+
+describe('URL del CSV con rango de importe (#366)', () => {
+  it('conserva la moneda solo si hay rango', () => {
+    expect(exportCsvUrl({ value_min: '10', currency: 'EUR', limit: '50' })).toBe('/api/transactions/export.csv?value_min=10&currency=EUR')
+    expect(exportCsvUrl({ type: 'BUY', currency: 'USD' })).toBe('/api/transactions/export.csv?type=BUY')
+  })
+})

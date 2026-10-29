@@ -8,11 +8,11 @@ import { OP_META, type OpGroup } from '../../constants/operations'
 import { T, alpha, ink } from '../../utils/colors'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
 import { calcEurValue, toDisplayAmount } from '../history/helpers'
-import { madridToday } from '../../utils/pnlChart'
-import { filterActivity, groupByDay, madridTime, selectRecent, type ActivityFilter } from '../../utils/recentActivity'
+import { localToday } from '../../utils/pnlChart'
+import { filterActivity, groupByDay, localTimeOf, selectRecent, type ActivityFilter } from '../../utils/recentActivity'
 import { activitySubtitle } from '../../utils/panelSubtitles'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import { EmptyState, PanelHeader, SegmentedControl, Skeleton, cardClasses } from '../../components/ui'
+import { EmptyState, PanelHeader, SegmentedControl, Skeleton, panelSurface } from '../../components/ui'
 
 // Actividad reciente (#237): línea de tiempo de los últimos 7 días (máx. 12
 // operaciones; si no hay, las 8 últimas) agrupada por día en hora de Madrid,
@@ -38,14 +38,14 @@ export function RecentActivity() {
     refetchInterval: 60_000,
   })
 
-  const today = madridToday()
+  const today = localToday()
   const items = useMemo<Item[]>(() => selectRecent(data?.transactions ?? [], today).map(tx => ({
     tx, timestamp: tx.timestamp, group: OP_META[tx.operation_type]?.group ?? 'other',
   })), [data, today])
   const groups = useMemo(() => groupByDay(filterActivity(items, filter), today), [items, filter, today])
 
   return (
-    <div className={cardClasses('none', 'overflow-hidden')}>
+    <div className={panelSurface('none', 'overflow-hidden')}>
       <PanelHeader
         icon={History}
         title="Actividad reciente"
@@ -84,7 +84,7 @@ export function RecentActivity() {
                       <button
                         type="button"
                         onClick={() => navigate(`/history?buscar=${encodeURIComponent(tx.asset)}&tx=${encodeURIComponent(tx.id)}`)}
-                        aria-label={`${meta.label} de ${formatAmount(tx.amount, 6)} ${tx.asset}${value != null ? `, ${formatMoney(value, currency)}` : ''}, ${madridTime(tx.timestamp)}. Abrir en el Historial`}
+                        aria-label={`${meta.label} de ${formatAmount(tx.amount, 6)} ${tx.asset}${value != null ? `, ${formatMoney(value, currency)}` : ''}, ${localTimeOf(tx.timestamp)}. Abrir en el Historial`}
                         className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-left transition-colors hover:bg-overlay/4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand"
                       >
                         <CryptoIcon symbol={tx.asset} size={28} />
@@ -102,7 +102,7 @@ export function RecentActivity() {
                         </span>
                         <span className="text-right shrink-0">
                           <span className="block text-sm mono font-semibold text-fg">{value != null ? formatMoney(value, currency) : '—'}</span>
-                          <span className="block text-[11px] mono text-fg-subtle">{madridTime(tx.timestamp)}</span>
+                          <span className="block text-[11px] mono text-fg-subtle">{localTimeOf(tx.timestamp)}</span>
                         </span>
                       </button>
                     </li>

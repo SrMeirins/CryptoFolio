@@ -97,7 +97,8 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                 <button ref={nameRef} type="button" data-row-nav="" data-asset={row.asset}
                   onClick={e => { e.stopPropagation(); open() }} aria-label={`Ver detalle de ${row.asset}`}
                   aria-keyshortcuts="ArrowUp ArrowDown s"
-                  className="font-medium rounded hover:text-brand focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60">
+                  // Con estilo de enlace (#460): se ve que abre el detalle.
+                  className="font-medium rounded underline decoration-dotted decoration-fg-subtle/60 underline-offset-4 hover:text-brand-ink hover:decoration-brand focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60">
                   {row.asset}
                 </button>
               )
@@ -121,14 +122,16 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                 })()}
               </div>
             )}
-            {/* Acciones al pasar el cursor o con el foco (#282); siempre visibles en pantallas táctiles */}
-            <div className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100">
+            {/* Detalle siempre visible, atenuado en reposo (#460); el resto de acciones, al pasar
+                el cursor o con el foco (#282) y siempre en pantallas táctiles */}
+            <div className="ml-auto flex items-center gap-0.5">
               {onOpen && (
                 <button type="button" onClick={e => { e.stopPropagation(); open() }} title="Detalle"
-                  aria-label={`Detalle de ${row.asset}`} className={iconButtonClasses('sm')}>
+                  aria-label={`Detalle de ${row.asset}`} className={iconButtonClasses('sm', false, 'opacity-60 group-hover/row:opacity-100 group-focus-within/row:opacity-100 transition-opacity')}>
                   <PanelRight size={13} aria-hidden="true" />
                 </button>
               )}
+              <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100">
               {onSimulate && (
                 <button type="button" onClick={e => { e.stopPropagation(); onSimulate(row.asset, row.totalQuantity) }}
                   className={iconButtonClasses('sm', false, '', 'brand')} title="Simular venta (s)" aria-label={`Simular venta de ${row.asset}`}>
@@ -139,6 +142,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                 title="Historial" aria-label={`Historial de ${row.asset}`} className={iconButtonClasses('sm')}>
                 <History size={13} aria-hidden="true" />
               </Link>
+              </div>
             </div>
           </div>
         </td>

@@ -9,6 +9,9 @@ export const THEME_CONFIG_KEY = 'theme'
 export const THEME_STORAGE_KEY = 'cflio_theme_effective'
 export const THEME_PREFERENCES: readonly ThemePreference[] = ['dark', 'light', 'system']
 
+/** Nombre visible de cada preferencia de tema. */
+export const THEME_LABELS: Record<ThemePreference, string> = { dark: 'Oscuro', light: 'Claro', system: 'Sistema' }
+
 /** Valor guardado → preferencia válida; cualquier otro valor cae en oscuro. */
 export function parseThemePreference(raw: unknown): ThemePreference {
   return raw === 'light' || raw === 'system' ? raw : 'dark'

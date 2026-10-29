@@ -1,7 +1,9 @@
 import { db } from '../../db/client';
 import { cargarAniosFiscales, baseAhorro, compensarPerdidas } from './carryforward';
-import { calcularIrpfAhorro, parseTiposConfig } from './irpf';
-import { madridYearMonth } from './madridTime';
+import { calcularIrpfAhorro } from './irpf';
+import { escalaDe } from './escalasAhorro';
+import { localYearMonth } from '../time/localTime';
+import { getAppTimezone } from '../time/appTimezone';
 import type { CifrasRenta, Presentacion721 } from './declaraciones';
 
 // Acceso a los ejercicios declarados (#311) y cifras actuales de la Renta de
@@ -14,18 +16,20 @@ export interface Declaracion { ejercicio: number; tipo: TipoDeclaracion; declara
 const RENDIMIENTOS = `('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')`;
 
 export async function cifrasRenta(year: number): Promise<CifrasRenta> {
+  const tz = await getAppTimezone(db);
   const gp = (await db.query(`
     SELECT COALESCE(SUM(CASE WHEN gain_loss_eur > 0 THEN gain_loss_eur ELSE 0 END), 0) AS ganancias,
            COALESCE(SUM(CASE WHEN gain_loss_eur < 0 THEN gain_loss_eur ELSE 0 END), 0) AS perdidas,
            COALESCE(SUM(gain_loss_eur), 0) AS neto, COUNT(*) AS operaciones
     FROM fifo_lot_consumptions
-    WHERE EXTRACT(YEAR FROM consumed_at AT TIME ZONE 'Europe/Madrid') = $1 AND fiscal_event_type != 'NONE'`, [year])).rows[0];
+    WHERE EXTRACT(YEAR FROM consumed_at AT TIME ZONE $2) = $1 AND fiscal_event_type != 'NONE'`, [year, tz])).rows[0];
   const rend = (await db.query(`
     SELECT COALESCE(SUM(amount_net * COALESCE(price_per_unit, 0)), 0) AS total, COUNT(*) AS n
     FROM transactions
-    WHERE EXTRACT(YEAR FROM timestamp AT TIME ZONE 'Europe/Madrid') = $1 AND operation_type IN ${RENDIMIENTOS}`, [year])).rows[0];
-  const tipos = parseTiposConfig((await db.query("SELECT value FROM app_config WHERE key = 'irpf_tramos_tipos'")).rows[0]?.value);
-  const detalle = compensarPerdidas(await cargarAniosFiscales(madridYearMonth().year)).detalle.find(d => d.year === year);
+    WHERE EXTRACT(YEAR FROM timestamp AT TIME ZONE $2) = $1 AND operation_type IN ${RENDIMIENTOS}`, [year, tz])).rows[0];
+  // Escala del ejercicio declarado (#452).
+  const tipos = await escalaDe(db, year);
+  const detalle = compensarPerdidas(await cargarAniosFiscales(localYearMonth(tz).year)).detalle.find(d => d.year === year);
   const neto = parseFloat(gp.neto);
   const rendimientos = parseFloat(rend.total);
   const base = Math.max(0, detalle ? baseAhorro(detalle) : neto + rendimientos);

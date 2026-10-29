@@ -22,6 +22,8 @@ export interface DepositReview {
   amount: number;
   historicalPrice: number | null;
   existingInDb?: boolean;  // true si ya está importado (necesita bulk-set-costs en lugar de depositCosts)
+  /** Qué se revisa: un depósito externo o una compra con fiat sin su pago en el CSV (#435). */
+  kind?: 'deposito' | 'compra';
 }
 
 export interface PreviewResult {
@@ -34,6 +36,8 @@ export interface PreviewResult {
   depositReviews: DepositReview[];  // depósitos externos que necesitan coste
   /** Historial de retiradas de Binance aportado (#320): cuántas se han emparejado. */
   retiradas?: ResumenRetiradas | null;
+  /** Filas ya importadas sin su fila original que este archivo puede completar (#374). */
+  originalRowsMissing?: number;
 }
 
 export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'binance', retiradasBuffers: readonly Buffer[] = []): Promise<PreviewResult> {
@@ -97,6 +101,13 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
     : { rows: [] as { row_hash: string }[] };
   const existingHashes = new Set(existingRes.rows.map((r: { row_hash: string }) => r.row_hash));
 
+  // Filas guardadas antes de #374 que este archivo puede completar.
+  const rawHashes = parseResult.rawRows.map(r => r.hash);
+  const missingRes = rawHashes.length > 0
+    ? await db.query('SELECT count(*)::int AS n FROM raw_transactions WHERE row_hash = ANY($1) AND original_row IS NULL', [rawHashes])
+    : { rows: [{ n: 0 }] };
+  const originalRowsMissing = Number(missingRes.rows[0]?.n ?? 0);
+
   let duplicateCount = 0;
   let newCount = 0;
   for (const tx of parseResult.transactions) {
@@ -130,7 +141,30 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
     const txKey = tx.rawRowHashes[0];
     let historicalPrice: number | null = null;
     try { historicalPrice = await getHistoricalPriceEur(tx.asset, tx.timestamp); } catch { /* ignorar */ }
-    depositReviews.push({ txKey, timestamp: tx.timestamp.toISOString(), asset: tx.asset, amount: tx.amount, historicalPrice });
+    depositReviews.push({
+      txKey, timestamp: tx.timestamp.toISOString(), asset: tx.asset, amount: tx.amount, historicalPrice,
+      kind: tx.orphanFiatBuy ? 'compra' : 'deposito',
+    });
+  }
+
+  // Caso 3 (#435): compra huérfana ya importada como airdrop, sin editar a mano.
+  // Al confirmar se reclasifica como compra; aquí se pide su coste.
+  const orphans = parseResult.transactions.filter(tx => tx.orphanFiatBuy && tx.rawRowHashes.some(h => existingHashes.has(h)));
+  if (orphans.length > 0) {
+    const misclassified = await db.query(
+      `SELECT DISTINCT t.id::text AS id, t.timestamp, t.asset, t.amount
+       FROM raw_transactions rt JOIN transactions t ON t.id = rt.transaction_id
+       WHERE rt.row_hash = ANY($1) AND t.operation_type = 'AIRDROP' AND t.original_import IS NULL`,
+      [orphans.flatMap(tx => tx.rawRowHashes)]
+    );
+    for (const row of misclassified.rows) {
+      let historicalPrice: number | null = null;
+      try { historicalPrice = await getHistoricalPriceEur(row.asset, new Date(row.timestamp)); } catch { /* ignorar */ }
+      depositReviews.push({
+        txKey: row.id, timestamp: new Date(row.timestamp).toISOString(), asset: row.asset,
+        amount: parseFloat(row.amount), historicalPrice, existingInDb: true, kind: 'compra',
+      });
+    }
   }
 
   // Caso 2: depósitos ya importados en DB pero sin coste — bloquean igual
@@ -152,6 +186,7 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
       amount: parseFloat(row.amount),
       historicalPrice,
       existingInDb: true,         // flag extra para distinguir en UI si hace falta
+      kind: 'deposito',
     });
   }
 
@@ -171,5 +206,6 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
     unknownOperationSamples,
     depositReviews,
     retiradas: resumen,
+    originalRowsMissing,
   };
 }

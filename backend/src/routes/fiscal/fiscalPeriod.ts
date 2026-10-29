@@ -2,19 +2,21 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../../db/client';
 import { parseYear, sendZodError } from './fiscalShared';
-import { clampDay } from '../../modules/fiscal/madridTime';
+import { getAppTimezone } from '../../modules/time/appTimezone';
+import { clampDay } from '../../modules/time/localTime';
 
 // Neto patrimonial de un ejercicio hasta una fecha (#297), para comparar el
 // año en curso con el mismo periodo del anterior («2025 a estas alturas»).
 // La fecha es un día de Madrid (MM-DD) y se incluye completo.
 const router = Router();
 
-const querySchema = z.object({
+const querySchema = z.strictObject({
   hasta: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, 'formato MM-DD'),
-}).strict();
+});
 
 // GET /api/fiscal/:year/neto-hasta?hasta=MM-DD
 router.get('/:year/neto-hasta', async (req: Request, res: Response) => {
+  const tz = await getAppTimezone(db);
   const year = parseYear(req.params.year);
   if (!year) return res.status(400).json({ error: 'Año inválido' });
   const parsed = querySchema.safeParse(req.query);
@@ -31,10 +33,10 @@ router.get('/:year/neto-hasta', async (req: Request, res: Response) => {
       COALESCE(SUM(flc.gain_loss_eur), 0) AS neto,
       COUNT(*) AS operaciones
     FROM fifo_lot_consumptions flc
-    WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE 'Europe/Madrid') = $1
-      AND (flc.consumed_at AT TIME ZONE 'Europe/Madrid')::date <= $2::date
+    WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE $3) = $1
+      AND (flc.consumed_at AT TIME ZONE $3)::date <= $2::date
       AND flc.fiscal_event_type != 'NONE'
-  `, [year, hasta]);
+  `, [year, hasta, tz]);
 
   res.json({
     year,

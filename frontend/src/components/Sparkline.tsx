@@ -8,17 +8,25 @@ import { formatPercent } from '../utils/format'
 const W = 100
 const H = 28
 
-export function Sparkline({ values, days, className = '' }: { values: readonly number[]; days: number; className?: string }) {
+/**
+ * `color` fija el color en lugar de seguir la tendencia y `decorative` lo
+ * oculta al lector de pantalla cuando la cifra ya se anuncia aparte (#407).
+ */
+export function Sparkline({ values, days, className = '', color: fixedColor, decorative = false }: {
+  values: readonly number[]; days: number; className?: string; color?: string; decorative?: boolean
+}) {
   const id = useId()
   const gradientId = `${id}-fill`
   const clipId = `${id}-clip`
   const points = sparklinePoints(values, W, H)
   if (!points) return null
   const change = sparklineChange(values) ?? 0
-  const color = change >= 0 ? 'var(--cf-positive)' : 'var(--cf-negative)'
+  const color = fixedColor ?? (change >= 0 ? 'var(--cf-positive)' : 'var(--cf-negative)')
+  const a11y = decorative
+    ? { 'aria-hidden': true as const }
+    : { role: 'img', 'aria-label': `Tendencia de ${days} días: ${formatPercent(change, 1, true)}` }
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={className}
-      role="img" aria-label={`Tendencia de ${days} días: ${formatPercent(change, 1, true)}`}>
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={className} {...a11y}>
       <defs>
         <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.22" />

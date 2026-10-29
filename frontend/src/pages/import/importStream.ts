@@ -16,11 +16,12 @@ export async function waitForImportCommit(prevCount: number, attempts = 8, delay
 }
 
 /**
- * Lee el stream SSE de POST /api/imports/confirm, línea a línea, invocando
- * `onEvent` por cada evento válido. Devuelve `true` si se vio una fase
- * terminal ('done' o 'error') antes de que el stream se cerrara.
+ * Lee el stream SSE de POST /api/imports/confirm (o de otro con el mismo
+ * formato, como el FIFO, #454), línea a línea, invocando `onEvent` por cada
+ * evento válido. Devuelve `true` si se vio una fase terminal ('done' o
+ * 'error') antes de que el stream se cerrara.
  */
-export async function readProgressStream(res: Response, onEvent: (event: ProgressEvent) => void): Promise<boolean> {
+export async function readProgressStream<E extends { phase: string } = ProgressEvent>(res: Response, onEvent: (event: E) => void): Promise<boolean> {
   let sawTerminal = false
   const reader  = res.body?.getReader()
   const decoder = new TextDecoder()
@@ -41,7 +42,7 @@ export async function readProgressStream(res: Response, onEvent: (event: Progres
     for (const line of lines) {
       if (!line.startsWith('data: ')) continue
       try {
-        const event: ProgressEvent = JSON.parse(line.slice(6))
+        const event = JSON.parse(line.slice(6)) as E
         onEvent(event)
         if (event.phase === 'done' || event.phase === 'error') sawTerminal = true
       } catch { /* ignorar línea malformada */ }

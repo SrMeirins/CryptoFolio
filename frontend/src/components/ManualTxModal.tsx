@@ -6,6 +6,8 @@ import { OP_META } from '../constants/operations'
 import { useToast } from '../hooks/useToast'
 import { ManualTxPreviewPanel } from './ManualTxPreviewPanel'
 import { ManualTxDoneScreen } from './ManualTxDoneScreen'
+import { ImportEditNotice } from './ImportEditNotice'
+import { amountNetFor, editFormType, savedOperationType } from './manualTxData'
 import { buttonClasses, iconButtonClasses, Modal } from './ui'
 
 interface ManualTxModalProps {
@@ -21,7 +23,7 @@ function isFeeOperation(operationTypeId: string): boolean {
 function txToInitialValues(tx: Transaction): { operationTypeId: string; fields: Record<string, unknown> } {
   const isFeeOp = isFeeOperation(tx.operation_type)
   return {
-    operationTypeId: tx.operation_type,
+    operationTypeId: editFormType(tx),
     fields: {
       timestamp:   tx.timestamp,
       asset:       isFeeOp ? undefined : tx.asset,
@@ -38,8 +40,8 @@ function txToInitialValues(tx: Transaction): { operationTypeId: string; fields: 
   }
 }
 
-function buildTxData(result: WizardResult): Record<string, unknown> {
-  const op = result.operationTypeId
+function buildTxData(result: WizardResult, original?: Transaction): Record<string, unknown> {
+  const op = savedOperationType(result.operationTypeId, original)
   const isFeeOp = isFeeOperation(op)
 
   const asset  = isFeeOp ? result.fields.fee_asset  : result.fields.asset
@@ -49,7 +51,7 @@ function buildTxData(result: WizardResult): Record<string, unknown> {
     operationType:        op,
     asset:                asset  ?? null,
     amount:               amount ?? null,
-    amountNet:            amount ?? null,
+    amountNet:            isFeeOp ? (amount ?? null) : amountNetFor(amount, original),
     costAsset:            result.fields.cost_asset  ?? null,
     costAmount:           result.fields.cost_amount ?? null,
     pricePerUnit:         result.fields.price_eur   ?? null,
@@ -80,6 +82,8 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
   // no añade ningún riesgo nuevo que no pueda darse ya con un click.
 
   const initialValues = transaction ? txToInitialValues(transaction) : undefined
+  // Editar una importada (#378): se avisa del archivo y de que se puede restaurar.
+  const importNotice = transaction && !transaction.manually_added ? <ImportEditNotice tx={transaction} /> : null
 
   async function handleWizardComplete(result: WizardResult) {
     setWizardResult(result)
@@ -88,7 +92,7 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
     setError(null)
 
     try {
-      const data = buildTxData(result)
+      const data = buildTxData(result, transaction)
       const prev = await portfolioApi.previewManualTx(data)
       setPreview(prev)
     } catch (e) {
@@ -104,7 +108,7 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
     setError(null)
 
     try {
-      const data = buildTxData(wizardResult)
+      const data = buildTxData(wizardResult, transaction)
       const result = isEditMode && transaction
         ? await portfolioApi.updateManualTx(transaction.id, data)
         : await portfolioApi.createManualTx(data)
@@ -137,6 +141,8 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
 
         {step === 'wizard' && (
           <OperationWizard
+            titleId={titleId}
+            notice={importNotice}
             initialValues={initialValues}
             onComplete={handleWizardComplete}
             onCancel={onClose}
@@ -146,7 +152,10 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
         {(step === 'preview' || step === 'saving') && wizardResult && (
           <>
             <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-              <h2 id={titleId} className="font-semibold text-lg">{isEditMode ? 'Confirmar edición' : 'Confirmar transacción'}</h2>
+              <div>
+                <h2 id={titleId} className="font-semibold text-lg">{isEditMode ? 'Confirmar edición' : 'Confirmar transacción'}</h2>
+                {importNotice}
+              </div>
               <button type="button" onClick={onClose} aria-label="Cerrar" className={iconButtonClasses('sm')}>
                 <X size={18} />
               </button>

@@ -25,11 +25,14 @@ export function groupsByDay(current: SortState): boolean {
 
 /**
  * URL de GET /transactions/export.csv con los mismos filtros y orden que el
- * listado, sin paginación ni moneda (el CSV trae EUR y USD).
+ * listado, sin paginación. La moneda solo va si hay rango de importe (#366):
+ * el rango se compara en ella; el CSV trae EUR y USD de todos modos.
  */
 export function exportCsvUrl(params: Record<string, string>): string {
+  const ranged = !!(params.value_min || params.value_max)
+  const skip = ranged ? ['limit', 'offset'] : ['limit', 'offset', 'currency']
   const qs = new URLSearchParams(
-    Object.entries(params).filter(([k, v]) => v !== '' && !['limit', 'offset', 'currency'].includes(k)),
+    Object.entries(params).filter(([k, v]) => v !== '' && !skip.includes(k)),
   ).toString()
   return `/api/transactions/export.csv${qs ? `?${qs}` : ''}`
 }

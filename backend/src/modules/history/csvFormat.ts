@@ -8,8 +8,8 @@ export const CSV_BOM = '﻿';
 export const HISTORY_CSV_HEADER = [
   'Fecha', 'Tipo', 'Activo', 'Importe', 'Coste', 'Activo coste', 'Precio unitario',
   'Comisión', 'Activo comisión', 'Valor EUR', 'Comisión EUR', 'Valor USD', 'Comisión USD',
-  'Origen del valor', 'Wallet', 'Wallet destino', 'Cuenta', 'Manual', 'Notas',
-  'ID', 'Archivo de origen', 'Hash',
+  'Origen del valor', 'Wallet', 'Wallet destino', 'Cuenta', 'Manual', 'Editada', 'Notas',
+  'ID', 'Archivo de origen', 'Hash', 'Operación asociada',
 ].join(';');
 
 /** Fila tal como la devuelve historyRowsSql (solo los campos que se exportan). */
@@ -32,9 +32,13 @@ export interface HistoryCsvRow {
   destination_wallet_name: string | null;
   account: string | null;
   manually_added: boolean;
+  /** Importada editada (#378): copia del original o null. */
+  original_import: unknown;
   notes: string | null;
   import_filename: string | null;
   tx_hash: string | null;
+  /** Compra o venta a la que pertenece una comisión (#371). */
+  fee_parent_id: string | null;
 }
 
 const partsCache = new Map<string, Intl.DateTimeFormat>();
@@ -63,7 +67,7 @@ export function localDate(date: Date, tz: string): string {
   return isoLocal(date, tz).slice(0, 10);
 }
 
-/** NUMERIC de Postgres («601.779800000000000000») sin ceros sobrantes; vacío si es null. */
+/** NUMERIC de Postgres («123.456700000000000000») sin ceros sobrantes; vacío si es null. */
 export function plainNumber(v: string | null): string {
   if (v === null || v === undefined) return '';
   if (!v.includes('.')) return v;
@@ -105,10 +109,12 @@ export function historyCsvLine(r: HistoryCsvRow, tz: string): string {
     text(r.destination_wallet_name),
     text(r.account),
     r.manually_added ? 'Sí' : 'No',
+    r.original_import ? 'Sí' : 'No',
     text(r.notes),
     r.id,
     text(r.import_filename),
     text(r.tx_hash),
+    r.fee_parent_id ?? '',
   ].join(';');
 }
 

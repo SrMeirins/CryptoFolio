@@ -1,63 +1,42 @@
 import type { ReactNode } from 'react'
-import { ArrowDownRight, ChevronDown, TrendingDown, TrendingUp } from 'lucide-react'
+import { ArrowDownRight, TrendingDown, TrendingUp } from 'lucide-react'
 import { InfoTooltip } from '../../components/InfoTooltip'
-import { panelEnterStyle } from '../../components/ui'
+import { StatCard } from '../../components/ui'
 import { formatMoney, formatPercent, type Currency } from '../../utils/format'
+import { T } from '../../utils/colors'
 import type { PeriodSummary } from '../../utils/evolutionSummary'
-import { summaryTiles, type SummaryTile, type TileId, type TileTone } from '../../utils/evolutionTiles'
+import { summaryTiles, tileChip, type SummaryTile, type TileId, type TileTone } from '../../utils/evolutionTiles'
 
 // Resumen del periodo del gráfico de evolución (#214, #250): titular con la
 // rentabilidad y el P&L (o la variación del valor en la pestaña Valor) y tres
-// mini-tarjetas: mejor día, peor día (u hora en 24H) y máxima caída. Mejor y
-// peor día abren el detalle de ese día.
+// mini tarjetas StatCard (#412): mejor día, peor día (u hora en 24H) y máxima
+// caída. Bajo la cifra, un chip con el % y la fecha; la explicación, en la
+// ayuda. Mejor y peor día despliegan el detalle de ese día.
 
 const signedMoney = (n: number, currency: Currency) => `${n >= 0 ? '+' : ''}${formatMoney(n, currency)}`
 
 const ICONS: Record<TileId, typeof TrendingUp> = { best: TrendingUp, worst: TrendingDown, drawdown: ArrowDownRight }
 
-const TONES: Record<TileTone, { text: string; icon: string; badge: string }> = {
-  positive: { text: 'text-positive', icon: 'bg-positive/12 text-positive-ink', badge: 'bg-positive/10 text-positive-ink' },
-  negative: { text: 'text-negative', icon: 'bg-negative/12 text-negative-ink', badge: 'bg-negative/10 text-negative-ink' },
-  neutral: { text: 'text-fg-subtle', icon: 'bg-overlay/6 text-fg-subtle', badge: 'bg-overlay/6 text-fg-subtle' },
+const TONES: Record<TileTone, { color: string; tone?: 'positive' | 'negative'; chip: string }> = {
+  positive: { color: T.positive, tone: 'positive', chip: 'bg-positive/10 text-positive-ink' },
+  negative: { color: T.negative, tone: 'negative', chip: 'bg-negative/10 text-negative-ink' },
+  neutral: { color: T.muted, chip: 'bg-overlay/6 text-fg-subtle' },
 }
 
 function Tile({ tile, index, open, onOpen }: { tile: SummaryTile; index: number; open: boolean; onOpen?: (day: string) => void }) {
   const tone = TONES[tile.tone]
-  const Icon = ICONS[tile.id]
+  const chip = tileChip(tile)
   const clickable = tile.day !== null && !!onOpen
-  const body = (
-    <>
-      <span className={`size-8 rounded-lg grid place-items-center shrink-0 ${tone.icon}`} aria-hidden="true">
-        <Icon size={16} strokeWidth={2.25} />
-      </span>
-      <span className="min-w-0 flex-1 text-left">
-        <span className="block text-[10px] uppercase tracking-wider text-fg-subtle leading-none">{tile.label}</span>
-        <span className="flex items-baseline gap-1.5 mt-1 flex-wrap">
-          <span className={`mono text-[15px] font-semibold leading-tight ${tone.text}`}>{tile.value}</span>
-          {tile.badge && <span className={`mono text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${tone.badge}`}>{tile.badge}</span>}
-        </span>
-        <span className="block text-[11px] text-fg-subtle mt-0.5 truncate">{tile.detail}</span>
-      </span>
-    </>
-  )
-  const frame = 'panel-in relative flex items-center gap-3 rounded-xl border pl-3 pr-7 py-2.5 min-w-0'
   return (
-    <div className={`${frame} ${clickable ? 'transition-colors hover:bg-overlay/5 hover:border-fg-subtle/30' : ''} ${open ? 'border-brand/50 bg-brand/5' : 'border-border bg-overlay/2'}`}
-      style={panelEnterStyle(index)}>
-      {clickable
-        ? (
-          <button type="button" onClick={() => onOpen(tile.day!)} aria-expanded={open}
-            aria-label={`${tile.label}: ${tile.value}${tile.badge ? ` (${tile.badge})` : ''}, ${tile.detail}. ${open ? 'Ocultar' : 'Ver'} el detalle del día`}
-            className="flex items-center gap-3 flex-1 min-w-0 rounded-lg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 cursor-pointer">
-            {body}
-            <ChevronDown size={14} aria-hidden="true" className={`absolute bottom-2 right-2 text-fg-subtle transition-transform ${open ? 'rotate-180' : ''}`} />
-          </button>
-        )
-        : <div className="flex items-center gap-3 flex-1 min-w-0">{body}</div>}
-      <span className="absolute top-2 right-2">
-        <InfoTooltip label={tile.label}>{tile.help}</InfoTooltip>
-      </span>
-    </div>
+    <StatCard compact title={tile.label} icon={ICONS[tile.id]} color={tone.color} tone={tone.tone}
+      value={tile.value} delay={index * 60}
+      chip={chip && <span className={`mono text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${tone.chip}`}>{chip}</span>}
+      help={<><p>{tile.help}</p>{tile.detail && (tile.id === 'drawdown' || tile.value === '—') && <p className="text-fg-muted">{tile.detail}.</p>}</>}
+      helpLabel={`Qué mide ${tile.label}`}
+      {...(clickable && {
+        onSelect: () => onOpen(tile.day!), expands: true, active: open,
+        actionLabel: `${chip ? `${chip}. ` : ''}${open ? 'Ocultar' : 'Ver'} el detalle del día`,
+      })} />
   )
 }
 

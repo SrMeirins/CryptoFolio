@@ -1,4 +1,5 @@
 import { ACQUISITION_TYPES, DISPOSAL_TYPES, FEE_TYPES, INFLOW_TYPES, OUTFLOW_TYPES, sqlList } from './operationGroups';
+import { cardSql } from './summaryCards';
 
 // Valoración en EUR de cada transacción del Historial (#346), en la consulta y
 // sin columnas persistidas: así sigue siendo coherente tras cada recálculo FIFO.
@@ -10,7 +11,7 @@ import { ACQUISITION_TYPES, DISPOSAL_TYPES, FEE_TYPES, INFLOW_TYPES, OUTFLOW_TYP
 //                 proceeds de los lotes que consumen. Es la cifra que usa Fiscal.
 //                 Solo si el FIFO cubre toda la cantidad (un faltante de lotes
 //                 daría un valor parcial).
-//   3. estimado — cantidad × cierre diario del activo (price_close_madrid, día
+//   3. estimado — cantidad × cierre diario del activo (price_close_daily de la zona, día
 //                 local) o, en su defecto, el precio diario de price_cache, la
 //                 misma fuente que usa el motor FIFO.
 //   4. sin_precio — ninguna de las anteriores: value_eur NULL.
@@ -49,7 +50,8 @@ export const VALUATION_CTES = `
 
 /**
  * JOINs de valoración para la transacción con alias `t`. `tzParam` es el
- * placeholder ($n) de la zona horaria del cierre diario (nunca interpolada).
+ * placeholder ($n) de la zona de la aplicación (nunca interpolada): el día local
+ * de la operación se cruza con el cierre de ese día en esa misma zona (#389).
  */
 export function valuationJoins(tzParam: string): string {
   const localDay = `(t.timestamp AT TIME ZONE ${tzParam})::date`;
@@ -59,9 +61,9 @@ export function valuationJoins(tzParam: string): string {
     LEFT JOIN val_cons vc  ON vc.tx_id = t.id AND vc.asset = t.asset
     LEFT JOIN val_cons vcf ON vcf.tx_id = t.id AND vcf.asset = t.fee_asset
       AND t.fee_asset <> t.asset AND t.fee_asset IS DISTINCT FROM t.cost_asset
-    LEFT JOIN price_close_madrid cm  ON cm.asset = t.asset AND cm.close_date = ${localDay} AND cm.price_eur > 0
+    LEFT JOIN price_close_daily cm   ON cm.asset = t.asset AND cm.timezone = ${tzParam} AND cm.close_date = ${localDay} AND cm.price_eur > 0
     LEFT JOIN price_cache pc         ON pc.asset = t.asset AND pc.price_date = ${utcDay} AND pc.price_eur > 0
-    LEFT JOIN price_close_madrid cmf ON cmf.asset = t.fee_asset AND cmf.close_date = ${localDay} AND cmf.price_eur > 0
+    LEFT JOIN price_close_daily cmf  ON cmf.asset = t.fee_asset AND cmf.timezone = ${tzParam} AND cmf.close_date = ${localDay} AND cmf.price_eur > 0
     LEFT JOIN price_cache pcf        ON pcf.asset = t.fee_asset AND pcf.price_date = ${utcDay} AND pcf.price_eur > 0`;
 }
 
@@ -104,12 +106,20 @@ export const VALUATION_COLUMNS = `
     ELSE 'sin_precio'
   END) AS fee_value_source`;
 
+const SIDE = cardSql('t');
+
 /**
  * Sentido de la operación en el total filtrado: 'in', 'out' o NULL (neutra).
  * Un retiro a una wallet propia es un movimiento interno, no una salida.
+ * Por el lado del fiat, como el resumen (#416): comprar cripto es entrada y
+ * venderla por fiat, salida, aunque el exchange lo registre al revés; pasar
+ * una stablecoin a fiat no cuenta.
  */
 export const FLOW_DIRECTION = `
   (CASE
+    WHEN ${SIDE.stableToFiat} THEN NULL
+    WHEN ${SIDE.fiatSold} THEN 'in'
+    WHEN ${SIDE.fiatBought} THEN 'out'
     WHEN t.operation_type IN ${sqlList(INFLOW_TYPES)} THEN 'in'
     WHEN t.operation_type = 'WITHDRAW' AND t.destination_wallet_id IS NOT NULL THEN NULL
     WHEN t.operation_type IN ${sqlList(OUTFLOW_TYPES)} THEN 'out'

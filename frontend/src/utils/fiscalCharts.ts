@@ -93,5 +93,9 @@ export function filtersFromUrl(params: URLSearchParams): Partial<EventFilters> {
   if (desde && ISO_DATE.test(desde)) out.from = desde
   if (hasta && ISO_DATE.test(hasta)) out.to = hasta
   if (activo && SYMBOL.test(activo)) out.asset = activo
+  // Desde las tarjetas del ejercicio (#418): solo ganancias o solo pérdidas.
+  const resultado = params.get('resultado')
+  if (resultado === 'ganancia') out.result = 'gain'
+  else if (resultado === 'perdida') out.result = 'loss'
   return out
 }
