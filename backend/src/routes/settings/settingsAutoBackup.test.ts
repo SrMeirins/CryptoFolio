@@ -73,10 +73,13 @@ describe('routes/settings — copias automáticas (#454)', () => {
 
   it('la rotación conserva exactamente las N últimas', async () => {
     await pool.query(`INSERT INTO app_config (key, value) VALUES ('auto_backup_keep', '3') ON CONFLICT (key) DO UPDATE SET value = '3'`);
+    const existing = await names();
+    const runs = [1, 2, 3, 4, 5].map(d => `cryptofolio-auto-202512${String(d).padStart(2, '0')}-100000.json`);
     for (const d of [1, 2, 3, 4, 5]) await auto.runAutoBackup(new Date(`2025-12-0${d}T10:00:00Z`));
-    // Quedan la de la primera prueba (fecha actual) y las de los días 5 y 4.
-    expect((await names()).slice(0, 2)).toEqual(['cryptofolio-auto-20251204-100000.json', 'cryptofolio-auto-20251205-100000.json']);
-    expect(await names()).toHaveLength(3);
+    // Quedan exactamente las 3 más recientes de todas las hechas (las de la
+    // fecha actual de los tests anteriores van primero).
+    const expected = [...new Set([...existing, ...runs])].sort().reverse().slice(0, 3).sort();
+    expect(await names()).toEqual(expected);
     const res = await request(app).get('/api/settings/backup/auto');
     expect(res.body.files).toHaveLength(3);
     expect(res.body.settings).toEqual({ enabled: true, frequencyHours: 24, keep: 3 });
