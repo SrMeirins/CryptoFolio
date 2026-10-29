@@ -18,6 +18,7 @@ import { formatMoney, formatNumber } from '../../utils/format'
 import { daysSince, formatAge } from '../../utils/portfolioLots'
 import { alpha, ink } from '../../utils/colors'
 import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses } from '../../components/ui'
+import { explorerLink } from '../../utils/externalLink'
 
 export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => void }) {
   const queryClient = useQueryClient()
@@ -214,8 +215,7 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                     {wallet.addresses.map(addr => {
                       const isEditingAddr = editingAddressId === addr.id
                       const netLabel = addr.network_name ?? addr.custom_network ?? '—'
-                      const explorerHref = addr.explorer_url && addr.address
-                        ? addr.explorer_url.replace('{address}', addr.address) : null
+                      const explorerHref = explorerLink(addr.explorer_url, '{address}', addr.address)
 
                       return (
                         <div key={addr.id} className="flex items-center gap-2 group/addr py-1">

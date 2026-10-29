@@ -81,4 +81,32 @@ describe('routes/wallets — validación Zod', () => {
 
     expect(res.status).toBe(400);
   });
+
+  // #471: solo http y https en las URL de explorador, que acaban en enlaces y
+  // en shell.openExternal de la app de escritorio.
+  it('custom_explorer_url y las URL de red rechazan esquemas distintos de http y https', async () => {
+    for (const url of ['javascript:alert(1)', 'file:///etc/passwd', 'smb://servidor/x', 'https://user:pass@ejemplo.com/']) {
+      const res = await request(app).post(`/api/wallets/${walletId}/addresses`)
+        .send({ network_id: networkId, address: '0xSINTETICA', custom_explorer_url: url });
+      expect(res.status, url).toBe(400);
+      expect(res.body.error).toMatch(/http o https/);
+    }
+    const red = await request(app).post('/api/wallets/networks')
+      .send({ name: 'Red sintética mala', native_asset: 'SNT', explorer_url: 'javascript:alert(1)//{address}' });
+    expect(red.status).toBe(400);
+    const tx = await request(app).post('/api/wallets/networks')
+      .send({ name: 'Red sintética mala 2', native_asset: 'SNT', explorer_tx_url: 'file:///{tx_hash}' });
+    expect(tx.status).toBe(400);
+  });
+
+  it('acepta plantillas http y https con {address} y {tx_hash}', async () => {
+    const red = await request(app).post('/api/wallets/networks').send({
+      name: 'Red sintética buena', native_asset: 'SNB',
+      explorer_url: 'https://explorador.ejemplo/address/{address}', explorer_tx_url: 'http://explorador.local:8080/tx/{tx_hash}',
+    });
+    expect(red.status).toBe(201);
+    const addr = await request(app).post(`/api/wallets/${walletId}/addresses`)
+      .send({ network_id: networkId, address: '0xSINTETICA2', custom_explorer_url: 'https://explorador.ejemplo/a/0xSINTETICA2' });
+    expect(addr.status).toBe(201);
+  });
 });
