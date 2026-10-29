@@ -15,15 +15,15 @@ const router = Router();
 // campos pero sin esa exigencia — es un full-replace que ya permitía antes
 // dejar ambos vacíos, comportamiento preservado deliberadamente.
 const addressFields = {
-  network_id:          z.string().uuid('network_id debe ser un UUID válido').nullish(),
+  network_id:          z.uuid('network_id debe ser un UUID válido').nullish(),
   custom_network:      shortText('custom_network').nullish(),
-  custom_explorer_url: z.string().url('custom_explorer_url debe ser una URL válida').max(MAX_LENGTH_LONG, `custom_explorer_url no puede superar ${MAX_LENGTH_LONG} caracteres`).nullish(),
+  custom_explorer_url: z.url('custom_explorer_url debe ser una URL válida').max(MAX_LENGTH_LONG, `custom_explorer_url no puede superar ${MAX_LENGTH_LONG} caracteres`).nullish(),
   address:             shortText('address').nullish(),
 };
 
 const addressCreateBodySchema = z.object(addressFields).refine(
   (data) => !!data.network_id || !!data.custom_network,
-  { message: 'network_id o custom_network son requeridos', path: ['network_id'] }
+  { error: 'network_id o custom_network son requeridos', path: ['network_id'] }
 );
 
 const addressUpdateBodySchema = z.object(addressFields);

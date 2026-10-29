@@ -12,14 +12,22 @@ import { UpdateBanner } from './components/UpdateBanner'
 import { TopBar } from './components/TopBar'
 import { useApplyTheme } from './hooks/useTheme'
 import { usePrivacyStore } from './store/privacyStore'
+import { useTimezoneStore } from './store/timezoneStore'
+import { useTimezoneSync } from './hooks/useTimezoneSync'
+import { useStartupPreferences } from './hooks/useStartupPreferences'
 
 function RoutedContent() {
+  // Privacidad al abrir y página de inicio (#446); necesita el router.
+  useStartupPreferences()
   const { pathname } = useLocation()
   // Modo privacidad (#254): al cambiarlo se vuelven a pintar las páginas, que
   // formatean los importes con el estado nuevo.
   usePrivacyStore(s => s.hidden)
+  // Zona horaria (#390): al cambiarla se vuelve a montar la página, que
+  // formatea fechas y horas con la zona nueva sin recargar.
+  const tz = useTimezoneStore(s => s.tz)
   return (
-    <div key={pathname} className="animate-page-in min-h-full">
+    <div key={`${pathname}|${tz}`} className="animate-page-in min-h-full">
       <Routes>
         <Route path="/"         element={<Dashboard />} />
         <Route path="/portfolio" element={<Portfolio />} />
@@ -35,6 +43,7 @@ function RoutedContent() {
 export default function App() {
   useLivePrices()
   useApplyTheme()
+  useTimezoneSync()
 
   // React Router v7: los future flags v7_startTransition/v7_relativeSplatPath
   // ya eran el comportamiento activado en v6; en v7 son el único

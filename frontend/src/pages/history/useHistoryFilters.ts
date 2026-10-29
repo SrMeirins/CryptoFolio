@@ -1,80 +1,113 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useCurrency } from '../../hooks/useDisplayCurrency'
+import { readIncludeMargin, saveIncludeMargin } from './stats/analyticsPrefs'
 import { DEFAULT_SORT, nextSort, type SortKey, type SortState } from './sorting'
+import {
+  EMPTY_FILTERS, hasActiveFilters as anyFilter, parseHistoryUrl, toApiParams, toHistoryUrl,
+  type HistoryFilterState,
+} from './urlState'
 
-// Estado de filtros, orden y página del Historial (#351), y los parámetros de
-// la consulta que se derivan de él.
+// Estado de filtros, orden y página del Historial (#351), guardado en la URL
+// (#366): recargar o compartir el enlace restaura la misma vista. La búsqueda
+// se aplica 250 ms después de dejar de teclear.
 
 export const PAGE_SIZE = 50
-
-export interface HistoryFilters {
-  asset: string; account: string; type: string; wallet_id: string
-  manualOnly: boolean; date_from: string; date_to: string; search: string; offset: number
-  /** Transacciones de una importación (#324), desde su resultado o la lista de importaciones. */
-  import_id: string
-}
-const INITIAL: HistoryFilters = {
-  asset: '', account: '', type: '', wallet_id: '',
-  manualOnly: false, date_from: '', date_to: '', search: '', offset: 0, import_id: '',
-}
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+export const SEARCH_DEBOUNCE_MS = 250
+export type { HistoryFilterState }
 
 export function useHistoryFilters() {
-  // ?buscar=XRP&tx=<id> llega desde la actividad reciente del Dashboard (#237);
-  // ?import=<id> desde el resultado o la lista de importaciones (#324).
+  const currency = useCurrency()
   const [params, setParams] = useSearchParams()
-  const focusTx = params.get('tx')
-  const [filters, setFilters] = useState<HistoryFilters>(() => {
-    const imp = params.get('import') ?? ''
-    return { ...INITIAL, search: params.get('buscar') ?? '', import_id: UUID_RE.test(imp) ? imp : '' }
-  })
-  // Orden en el servidor (#349): abarca todas las páginas, no solo la visible.
-  const [sort, setSort] = useState<SortState>(DEFAULT_SORT)
+  const [initial] = useState(() => parseHistoryUrl(params, readIncludeMargin()))
+  const [filters, setFilters] = useState<HistoryFilterState>(initial.filters)
+  const [searchInput, setSearchInput] = useState(initial.filters.search)
+  const [sort, setSort] = useState<SortState>(initial.sort)
+  const [page, setPage] = useState(initial.page)
+  // ?tx=<id>: transacción con el panel de detalle abierto (#373; enlace desde el
+  // Dashboard, #237). Se cierra al cambiar filtros, orden o página.
+  const [focusTx, setFocusTx] = useState<string | null>(params.get('tx'))
+  const lastWritten = useRef(params.toString())
+  // Abierto sin parámetros: solo entonces se aplica la vista predeterminada (#369).
+  const [startedEmpty] = useState(() => params.toString() === '')
 
-  const queryParams = useMemo(() => ({
-    limit:  String(PAGE_SIZE),
-    offset: String(filters.offset),
-    ...(filters.asset      ? { asset:          filters.asset.toUpperCase() } : {}),
-    ...(filters.account    ? { account:        filters.account }             : {}),
-    ...(filters.type       ? { type:           filters.type }                : {}),
-    ...(filters.wallet_id  ? { wallet_id:      filters.wallet_id }           : {}),
-    ...(filters.date_from  ? { date_from:      filters.date_from }           : {}),
-    ...(filters.date_to    ? { date_to:        filters.date_to }             : {}),
-    ...(filters.search     ? { search:         filters.search }              : {}),
-    ...(filters.manualOnly ? { manually_added: 'true' }                      : {}),
-    ...(filters.import_id  ? { import_id:      filters.import_id }           : {}),
-    sort: sort.key,
-    dir:  sort.dir,
-  }), [filters, sort])
+  // Búsqueda con debounce: una sola petición al dejar de teclear.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters(prev => {
+        if (prev.search === searchInput) return prev
+        setPage(1)
+        return { ...prev, search: searchInput }
+      })
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  // Estado → URL (replace: el botón Atrás sale de Historial, no deshace filtros).
+  useEffect(() => {
+    const next = toHistoryUrl({ filters, sort, page })
+    if (focusTx) next.set('tx', focusTx)
+    const text = next.toString()
+    if (text !== lastWritten.current) {
+      lastWritten.current = text
+      setParams(next, { replace: true })
+    }
+  }, [filters, sort, page, focusTx, setParams])
+
+  // URL → estado, solo si cambia desde fuera (un enlace estando ya en Historial).
+  useEffect(() => {
+    const text = params.toString()
+    if (text === lastWritten.current) return
+    lastWritten.current = text
+    const parsed = parseHistoryUrl(params, readIncludeMargin())
+    setFilters(parsed.filters)
+    setSearchInput(parsed.filters.search)
+    setSort(parsed.sort)
+    setPage(parsed.page)
+    setFocusTx(params.get('tx'))
+  }, [params])
 
   /** Cambiar cualquier filtro vuelve a la primera página. */
-  const setFilter = useCallback(<K extends keyof HistoryFilters>(key: K, value: HistoryFilters[K]) => {
-    setFilters(prev => ({ ...prev, [key]: value, ...(key !== 'offset' ? { offset: 0 } : {}) }))
+  const setFilter = useCallback(<K extends keyof HistoryFilterState>(key: K, value: HistoryFilterState[K]) => {
+    setFilters(prev => ({ ...prev, [key]: value }))
+    if (key === 'search') setSearchInput(value as string)
+    setPage(1)
+    setFocusTx(null)
   }, [])
-  const setDateRange = useCallback((from: string, to: string) => {
-    setFilters(prev => ({ ...prev, date_from: from, date_to: to, offset: 0 }))
+  const patchFilters = useCallback((patch: Partial<HistoryFilterState>) => {
+    setFilters(prev => ({ ...prev, ...patch }))
+    if (patch.search !== undefined) setSearchInput(patch.search)
+    setPage(1)
+    setFocusTx(null)
   }, [])
-  const setOffset = useCallback((offset: number) => setFilters(prev => ({ ...prev, offset })), [])
-
-  const clearImport = useCallback(() => {
-    setFilters(prev => ({ ...prev, import_id: '', offset: 0 }))
-    if (params.has('import')) { const p = new URLSearchParams(params); p.delete('import'); setParams(p, { replace: true }) }
-  }, [params, setParams])
-
+  const setDateRange = useCallback((from: string, to: string) => patchFilters({ date_from: from, date_to: to }), [patchFilters])
+  /** Cambia de página; `tx` mantiene abierto el detalle de esa transacción (Anterior/Siguiente, #373). */
+  const setOffset = useCallback((offset: number, tx: string | null = null) => { setPage(Math.floor(offset / PAGE_SIZE) + 1); setFocusTx(tx) }, [])
+  const clearImport = useCallback(() => patchFilters({ import_id: '' }), [patchFilters])
   const clearFilters = useCallback(() => {
-    clearImport(); setFilters(INITIAL); setSort(DEFAULT_SORT)
-  }, [clearImport])
-
-  const toggleSort = useCallback((col: SortKey) => {
-    setSort(s => nextSort(s, col))
-    setFilters(prev => ({ ...prev, offset: 0 }))
+    // El margen es una preferencia del resumen, no un filtro: se conserva.
+    setFilters(prev => ({ ...EMPTY_FILTERS, includeMargin: prev.includeMargin }))
+    setSearchInput(''); setSort(DEFAULT_SORT); setPage(1); setFocusTx(null)
   }, [])
+  /** Margen en el resumen (#403): no cambia la lista, así que mantiene página y detalle. */
+  const setIncludeMargin = useCallback((include: boolean) => {
+    saveIncludeMargin(include)
+    setFilters(prev => ({ ...prev, includeMargin: include }))
+  }, [])
+  /** Sustituye filtros y orden de golpe (aplicar una vista guardada, #369). */
+  const applyState = useCallback((next: { filters: HistoryFilterState; sort: SortState }) => {
+    setFilters(next.filters); setSearchInput(next.filters.search); setSort(next.sort); setPage(1); setFocusTx(null)
+  }, [])
+  const toggleSort = useCallback((col: SortKey) => { setSort(s => nextSort(s, col)); setPage(1); setFocusTx(null) }, [])
 
-  const hasActiveFilters = !!(filters.asset || filters.account || filters.type || filters.wallet_id ||
-    filters.manualOnly || filters.date_from || filters.date_to || filters.search || filters.import_id)
+  const offset = (page - 1) * PAGE_SIZE
+  const queryParams = useMemo(() => toApiParams(filters, sort, offset, PAGE_SIZE, currency), [filters, sort, offset, currency])
 
   return {
-    filters, sort, queryParams, hasActiveFilters, focusTx,
-    setFilter, setDateRange, setOffset, clearImport, clearFilters, toggleSort,
+    filters, searchInput, sort, page, offset, queryParams, focusTx, startedEmpty,
+    hasActiveFilters: anyFilter(filters),
+    setFilter, patchFilters, setSearchInput, setDateRange, setOffset, clearImport, clearFilters, toggleSort, applyState,
+    setIncludeMargin,
+    openTx: setFocusTx,
   }
 }

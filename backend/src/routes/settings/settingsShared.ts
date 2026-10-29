@@ -1,15 +1,9 @@
-import { z, ZodError } from 'zod';
+import { z } from 'zod';
 import { Response } from 'express';
 
-// Construye un mensaje 400 legible en castellano a partir de los issues de
-// Zod, sin filtrar detalles internos sensibles.
-export function zodErrorMessage(error: ZodError): string {
-  return error.issues.map((issue) => `${issue.path.join('.') || 'body'}: ${issue.message}`).join('; ');
-}
-
-export function sendZodError(res: Response, error: ZodError): void {
-  res.status(400).json({ error: `Datos inválidos: ${zodErrorMessage(error)}` });
-}
+// Errores de validación comunes (#385): una sola implementación.
+import { sendZodError } from '../../modules/validation/zodErrors';
+export { zodErrorMessage, sendZodError } from '../../modules/validation/zodErrors';
 
 // Formato válido para un símbolo de activo: 1-20 caracteres alfanuméricos
 const SYMBOL_RE = /^[A-Z0-9]{1,20}$/;
@@ -29,7 +23,7 @@ export const coingeckoIdSchema = z.string().regex(/^[a-z0-9-]{1,80}$/, 'coingeck
 // futuro consumidor de la API) los dispare sin intención. El frontend ya
 // pide confirmación al usuario (DatosSection.tsx) y envía este flag.
 export const confirmBodySchema = z.object({
-  confirm: z.literal(true, { message: 'Esta operación requiere { "confirm": true } en el body' }),
+  confirm: z.literal(true, { error: 'Esta operación requiere { "confirm": true } en el body' }),
 });
 
 export function requireConfirm(res: Response, body: unknown): boolean {

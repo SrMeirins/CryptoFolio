@@ -18,7 +18,13 @@ export interface ImpactoEjercicio { year: number; antes: number; despues: number
 export interface PrecioSinEncontrar { activo: string; fecha: string }
 
 /** Desglose de un lote (#326): una importación registrada por archivo. */
-export interface ArchivoImportado { importId: string; archivo: string; exchange: string; nuevas: number; duplicadas: number }
+export interface ArchivoImportado {
+  importId: string; archivo: string; exchange: string; nuevas: number; duplicadas: number
+  /** Importadas editadas a mano que el importador no ha tocado (#378). */
+  editadas_respetadas?: number
+  /** Filas de importaciones anteriores a las que se ha añadido su original (#374). */
+  originales_completadas?: number
+}
 
 export interface ResumenImportacion {
   /** Primera importación del lote (compatibilidad con un solo archivo). */

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
-import { madridYearMonth } from './madridTime';
+import { localYearMonth } from '../time/localTime';
+import { DEFAULT_TIMEZONE } from '../time/appTimezone';
 
 // Obligación del 721 para el calendario (#309), con el reloj real y una base
 // de prueba vacía. Import dinámico: db/client debe leer DATABASE_URL de test.
@@ -16,7 +17,7 @@ describe('obligaciones721 (#309)', () => {
   it('sin cartera no hay obligación, y el cálculo se reutiliza en el día', async () => {
     const { obligaciones721, resetObligaciones721Cache } = await import('./obligacion721');
     resetObligaciones721Cache();
-    const y = madridYearMonth().year;
+    const y = localYearMonth(DEFAULT_TIMEZONE).year;
     const t0 = Date.now();
     const o = await obligaciones721();
     expect(o(y - 1)).toBe(false);

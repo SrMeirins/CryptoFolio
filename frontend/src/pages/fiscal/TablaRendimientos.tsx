@@ -5,7 +5,7 @@ import { CryptoIcon } from '../../components/CryptoIcon'
 import { TableExpandToggle } from './TableExpandToggle'
 import type { RendimientoEvent } from './types'
 import { fiscalDateDetail, formatFiscalDate, formatFiscalQty } from '../../utils/fiscalTable'
-import { cardClasses, buttonClasses, badgeClasses, tableFootRowClasses, tableHeadRowClasses, tableRowClasses, Dropdown, Pagination } from '../../components/ui'
+import { buttonClasses, badgeClasses, tableFootRowClasses, tableHeadRowClasses, tableRowClasses, Dropdown, Pagination, panelSurface } from '../../components/ui'
 import { paginate, type PageSize } from '../../utils/pagination'
 import { buildRendimientosCsv } from '../../utils/fiscalRendimientos'
 import { usePrivacyStore } from '../../store/privacyStore'
@@ -50,7 +50,8 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
   }, {})
 
   return (
-    <div className={cardClasses('none', 'overflow-hidden')}>
+    // Destino de la tarjeta Rendimientos del ejercicio (#418): recibe el foco al llegar.
+    <div id="fiscal-rendimientos" tabIndex={-1} className={panelSurface('none', 'overflow-hidden scroll-mt-4 focus:outline-hidden')}>
       <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-wrap gap-2">
         <TableExpandToggle
           icon={TrendingDown}

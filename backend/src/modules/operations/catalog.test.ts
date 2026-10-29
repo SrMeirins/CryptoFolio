@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { CATEGORY_META, OPERATION_CATALOG, getOperationsByCategory, getOperationType } from './catalog';
+import { DB_OPERATION_TYPES } from '../history/operationGroups';
 
 describe('OPERATION_CATALOG', () => {
-  it('mantiene los 21 tipos de operacion tras fragmentar en modules/operations/', () => {
-    expect(OPERATION_CATALOG).toHaveLength(21);
+  it('mantiene los 21 tipos creables y los 2 de margen solo editables (#394)', () => {
+    expect(OPERATION_CATALOG).toHaveLength(23);
+    expect(OPERATION_CATALOG.filter((op) => op.editOnly).map((op) => op.id)).toEqual(['MARGIN_BORROW', 'MARGIN_REPAY']);
+  });
+
+  it('todos los ids son tipos de la base de datos', () => {
+    for (const op of OPERATION_CATALOG) {
+      expect(DB_OPERATION_TYPES).toContain(op.id);
+    }
   });
 
   it('no tiene ids duplicados entre las 6 categorias', () => {

@@ -2,34 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Transaction } from '../../api/portfolio'
+import { makeTx } from '../../test/fixtures/transaction'
 import { TxRow } from './TxRow'
 
 // Render estático (sin DOM ni efectos) de una fila del Historial (#346).
-function tx(overrides: Partial<Transaction>): Transaction {
-  return {
-    id: '00000000-0000-0000-0000-000000000001',
-    operation_type: 'WITHDRAW',
-    timestamp: '2026-01-15T10:30:00.000Z',
-    asset: 'XRP', amount: '10', amount_net: '10',
-    cost_asset: null, cost_amount: null, price_per_unit: null,
-    fee_asset: null, fee_amount: null,
-    wallet_id: '00000000-0000-0000-0000-000000000002', wallet_name: 'Exchange', wallet_color: '#000000', wallet_kind: 'exchange',
-    account: null, notes: null, manually_added: false, created_at: '2026-01-15T10:30:00.000Z',
-    destination_wallet_id: null, destination_wallet_name: null, destination_wallet_color: null,
-    linked_tx_id: null, linked_tx_timestamp: null, linked_tx_operation_type: null, linked_tx_amount: null, linked_tx_asset: null,
-    import_id: null, import_filename: null, tx_hash: null,
-    value_eur: 5, value_source: 'estimado', fee_value_eur: null, fee_value_source: null,
-    usd_per_eur: 1.1,
-    ...overrides,
-  }
-}
+const tx = makeTx
 
-function render(t: Transaction, currency: 'EUR' | 'USD' = 'EUR'): string {
+function render(t: Transaction, currency: 'EUR' | 'USD' = 'EUR', selected = false, walletId?: string): string {
   const client = new QueryClient()
   return renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <table><tbody>
-        <TxRow tx={t} currency={currency} onDelete={() => {}} onEdit={() => {}} isDeleting={false} searchTerm="" />
+        <TxRow tx={t} currency={currency} onDelete={() => {}} onEdit={() => {}} onOpen={() => {}} onPrefetch={() => {}}
+          isDeleting={false} searchTerm="" selected={selected} walletId={walletId} />
       </tbody></table>
     </QueryClientProvider>,
   )
@@ -67,16 +52,15 @@ describe('TxRow (#346)', () => {
 })
 
 describe('TxRow — accesibilidad (#351)', () => {
-  it('el botón de detalle anuncia su estado (aria-expanded) y controla la fila de detalle', () => {
-    const cerrada = render(tx({}))
-    expect(cerrada).toMatch(/aria-expanded="false"[^>]*aria-label="Expandir detalle"/)
-    const abierta = renderToStaticMarkup(
-      <QueryClientProvider client={new QueryClient()}><table><tbody>
-        <TxRow tx={tx({})} currency="EUR" onDelete={() => {}} onEdit={() => {}} isDeleting={false} searchTerm="" defaultExpanded />
-      </tbody></table></QueryClientProvider>,
-    )
-    expect(abierta).toContain('aria-expanded="true" aria-controls="tx-detalle-00000000-0000-0000-0000-000000000001"')
-    expect(abierta).toContain('id="tx-detalle-00000000-0000-0000-0000-000000000001"')
+  it('el botón «Ver detalle» anuncia que abre un diálogo (#373)', () => {
+    const html = render(tx({}))
+    expect(html).toMatch(/aria-haspopup="dialog"[^>]*aria-label="Ver detalle"/)
+    expect(html).not.toContain('aria-expanded')
+  })
+
+  it('la fila con el detalle abierto se marca con aria-current (#373)', () => {
+    expect(render(tx({}), 'EUR', true)).toContain('aria-current="true"')
+    expect(render(tx({}))).not.toContain('aria-current')
   })
 
   it('la insignia «M» tiene nombre accesible', () => {
@@ -88,5 +72,84 @@ describe('TxRow — accesibilidad (#351)', () => {
     const html = render(tx({ manually_added: true }))
     expect(html).toContain('group-focus-within:opacity-100')
     expect(html).toContain('[@media(hover:none)]:opacity-100')
+  })
+})
+
+describe('TxRow — comisiones agrupadas (#371)', () => {
+  const fees = [
+    { id: 'f1', asset: 'BNB', amount: '0.01', value_eur: 3, value_source: 'fifo' as const },
+    { id: 'f2', asset: 'EUR', amount: '0.5', value_eur: 0.5, value_source: 'coste' as const },
+  ]
+
+  it('la columna Fee muestra el total y «+N comisiones»', () => {
+    const html = render(tx({ operation_type: 'SELL', value_source: 'fifo', grouped_fees: fees }))
+    expect(html).toContain('3,50')
+    expect(html).toContain('+2 comisiones')
+  })
+})
+
+describe('TxRow — importadas editadas (#378)', () => {
+  it('la insignia «E» tiene nombre accesible y solo aparece si está editada', () => {
+    expect(render(tx({ original_import: { operation_type: 'WITHDRAW', timestamp: '2026-01-15T10:30:00Z', asset: 'XRP', amount: 9, amount_net: 9,
+      cost_asset: null, cost_amount: null, price_per_unit: null, fee_asset: null, fee_amount: null,
+      wallet_id: '00000000-0000-0000-0000-000000000002', destination_wallet_id: null, destination_pending: false } })))
+      .toContain('<span class="sr-only">Importada y editada a mano</span>')
+    expect(render(tx({}))).not.toContain('editada a mano')
+  })
+})
+
+describe('TxRow — saldo corrido (#380)', () => {
+  const conSaldo = (value: { balance: number; missing: number | null } | undefined) => renderToStaticMarkup(
+    <QueryClientProvider client={new QueryClient()}><table><tbody>
+      <TxRow tx={tx({})} currency="EUR" onDelete={() => {}} onEdit={() => {}} onOpen={() => {}} onPrefetch={() => {}}
+        isDeleting={false} searchTerm="" balance={{ asset: 'XRP', value }} />
+    </tbody></table></QueryClientProvider>,
+  )
+
+  it('muestra el saldo tras la operación', () => {
+    expect(conSaldo({ balance: 40, missing: null })).toContain('40 XRP')
+  })
+
+  it('un hueco se marca con icono y texto, también para lectores de pantalla', () => {
+    const html = conSaldo({ balance: 0, missing: 62 })
+    expect(html).toContain('hueco')
+    expect(html).toContain('Faltaban 62 XRP: posible importación incompleta')
+  })
+
+  it('sin dato, «—» con texto accesible; sin activo filtrado, no hay celda', () => {
+    expect(conSaldo(undefined)).toContain('<span class="sr-only">Sin saldo</span>')
+    expect(render(tx({}))).not.toContain('Sin saldo')
+  })
+})
+
+// Operaciones entre wallets propias (#395): origen y destino siempre, y el
+// sentido respecto a la wallet filtrada.
+describe('TxRow, wallets de origen y destino (#395)', () => {
+  const COLD = '00000000-0000-0000-0000-000000000009'
+  const retiro = tx({ destination_wallet_id: COLD, destination_wallet_name: 'Fría', destination_wallet_color: '#123456' })
+
+  it('un retiro a una wallet propia muestra origen y destino, sin sentido si no se filtra', () => {
+    const html = render(retiro)
+    expect(html).toContain('Exchange')
+    expect(html).toContain('Fría')
+    expect(html).toContain('hacia')
+    expect(html).not.toContain('Entrada')
+    expect(html).not.toContain('Salida')
+  })
+
+  it('filtrando por la de destino es una entrada con +', () => {
+    const html = render(retiro, 'EUR', false, COLD)
+    expect(html).toContain('Entrada')
+    expect(html).toMatch(/text-positive[^>]*>\+10/)
+  })
+
+  it('filtrando por la de origen es una salida', () => {
+    expect(render(retiro, 'EUR', false, retiro.wallet_id)).toContain('Salida')
+  })
+
+  it('la comisión de una entrada se marca como pagada en origen', () => {
+    const conFee = tx({ ...retiro, fee_asset: 'XRP', fee_amount: '0.1' })
+    expect(render(conFee, 'EUR', false, COLD)).toContain('pagada en origen')
+    expect(render(conFee, 'EUR', false, conFee.wallet_id)).not.toContain('pagada en origen')
   })
 })

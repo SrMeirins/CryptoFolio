@@ -65,6 +65,9 @@ export async function consumeLots(
 
   if (lots.length === 0) {
     result.errors.push(`Sin lotes abiertos para ${asset} en wallet ${walletId} (tx ${txId})`);
+    if (quantityToConsume > FIFO_SHORTFALL_EPSILON) {
+      result.shortfalls.push({ txId, asset, walletId, requested: quantityToConsume, missing: quantityToConsume });
+    }
     return;
   }
 
@@ -112,6 +115,7 @@ export async function consumeLots(
       `Lotes insuficientes para ${asset} en wallet ${walletId} (tx ${txId}): ` +
       `faltan ${remaining.toFixed(6)} de ${quantityToConsume.toFixed(6)} solicitados`
     );
+    result.shortfalls.push({ txId, asset, walletId, requested: quantityToConsume, missing: remaining });
   }
 }
 

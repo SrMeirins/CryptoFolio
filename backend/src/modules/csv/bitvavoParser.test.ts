@@ -47,19 +47,27 @@ describe('parseBitvavoCsv — toUtcDate (conversión de zona horaria)', () => {
 
 describe('parseBitvavoCsv — buy (fee ya incluido en Received/Paid Amount)', () => {
   it('fee en la misma moneda que costAsset: no se registra feeAsset/feeAmount aparte (ya incluido)', async () => {
-    const rows = ['Europe/Madrid,2026-09-03,16:23:06,buy,ONDO,334.25497297,EUR,0.30994,EUR,-103.86,EUR,0.26,Completed,tx-buy,'];
+    const rows = ['Europe/Madrid,2026-01-10,10:00:00,buy,SINT,50,EUR,2,EUR,-100.25,EUR,0.25,Completed,tx-buy,'];
     const result = parseBitvavoCsv(csv(rows));
     const tx = result.transactions[0];
     expect(tx.operationType).toBe('BUY');
-    expect(tx.asset).toBe('ONDO');
+    expect(tx.asset).toBe('SINT');
     expect(tx.costAsset).toBe('EUR');
-    expect(tx.costAmount).toBeCloseTo(103.86, 6);
+    expect(tx.costAmount).toBeCloseTo(100.25, 6);
     expect(tx.feeAsset).toBeUndefined();
     expect(tx.feeAmount).toBeUndefined();
   });
 
+  it('fee incluida en el coste: se guarda aparte como informativa (#415)', async () => {
+    const tx = parseBitvavoCsv(csv(['Europe/Madrid,2026-01-10,10:00:00,buy,SINT,10,EUR,2,EUR,-20.05,EUR,0.05,Completed,tx-sint,'])).transactions[0];
+    expect(tx.feeAsset).toBeUndefined();
+    expect(tx).toMatchObject({ includedFeeAsset: 'EUR', includedFeeAmount: 0.05, costAmount: 20.05 });
+    const otra = parseBitvavoCsv(csv(['Europe/Madrid,2026-01-10,10:00:00,buy,SINT,10,EUR,2,EUR,-20,BNB,0.01,Completed,tx-sint2,'])).transactions[0];
+    expect(otra.includedFeeAmount).toBeUndefined();
+  });
+
   it('fee en moneda distinta a costAsset: se registra feeAsset/feeAmount como disposición aparte', async () => {
-    const rows = ['Europe/Madrid,2026-09-03,16:23:06,buy,ONDO,100,EUR,0.3,EUR,-30,BNB,0.01,Completed,tx-buy2,'];
+    const rows = ['Europe/Madrid,2026-01-10,10:00:00,buy,SINT,100,EUR,0.3,EUR,-30,BNB,0.01,Completed,tx-buy2,'];
     const result = parseBitvavoCsv(csv(rows));
     const tx = result.transactions[0];
     expect(tx.feeAsset).toBe('BNB');
@@ -95,15 +103,15 @@ describe('parseBitvavoCsv — withdrawal', () => {
   });
 
   it('retiro de cripto con fee en el mismo activo: amount/amountNet descuentan la fee', async () => {
-    // amount bruto 604.77982861, fee 3 → neto 601.77982861
-    const rows = ['Europe/Madrid,2026-09-03,17:11:51,withdrawal,ONDO,-604.77982861,,,,,ONDO,3,Completed,tx-wd-ondo,'];
+    // amount bruto 103.5, fee 1.5 → neto 102
+    const rows = ['Europe/Madrid,2026-01-11,10:00:00,withdrawal,SINT,-103.5,,,,,SINT,1.5,Completed,tx-wd-sint,'];
     const result = parseBitvavoCsv(csv(rows));
     const tx = result.transactions[0];
     expect(tx.operationType).toBe('WITHDRAW');
-    expect(tx.amount).toBeCloseTo(601.77982861, 6);
-    expect(tx.amountNet).toBeCloseTo(601.77982861, 6);
-    expect(tx.feeAsset).toBe('ONDO');
-    expect(tx.feeAmount).toBe(3);
+    expect(tx.amount).toBeCloseTo(102, 6);
+    expect(tx.amountNet).toBeCloseTo(102, 6);
+    expect(tx.feeAsset).toBe('SINT');
+    expect(tx.feeAmount).toBe(1.5);
   });
 
   it('retiro de cripto sin fee en el mismo activo: amount sin descuento, sin feeAsset', async () => {

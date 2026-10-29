@@ -6,7 +6,7 @@ import { AlertTriangle, ChevronRight, Download, Landmark, ShieldCheck } from 'lu
 import { formatEur, formatPercent, formatPrice } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { InfoTooltip } from '../../components/InfoTooltip'
-import { buttonClasses, cardClasses, fieldClasses } from '../../components/ui'
+import { buttonClasses, fieldClasses, panelSurface } from '../../components/ui'
 import { usePrivacyStore } from '../../store/privacyStore'
 import { ink } from '../../utils/colors'
 import { formatFiscalDate, formatFiscalQty } from '../../utils/fiscalTable'
@@ -141,7 +141,7 @@ export function Modelo721Card({ data: snapshot, activeYear }: { data: Modelo721;
   }
 
   return (
-    <section aria-labelledby="m721-title" className={cardClasses('none', `overflow-hidden ${data.superaUmbral ? 'border-negative/40' : ''}`)}>
+    <section aria-labelledby="m721-title" className={panelSurface('none', `overflow-hidden ${data.superaUmbral ? 'border-negative/40' : ''}`)}>
       {/* Cabecera: título, estado, fecha de valoración y exportación */}
       <div className="flex items-start justify-between gap-3 flex-wrap px-5 py-4 border-b border-border">
         <div className="min-w-0">

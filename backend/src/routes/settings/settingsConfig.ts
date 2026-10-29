@@ -4,19 +4,38 @@ import { db } from '../../db/client';
 import { MAX_LENGTH_SHORT } from '../../modules/validation/textLength';
 import { DISPLAY_CURRENCIES } from '../../modules/fiat/displayCurrency';
 import { sendZodError } from './settingsShared';
+import { VIEWS_KEY } from '../../modules/history/savedViews';
+import { preferenceSchemas } from '../../modules/settings/preferences';
+import { autoBackupAvailability } from '../../modules/backup/autoBackup';
+import { listAutoBackups } from '../../modules/backup/autoBackupStore';
+import { DISMISSED_KEY } from '../../modules/notifications/preferences';
+import { DEFAULT_TIMEZONE, TIMEZONE_CONFIG_KEY, getTimezoneInfo, invalidateTimezoneCache, isValidTimeZone } from '../../modules/time/appTimezone';
 
 const router = Router();
 
+// Tamaño máximo de un valor de configuración (#369): las claves actuales usan
+// valores cortos; un límite evita cargas enormes en app_config.
+export const MAX_CONFIG_VALUE = 2000;
+// Claves con API propia: no se escriben con el PUT genérico.
+// irpf_tramos_tipos (#452): los tipos IRPF van por ejercicio en /fiscal/escalas.
+const PROTECTED_KEYS = new Set([VIEWS_KEY, DISMISSED_KEY, 'irpf_tramos_tipos']);
+
 const configSchema = z.object({
-  key:   z.string().min(1, 'key es requerido').max(MAX_LENGTH_SHORT, `key no puede superar ${MAX_LENGTH_SHORT} caracteres`),
-  value: z.union([z.string(), z.number(), z.boolean()], { message: 'value es requerido' }),
+  key:   z.string().min(1, 'key es requerido').max(MAX_LENGTH_SHORT, `key no puede superar ${MAX_LENGTH_SHORT} caracteres`)
+    .refine(k => !PROTECTED_KEYS.has(k), 'esta clave se gestiona con su propia API'),
+  value: z.union([z.string().max(MAX_CONFIG_VALUE, `value no puede superar ${MAX_CONFIG_VALUE} caracteres`), z.number(), z.boolean()], { error: 'value es requerido' }),
 });
 
 // Claves con un conjunto cerrado de valores: se valida el valor antes de
 // guardarlo para que un cliente no deje la app en un estado inválido.
 const restrictedValues: Record<string, z.ZodType<string>> = {
-  display_currency: z.enum(DISPLAY_CURRENCIES, { message: 'display_currency debe ser EUR o USD' }),
-  theme: z.enum(['dark', 'light', 'system'], { message: 'theme debe ser dark, light o system' }),
+  display_currency: z.enum(DISPLAY_CURRENCIES, { error: 'display_currency debe ser EUR o USD' }),
+  theme: z.enum(['dark', 'light', 'system'], { error: 'theme debe ser dark, light o system' }),
+  // Zona horaria (#388): una zona IANA conocida (lista blanca) o «» para volver
+  // a la de la variable APP_TIMEZONE o la de por defecto.
+  [TIMEZONE_CONFIG_KEY]: z.string().refine(v => v === '' || isValidTimeZone(v), 'timezone debe ser una zona horaria IANA válida (p. ej. Europe/Madrid)'),
+  // Preferencias de General (#446): umbral de polvo, privacidad al abrir y página de inicio.
+  ...preferenceSchemas,
 };
 
 // ── GET /api/settings/config ───────────────────────────────────────────────
@@ -40,24 +59,45 @@ router.put('/config', async (req: Request, res: Response) => {
     sendZodError(res, restricted.error);
     return;
   }
-  await db.query(
-    `INSERT INTO app_config (key, value) VALUES ($1, $2)
-     ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
-    [key, String(value)]
-  );
+  if (key === TIMEZONE_CONFIG_KEY && value === '') {
+    await db.query('DELETE FROM app_config WHERE key = $1', [key]);
+  } else {
+    await db.query(
+      `INSERT INTO app_config (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+      [key, String(value)]
+    );
+  }
+  if (key === TIMEZONE_CONFIG_KEY) invalidateTimezoneCache();
   res.json({ success: true });
+});
+
+// ── GET /api/settings/timezone ─────────────────────────────────────────────
+// Zona efectiva (#388), de dónde sale (ajuste, variable o por defecto) y el
+// ajuste guardado si no es válido y se ha ignorado.
+router.get('/timezone', async (_req: Request, res: Response) => {
+  const info = await getTimezoneInfo(db);
+  res.json({ ...info, default: DEFAULT_TIMEZONE });
 });
 
 // ── GET /api/settings/stats ────────────────────────────────────────────────
 router.get('/stats', async (_req: Request, res: Response) => {
-  const [txs, lots, imports, cache, wallets, assets] = await Promise.all([
+  const [txs, lots, imports, cache, wallets, assets, health] = await Promise.all([
     db.query('SELECT COUNT(*) FROM transactions'),
     db.query('SELECT COUNT(*) FROM fifo_lots'),
     db.query('SELECT COUNT(*) FROM csv_imports'),
     db.query('SELECT COUNT(*) FROM price_cache'),
     db.query('SELECT COUNT(*) FROM wallets'),
     db.query('SELECT COUNT(*) FROM asset_metadata'),
+    // Salud (#454): tamaño en disco, última importación y último FIFO (los
+    // lotes se recrean en cada ejecución, así que su fecha es la del FIFO).
+    db.query(`SELECT pg_database_size(current_database()) AS size,
+                     (SELECT MAX(imported_at) FROM csv_imports) AS last_import,
+                     (SELECT MAX(created_at) FROM fifo_lots) AS last_fifo`),
   ]);
+  const av = autoBackupAvailability();
+  const [lastBackup] = av.available ? await listAutoBackups(av.dir).catch(() => []) : [];
+  const h = health.rows[0];
   res.json({
     transactions: parseInt(txs.rows[0].count),
     fifoLots:     parseInt(lots.rows[0].count),
@@ -65,6 +105,10 @@ router.get('/stats', async (_req: Request, res: Response) => {
     priceCache:   parseInt(cache.rows[0].count),
     wallets:      parseInt(wallets.rows[0].count),
     assets:       parseInt(assets.rows[0].count),
+    dbSizeBytes:  Number(h.size),
+    lastImportAt: h.last_import ? new Date(h.last_import).toISOString() : null,
+    lastFifoAt:   h.last_fifo ? new Date(h.last_fifo).toISOString() : null,
+    lastBackupAt: lastBackup?.created_at ?? null,
   });
 });
 

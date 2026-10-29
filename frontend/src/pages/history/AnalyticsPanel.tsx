@@ -1,73 +1,73 @@
 import { useState } from 'react'
 import { BarChart2, ChevronDown, ChevronUp } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { CryptoIcon } from '../../components/CryptoIcon'
-import { formatMoney, formatAmount, type Currency } from '../../utils/format'
-import { fmtMonthLabel, monthlyTableRows } from './helpers'
+import { STATS_CATEGORIES, type HistoryStats } from '../../api/portfolio'
+import type { Currency } from '../../utils/format'
 import { useChartColors } from '../../hooks/useChartColors'
-import { cardClasses } from '../../components/ui'
+import { panelSurface } from '../../components/ui'
+import { CATEGORY_LABELS, activePeriod, chartPeriodText, periodRange, type ChartMode } from './stats/statsChart'
+import { readAnalyticsOpen, readChartMode, saveAnalyticsOpen, saveChartMode } from './stats/analyticsPrefs'
+import { ActivityChart, type CategoryColors } from './stats/ActivityChart'
+import { Rankings } from './stats/Rankings'
 
-function ChartTooltip({ active, payload, label }: {
-  active?: boolean; payload?: { value: number; name?: string }[]; label?: string
-}) {
-  if (!active || !payload?.length) return null
+// Analítica de actividad del Historial sobre lo filtrado (#376): gráfico por
+// mes o año en número de operaciones o en valor, top activos y comisiones por
+// activo. Los conmutadores trabajan con los datos ya cargados. Pulsar un
+// periodo filtra la lista por sus fechas (#413).
+
+function ModeToggle({ mode, onChange }: { mode: ChartMode; onChange: (m: ChartMode) => void }) {
+  const options: [ChartMode, string][] = [['ops', 'Número'], ['valor', 'Valor']]
   return (
-    <div className={cardClasses('none', 'px-3 py-2 text-xs shadow-lg')}>
-      <p className="text-fg-muted mb-1 font-medium">{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} className="text-fg mono">{p.name}: <span className="font-bold">{p.value}</span></p>
+    <div role="group" aria-label="Medida del gráfico" className="inline-flex rounded-lg border border-border p-0.5">
+      {options.map(([m, label]) => (
+        <button key={m} type="button" aria-pressed={mode === m} onClick={() => onChange(m)}
+          className={`px-2.5 py-1 text-xs rounded-md transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
+            mode === m ? 'bg-brand/15 text-brand-ink font-semibold' : 'text-fg-muted hover:text-fg'}`}>
+          {label}
+        </button>
       ))}
     </div>
   )
 }
 
-function MonthlyTable({ rows }: { rows: Parameters<typeof monthlyTableRows>[0] }) {
-  return (
-    <table className="sr-only">
-      <caption>Operaciones por mes y categoría</caption>
-      <thead>
-        <tr>{['Mes', 'Compras', 'Ventas', 'Otras salidas', 'Ingresos', 'Transferencias', 'Otros', 'Total'].map(h => <th key={h} scope="col">{h}</th>)}</tr>
-      </thead>
-      <tbody>
-        {monthlyTableRows(rows).map(r => (
-          <tr key={r.mes}>
-            <th scope="row">{r.mes}</th>
-            <td>{r.compras}</td><td>{r.ventas}</td><td>{r.otrasSalidas}</td><td>{r.ingresos}</td>
-            <td>{r.transferencias}</td><td>{r.otros}</td><td>{r.total}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-
-export function AnalyticsPanel({ stats, onAssetClick }: {
-  stats: {
-    currency?: Currency
-    monthly:   { mes: string; total_ops: number; compras: number; ventas: number; otras_salidas: number; ingresos: number; transferencias: number; eur_invertido: number }[]
-    topAssets: { asset: string; ops: number; eur_volume: number }[]
-    fees:      { asset: string; ops: number; total_amount: number; total_eur: number }[]
-  }
+export function AnalyticsPanel({ stats, currency, dateFrom, dateTo, onAssetClick, onDateRange }: {
+  stats: HistoryStats
+  currency: Currency
+  /** Filtro de fechas actual: el gráfico y los rankings cubren ese rango. */
+  dateFrom: string
+  dateTo: string
   onAssetClick: (asset: string) => void
+  onDateRange: (from: string, to: string) => void
 }) {
   const c = useChartColors()
-  const [open, setOpen] = useState(false)
-  const chartData = stats.monthly.map(m => ({
-    name:          fmtMonthLabel(m.mes),
-    Compras:       m.compras,
-    Ventas:        m.ventas,
-    'Otras salidas': m.otras_salidas,
-    Ingresos:      m.ingresos,
-    Transferencias: m.transferencias,
-    Otros:         m.total_ops - m.compras - m.ventas - m.otras_salidas - m.ingresos - m.transferencias,
-  }))
-  const maxOps = Math.max(...stats.monthly.map(m => m.total_ops), 1)
+  const [open, setOpen] = useState(readAnalyticsOpen)
+  const [mode, setMode] = useState<ChartMode>(readChartMode)
+  const datesFiltered = !!(dateFrom || dateTo)
+  const period = chartPeriodText(stats.chart, datesFiltered)
+  const rankings = stats.rankings_periodo === 'ultimo_anio' ? 'último año' : 'periodo filtrado'
+  const colors: CategoryColors = {
+    compras: [c.gain, 1], ventas: [c.loss, 1], otras_salidas: [c.loss, 0.45],
+    ingresos: [c.warn, 1], transferencias: [c.neutral, 1], otros: [c.neutralSoft, 1],
+  }
+  const selected = activePeriod(stats.chart, dateFrom, dateTo)
+
+  function toggleOpen() {
+    setOpen(o => { saveAnalyticsOpen(!o); return !o })
+  }
+  function changeMode(m: ChartMode) {
+    setMode(m)
+    saveChartMode(m)
+  }
+  function selectPeriod(periodo: string | null) {
+    if (!periodo) { onDateRange('', ''); return }
+    const r = periodRange(periodo, stats.chart.granularity)
+    onDateRange(r.from, r.to)
+  }
 
   return (
-    <div className={cardClasses('none', 'overflow-hidden')}>
+    <div className={panelSurface('none', 'overflow-hidden')}>
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={toggleOpen}
         aria-expanded={open}
         aria-controls={open ? 'historial-analitica' : undefined}
         className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-overlay/2 transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
@@ -75,97 +75,32 @@ export function AnalyticsPanel({ stats, onAssetClick }: {
         <div className="flex items-center gap-2">
           <BarChart2 size={14} aria-hidden="true" className="text-fg-subtle" />
           <span className="text-sm font-medium">Analítica de actividad</span>
-          <span className="text-xs text-fg-subtle">últimos 18 meses · top activos · fees</span>
+          <span className="text-xs text-fg-subtle">{period} · top activos · comisiones</span>
         </div>
         {open ? <ChevronUp size={14} aria-hidden="true" className="text-fg-subtle" /> : <ChevronDown size={14} aria-hidden="true" className="text-fg-subtle" />}
       </button>
 
       {open && (
         <div id="historial-analitica" className="border-t border-border p-5 space-y-5">
-          {/* Gráfico — ancho completo */}
           <div>
-            <p className="text-[11px] text-fg-subtle uppercase tracking-widest mb-3">Operaciones por mes</p>
-            {/* Alternativa en texto del gráfico (#351): el SVG no es accesible. */}
-            <MonthlyTable rows={stats.monthly} />
-            <div aria-hidden="true">
-            <ResponsiveContainer width="100%" height={130}>
-              <BarChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} barSize={10} barGap={1}>
-                <XAxis dataKey="name" tick={{ fontSize: 12, fill: c.axisMuted }} axisLine={false} tickLine={false} />
-                <YAxis hide domain={[0, maxOps * 1.2]} />
-                <Tooltip content={<ChartTooltip />} cursor={{ fill: c.cursorSoft }} />
-                <Bar dataKey="Compras"        stackId="a" fill={c.gain} />
-                <Bar dataKey="Ventas"         stackId="a" fill={c.loss} />
-                <Bar dataKey="Otras salidas"  stackId="a" fill={c.loss} fillOpacity={0.45} />
-                <Bar dataKey="Ingresos"       stackId="a" fill={c.warn} />
-                <Bar dataKey="Transferencias" stackId="a" fill={c.neutral} />
-                <Bar dataKey="Otros"          stackId="a" fill={c.neutralSoft} radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <p className="text-[11px] text-fg-subtle uppercase tracking-widest">
+                {mode === 'ops' ? 'Operaciones' : `Valor en ${currency}`} {stats.chart.granularity === 'year' ? 'por año' : 'por mes'}
+                <span className="normal-case tracking-normal"> · pulsa un {stats.chart.granularity === 'year' ? 'año' : 'mes'} para filtrarlo</span>
+              </p>
+              <ModeToggle mode={mode} onChange={changeMode} />
             </div>
-            <div aria-hidden="true" className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
-              {([['Compras',c.gain,1],['Ventas',c.loss,1],['Otras salidas',c.loss,0.45],['Ingresos',c.warn,1],['Transferencias',c.neutral,1],['Otros',c.neutralSoft,1]] as const).map(([l,c,o]) => (
-                <div key={l} className="flex items-center gap-1.5 text-xs text-fg-subtle">
-                  <div className="w-2 h-2 rounded-lg" style={{ backgroundColor: c, opacity: o }} />{l}
+            <ActivityChart chart={stats.chart} mode={mode} currency={currency} colors={colors}
+              selected={selected} onSelect={selectPeriod} />
+            <div aria-hidden="true" className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3">
+              {STATS_CATEGORIES.map(cat => (
+                <div key={cat} className="flex items-center gap-1.5 text-xs text-fg-subtle">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: colors[cat][0], opacity: colors[cat][1] }} />{CATEGORY_LABELS[cat]}
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Top activos + Fees — dos columnas iguales */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1 border-t border-border/50">
-            {/* Top activos */}
-            <div>
-              <p className="text-[11px] text-fg-subtle uppercase tracking-widest mb-2">
-                Top activos <span className="text-fg-subtle normal-case">· último año</span>
-              </p>
-              <div className="space-y-1.5">
-                {stats.topAssets.slice(0, 6).map((row) => (
-                  <button
-                    key={row.asset}
-                    type="button"
-                    onClick={() => onAssetClick(row.asset)}
-                    className="w-full flex items-center gap-2 group/asset hover:bg-background-tertiary/50 rounded-lg px-1 py-0.5 transition-colors"
-                    title={`Buscar ${row.asset}`}
-                    aria-label={`Buscar ${row.asset}: ${row.ops} operaciones en el último año`}
-                  >
-                    <CryptoIcon symbol={row.asset} size={16} />
-                    <span className="text-xs mono font-bold text-fg w-12 shrink-0 group-hover/asset:text-fg transition-colors">{row.asset}</span>
-                    <div className="flex-1 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-brand/60 group-hover/asset:bg-brand-solid text-on-brand transition-colors"
-                        style={{ width: `${(row.ops / (stats.topAssets[0]?.ops ?? 1)) * 100}%` }} />
-                    </div>
-                    <span className="text-xs text-fg-subtle w-5 text-right shrink-0">{row.ops}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-fg-subtle mt-1.5 pl-1">Pulsa un activo para buscarlo</p>
-            </div>
-
-            {/* Fees por activo */}
-            {stats.fees.length > 0 && (
-              <div>
-                <p className="text-[11px] text-fg-subtle uppercase tracking-widest mb-2">
-                  Fees por activo <span className="text-fg-subtle normal-case">· último año</span>
-                </p>
-                <div className="space-y-1.5">
-                  {stats.fees.map((row) => (
-                    <div key={row.asset} className="flex items-center gap-2">
-                      <CryptoIcon symbol={row.asset} size={16} />
-                      <span className="text-xs mono font-bold text-fg w-12 shrink-0">{row.asset}</span>
-                      <div className="flex-1 h-1.5 bg-background-tertiary rounded-full overflow-hidden">
-                        <div className="h-full rounded-full bg-warning/50"
-                          style={{ width: `${(row.total_eur / (stats.fees[0]?.total_eur ?? 1)) * 100}%` }} />
-                      </div>
-                      {row.total_eur > 0
-                        ? <span className="text-xs text-fg-muted mono font-semibold shrink-0">{formatMoney(row.total_eur, stats.currency ?? 'EUR')}</span>
-                        : <span className="text-xs text-fg-subtle mono shrink-0">{formatAmount(row.total_amount, 4)}</span>
-                      }
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          <Rankings stats={stats} currency={currency} period={rankings} onAssetClick={onAssetClick} />
         </div>
       )}
     </div>

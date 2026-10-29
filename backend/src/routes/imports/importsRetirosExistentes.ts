@@ -12,8 +12,8 @@ const router = Router();
 
 const ESPECIALES = ['__external__', '__gift__', '__lost__'] as const;
 const reasignacionesSchema = z.record(
-  z.string().uuid(),
-  z.union([z.enum(ESPECIALES), z.string().uuid()]),
+  z.uuid(),
+  z.union([z.enum(ESPECIALES), z.uuid()]),
 );
 
 class PeticionInvalida extends Error {}

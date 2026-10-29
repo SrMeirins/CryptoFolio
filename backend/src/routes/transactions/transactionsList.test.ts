@@ -4,8 +4,8 @@ import express from 'express';
 import type { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
 
-// GET /, /stats y /facets del Historial (#346): validación, valoración con el
-// FIFO (y su respaldo estimado), flujos de entradas/salidas y estadísticas.
+// GET /, /facets y /api/v1/historial/estadisticas (#346, #376): validación,
+// valoración con el FIFO (y su respaldo estimado), flujos y estadísticas.
 // Datos sintéticos: cada transacción cubre una vía de valoración distinta.
 let testDb: TestDatabase;
 let pool: Pool;
@@ -16,6 +16,7 @@ RECENT.setUTCHours(12, 0, 0, 0);
 const DAY = RECENT.toISOString().slice(0, 10);
 const at = (min: number) => new Date(RECENT.getTime() + min * 60_000).toISOString();
 const ids: Record<string, string> = {};
+const wallets: Record<string, string> = {};
 
 type TxFields = Record<string, unknown>;
 async function tx(key: string, f: TxFields): Promise<string> {
@@ -44,7 +45,7 @@ async function consume(lotId: string, consumingTx: string, qty: number, proceeds
 }
 const byId = (rows: { id: string }[], key: string) => rows.find(r => r.id === ids[key]) as Record<string, unknown>;
 
-describe('routes/transactions — listado, stats y facetas', () => {
+describe('routes/transactions — listado, estadísticas y facetas', () => {
   beforeAll(async () => {
     testDb = await createTestDatabase();
     process.env.DATABASE_URL = testDb.connectionString;
@@ -54,6 +55,7 @@ describe('routes/transactions — listado, stats y facetas', () => {
 
     const a = (await pool.query(`INSERT INTO wallets (name, type) VALUES ('Exchange test', 'exchange') RETURNING id`)).rows[0].id;
     const b = (await pool.query(`INSERT INTO wallets (name, type) VALUES ('Fría test', 'hardware') RETURNING id`)).rows[0].id;
+    Object.assign(wallets, { a, b });
     const base = { wallet_id: a };
 
     // 1. Compra con EUR → «coste», comisión en EUR.
@@ -88,13 +90,15 @@ describe('routes/transactions — listado, stats y facetas', () => {
     await tx('midnight', { ...base, operation_type: 'DEPOSIT_FIAT', timestamp: '2024-03-10T23:30:00Z', asset: 'EUR', amount: 10, amount_net: 10 });
 
     await pool.query(
-      `INSERT INTO price_close_madrid (asset, close_date, price_eur, source) VALUES ('XRP', $1, 0.5, 'okx_1d'), ('USDT', $1, 0.9, 'okx_1d')`, [DAY]);
+      `INSERT INTO price_close_daily (asset, timezone, close_date, price_eur, source) VALUES ('XRP', 'Europe/Madrid', $1, 0.5, 'okx_1d'), ('USDT', 'Europe/Madrid', $1, 0.9, 'okx_1d')`, [DAY]);
     await pool.query(
       `INSERT INTO price_cache (asset, price_eur, source, price_date) VALUES ('ADA', 0.3, 'binance', $1), ('USDT', 0.8, 'binance', $1)`, [DAY]);
 
     const { default: router } = await import('./index');
+    const { default: stats } = await import('../historial/estadisticas');
     app = express();
     app.use('/api/transactions', router);
+    app.use('/api/v1/historial/estadisticas', stats);
   });
 
   afterAll(async () => {
@@ -111,15 +115,21 @@ describe('routes/transactions — listado, stats y facetas', () => {
       ["type=BUY' OR '1'='1", 'type'],
       ['date_from=2026-02-30', 'date_from'],
       ['manually_added=yes', 'manually_added'],
-      ['foo=1', 'Unrecognized'],
+      ['foo=1', 'desconocida: "foo"'],
     ])('%s → 400 legible', async (qs, campo) => {
       const res = await request(app).get(`/api/transactions?${qs}`);
       expect(res.status).toBe(400);
       expect(res.body.error).toContain(campo);
     });
 
-    it('/stats valida la moneda', async () => {
-      expect((await request(app).get('/api/transactions/stats?currency=GBP')).status).toBe(400);
+    it.each([
+      ['currency=GBP', 'currency'],
+      ['type=NOPE', 'type'],
+      ['limit=10', 'desconocida: "limit"'],
+    ])('estadísticas: %s → 400 legible', async (qs, campo) => {
+      const res = await request(app).get(`/api/v1/historial/estadisticas?${qs}`);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain(campo);
     });
   });
 
@@ -250,6 +260,45 @@ describe('routes/transactions — listado, stats y facetas', () => {
     });
   });
 
+  describe('GET / — filtros avanzados (#366)', () => {
+    const totalDe = async (qs: string) => (await request(app).get(`/api/transactions?${qs}`)).body.total as number;
+
+    it('varios tipos y varios activos a la vez', async () => {
+      expect(await totalDe('type=SELL,LOST')).toBe(3);        // venta, venta con faltante y pérdida
+      expect(await totalDe('asset=btc,eth')).toBe(3);         // compra y venta de BTC, swap a ETH
+    });
+
+    it('rango de importe en EUR: excluye las filas sin precio', async () => {
+      expect(await totalDe('value_min=50')).toBe(3);          // 100, 56 y 250
+      expect(await totalDe('value_max=5')).toBe(2);           // las dos de 5 €; las sin precio no entran
+    });
+
+    it('rango de importe en USD con el tipo de cada fecha (1 / 0,8)', async () => {
+      expect(await totalDe('currency=USD&value_min=125')).toBe(2);   // 100 € = 125 $ y 250 €
+    });
+
+    it('los flujos respetan el rango de importe', async () => {
+      const { flows } = (await request(app).get('/api/transactions?value_min=100')).body;
+      expect(flows.EUR).toEqual({ entradas: 350, salidas: 0 });
+    });
+
+    it('la búsqueda encuentra por hash on-chain y por nombre del archivo de origen', async () => {
+      await pool.query(`UPDATE transactions SET tx_hash = 'abcd1234ffee99' WHERE id = $1`, [ids.withdrawOwn]);
+      const imp = (await pool.query(
+        `INSERT INTO csv_imports (filename, file_hash, exchange) VALUES ('export_sintetico_2026.csv', 'hash-sintetico-366', 'binance') RETURNING id`)).rows[0].id;
+      await pool.query(`UPDATE transactions SET import_id = $1 WHERE id = $2`, [imp, ids.lost]);
+      const porHash = (await request(app).get('/api/transactions?search=FFEE99')).body.transactions;
+      expect(porHash.map((t: { id: string }) => t.id)).toEqual([ids.withdrawOwn]);
+      const porArchivo = (await request(app).get('/api/transactions?search=sintetico_2026')).body.transactions;
+      expect(porArchivo.map((t: { id: string }) => t.id)).toEqual([ids.lost]);
+    });
+
+    it('listas manipuladas → 400 sin llegar a SQL', async () => {
+      expect((await request(app).get("/api/transactions?type=BUY,'%20OR%201=1--")).status).toBe(400);
+      expect((await request(app).get('/api/transactions?value_min=1;DROP')).status).toBe(400);
+    });
+  });
+
   describe('GET / — flujos', () => {
     it('separa entradas y salidas; los movimientos entre wallets propias no cuentan', async () => {
       const { flows } = (await request(app).get('/api/transactions')).body;
@@ -267,34 +316,117 @@ describe('routes/transactions — listado, stats y facetas', () => {
     });
   });
 
-  describe('GET /stats', () => {
-    it('definiciones coherentes de Invertido, Ventas y Comisiones', async () => {
-      const res = await request(app).get('/api/transactions/stats');
+  describe('GET / — filtro por wallet de origen o destino (#395)', () => {
+    const idsOf = (res: { body: { transactions: { id: string }[] } }) => res.body.transactions.map(t => t.id).sort();
+
+    it('la wallet de destino ve las transferencias y retiros que llegan a ella', async () => {
+      const res = await request(app).get(`/api/transactions?wallet_id=${wallets.b}`);
+      expect(res.body.total).toBe(2);
+      expect(idsOf(res)).toEqual([ids.withdrawOwn, ids.noPrice].sort());
+    });
+
+    it('la wallet de origen sigue viendo todas las suyas, también las que salen', async () => {
+      const res = await request(app).get(`/api/transactions?wallet_id=${wallets.a}&limit=200`);
+      expect(res.body.total).toBe(11);
+      expect(idsOf(res)).toContain(ids.withdrawOwn);
+    });
+
+    it('un movimiento entre wallets propias no cuenta como entrada ni salida', async () => {
+      const { flows } = (await request(app).get(`/api/transactions?wallet_id=${wallets.b}`)).body;
+      expect(flows.EUR).toEqual({ entradas: 0, salidas: 0 });
+    });
+
+    it('las estadísticas usan el mismo filtro', async () => {
+      const stats = (await request(app).get(`/api/v1/historial/estadisticas?wallet_id=${wallets.b}`)).body;
+      expect(stats.totals.ops).toBe(2);
+    });
+
+    it('las comisiones solo cuentan en la wallet que las pagó', async () => {
+      // Comisión de red en el retiro a la wallet fría, solo durante este test.
+      await pool.query(`UPDATE transactions SET fee_asset = 'XRP', fee_amount = 0.1 WHERE id = $1`, [ids.withdrawOwn]);
+      try {
+        const totals = async (w: string) => (await request(app).get(`/api/v1/historial/estadisticas?wallet_id=${w}`)).body.totals;
+        expect((await totals(wallets.b)).fee_ops).toBe(0);
+        expect((await totals(wallets.a)).fee_ops).toBe(5);
+      } finally {
+        await pool.query(`UPDATE transactions SET fee_asset = NULL, fee_amount = NULL WHERE id = $1`, [ids.withdrawOwn]);
+      }
+    });
+  });
+
+  describe('GET /api/v1/historial/estadisticas (#376)', () => {
+    const STATS = '/api/v1/historial/estadisticas';
+    const get = async (qs = '') => (await request(app).get(`${STATS}${qs ? `?${qs}` : ''}`)).body;
+
+    it('definiciones coherentes de Invertido, Ventas y Comisiones, en EUR y USD', async () => {
+      const res = await request(app).get(STATS);
       expect(res.status).toBe(200);
-      expect(res.body.totals).toMatchObject({
-        total_ops: 11,
-        total_invested: 100,   // solo compras pagadas con fiat
-        total_fiat_buys: 1,
-        total_buys: 2,         // incluye el swap
-        total_sells: 2,        // la pérdida no es una venta
-        total_sold: 58,
-        total_manual: 1,
-        total_fee_ops: 4,      // 3 comisiones en columna + 1 fila FEE_EXCHANGE
-        fees_sin_valor: 0,
+      const t = res.body.totals;
+      expect(t).toMatchObject({
+        ops: 11, unique_assets: 8, manual: 1,
+        fiat_buys: 1, invested: { EUR: 100 },   // solo compras pagadas con fiat
+        sells: 2, sold: { EUR: 58 },             // la pérdida no es una venta
+        income_ops: 0, income: { EUR: 0, USD: 0 },
+        fee_ops: 4, fees_sin_valor: 0,           // 3 comisiones en columna + 1 fila FEE_EXCHANGE
       });
-      expect(res.body.totals.total_fees_eur).toBeCloseTo(1 + 4 + 0.09 + 5, 8);
+      expect(t.fees.EUR).toBeCloseTo(1 + 4 + 0.09 + 5, 8);
+      // USD con el tipo de la fecha (USDT a 0,8 EUR en price_cache).
+      expect(t.invested.USD).toBeCloseTo(100 / 0.8, 6);
     });
 
-    it('el gráfico mensual separa ventas y otras salidas y cuadra con las tarjetas', async () => {
-      const { monthly } = (await request(app).get('/api/transactions/stats')).body;
-      const mes = monthly.find((m: { mes: string }) => m.mes === DAY.slice(0, 7));
-      expect(mes).toMatchObject({ compras: 2, ventas: 2, otras_salidas: 1, eur_invertido: 100 });
+    it.each(['', 'type=SELL', 'asset=BTC', 'value_min=50', 'wallet_id=00000000-0000-0000-0000-000000000000', 'group_fees=false'])(
+      '«Operaciones» coincide con el total de la lista (%s)', async qs => {
+        const list = (await request(app).get(`/api/transactions${qs ? `?${qs}` : ''}`)).body;
+        expect((await get(qs)).totals.ops).toBe(list.total);
+      });
+
+    it('las tarjetas siguen a los filtros', async () => {
+      expect((await get('type=SELL')).totals).toMatchObject({ ops: 2, sells: 2, sold: { EUR: 58 }, fiat_buys: 0, invested: { EUR: 0 } });
+      expect((await get('asset=BTC')).totals).toMatchObject({ ops: 2, fiat_buys: 1, invested: { EUR: 100 } });
+      expect((await get('date_from=2024-03-11&date_to=2024-03-11')).totals).toMatchObject({ ops: 1, sells: 0 });
     });
 
-    it('comisiones por activo valoradas', async () => {
-      const { fees } = (await request(app).get('/api/transactions/stats')).body;
-      const bnb = fees.find((f: { asset: string }) => f.asset === 'BNB');
-      expect(bnb).toMatchObject({ ops: 2, total_eur: 9 });
+    it('gráfico: últimos 18 meses por defecto, con todas las categorías y ventas separadas de otras salidas', async () => {
+      const { chart } = await get();
+      expect(chart.granularity).toBe('month');
+      expect(chart.buckets).toHaveLength(18);
+      const mes = chart.buckets.find((b: { periodo: string }) => b.periodo === DAY.slice(0, 7));
+      expect(mes.ops).toMatchObject({ compras: 2, ventas: 2, otras_salidas: 1, ingresos: 0 });
+      expect(mes.valor.EUR.ventas).toBe(58);
+      const total = chart.buckets.reduce((n: number, b: { ops: Record<string, number> }) => n + Object.values(b.ops).reduce((x, y) => x + y, 0), 0);
+      expect(total).toBe(10); // el depósito de 2024 queda fuera de los 18 meses
+    });
+
+    it('gráfico: el rango filtrado, por años si pasa de 36 meses', async () => {
+      const marzo = (await get('date_from=2024-03-01&date_to=2024-03-31')).chart;
+      expect(marzo).toMatchObject({ granularity: 'month', from: '2024-03-01', to: '2024-03-01' });
+      expect(marzo.buckets[0].ops.transferencias).toBe(1); // el depósito de 2024
+      const largo = (await get(`date_from=2023-01-01&date_to=${DAY}`)).chart;
+      expect(largo.granularity).toBe('year');
+      expect(largo.buckets[0].periodo).toBe('2023');
+    });
+
+    it('rankings: último año sin fechas; lo filtrado con ellas', async () => {
+      const sin = await get();
+      expect(sin.rankings_periodo).toBe('ultimo_anio');
+      expect(sin.top_assets[0]).toMatchObject({ asset: 'BTC', ops: 2 });
+      expect(sin.fees_by_asset.find((f: { asset: string }) => f.asset === 'BNB')).toMatchObject({ ops: 2, value: { EUR: 9 } });
+      const con = await get('date_from=2024-01-01&date_to=2024-12-31');
+      expect(con.rankings_periodo).toBe('filtrado');
+      expect(con.top_assets).toEqual([]);
+    });
+
+    it('ingresos: valor y número con la misma valoración que la lista', async () => {
+      const id = await tx('reward', { wallet_id: (await pool.query(`SELECT id FROM wallets WHERE name = 'Exchange test'`)).rows[0].id,
+        operation_type: 'STAKING_REWARD', timestamp: at(10), asset: 'XRP', amount: 4, amount_net: 4 });
+      try {
+        const t = (await get('type=STAKING_REWARD')).totals;
+        const fila = (await request(app).get('/api/transactions?type=STAKING_REWARD')).body.transactions[0];
+        expect(t).toMatchObject({ ops: 1, income_ops: 1, income: { EUR: Number(fila.value_eur) }, income_sin_valor: 0 });
+        expect(t.income.EUR).toBeCloseTo(2, 8); // cierre de XRP a 0,5
+      } finally {
+        await pool.query('DELETE FROM transactions WHERE id = $1', [id]);
+      }
     });
   });
 
@@ -305,6 +437,22 @@ describe('routes/transactions — listado, stats y facetas', () => {
       expect(res.body.accounts).toEqual(['Bitvavo', 'Spot']);
       expect(res.body.assets).toContain('DOGE');
       expect(res.body.types).toContain('FEE_EXCHANGE');
+    });
+
+    it('lista los años con transacciones en la zona de la app (#382)', async () => {
+      const w = (await pool.query(`SELECT id FROM wallets WHERE name = 'Exchange test'`)).rows[0].id;
+      // 23:30 UTC del 31/12/2022 ya es 2023 en Madrid.
+      const id = await tx('nochevieja', { wallet_id: w, operation_type: 'DEPOSIT_FIAT', timestamp: '2022-12-31T23:30:00Z', asset: 'EUR', amount: 1, amount_net: 1 });
+      try {
+        const { years } = (await request(app).get('/api/transactions/facets')).body;
+        expect(years).toEqual([...years].sort((a: number, b: number) => a - b));
+        expect(years).toContain(2023);
+        expect(years).not.toContain(2022);
+        expect(years).toContain(2024);
+        expect(years).toContain(Number(DAY.slice(0, 4)));
+      } finally {
+        await pool.query('DELETE FROM transactions WHERE id = $1', [id]);
+      }
     });
   });
 });

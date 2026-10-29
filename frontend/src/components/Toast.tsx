@@ -58,7 +58,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const addToast = useCallback((toast: Omit<ToastItem, 'id'>) => {
     const id = Math.random().toString(36).slice(2)
     setToasts(prev => [...prev.slice(-4), { ...toast, id }])
-    const duration = toast.duration ?? (toast.type === 'error' ? 6000 : 4000)
+    // Con acción, más tiempo para alcanzarla (#445).
+    const duration = toast.duration ?? (toast.type === 'error' || toast.action ? 6000 : 4000)
     timerState.current[id] = { duration, remaining: duration, startedAt: Date.now() }
     scheduleTimer(id, duration)
   }, [scheduleTimer])
@@ -92,6 +93,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             role={ROLE[t.type]}
             onMouseEnter={() => pause(t.id)}
             onMouseLeave={() => resume(t.id)}
+            // También con el foco dentro (#445): el teclado llega a la acción sin que se cierre.
+            onFocus={() => pause(t.id)}
+            onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) resume(t.id) }}
             className={`pointer-events-auto flex items-start gap-3 px-4 py-3 bg-background-card border ${BORDER[t.type]} rounded-xl shadow-xl animate-slide-in`}
           >
             {ICONS[t.type]}
@@ -99,6 +103,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               <p className="text-sm font-medium text-fg leading-snug">{t.title}</p>
               {t.message && <p className="text-xs text-fg-muted mt-0.5 leading-snug">{t.message}</p>}
             </div>
+            {t.action && (
+              <button type="button" onClick={() => { t.action!.onClick(); remove(t.id) }}
+                className="shrink-0 -my-0.5 px-2 py-1 rounded-md text-xs font-semibold text-brand-ink hover:bg-brand/10 transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
+                {t.action.label}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => remove(t.id)}

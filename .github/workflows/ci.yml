@@ -48,12 +48,17 @@ jobs:
     # producción (#203) y, desde #355, también en las de desarrollo: una
     # vulnerabilidad en la cadena de herramientas (vite, el servidor de
     # desarrollo) afecta a quien trabaja en el repo. Además, toda dependencia
-    # debe declararse con versión exacta.
+    # debe declararse con versión exacta. La raíz (#368) solo tiene
+    # herramientas de desarrollo (markdownlint-cli2).
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        package: [backend, frontend, electron]
+        include:
+          - { package: backend,  dir: backend }
+          - { package: frontend, dir: frontend }
+          - { package: electron, dir: electron }
+          - { package: raíz,     dir: . }
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -63,16 +68,21 @@ jobs:
         with:
           node-version: '24'
 
+      # Como npm audit --audit-level=high, con excepciones temporales
+      # documentadas y caducables en scripts/audit-exceptions.json (#384).
+      - name: Tests del script de auditoría
+        run: node --test scripts/audit.test.mjs
+
       - name: npm audit (producción)
-        working-directory: ${{ matrix.package }}
-        run: npm audit --omit=dev --audit-level=high
+        working-directory: ${{ matrix.dir }}
+        run: node "$GITHUB_WORKSPACE/scripts/audit.mjs" --omit=dev
 
       - name: npm audit (desarrollo)
-        working-directory: ${{ matrix.package }}
-        run: npm audit --audit-level=high
+        working-directory: ${{ matrix.dir }}
+        run: node "$GITHUB_WORKSPACE/scripts/audit.mjs"
 
       - name: Versiones exactas
-        run: node scripts/check-exact-versions.mjs ${{ matrix.package }}/package.json
+        run: node scripts/check-exact-versions.mjs ${{ matrix.dir }}/package.json
 
   test-backend:
     name: Tests — backend

@@ -1,3 +1,4 @@
+import type { NotificationCategory } from '../constants/notifications'
 import { api } from './client'
 import type { Currency } from '../utils/format'
 // Tipos del módulo fiscal detallado (pages/fiscal/) — viven ahí por ser
@@ -41,7 +42,8 @@ export interface DailyPnlResponse {
   currency: Currency
   from: string
   to: string
-  timezone: 'Europe/Madrid'
+  /** Zona de los días del P&L: la de la aplicación (#389). */
+  timezone: string
   refreshing: boolean
   totalPnl: number
   twrPct: number
@@ -239,6 +241,14 @@ export interface AssetMetadata {
   /** Precio en vivo en EUR y su fuente, si lo hay (#337). */
   precio_actual?: number | null
   fuente_actual?: 'binance' | 'coingecko' | 'coinpaprika' | 'okx' | null
+  /** Logo (#449): id de CoinGecko solo para el logo, cómo se fijó y de dónde salió el logo guardado. */
+  icon_coingecko_id?: string | null
+  icon_id_source?: 'auto' | 'manual' | null
+  icon_source?: 'coingecko' | 'local' | 'flag' | null
+  /** Uso (#450): operaciones con el activo. */
+  operaciones?: number
+  /** Último fallo de precio (#450), en memoria del backend. */
+  ultimo_fallo?: { source: 'coingecko' | 'coinpaprika' | 'okx'; reason: 'sin-respuesta' | 'sin-precio'; at: string } | null
 }
 
 export interface ManualTxPreview {
@@ -266,6 +276,15 @@ export interface ManualTxPreview {
   }[]
 }
 
+/** Campos de una importada tal como se importaron (#378), en el formato de la API. */
+export interface ImportOriginal {
+  operation_type: string; timestamp: string; asset: string | null
+  amount: string | number | null; amount_net: string | number | null
+  cost_asset: string | null; cost_amount: string | number | null; price_per_unit: string | number | null
+  fee_asset: string | null; fee_amount: string | number | null
+  wallet_id: string; destination_wallet_id: string | null; destination_pending: boolean
+}
+
 export interface Transaction {
   id: string
   operation_type: string
@@ -280,6 +299,11 @@ export interface Transaction {
   usd_per_eur?: number | string | null
   fee_asset: string | null
   fee_amount: string | null
+  /** Comisión que el exchange ya incluye en el coste (#415); solo informativa. */
+  included_fee_asset?: string | null
+  included_fee_amount?: string | null
+  /** Operación de origen si la comisión va incluida en el precio y el CSV no la desglosa (#431). */
+  fee_in_price?: string | null
   wallet_id: string
   wallet_name: string
   wallet_color: string
@@ -287,6 +311,8 @@ export interface Transaction {
   account: string | null
   notes: string | null
   manually_added: boolean
+  /** Importada editada a mano (#378): campos tal como se importaron; null si no se ha editado. */
+  original_import: ImportOriginal | null
   created_at: string
   destination_wallet_id: string | null
   destination_wallet_name: string | null
@@ -296,6 +322,10 @@ export interface Transaction {
   linked_tx_operation_type: string | null
   linked_tx_amount: string | null
   linked_tx_asset: string | null
+  /** Comisiones agrupadas con esta compra o venta (#371); vacío si no hay o no se agrupa. */
+  grouped_fees: GroupedFee[]
+  /** En una comisión: la compra o venta a la que pertenece, si se pudo emparejar (#371). */
+  fee_parent_id: string | null
   /** Importación de origen y hash on-chain, para la trazabilidad (#349). */
   import_id: string | null
   import_filename: string | null
@@ -320,10 +350,151 @@ export interface TransactionFlows {
   USD: { entradas: number; salidas: number } | null
 }
 
+/** Comisión agrupada dentro de su compra o venta (#371). */
+export interface GroupedFee {
+  id: string
+  asset: string
+  amount: string
+  value_eur: number | null
+  value_source: ValuationSource
+}
+
+/** Detalle con trazabilidad de una transacción (#373). */
+/** Filas originales del CSV (#374): columnas en el orden del archivo y valores como texto. */
+export interface OriginalRows {
+  columns: string[]
+  rows: string[][]
+}
+
+/** Papel de un consumo FIFO (#405), espejo de modules/history/consumptionRole.ts. */
+export type ConsumptionRole =
+  | 'traslado' | 'comision_red' | 'venta' | 'permuta' | 'comision' | 'perdida' | 'donacion'
+  | 'devolucion_margen' | 'intereses_margen' | 'otro'
+
+export interface TransactionDetail {
+  transaction: Transaction
+  fifo: {
+    /** De dónde salen sus unidades: lotes que consume. */
+    consumed: {
+      id: string; lot_id: string; asset: string; wallet_name: string; opened_at: string
+      origin: { id: string; operation_type: string; timestamp: string }
+      quantity: number | null; cost_eur: number | null; proceeds_eur: number | null; gain_loss_eur: number | null
+      fiscal_event_type: 'GAIN' | 'LOSS' | 'NONE'
+      /** Papel del consumo en esta operación y destino de un traslado (#405). */
+      role: ConsumptionRole; destination_name: string | null
+    }[]
+    /** Totales de los consumos con efecto fiscal. */
+    totals: { cost_eur: number; proceeds_eur: number; gain_loss_eur: number }
+    /** Adónde van: lotes que abre y quién los consumió después. */
+    opened: {
+      id: string; asset: string; wallet_name: string; opened_at: string; is_closed: boolean
+      quantity_original: number | null; quantity_remaining: number | null; price_per_unit_eur: number | null; fee_eur: number | null
+      /** Lote de origen de un traslado (#405); null si el lote nace en esta operación. */
+      source: { id: string; operation_type: string; timestamp: string } | null
+      consumed_by: {
+        transaction_id: string; operation_type: string; timestamp: string
+        quantity: number | null; proceeds_eur: number | null; gain_loss_eur: number | null; fiscal_event_type: 'GAIN' | 'LOSS' | 'NONE'
+        role: ConsumptionRole; destination_name: string | null
+      }[]
+    }[]
+  }
+  origin: {
+    import: { id: string; filename: string; exchange: string; imported_at: string } | null
+    /** Filas del archivo que agrupa la transacción (p. ej. fills parciales). */
+    source_rows: number
+    /** Las filas tal como venían en el CSV (#374); null si se importó antes. */
+    original_rows: OriginalRows | null
+  }
+  onchain: { tx_hash: string | null; address: string | null; network: string | null; tx_url: string | null; address_url: string | null }
+  fiscal_years: number[]
+}
+
+/** Importe en ambas monedas (#376): el cambio EUR ↔ USD no pide nada nuevo. */
+export interface Money { EUR: number; USD: number }
+export const STATS_CATEGORIES = ['compras', 'ventas', 'otras_salidas', 'ingresos', 'transferencias', 'otros'] as const
+export type StatsCategory = typeof STATS_CATEGORIES[number]
+export type ByCategory = Record<StatsCategory, number>
+
+/** Estadísticas del Historial sobre lo filtrado (#376). */
+export interface HistoryStats {
+  totals: {
+    ops: number; unique_assets: number; manual: number
+    fiat_buys: number; invested: Money
+    /** Fiat recibido al vender cripto (#403): Invertido menos esto es el neto. */
+    recovered: Money
+    sells: number; sold: Money
+    /** Resultado (G/P) de las ventas según el FIFO (#403). */
+    sold_gp: Money
+    /** Ventas por lo que se recibe a cambio (#403). */
+    sold_by_counterpart: Record<SaleCounterpart, { ops: number; value: Money }>
+    /** Stablecoin pasada a fiat (#407): no se suma a Ventas. */
+    stable_to_fiat: { ops: number; value: Money }
+    /** Fiat retirado al banco o a tarjeta y depositado (#407). */
+    withdrawn_ops: number; withdrawn: Money; deposited: Money
+    income_ops: number; income: Money; income_sin_valor: number
+    fee_ops: number; fees: Money; fees_sin_valor: number
+    /** De ellas, incluidas en el coste de la compra (#415). */
+    fees_included: { ops: number; value: Money }
+    /** Con la comisión incluida en el precio, sin cifra en el CSV (#431): no suman. */
+    fees_in_price_ops: number
+  }
+  chart: {
+    granularity: 'month' | 'year'; from: string; to: string
+    buckets: { periodo: string; ops: ByCategory; valor: { EUR: ByCategory; USD: ByCategory } }[]
+  }
+  /** Rankings: sobre lo filtrado con fechas; sin ellas, el último año. */
+  rankings_periodo: 'filtrado' | 'ultimo_anio'
+  top_assets: { asset: string; ops: number; volume: Money }[]
+  fees_by_asset: { asset: string; ops: number; amount: number; value: Money }[]
+  /** Operativa de margen (#403): si el resumen la incluye y cuántas operaciones (y ventas) son de margen. */
+  margin: { included: boolean; ops: number; sells: number }
+  /** Importe de cada tarjeta por periodo del gráfico (#407). */
+  series: { periodo: string; valor: Record<SummaryCard, Money> }[]
+}
+
+/** Tarjetas del resumen del Historial (#407), espejo de modules/history/summaryCards.ts. */
+export const SUMMARY_CARDS = ['invertido', 'retirado', 'ventas', 'ingresos', 'comisiones'] as const
+export type SummaryCard = typeof SUMMARY_CARDS[number]
+
+export const SALE_COUNTERPARTS = ['fiat', 'stablecoin', 'cripto'] as const
+export type SaleCounterpart = typeof SALE_COUNTERPARTS[number]
+
+/** Zona horaria efectiva de la aplicación (#388). */
+export interface TimezoneInfo {
+  timezone: string
+  /** De dónde sale: el ajuste guardado, la variable APP_TIMEZONE o la de por defecto. */
+  source: 'ajuste' | 'variable' | 'defecto'
+  /** Ajuste guardado que no es una zona válida y se ha ignorado. */
+  invalidSetting: string | null
+  default: string
+}
+
+/** Saldo corrido de un activo en el Historial (#380). */
+export interface RunningBalance {
+  asset: string
+  wallet_id: string | null
+  /** Saldo actual: cuadra con Portfolio. */
+  current: number
+  /** Saldo tras cada fila pedida; `missing`: lo que faltaba en lotes (hueco). */
+  rows: { id: string; balance: number; missing: number | null }[]
+  /** Operaciones con hueco en todo el historial del activo y la más antigua. */
+  shortfalls: { count: number; first_id: string | null }
+}
+
+/** Vista guardada del Historial (#369): filtros y orden con los nombres de la API. */
+export interface SavedView {
+  id: string
+  nombre: string
+  predeterminada: boolean
+  filtros: Record<string, string>
+}
+
 export interface TransactionFacets {
   accounts: string[]
   assets: string[]
   types: string[]
+  /** Años con transacciones en la zona de la app, ascendentes (#382). */
+  years: number[]
 }
 
 export interface SimulatedLot {
@@ -486,6 +657,8 @@ export interface OperationType {
   example?: string
   badge: string
   badgeColor: 'green' | 'red' | 'blue' | 'gray' | 'amber'
+  /** Solo para editar importadas; no se ofrece al crear (#394). */
+  editOnly?: boolean
 }
 
 export interface CategoryMeta { label: string; description: string; icon: string }
@@ -504,12 +677,26 @@ export interface FiatBalance {
   balance: string
 }
 
+/** Escala del ahorro de un ejercicio (#452). `hasta` null en el último tramo. */
+export interface EscalaAhorro {
+  ejercicio: number
+  personalizada: boolean
+  tramos: { hasta: number | null; tipo: number; tipoOficial: number }[]
+}
+
 export interface Notification {
   id: string
   type: 'error' | 'warning' | 'info'
   category: string
   message: string
   count?: number
+}
+
+/** Aviso con su estado según las preferencias (#447): silenciado por categoría o descartado. */
+export interface NotificationWithState extends Notification {
+  categoryKey: NotificationCategory | null
+  muted: boolean
+  dismissed: boolean
 }
 
 export const portfolioApi = {
@@ -528,6 +715,10 @@ export const portfolioApi = {
   getAssets: () => api.get<AssetMetadata[]>('/settings/assets'),
   createAsset: (data: Partial<AssetMetadata>) => api.post<{ success: boolean; symbol: string }>('/settings/assets', data),
   updateAsset: (symbol: string, data: Partial<AssetMetadata>) => api.put<{ success: boolean }>(`/settings/assets/${symbol}`, data),
+  // Corrige el logo (#449): id de CoinGecko solo para el logo; null vuelve al automático.
+  // Reintenta los precios de CoinGecko y del respaldo (#450); 429 si se repite antes de un minuto.
+  retryPrices: () => api.post<{ success: boolean }>('/settings/assets/retry-prices', {}),
+  setAssetIconId: (symbol: string, id: string | null) => api.put<{ success: boolean }>(`/settings/assets/${encodeURIComponent(symbol)}/icon-id`, { id }),
   deleteAsset: (symbol: string) => api.delete<{ success: boolean }>(`/settings/assets/${symbol}`),
   detectPairs: (symbol: string) => api.post<AssetMetadata>(`/settings/assets/${symbol}/detect`, {}),
   detectAllPairs: () => api.post<{ detected: number; failed: number; total: number }>('/settings/assets/detect-all', {}),
@@ -548,6 +739,15 @@ export const portfolioApi = {
     api.put<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>(`/transactions/${id}`, data),
   deleteManualTx: (id: string) =>
     api.delete<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>(`/transactions/${id}`),
+  /** Saldo corrido de un activo (#380) para las filas `ids` de la página. */
+  getRunningBalance: (params: { asset: string; wallet_id?: string; ids: string[]; group_fees: boolean }) => {
+    const qs = new URLSearchParams({ asset: params.asset, ids: params.ids.join(','), group_fees: String(params.group_fees) })
+    if (params.wallet_id) qs.set('wallet_id', params.wallet_id)
+    return api.get<RunningBalance>(`/v1/historial/saldos?${qs.toString()}`)
+  },
+  /** Devuelve una importada editada a sus valores importados (#378). */
+  restoreTransaction: (id: string) =>
+    api.post<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>(`/v1/transactions/${encodeURIComponent(id)}/restaurar`, {}),
   getTransactions: (params?: Record<string, string | undefined>, currency: Currency = 'EUR') => {
     const filtered = params
       ? Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][])
@@ -556,24 +756,24 @@ export const portfolioApi = {
     const qs = Object.keys(filtered).length ? '?' + new URLSearchParams(filtered).toString() : ''
     return api.get<{
       transactions: Transaction[]; total: number; flows: TransactionFlows; limit: number; offset: number
+      /** Si las comisiones van agrupadas con su operación (#371). */
+      grouped_fees?: boolean
       currency?: Currency
     }>(`/transactions${qs}`)
   },
   getTransactionFacets: () => api.get<TransactionFacets>('/transactions/facets'),
-  getTransactionStats: (currency: Currency = 'EUR') => api.get<{
-    currency?: Currency
-    totals: {
-      total_ops: number; unique_assets: number; total_invested: number; total_fiat_buys: number
-      total_fee_ops: number; total_fees_eur: number; fees_sin_valor: number
-      total_buys: number; total_sells: number; total_sold: number; total_manual: number
-    }
-    monthly: {
-      mes: string; total_ops: number; compras: number; ventas: number; otras_salidas: number
-      ingresos: number; transferencias: number; eur_invertido: number
-    }[]
-    topAssets: { asset: string; ops: number; eur_volume: number }[]
-    fees: { asset: string; ops: number; total_amount: number; total_eur: number }[]
-  }>(`/transactions/stats?currency=${currency}`),
+  // Detalle con trazabilidad de una transacción (#373).
+  getTransactionDetail: (id: string) => api.get<TransactionDetail>(`/v1/transactions/${encodeURIComponent(id)}/detalle`),
+  // Vistas guardadas del Historial (#369).
+  getSavedViews: () => api.get<{ vistas: SavedView[] }>('/v1/historial/vistas'),
+  createSavedView: (body: { nombre: string; predeterminada: boolean; filtros: Record<string, string>; sustituir?: boolean }) =>
+    api.post<{ vista: SavedView; sustituida: boolean }>('/v1/historial/vistas', body),
+  updateSavedView: (id: string, body: { nombre?: string; predeterminada?: boolean; filtros?: Record<string, string> }) =>
+    api.put<{ vista: SavedView }>(`/v1/historial/vistas/${encodeURIComponent(id)}`, body),
+  deleteSavedView: (id: string) => api.delete<void>(`/v1/historial/vistas/${encodeURIComponent(id)}`),
+  /** Estadísticas del Historial sobre lo filtrado (#376): mismos parámetros que la lista, sin paginación. */
+  getHistoryStats: (params: Record<string, string>) =>
+    api.get<HistoryStats>(`/v1/historial/estadisticas?${new URLSearchParams(params).toString()}`),
   getWallets: () => api.get<Wallet[]>('/wallets'),
   getWalletsFull: () => api.get<WalletFull[]>('/wallets'),
   getCatalog: () => api.get<CatalogData>('/catalog'),
@@ -586,7 +786,10 @@ export const portfolioApi = {
     address: string
   }) => api.post<{ wallet: { id: string; name: string; color: string }; addressId: string }>('/wallets/link-address', data),
   createWallet: (data: Record<string, unknown>) => api.post<{ id: string }>('/wallets', data),
-  updateWallet: (id: string, data: Record<string, unknown>) => api.put<{ success: boolean }>(`/wallets/${id}`, data),
+  // Solo se cambian los campos enviados (#448); notes: null las vacía.
+  updateWallet: (id: string, data: { name: string; type?: string; color?: string; notes?: string | null }) => api.put<{ success: boolean }>(`/wallets/${id}`, data),
+  // Uso de cada wallet para Ajustes (#448): operaciones y última actividad.
+  getWalletSummary: () => api.get<{ wallet_id: string; operations: number; last_activity: string | null }[]>('/wallets/summary'),
   deleteWallet: (id: string) => api.delete<{ success: boolean }>(`/wallets/${id}`),
   createAddress: (walletId: string, data: Record<string, unknown>) => api.post<{ id: string }>(`/wallets/${walletId}/addresses`, data),
   updateAddress: (walletId: string, addressId: string, data: Record<string, unknown>) => api.put<{ success: boolean }>(`/wallets/${walletId}/addresses/${addressId}`, data),
@@ -601,12 +804,15 @@ export const portfolioApi = {
     api.put<{ success: boolean }>(`/wallets/networks/${networkId}/api-key`, { api_key: apiKey }),
   deleteNetworkApiKey: (networkId: string) =>
     api.delete<{ success: boolean }>(`/wallets/networks/${networkId}/api-key`),
-  exportBackup: () => api.get<Record<string, unknown>>('/settings/backup'),
   getConfig: () => api.get<Record<string, string>>('/settings/config'),
+  /** Zona horaria efectiva (#388, #390): zona, origen y ajuste guardado inválido. */
+  getTimezone: () => api.get<TimezoneInfo>('/settings/timezone'),
   setConfig: (key: string, value: string) => api.put<{ success: boolean }>('/settings/config', { key, value }),
   getStats: () => api.get<{
     transactions: number; fifoLots: number; imports: number
     priceCache: number; wallets: number; assets: number
+    /** Salud (#454): tamaño en disco y fechas ISO de lo último hecho, o null. */
+    dbSizeBytes: number; lastImportAt: string | null; lastFifoAt: string | null; lastBackupAt: string | null
   }>('/settings/stats'),
   // El backend exige { confirm: true } en estos dos borrados destructivos de
   // alcance amplio (ver routes/settings/settingsShared.ts, requireConfirm) —
@@ -643,6 +849,14 @@ export const portfolioApi = {
     netInvested: number
   }>(`/fifo/eur-flow?currency=${currency}`),
   getNotifications: () => api.get<Notification[]>('/settings/notifications'),
+  // Escala del ahorro por ejercicio (#452): la oficial del año y los tipos cambiados a mano.
+  getEscala: (year: number) => api.get<EscalaAhorro>(`/fiscal/escalas/${year}`),
+  setEscala: (year: number, tipos: number[]) => api.put<EscalaAhorro>(`/fiscal/escalas/${year}`, { tipos }),
+  resetEscala: (year: number) => api.delete<EscalaAhorro>(`/fiscal/escalas/${year}`),
+  // Todos los avisos con su estado, para el resumen por categoría de Ajustes (#447).
+  getAllNotifications: () => api.get<NotificationWithState[]>('/settings/notifications?incluir=todas'),
+  // Descartar hasta que cambie su contenido (#447); sin ids, todos los visibles.
+  dismissNotifications: (ids?: string[]) => api.post<{ dismissed: number }>('/settings/notifications/dismiss', ids ? { ids } : {}),
   // Cobertura temporal de las importaciones y revisiones de huecos (#328).
   getCobertura: () => api.get<CoberturaExchange[]>('/imports/cobertura'),
   revisarCobertura: (data: { exchange: 'binance' | 'bitvavo'; tipo: 'hueco' | 'pendiente'; desde: string; hasta: string }) =>

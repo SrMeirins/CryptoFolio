@@ -63,9 +63,9 @@ export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; on
           className={fieldClasses('md', false, 'flex-1 font-mono')}
         />
         <button type="button" onClick={handleTest} disabled={testing || !geckoId.trim()}
-          title="Verificar que este ID devuelve precio en CoinGecko"
+          title="Verificar que este ID devuelve precio en CoinGecko" aria-label="Verificar el id de CoinGecko"
           className="px-3 py-2 bg-background-tertiary hover:bg-border disabled:opacity-50 rounded-lg text-sm transition-colors">
-          {testing ? <RefreshCw size={13} className="animate-spin" /> : <Search size={13} />}
+          {testing ? <RefreshCw size={13} aria-hidden="true" className="animate-spin" /> : <Search size={13} aria-hidden="true" />}
         </button>
         {isDirty && (
           <button type="button" onClick={handleSave} disabled={saving || !geckoId.trim()}
@@ -77,7 +77,7 @@ export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; on
       {testResult && (
         <div className={`flex items-center gap-2 text-xs ${testResult.valid ? 'text-positive' : 'text-negative'}`}>
           {testResult.valid
-            ? <><CheckCircle size={12} /> Válido — precio actual: <span className="mono font-medium">{formatNumber(testResult.price_eur ?? 0, 6, 6)} EUR</span></>
+            ? <><CheckCircle size={12} /> Válido, precio actual: <span className="mono font-medium">{formatNumber(testResult.price_eur ?? 0, 6, 6)} EUR</span></>
             : <><XCircle size={12} /> Este ID no devuelve precio en CoinGecko</>
           }
         </div>

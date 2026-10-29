@@ -1,4 +1,5 @@
 import { formatMoney, type Currency } from './format'
+import { timezoneLabel } from './timezoneLabel'
 
 // Chip de variación con su ventana de tiempo visible (#247): «Hoy» (desde las
 // 00:00 de Madrid, sin depósitos ni retiradas; la cifra del calendario) frente
@@ -13,7 +14,8 @@ export const WINDOW_LABELS: Record<ChipWindow, { label: string; title: string; h
   today: {
     label: 'Hoy',
     title: 'P&L de hoy',
-    help: 'Desde las 00:00 (hora de Madrid), sin contar depósitos ni retiradas. Es la misma cifra que el día de hoy del calendario.',
+    // Getter: el texto sigue la zona actual de la aplicación (#390).
+    get help() { return `Desde las 00:00 (${timezoneLabel()}), sin contar depósitos ni retiradas. Es la misma cifra que el día de hoy del calendario.` },
   },
   '24h': {
     label: '24 h',

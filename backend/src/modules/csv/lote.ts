@@ -29,6 +29,8 @@ export interface ArchivoLote {
   duplicadas: number;
   /** Repetidas en un archivo anterior del mismo lote (exportaciones solapadas). */
   repetidasEnLote: number;
+  /** Filas ya importadas sin su fila original que el archivo puede completar (#374). */
+  faltanOriginales: number;
   rango: { from: string; to: string } | null;
 }
 
@@ -85,6 +87,7 @@ export function combinarVistasPrevias(vistas: readonly VistaArchivo[]): PreviewL
             : repetidas > 0 ? 'Todo está en otro archivo del lote o ya importado' : 'Ya importado, nada nuevo')
           : null,
       nuevas, duplicadas: r.duplicateCount, repetidasEnLote: repetidas, rango: r.validation.dateRange,
+      faltanOriginales: r.originalRowsMissing ?? 0,
     });
 
     if (!reconocido) { validation.errors.push(...r.validation.errors.map(e => conNombre(v.nombre, e))); return; }
@@ -122,5 +125,6 @@ export function combinarVistasPrevias(vistas: readonly VistaArchivo[]): PreviewL
     retiradas,
     archivos,
     repetidasEnLote: archivos.reduce((s, a) => s + a.repetidasEnLote, 0),
+    originalRowsMissing: archivos.reduce((s, a) => s + a.faltanOriginales, 0),
   };
 }

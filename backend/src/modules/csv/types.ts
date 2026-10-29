@@ -69,12 +69,17 @@ export interface ParsedTransaction {
   // Fees
   feeAsset?: string;
   feeAmount?: number;    // Siempre positivo
+  /** Comisión que el exchange ya incluye en costAmount (#415): solo informativa. */
+  includedFeeAsset?: string;
+  includedFeeAmount?: number;
   // Meta
   account: string;
   notes?: string;
   subTradeCount: number;
   rawRowHashes: string[];
   needsCostReview?: boolean;  // depósito externo: coste de adquisición desconocido
+  /** Compra con fiat cuya fila de pago no está en el CSV (#435): coste a revisar, nunca rendimiento. */
+  orphanFiatBuy?: boolean;
 }
 
 // Lo que devuelve el parser completo

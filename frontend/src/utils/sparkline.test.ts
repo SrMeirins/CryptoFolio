@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sparklineChange, sparklinePoints, valueSparkline } from './sparkline'
+import { pnlSparkline, returnSparkline, sparklineChange, sparklinePoints, valueSparkline } from './sparkline'
 
 // Mini-gráfico de la tarjeta «Valor» (#251).
 const day = (i: number, value: number, live = false) => ({ date: `2026-01-${String(i).padStart(2, '0')}`, value, live })
@@ -31,5 +31,25 @@ describe('sparklineChange', () => {
     expect(sparklineChange([100, 90, 110])).toBeCloseTo(10, 9)
     expect(sparklineChange([0, 5])).toBeNull()
     expect(sparklineChange([5])).toBeNull()
+  })
+})
+
+describe('mini gráficas de P&L y rentabilidad (#412)', () => {
+  it('P&L: se reconstruye hacia atrás y la punta es la cifra actual', () => {
+    expect(pnlSparkline([{ pnl: 10 }, { pnl: -5 }, { pnl: 20 }], 100)).toEqual([85, 80, 100])
+  })
+
+  it('P&L: solo los últimos días y nada sin cifra actual', () => {
+    const series = Array.from({ length: 40 }, () => ({ pnl: 1 }))
+    const out = pnlSparkline(series, 50)
+    expect(out).toHaveLength(30)
+    expect(out[29]).toBe(50)
+    expect(out[0]).toBe(21)
+    expect(pnlSparkline(series, null)).toEqual([])
+  })
+
+  it('rentabilidad: la acumulada de los últimos días', () => {
+    const series = Array.from({ length: 35 }, (_, i) => ({ cumulativePct: i }))
+    expect(returnSparkline(series)).toEqual(Array.from({ length: 30 }, (_, i) => i + 5))
   })
 })

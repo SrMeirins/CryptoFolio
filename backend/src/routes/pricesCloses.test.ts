@@ -16,8 +16,8 @@ describe('GET /api/v1/prices/closes', () => {
     // Cierres de los últimos 10 días para XRP y uno antiguo; ADA sin cierres.
     for (let i = 0; i < 10; i++) {
       await pool.query(
-        `INSERT INTO price_close_madrid (asset, close_date, price_eur, source)
-         VALUES ('XRP', (NOW() AT TIME ZONE 'Europe/Madrid')::date - $1::int, $2, 'binance_1h')`, [i, 1 + i / 10],
+        `INSERT INTO price_close_daily (asset, timezone, close_date, price_eur, source)
+         VALUES ('XRP', 'Europe/Madrid', (NOW() AT TIME ZONE 'Europe/Madrid')::date - $1::int, $2, 'binance_1h')`, [i, 1 + i / 10],
       );
     }
     app = (await import('../app')).default;

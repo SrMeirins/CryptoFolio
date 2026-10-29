@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../../db/client';
-import { MADRID_TZ } from '../../modules/fiscal/madridTime';
+import { getAppTimezone } from '../../modules/time/appTimezone';
 import { hasFilters, historyExportSchema } from '../../modules/history/listFilters';
 import { historyRowsSql } from '../../modules/history/historyQuery';
 import { CSV_BOM, HISTORY_CSV_HEADER, HistoryCsvRow, historyCsvFilename, historyCsvLine } from '../../modules/history/csvFormat';
@@ -9,8 +9,6 @@ import { sendZodError } from './transactionsShared';
 
 const router = Router();
 
-// Zona de las fechas del CSV y del nombre del archivo (la sustituirá #347).
-const EXPORT_TZ = MADRID_TZ;
 export const EXPORT_BATCH = 1000;
 // Tiempos límite de la transacción de exportación (fallo seguro): una consulta
 // atascada o un cliente que deja de leer no retienen la conexión indefinidamente.
@@ -23,10 +21,11 @@ const IDLE_IN_TX_TIMEOUT_MS = 120_000;
 // valoración se calcula una vez, la memoria queda acotada a un lote y el
 // resultado es coherente aunque cambien los datos durante la descarga.
 router.get('/export.csv', async (req: Request, res: Response) => {
+  const tz = await getAppTimezone(pool);
   const parsed = historyExportSchema.safeParse(req.query);
   if (!parsed.success) { sendZodError(res, parsed.error); return; }
   const filters = parsed.data;
-  const { sql, params } = historyRowsSql(filters, EXPORT_TZ);
+  const { sql, params } = historyRowsSql(filters, tz);
 
   const client = await pool.connect();
   let aborted = false;
@@ -38,7 +37,7 @@ router.get('/export.csv', async (req: Request, res: Response) => {
     await client.query(`DECLARE historial_csv NO SCROLL CURSOR FOR ${sql}`, params);
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${historyCsvFilename(new Date(), EXPORT_TZ, hasFilters(filters))}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${historyCsvFilename(new Date(), tz, hasFilters(filters))}"`);
     res.setHeader('Cache-Control', 'no-store');
     res.write(`${CSV_BOM}${HISTORY_CSV_HEADER}\n`);
 
@@ -46,7 +45,7 @@ router.get('/export.csv', async (req: Request, res: Response) => {
       if (aborted) break;
       const batch = await client.query<HistoryCsvRow>(`FETCH ${EXPORT_BATCH} FROM historial_csv`);
       if (batch.rows.length === 0) break;
-      const chunk = batch.rows.map(r => historyCsvLine(r, EXPORT_TZ)).join('\n') + '\n';
+      const chunk = batch.rows.map(r => historyCsvLine(r, tz)).join('\n') + '\n';
       // Respeta la contrapresión: espera a que el cliente consuma el lote, o a
       // que se desconecte (en ese caso se deja de leer y se libera la conexión).
       if (!res.write(chunk) && !(await waitForDrain(res))) aborted = true;

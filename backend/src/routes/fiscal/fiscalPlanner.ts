@@ -3,11 +3,12 @@ import { z } from 'zod';
 import { db } from '../../db/client';
 import { FIFO_DUST_EPSILON } from '../../modules/fifo/constants';
 import { cargarAniosFiscales, compensarPerdidas } from '../../modules/fiscal/carryforward';
-import { parseTiposConfig } from '../../modules/fiscal/irpf';
-import { madridYearMonth } from '../../modules/fiscal/madridTime';
+import { escalaDe } from '../../modules/fiscal/escalasAhorro';
 import { colchonSinTributar, cuotaConExtra } from '../../modules/fiscal/planificador';
 import { sendZodError } from './fiscalShared';
 import { sendInternalError } from '../../middleware/errorHandler';
+import { localYearMonth } from '../../modules/time/localTime';
+import { getAppTimezone } from '../../modules/time/appTimezone';
 
 // Planificador de fin de año (#307). El contexto fiscal del ejercicio en
 // curso y los lotes abiertos en orden FIFO; el navegador los valora con los
@@ -16,9 +17,11 @@ import { sendInternalError } from '../../middleware/errorHandler';
 const router = Router();
 
 async function contexto() {
-  const year = madridYearMonth().year;
+  const tz = await getAppTimezone(db);
+  const year = localYearMonth(tz).year;
   const anios = await cargarAniosFiscales(year);
-  const tipos = parseTiposConfig((await db.query("SELECT value FROM app_config WHERE key = 'irpf_tramos_tipos'")).rows[0]?.value);
+  // Escala del ejercicio en curso (#452), con los tipos cambiados a mano si los hay.
+  const tipos = await escalaDe(db, year);
   return { year, anios, tipos };
 }
 
@@ -61,9 +64,9 @@ router.get('/planificador', async (_req: Request, res: Response) => {
   }
 });
 
-const cuotasSchema = z.object({
-  ganancias: z.array(z.number().finite().min(-1e9).max(1e9)).min(1).max(200),
-}).strict();
+const cuotasSchema = z.strictObject({
+  ganancias: z.array(z.number().min(-1e9).max(1e9)).min(1).max(200),
+});
 
 // POST /api/fiscal/planificador/cuotas — cuota del año con cada ganancia (o pérdida) adicional
 router.post('/planificador/cuotas', async (req: Request, res: Response) => {

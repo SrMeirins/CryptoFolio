@@ -1,4 +1,5 @@
-import { heatBackground } from '../../../utils/topMovers'
+import type { CSSProperties } from 'react'
+import { heatVars } from '../../../utils/topMovers'
 import { legendScale, legendSteps, stepLabel } from '../../../utils/calendarLegend'
 import { InfoTooltip } from '../../../components/InfoTooltip'
 import type { Currency } from '../../../utils/format'
@@ -18,9 +19,10 @@ export function CalendarLegend({ maxAbs, currency }: { maxAbs: number; currency:
         <span aria-hidden="true">Pérdida</span>
         <span aria-hidden="true" className="flex items-center gap-0.5">
           {steps.map(value => (
+            // Con el mismo marco de intensidad que las celdas (#412).
             <span key={value} title={stepLabel(value, currency)}
-              className={`size-3 rounded-[3px] ${value === 0 ? 'border border-border mx-1' : ''}`}
-              style={{ background: value === 0 ? 'var(--cf-bg-tertiary)' : heatBackground(value, maxAbs) }} />
+              className={`size-3 rounded-[3px] ${value === 0 ? 'border border-border mx-1 bg-background-card' : 'heat-swatch'}`}
+              style={value === 0 ? undefined : heatVars(value, maxAbs) as CSSProperties} />
           ))}
         </span>
         <span aria-hidden="true">Ganancia</span>

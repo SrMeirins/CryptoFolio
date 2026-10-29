@@ -6,22 +6,23 @@ import { fetchWithTimeout } from './httpTimeout';
 import { dedupeByKey } from './priceDedup';
 import { PRICE_ALIASES } from './priceAliases';
 
-// Precio de cierre de cada día a las 00:00 Europe/Madrid (#164), base del
-// P&L diario (#154). El cierre del día D es el precio en el instante en que
-// empieza D+1 en Madrid (22:00 o 23:00 UTC de D según el horario).
+// Precio de cierre de cada día a las 00:00 locales de la zona de la aplicación
+// (#164, #389), base del P&L diario (#154). El cierre del día D es el precio en
+// el instante en que empieza D+1 en esa zona (en Madrid, 22:00 o 23:00 UTC de D
+// según el horario). Con desfases de media hora (p. ej. Asia/Kolkata) la vela
+// horaria más próxima aproxima el cierre en menos de 30 minutos.
 //
 // Fuentes, en orden:
 // 1. Vela horaria de Binance que termina en ese instante, con la cascada de
 //    pares EUR > USDT > BTC > ETH. USDT se convierte con la vela de EURUSDT
 //    de la misma hora; BTC/ETH, con su propio cierre en EUR.
 // 2. Respaldo CoinGecko: precio diario (00:00 UTC) de D+1, el más cercano a
-//    la medianoche de Madrid (1-2 h de diferencia).
-// Se guarda en price_close_madrid una sola vez por (activo, día). Sin precio
+//    la medianoche local (pocas horas de diferencia).
+// Se guarda en price_close_daily una sola vez por (activo, zona, día). Sin precio
 // en ninguna fuente se guarda la marca -1 para no reintentar. Los fallos
 // transitorios (red, 5xx, 429 agotados) lanzan error y no dejan marca.
 
 const REST_BASE = 'https://api.binance.com/api/v3';
-const TIMEZONE = 'Europe/Madrid';
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_429_RETRIES = 3;
@@ -52,33 +53,46 @@ function parseDay(day: string): { y: number; m: number; d: number } {
   return { y, m, d };
 }
 
-// Formateadores creados una sola vez (#183): construir un Intl.DateTimeFormat
-// es caro y estas funciones se llaman miles de veces por petición del P&L
-// diario (dos por cada día del histórico). Eran ~80 % de su tiempo de cálculo.
-const offsetFormatter = new Intl.DateTimeFormat('en-US', {
-  timeZone: TIMEZONE, hourCycle: 'h23',
-  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
-});
-const dateFormatter = new Intl.DateTimeFormat('en-CA', {
-  timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit',
-});
+// Formateadores creados una sola vez por zona (#183): construir un
+// Intl.DateTimeFormat es caro y estas funciones se llaman miles de veces por
+// petición del P&L diario (dos por cada día del histórico).
+const offsetFormatters = new Map<string, Intl.DateTimeFormat>();
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
+function offsetFormatter(tz: string): Intl.DateTimeFormat {
+  let f = offsetFormatters.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hourCycle: 'h23',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+    offsetFormatters.set(tz, f);
+  }
+  return f;
+}
+function dateFormatter(tz: string): Intl.DateTimeFormat {
+  let f = dateFormatters.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+    dateFormatters.set(tz, f);
+  }
+  return f;
+}
 
-// Minutos que la hora de Madrid adelanta a UTC en un instante dado (60 o 120).
-function madridOffsetMinutes(instantMs: number): number {
-  const parts = offsetFormatter.formatToParts(new Date(instantMs));
+// Minutos que la hora local de la zona adelanta a UTC en un instante dado.
+function offsetMinutes(tz: string, instantMs: number): number {
+  const parts = offsetFormatter(tz).formatToParts(new Date(instantMs));
   const get = (type: string) => Number(parts.find(p => p.type === type)?.value);
   const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
   return Math.round((asUtc - instantMs) / 60_000);
 }
 
-// Instante UTC en que empieza el día local `day` en Madrid. La medianoche
-// nunca cae en el salto horario (que ocurre a las 02:00/03:00), así que el
-// desfase es único; se recalcula una vez para afinar alrededor del cambio.
-function madridMidnightMs(day: string): number {
+// Instante UTC en que empieza el día local `day` en la zona. Se recalcula una
+// vez para afinar alrededor de un cambio de hora.
+function localMidnightMs(tz: string, day: string): number {
   const { y, m, d } = parseDay(day);
   const naive = Date.UTC(y, m - 1, d);
-  const guess = naive - madridOffsetMinutes(naive) * 60_000;
-  return naive - madridOffsetMinutes(guess) * 60_000;
+  const guess = naive - offsetMinutes(tz, naive) * 60_000;
+  return naive - offsetMinutes(tz, guess) * 60_000;
 }
 
 function nextDay(day: string): string {
@@ -86,14 +100,14 @@ function nextDay(day: string): string {
   return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
 }
 
-/** Instante de cierre del día local `day`: las 00:00 de Madrid del día siguiente. */
-export function madridCloseInstant(day: string): Date {
-  return new Date(madridMidnightMs(nextDay(day)));
+/** Instante de cierre del día local `day`: las 00:00 locales del día siguiente en la zona. */
+export function closeInstant(tz: string, day: string): Date {
+  return new Date(localMidnightMs(tz, nextDay(day)));
 }
 
-/** Día local (YYYY-MM-DD) en Madrid de un instante. */
-export function madridDateOf(instantMs: number): string {
-  const parts = dateFormatter.formatToParts(new Date(instantMs));
+/** Día local (YYYY-MM-DD) de un instante en la zona. */
+export function localDateOf(tz: string, instantMs: number): string {
+  const parts = dateFormatter(tz).formatToParts(new Date(instantMs));
   const get = (type: string) => parts.find(p => p.type === type)?.value;
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
@@ -146,12 +160,12 @@ async function hourlyClose(pair: string, closeMs: number): Promise<number | null
   return close > 0 ? close : null;
 }
 
-// Cierres a las 00:00 de Madrid de una lista de días a partir de una serie de
+// Cierres a las 00:00 locales de una lista de días a partir de una serie de
 // velas horarias, pidiendo bloques de hasta 1000 h (~41 días) por petición.
-async function hourlyClosesForDays(pair: string, days: readonly string[]): Promise<Map<string, number>> {
+async function hourlyClosesForDays(pair: string, days: readonly string[], tz: string): Promise<Map<string, number>> {
   const result = new Map<string, number>();
   if (days.length === 0) return result;
-  const wanted = new Map(days.map(d => [madridCloseInstant(d).getTime() - HOUR_MS, d])); // apertura de la vela → día
+  const wanted = new Map(days.map(d => [closeInstant(tz, d).getTime() - HOUR_MS, d])); // apertura de la vela: día
   const opens = [...wanted.keys()].sort((a, b) => a - b);
   let cursor = opens[0];
   const last = opens[opens.length - 1];
@@ -171,7 +185,7 @@ async function hourlyClosesForDays(pair: string, days: readonly string[]): Promi
   return result;
 }
 
-async function binanceClose(asset: string, day: string, closeMs: number): Promise<number | null> {
+async function binanceClose(asset: string, day: string, closeMs: number, tz: string): Promise<number | null> {
   // USDT no tiene par USDTEUR: su precio en EUR es el inverso de EURUSDT.
   if (asset === 'USDT') {
     const eurusdt = await hourlyClose(EURUSDT_PAIR, closeMs);
@@ -188,11 +202,11 @@ async function binanceClose(asset: string, day: string, closeMs: number): Promis
     if (p && eurusdt) return p / eurusdt;
   }
   if (info.binanceBtcPair) {
-    const [p, btcEur] = await Promise.all([hourlyClose(info.binanceBtcPair, closeMs), getClosePriceEur('BTC', day)]);
+    const [p, btcEur] = await Promise.all([hourlyClose(info.binanceBtcPair, closeMs), getClosePriceEur('BTC', day, tz)]);
     if (p && btcEur) return p * btcEur;
   }
   if (info.binanceEthPair) {
-    const [p, ethEur] = await Promise.all([hourlyClose(info.binanceEthPair, closeMs), getClosePriceEur('ETH', day)]);
+    const [p, ethEur] = await Promise.all([hourlyClose(info.binanceEthPair, closeMs), getClosePriceEur('ETH', day, tz)]);
     if (p && ethEur) return p * ethEur;
   }
   return null;
@@ -203,29 +217,29 @@ async function binanceClose(asset: string, day: string, closeMs: number): Promis
 const inFlight = new Map<string, Promise<number | null>>();
 
 /**
- * Precio en EUR de `asset` al cierre del día local `day` (00:00 de Madrid del
- * día siguiente). null si no hay precio en ninguna fuente o el día aún no ha
- * cerrado.
+ * Precio en EUR de `asset` al cierre del día local `day` en la zona `tz` (00:00
+ * locales del día siguiente). null si no hay precio en ninguna fuente o el día
+ * aún no ha cerrado.
  */
-export function getClosePriceEur(asset: string, day: string): Promise<number | null> {
-  if (PRICE_ALIASES[asset]) return getClosePriceEur(PRICE_ALIASES[asset], day);
+export function getClosePriceEur(asset: string, day: string, tz: string): Promise<number | null> {
+  if (PRICE_ALIASES[asset]) return getClosePriceEur(PRICE_ALIASES[asset], day, tz);
   if (asset === 'EUR') return Promise.resolve(1);
-  const closeMs = madridCloseInstant(day).getTime();
+  const closeMs = closeInstant(tz, day).getTime();
   if (closeMs > Date.now()) return Promise.resolve(null); // día no cerrado: no se cachea
-  return dedupeByKey(inFlight, `${asset}|${day}`, () => resolveClose(asset, day, closeMs));
+  return dedupeByKey(inFlight, `${asset}|${tz}|${day}`, () => resolveClose(asset, day, closeMs, tz));
 }
 
-async function resolveClose(asset: string, day: string, closeMs: number): Promise<number | null> {
+async function resolveClose(asset: string, day: string, closeMs: number, tz: string): Promise<number | null> {
   const cached = await db.query(
-    'SELECT price_eur FROM price_close_madrid WHERE asset = $1 AND close_date = $2',
-    [asset, day],
+    'SELECT price_eur FROM price_close_daily WHERE asset = $1 AND timezone = $2 AND close_date = $3',
+    [asset, tz, day],
   );
   if (cached.rows.length > 0) {
     const price = parseFloat(cached.rows[0].price_eur);
     return price > 0 ? price : null;
   }
 
-  let price = await binanceClose(asset, day, closeMs);
+  let price = await binanceClose(asset, day, closeMs, tz);
   let source: CloseSource = 'binance_1h';
 
   if (price === null && withinCoinGeckoHistory(day)) {
@@ -238,17 +252,17 @@ async function resolveClose(asset: string, day: string, closeMs: number): Promis
   // fallo de red lanza y no deja marca: se reintentará.
   // USDT queda fuera: es la propia conversión y se esperaría a sí mismo.
   if (price === null && asset !== 'USDT') {
-    const r = await precioDiaRespaldo(asset, nextDay(day), async () => getClosePriceEur('USDT', day));
+    const r = await precioDiaRespaldo(asset, nextDay(day), async () => getClosePriceEur('USDT', day, tz));
     if (r) { price = r.precio; source = r.fuente === 'okx' ? 'okx_1d' : 'coinpaprika_daily'; }
   }
   if (price === null) source = 'none';
 
   await db.query(
-    `INSERT INTO price_close_madrid (asset, close_date, price_eur, source)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (asset, close_date) DO UPDATE
+    `INSERT INTO price_close_daily (asset, timezone, close_date, price_eur, source)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (asset, timezone, close_date) DO UPDATE
        SET price_eur = EXCLUDED.price_eur, source = EXCLUDED.source, fetched_at = NOW()`,
-    [asset, day, price ?? -1, source],
+    [asset, tz, day, price ?? -1, source],
   );
   return price;
 }
@@ -258,13 +272,13 @@ async function resolveClose(asset: string, day: string, closeMs: number): Promis
  * por debajo del límite de Binance). Los errores de un elemento se registran
  * y no detienen el resto.
  */
-export async function prefetchClosePrices(items: ReadonlyArray<{ asset: string; day: string }>): Promise<void> {
+export async function prefetchClosePrices(items: ReadonlyArray<{ asset: string; day: string }>, tz: string): Promise<void> {
   const CONCURRENCY = 5;
   const BATCH_DELAY_MS = 600;
   for (let i = 0; i < items.length; i += CONCURRENCY) {
     const batch = items.slice(i, i + CONCURRENCY);
     await Promise.all(batch.map(({ asset, day }) =>
-      getClosePriceEur(asset, day).catch(e =>
+      getClosePriceEur(asset, day, tz).catch(e =>
         console.error(`[PRICES] Cierre ${asset} ${day} no disponible:`, (e as Error).message))));
     if (i + CONCURRENCY < items.length) await sleep(BATCH_DELAY_MS);
   }
@@ -280,14 +294,15 @@ export async function getCachedCloses(
   assets: readonly string[],
   fromDay: string,
   toDay: string,
+  tz: string,
 ): Promise<Map<string, Map<string, number>>> {
   const result = new Map<string, Map<string, number>>();
   if (assets.length === 0) return result;
   const res = await db.query(
     `SELECT asset, to_char(close_date, 'YYYY-MM-DD') AS day, price_eur::float AS price
-     FROM price_close_madrid
-     WHERE asset = ANY($1) AND close_date BETWEEN $2 AND $3`,
-    [[...assets], fromDay, toDay],
+     FROM price_close_daily
+     WHERE asset = ANY($1) AND timezone = $4 AND close_date BETWEEN $2 AND $3`,
+    [[...assets], fromDay, toDay, tz],
   );
   for (const r of res.rows as { asset: string; day: string; price: number }[]) {
     if (!result.has(r.asset)) result.set(r.asset, new Map());
@@ -302,32 +317,32 @@ export async function getCachedCloses(
  * EURUSDT) en bloques de 1000 h; los días que no se resuelvan así siguen el
  * camino individual (pares BTC/ETH, CoinGecko, marca de sin precio).
  */
-export async function prefetchCloseRange(asset: string, fromDay: string, toDay: string): Promise<void> {
+export async function prefetchCloseRange(asset: string, fromDay: string, toDay: string, tz: string): Promise<void> {
   const target = PRICE_ALIASES[asset] ?? asset;
   if (target === 'EUR') return;
-  const lastClosed = madridDateOf(Date.now() - 24 * HOUR_MS);
+  const lastClosed = localDateOf(tz, Date.now() - 24 * HOUR_MS);
   const to = toDay < lastClosed ? toDay : lastClosed;
   if (fromDay > to) return;
 
-  const cached = (await getCachedCloses([target], fromDay, to)).get(target) ?? new Map();
+  const cached = (await getCachedCloses([target], fromDay, to, tz)).get(target) ?? new Map();
   let missing = daysBetween(fromDay, to).filter(d => !cached.has(d));
   if (missing.length === 0) return;
 
   const found = new Map<string, number>();
   if (target === 'USDT') {
-    for (const [d, p] of await hourlyClosesForDays(EURUSDT_PAIR, missing)) found.set(d, 1 / p);
+    for (const [d, p] of await hourlyClosesForDays(EURUSDT_PAIR, missing, tz)) found.set(d, 1 / p);
   }
   const info = target === 'USDT'
     ? { binanceEurPair: null, binanceUsdtPair: null, binanceBtcPair: null, binanceEthPair: null }
     : await getOrDetectPairInfo(target);
   if (info.binanceEurPair) {
-    for (const [d, p] of await hourlyClosesForDays(info.binanceEurPair, missing)) found.set(d, p);
+    for (const [d, p] of await hourlyClosesForDays(info.binanceEurPair, missing, tz)) found.set(d, p);
   }
   const stillMissing = missing.filter(d => !found.has(d));
   if (info.binanceUsdtPair && stillMissing.length > 0) {
     const [series, eurusdt] = await Promise.all([
-      hourlyClosesForDays(info.binanceUsdtPair, stillMissing),
-      hourlyClosesForDays(EURUSDT_PAIR, stillMissing),
+      hourlyClosesForDays(info.binanceUsdtPair, stillMissing, tz),
+      hourlyClosesForDays(EURUSDT_PAIR, stillMissing, tz),
     ]);
     for (const [d, p] of series) {
       const rate = eurusdt.get(d);
@@ -338,10 +353,10 @@ export async function prefetchCloseRange(asset: string, fromDay: string, toDay: 
   if (found.size > 0) {
     const days = [...found.keys()];
     await db.query(
-      `INSERT INTO price_close_madrid (asset, close_date, price_eur, source)
-       SELECT $1, d, p, 'binance_1h' FROM unnest($2::date[], $3::numeric[]) AS x(d, p)
-       ON CONFLICT (asset, close_date) DO NOTHING`,
-      [target, days, days.map(d => found.get(d))],
+      `INSERT INTO price_close_daily (asset, timezone, close_date, price_eur, source)
+       SELECT $1, $4, d, p, 'binance_1h' FROM unnest($2::date[], $3::numeric[]) AS x(d, p)
+       ON CONFLICT (asset, timezone, close_date) DO NOTHING`,
+      [target, days, days.map(d => found.get(d)), tz],
     );
   }
 
@@ -362,25 +377,25 @@ export async function prefetchCloseRange(asset: string, fromDay: string, toDay: 
     if (fromChart.size > 0) {
       const days = [...fromChart.keys()];
       await db.query(
-        `INSERT INTO price_close_madrid (asset, close_date, price_eur, source)
-         SELECT $1, d, p, 'coingecko_daily' FROM unnest($2::date[], $3::numeric[]) AS x(d, p)
-         ON CONFLICT (asset, close_date) DO NOTHING`,
-        [target, days, days.map(d => fromChart.get(d))],
+        `INSERT INTO price_close_daily (asset, timezone, close_date, price_eur, source)
+         SELECT $1, $4, d, p, 'coingecko_daily' FROM unnest($2::date[], $3::numeric[]) AS x(d, p)
+         ON CONFLICT (asset, timezone, close_date) DO NOTHING`,
+        [target, days, days.map(d => fromChart.get(d)), tz],
       );
     }
     if (noPrice.length > 0) {
       await db.query(
-        `INSERT INTO price_close_madrid (asset, close_date, price_eur, source)
-         SELECT $1, d, -1, 'none' FROM unnest($2::date[]) AS x(d)
-         ON CONFLICT (asset, close_date) DO NOTHING`,
-        [target, noPrice],
+        `INSERT INTO price_close_daily (asset, timezone, close_date, price_eur, source)
+         SELECT $1, $3, d, -1, 'none' FROM unnest($2::date[]) AS x(d)
+         ON CONFLICT (asset, timezone, close_date) DO NOTHING`,
+        [target, noPrice, tz],
       );
     }
     missing = missing.filter(d => !fromChart.has(d) && !noPrice.includes(d));
   }
 
   for (const day of missing) {
-    await getClosePriceEur(target, day).catch(e =>
+    await getClosePriceEur(target, day, tz).catch(e =>
       console.error(`[PRICES] Cierre ${target} ${day} no disponible:`, (e as Error).message));
     await sleep(150);
   }

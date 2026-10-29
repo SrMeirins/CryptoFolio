@@ -1,4 +1,5 @@
-import { madridDate } from './madridTime';
+import { localDate } from '../time/localTime';
+import { DEFAULT_TIMEZONE } from '../time/appTimezone';
 
 // Calendario fiscal (#309): cierre del ejercicio, Modelo 721 y campaña de la
 // Renta, en hora de Madrid. Lógica pura con `now` como parámetro; la usan el
@@ -59,8 +60,9 @@ function hito(id: HitoId, ejercicio: number, hoy: string, obligado: Obligacion72
  * Ciclo alrededor de hoy: los tres hitos que vienen. El próximo hito (el de
  * la campana y el Dashboard) salta el 721 si consta que no hay obligación.
  */
-export function calendarioFiscal(now: Date = new Date(), obligado: Obligacion721 = () => null): { hoy: string; hitos: Hito[]; proximo: Hito } {
-  const hoy = madridDate(now);
+export function calendarioFiscal(now: Date = new Date(), obligado: Obligacion721 = () => null, tz: string = DEFAULT_TIMEZONE): { hoy: string; hitos: Hito[]; proximo: Hito } {
+  // Hoy en la zona de la aplicación (#388).
+  const hoy = localDate(tz, now);
   const y = Number(hoy.slice(0, 4));
   const todos = [hito('modelo721', y - 1, hoy, obligado), hito('renta', y - 1, hoy, obligado), hito('cierre', y, hoy, obligado), hito('modelo721', y, hoy, obligado), hito('renta', y, hoy, obligado)];
   const vigentes = todos.filter(h => h.estado !== 'pasado').sort((a, b) => a.hasta.localeCompare(b.hasta));
@@ -69,8 +71,8 @@ export function calendarioFiscal(now: Date = new Date(), obligado: Obligacion721
 }
 
 /** Aviso para la campana: a 30 días del próximo hito (información) y a 7 (aviso). */
-export function avisoCalendario(now: Date = new Date(), obligado: Obligacion721 = () => null): { type: 'info' | 'warning'; message: string } | null {
-  const { proximo } = calendarioFiscal(now, obligado);
+export function avisoCalendario(now: Date = new Date(), obligado: Obligacion721 = () => null, tz: string = DEFAULT_TIMEZONE): { type: 'info' | 'warning'; message: string } | null {
+  const { proximo } = calendarioFiscal(now, obligado, tz);
   if (proximo.diasRestantes > 30) return null;
   const cuando = proximo.diasRestantes === 0 ? 'hoy es el último día' : `${proximo.diasRestantes === 1 ? 'queda 1 día' : `quedan ${proximo.diasRestantes} días`}`;
   const accion = proximo.id === 'cierre' ? 'Revisa el planificador antes del 31 de diciembre.'

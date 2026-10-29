@@ -28,10 +28,24 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     clearTimeout(timeout)
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error || res.statusText)
+    const body = await res.json().catch(() => ({ error: res.statusText }))
+    throw new ApiError(res.status, body?.error || res.statusText, body)
   }
+  // 204 sin cuerpo (p. ej. al borrar): no hay JSON que leer (#369).
+  if (res.status === 204) return undefined as T
   return res.json()
+}
+
+/**
+ * Error de la API con su código HTTP y el cuerpo de la respuesta (#369): sigue
+ * siendo un Error (mismo mensaje que antes), pero permite distinguir, p. ej.,
+ * un 409 de nombre repetido.
+ */
+export class ApiError extends Error {
+  constructor(public readonly status: number, message: string, public readonly body: unknown) {
+    super(message)
+    this.name = 'ApiError'
+  }
 }
 
 export const api = {

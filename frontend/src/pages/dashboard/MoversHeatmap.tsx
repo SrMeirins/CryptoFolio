@@ -60,7 +60,9 @@ function Cell({ cell, rect, width, cap, currency, dimmed, onActive, onOpen }: {
       aria-label={describe(cell, currency)}
       onMouseEnter={() => onActive(true)} onFocus={() => onActive(true)} onBlur={() => onActive(false)}
       onClick={() => clickable && onOpen()}
-      className={`group absolute p-[1.5px] focus:outline-hidden hover:z-10 focus-visible:z-10 transition-opacity duration-200 ${dimmed ? 'opacity-60' : ''} ${clickable ? 'cursor-pointer' : 'cursor-default'}`}
+      className={`group absolute p-[1.5px] focus:outline-hidden hover:z-10 focus-visible:z-10 ${clickable ? 'cursor-pointer' : 'cursor-default'}`}
+      data-heat-tile=""
+      data-dimmed={dimmed || undefined}
       style={{ left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.w}%`, height: `${rect.h}%` }}
     >
       <span
@@ -74,6 +76,8 @@ function Cell({ cell, rect, width, cap, currency, dimmed, onActive, onOpen }: {
       >
         {/* Reflejo superior para dar relieve */}
         <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-linear-to-b from-white/8 to-transparent" />
+        {/* Atenuado (#438): solo el color de fondo se acerca al de la tarjeta; el texto, encima, conserva su contraste. */}
+        <span aria-hidden="true" className={`pointer-events-none absolute inset-0 bg-background-card transition-opacity duration-200 motion-reduce:transition-none ${dimmed ? 'opacity-55' : 'opacity-0'}`} />
         <span aria-hidden="true" className="relative flex flex-col items-center leading-tight px-1 max-w-full">
           <span className={`font-semibold text-fg truncate max-w-full ${TEXT[tier].asset}`}>{label}</span>
           <span className={`mono font-bold text-fg ${TEXT[tier].pct}`}>

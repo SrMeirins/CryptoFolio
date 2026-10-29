@@ -16,6 +16,16 @@ const vista = (nombre: string, r: PreviewResult, reconocido = true): VistaArchiv
   ({ nombre, exchange: 'binance', deteccion: { exchange: reconocido ? 'binance' : null, idioma: 'en', reconocido }, resultado: r });
 
 describe('combinarVistasPrevias', () => {
+  it('suma las filas sin su original que el lote puede completar (#374)', () => {
+    const l = combinarVistasPrevias([
+      vista('a.csv', resultado({ originalRowsMissing: 3 })),
+      vista('b.csv', resultado({})),
+      vista('c.csv', resultado({ originalRowsMissing: 2 })),
+    ]);
+    expect(l.originalRowsMissing).toBe(5);
+    expect(l.archivos.map(a => a.faltanOriginales)).toEqual([3, 0, 2]);
+  });
+
   it('cuenta una sola vez las filas repetidas entre archivos solapados', () => {
     const l = combinarVistasPrevias([
       vista('2023.csv', resultado({ transactions: [tx('a'), tx('b')] })),

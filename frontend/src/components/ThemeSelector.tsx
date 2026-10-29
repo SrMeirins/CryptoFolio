@@ -1,15 +1,15 @@
 import { useEffectiveTheme, useSetTheme } from '../hooks/useTheme'
-import { THEME_PREFERENCES, type ThemePreference } from '../utils/theme'
+import { THEME_LABELS, THEME_PREFERENCES, type ThemePreference } from '../utils/theme'
 import { SegmentedControl } from './ui'
 
-const LABELS: Record<ThemePreference, string> = { dark: 'Oscuro', light: 'Claro', system: 'Sistema' }
 
 /** Selector de tema de Ajustes → General (#197): oscuro, claro o el del sistema. */
-export function ThemeSelector() {
+/** `onChanged` (#445): Ajustes ofrece Deshacer con el valor anterior. */
+export function ThemeSelector({ onChanged }: { onChanged?: (previous: ThemePreference, next: ThemePreference) => void } = {}) {
   const { preference } = useEffectiveTheme()
   const setTheme = useSetTheme()
   return (
-    <SegmentedControl label="Tema" size="md" value={preference} onChange={setTheme}
-      options={THEME_PREFERENCES.map(p => ({ value: p, label: LABELS[p] }))} />
+    <SegmentedControl label="Tema" size="md" value={preference} onChange={next => { if (next === preference) return; setTheme(next); onChanged?.(preference, next) }}
+      options={THEME_PREFERENCES.map(p => ({ value: p, label: THEME_LABELS[p] }))} />
   )
 }

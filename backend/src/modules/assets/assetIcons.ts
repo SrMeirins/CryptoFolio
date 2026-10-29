@@ -3,6 +3,7 @@ import { BASE_URL, enqueueCoinGeckoCall, fetchWithRetry } from '../prices/coinge
 import { fetchWithTimeout } from '../prices/httpTimeout';
 import { PRICE_ALIASES } from '../prices/priceAliases';
 import { FIAT_ICON_SYMBOLS, FLAG_HOST, fiatFlagUrl } from './fiatFlags';
+import { bestCoinGeckoMatch, isIconSymbol, isValidCoinGeckoId, localIcon } from './iconSources';
 
 // Logos de los activos servidos desde el propio origen (#201). Antes el
 // navegador los pedía a un servicio externo, lo que revelaba qué activos se
@@ -52,15 +53,38 @@ async function downloadIcon(url: string): Promise<{ type: IconContentType; data:
   return type ? { type, data } : null;
 }
 
-async function saveIcon(symbol: string, icon: { type: IconContentType; data: Buffer } | null): Promise<void> {
+type IconSource = 'coingecko' | 'local' | 'flag';
+
+async function saveIcon(symbol: string, icon: { type: IconContentType; data: Buffer } | null, source: IconSource | null = null): Promise<void> {
   await db.query(
-    `INSERT INTO asset_icons (symbol, status, content_type, data, fetched_at)
-     VALUES ($1, $2, $3, $4, NOW())
+    `INSERT INTO asset_icons (symbol, status, content_type, data, fetched_at, source)
+     VALUES ($1, $2, $3, $4, NOW(), $5)
      ON CONFLICT (symbol) DO UPDATE
        SET status = EXCLUDED.status, content_type = EXCLUDED.content_type,
-           data = EXCLUDED.data, fetched_at = EXCLUDED.fetched_at`,
-    [symbol, icon ? 'ok' : 'missing', icon?.type ?? null, icon?.data ?? null],
+           data = EXCLUDED.data, fetched_at = EXCLUDED.fetched_at, source = EXCLUDED.source`,
+    [symbol, icon ? 'ok' : 'missing', icon?.type ?? null, icon?.data ?? null, icon ? source : null],
   );
+}
+
+/** PNG del paquete local con los mismos controles que un logo descargado (#449). */
+function localPng(symbol: string): { type: IconContentType; data: Buffer } | null {
+  const data = localIcon(symbol);
+  if (!data || data.length === 0 || data.length > MAX_ICON_BYTES) return null;
+  const type = sniffImageType(data);
+  return type ? { type, data } : null;
+}
+
+/**
+ * Id de CoinGecko para el logo de un símbolo, buscado por símbolo (#449).
+ * Nunca toca coingecko_id. null si no hay coincidencia; undefined si falló la red.
+ */
+async function resolveIconId(symbol: string): Promise<string | null | undefined> {
+  try {
+    const data = await enqueueCoinGeckoCall(() => fetchWithRetry(`${BASE_URL}/search?query=${encodeURIComponent(symbol)}`)) as { coins?: unknown };
+    return bestCoinGeckoMatch(data?.coins, symbol);
+  } catch {
+    return undefined;
+  }
 }
 
 let syncInFlight: Promise<void> | null = null;
@@ -110,40 +134,78 @@ async function syncFiatFlags(): Promise<void> {
     if (url) {
       try { icon = await downloadIcon(url); } catch { icon = null; }
     }
-    await saveIcon(symbol, icon);
+    await saveIcon(symbol, icon, 'flag');
   }
 }
 
+/**
+ * Logos de los activos (#449), en este orden: CoinGecko (id manual del logo,
+ * coingecko_id de precios o id del logo resuelto por símbolo), el paquete
+ * local y, si nada, «sin logo» (el frontend pinta las iniciales). Los activos
+ * sin ningún id se resuelven por símbolo una vez y se guardan como «auto».
+ */
 async function syncCoinGeckoIcons(): Promise<void> {
-  const pending = (await db.query(
-    `SELECT am.symbol, am.coingecko_id
+  const rows = (await db.query(
+    `SELECT am.symbol, am.coingecko_id, am.icon_coingecko_id, am.icon_id_source
      FROM asset_metadata am
      LEFT JOIN asset_icons ai ON ai.symbol = am.symbol
-     WHERE am.coingecko_id IS NOT NULL
-       AND am.symbol <> ALL($2::text[])
+     WHERE am.symbol <> ALL($2::text[])
        AND (ai.symbol IS NULL OR (ai.status = 'missing' AND ai.fetched_at < NOW() - make_interval(days => $1)))
      ORDER BY am.symbol`,
     [MISSING_RETRY_DAYS, FIAT_ICON_SYMBOLS],
-  )).rows as Array<{ symbol: string; coingecko_id: string }>;
-  if (pending.length === 0) return;
+  )).rows as Array<{ symbol: string; coingecko_id: string | null; icon_coingecko_id: string | null; icon_id_source: 'auto' | 'manual' | null }>;
+  if (rows.length === 0) return;
 
-  for (let i = 0; i < pending.length; i += MARKETS_BATCH) {
-    const batch = pending.slice(i, i + MARKETS_BATCH);
-    const ids = [...new Set(batch.map(p => p.coingecko_id))];
-    const url = `${BASE_URL}/coins/markets?${new URLSearchParams({ vs_currency: 'eur', ids: ids.join(','), per_page: String(MARKETS_BATCH) })}`;
-    const markets = await enqueueCoinGeckoCall(() => fetchWithRetry(url)) as Array<{ id?: unknown; image?: unknown }>;
-    const imageById = new Map<string, string>();
-    for (const m of Array.isArray(markets) ? markets : []) {
-      if (typeof m.id === 'string' && typeof m.image === 'string') imageById.set(m.id, m.image);
-    }
-    for (const { symbol, coingecko_id } of batch) {
-      const imageUrl = imageById.get(coingecko_id);
-      let icon: { type: IconContentType; data: Buffer } | null = null;
-      if (imageUrl) {
-        try { icon = await downloadIcon(imageUrl); } catch { icon = null; }
+  // El manual manda; después el de precios; después el resuelto por símbolo.
+  // `offline`: sin respuesta de CoinGecko; sin logo local, no se marca y se reintenta pronto.
+  const pending: Array<{ symbol: string; id: string | null; offline: boolean }> = [];
+  for (const r of rows) {
+    if (!isIconSymbol(r.symbol)) continue;
+    let id = r.icon_id_source === 'manual' ? r.icon_coingecko_id : (r.coingecko_id ?? r.icon_coingecko_id);
+    // Un alias sin id propio usa el logo de su destino (BETH → ETH): no se busca otro.
+    if (!id && PRICE_ALIASES[r.symbol]) continue;
+    let offline = false;
+    if (!id) {
+      const found = await resolveIconId(r.symbol);
+      offline = found === undefined;
+      id = found ?? null;
+      if (id) {
+        await db.query(
+          `UPDATE asset_metadata SET icon_coingecko_id = $2, icon_id_source = 'auto'
+           WHERE symbol = $1 AND icon_coingecko_id IS NULL`, [r.symbol, id]);
       }
-      await saveIcon(symbol, icon);
     }
+    pending.push({ symbol: r.symbol, id: isValidCoinGeckoId(id) ? id : null, offline });
+  }
+
+  const imageById = new Map<string, string>();
+  const unreachable = new Set<string>();
+  const ids = [...new Set(pending.map(p => p.id).filter((x): x is string => !!x))];
+  for (let i = 0; i < ids.length; i += MARKETS_BATCH) {
+    const batch = ids.slice(i, i + MARKETS_BATCH);
+    const url = `${BASE_URL}/coins/markets?${new URLSearchParams({ vs_currency: 'eur', ids: batch.join(','), per_page: String(MARKETS_BATCH) })}`;
+    try {
+      const markets = await enqueueCoinGeckoCall(() => fetchWithRetry(url)) as Array<{ id?: unknown; image?: unknown }>;
+      for (const m of Array.isArray(markets) ? markets : []) {
+        if (typeof m.id === 'string' && typeof m.image === 'string') imageById.set(m.id, m.image);
+      }
+    } catch {
+      // Sin red: se prueba el paquete local y, si no está, se reintenta en la próxima sincronización.
+      batch.forEach(id => unreachable.add(id));
+    }
+  }
+
+  for (const { symbol, id, offline } of pending) {
+    const imageUrl = id ? imageById.get(id) : undefined;
+    let icon: { type: IconContentType; data: Buffer } | null = null;
+    if (imageUrl) {
+      try { icon = await downloadIcon(imageUrl); } catch { icon = null; }
+    }
+    if (icon) { await saveIcon(symbol, icon, 'coingecko'); continue; }
+    const local = localPng(symbol);
+    if (local) { await saveIcon(symbol, local, 'local'); continue; }
+    if (offline || (id !== null && unreachable.has(id))) continue;
+    await saveIcon(symbol, null);
   }
 }
 

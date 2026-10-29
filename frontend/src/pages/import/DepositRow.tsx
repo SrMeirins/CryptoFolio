@@ -54,6 +54,12 @@ export function DepositRow({ dep, cost, reviewed, onSetCost, resaltado }: {
         {!reviewed && <span className="ml-auto text-xs text-warning">● pendiente</span>}
       </div>
 
+      {dep.kind === 'compra' && (
+        <p className="text-[11px] text-warning-ink mb-2">
+          Compra con fiat sin el pago en el CSV: indica el precio por unidad (EUR pagados / cantidad) que figura en tu banco o tarjeta, o usa el de mercado.
+        </p>
+      )}
+
       {dep.historicalPrice != null && dep.historicalPrice > 0 && (
         <p className="text-[11px] text-fg-subtle mb-2">
           Mercado ese día: <span className="mono text-fg-muted">{formatNumber(dep.historicalPrice, 6)} €/ud.</span> · valor <span className="mono text-fg-muted">{formatEur(dep.historicalPrice * dep.amount)}</span>

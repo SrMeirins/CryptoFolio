@@ -1,16 +1,21 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
+import { Link } from 'react-router-dom'
 import {
-  Plus, Check, X, ExternalLink, Trash2, ChevronDown,
+  Plus, Check, X, ExternalLink, Trash2, ChevronDown, Pencil, Wallet as WalletIcon, History as HistoryIcon,
 } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { CopyButton } from '../../components/CopyButton'
 import { WALLET_TYPE_META, truncateAddress, hayPendientes } from './wallets/helpers'
-import { ColorPicker } from './wallets/ColorPicker'
 import { SyncBadge } from './wallets/SyncBadge'
 import { AddAddressForm } from './wallets/AddAddressForm'
 import { AddWalletForm } from './wallets/AddWalletForm'
+import { WalletEditPanel, type WalletEdit } from './wallets/WalletEditPanel'
+import { useWalletValues } from '../../hooks/useWalletValues'
+import { useSettingFeedback } from '../../hooks/useSettingFeedback'
+import { formatMoney, formatNumber } from '../../utils/format'
+import { daysSince, formatAge } from '../../utils/portfolioLots'
 import { alpha, ink } from '../../utils/colors'
 import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses } from '../../components/ui'
 
@@ -22,9 +27,8 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
   const [editingAddressId, setEditingAddressId]   = useState<string | null>(null)
   const [editingAddressValue, setEditingAddressValue] = useState('')
   const [expandedNets, setExpandedNets]           = useState<Set<string>>(new Set())
+  // Wallet en edición en el panel lateral (#448).
   const [editingWalletId, setEditingWalletId]     = useState<string | null>(null)
-  const [editName, setEditName]                   = useState('')
-  const [editColor, setEditColor]                 = useState('')
   const [syncingAddressId, setSyncingAddressId]   = useState<string | null>(null)
 
   // Mientras alguna dirección esté pendiente de su verificación automática, se refresca sola (#336).
@@ -39,6 +43,13 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
   })
 
   const confirmTarget = wallets.find(w => w.id === confirmDeleteId)
+  const editTarget = wallets.find(w => w.id === editingWalletId)
+
+  // Resumen de cada wallet (#448): valor como en Portfolio, operaciones y última actividad.
+  const { byWallet, currency } = useWalletValues()
+  const { data: usage = [] } = useQuery({ queryKey: ['wallet-summary'], queryFn: portfolioApi.getWalletSummary })
+  const usageOf = (id: string) => usage.find(u => u.wallet_id === id)
+  const { confirm } = useSettingFeedback()
 
   async function handleCreateWallet(data: Record<string, unknown>) {
     await portfolioApi.createWallet(data)
@@ -47,10 +58,12 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
     onWalletCreated?.()
   }
 
-  async function handleSaveWallet(id: string) {
-    await portfolioApi.updateWallet(id, { name: editName, color: editColor })
-    queryClient.invalidateQueries({ queryKey: ['wallets'] })
-    setEditingWalletId(null)
+  async function handleSaveWallet(id: string, edit: WalletEdit, previous?: WalletEdit) {
+    await portfolioApi.updateWallet(id, edit)
+    await queryClient.invalidateQueries({ queryKey: ['wallets'] })
+    // Nombre y color salen también en Portfolio, Historial y los gráficos.
+    void queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
+    if (previous) confirm(`wallet-${id}`, `Wallet ${edit.name}`, () => void handleSaveWallet(id, previous))
   }
 
   async function handleDeleteWallet(id: string) {
@@ -128,11 +141,13 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
           {userWallets.map(wallet => {
             const TypeMeta = WALLET_TYPE_META[wallet.type] ?? WALLET_TYPE_META.exchange
             const TypeIcon = TypeMeta.icon
-            const isEditing    = editingWalletId === wallet.id
             const netsExpanded = expandedNets.has(wallet.id)
+            const value = byWallet.get(wallet.id)?.value
+            const use = usageOf(wallet.id)
+            const lastDays = use?.last_activity ? daysSince(Date.parse(use.last_activity)) : null
 
             return (
-              <div key={wallet.id} className={cardClasses('none', 'overflow-hidden')}
+              <div key={wallet.id} role="region" aria-label={`Wallet ${wallet.name}`} className={cardClasses('none', 'overflow-hidden')}
                 style={{ borderLeftColor: wallet.color, borderLeftWidth: 3 }}>
                 {/* Cabecera wallet */}
                 <div className="flex items-center gap-3 px-4 py-3">
@@ -141,54 +156,53 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                     <TypeIcon size={15} style={{ color: ink(wallet.color) }} />
                   </div>
 
-                  {isEditing ? (
-                    <div className="flex-1 flex items-center gap-2">
-                      <input value={editName} onChange={e => setEditName(e.target.value)}
-                        className={fieldClasses('md', false, 'flex-1 px-2.5 py-1.5')}
-                        onKeyDown={e => e.key === 'Enter' && handleSaveWallet(wallet.id)} />
-                      <ColorPicker value={editColor} onChange={setEditColor} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm">{wallet.name}</span>
+                      {wallet.is_default && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-lg bg-warning/15 text-warning-ink font-bold">DEFAULT</span>
+                      )}
                     </div>
-                  ) : (
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm">{wallet.name}</span>
-                        {wallet.is_default && (
-                          <span className="text-xs px-1.5 py-0.5 rounded-lg bg-warning/15 text-warning-ink font-bold">DEFAULT</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-xs text-fg-subtle">{TypeMeta.label}</span>
-                        {wallet.notes && <span className="text-xs text-fg-subtle">· {wallet.notes}</span>}
-                      </div>
+                    <div className="flex items-center gap-1.5 mt-0.5 text-xs text-fg-subtle flex-wrap">
+                      <span>{TypeMeta.label}</span>
+                      {wallet.notes && <span className="truncate">· {wallet.notes}</span>}
                     </div>
-                  )}
+                  </div>
+
+                  {/* Resumen (#448): valor como en Portfolio, operaciones y última actividad */}
+                  <dl className="hidden sm:grid grid-cols-3 gap-x-5 text-right shrink-0">
+                    <div><dt className="text-[10px] uppercase tracking-wider text-fg-subtle">Valor</dt>
+                      <dd className="mono tabular-nums text-sm font-semibold">{value !== undefined ? formatMoney(value, currency) : '—'}</dd></div>
+                    <div><dt className="text-[10px] uppercase tracking-wider text-fg-subtle">Operaciones</dt>
+                      <dd className="mono tabular-nums text-sm">{formatNumber(use?.operations ?? 0, 0)}</dd></div>
+                    <div><dt className="text-[10px] uppercase tracking-wider text-fg-subtle">Última</dt>
+                      <dd className="text-sm">{lastDays === null ? '—' : formatAge(lastDays)}</dd></div>
+                  </dl>
 
                   <div className="flex items-center gap-1 shrink-0">
-                    {isEditing ? (
-                      <>
-                        <button type="button" onClick={() => handleSaveWallet(wallet.id)} aria-label="Guardar"
-                          className={iconButtonClasses('md', false, '', 'positive')}><Check size={13} /></button>
-                        <button type="button" onClick={() => setEditingWalletId(null)} aria-label="Cancelar"
-                          className={iconButtonClasses('md')}><X size={13} /></button>
-                      </>
-                    ) : (
-                      <>
-                        <button type="button" onClick={() => { setEditingWalletId(wallet.id); setEditName(wallet.name); setEditColor(wallet.color) }}
-                          className="p-1.5 text-fg-subtle hover:text-fg hover:bg-background-tertiary rounded-lg transition-colors text-xs">
-                          Editar
-                        </button>
-                        <button type="button" onClick={() => setConfirmDeleteId(wallet.id)} aria-label="Eliminar wallet"
-                          className={iconButtonClasses('md', false, '', 'danger')}>
-                          <Trash2 size={13} />
-                        </button>
-                      </>
-                    )}
+                    <button type="button" onClick={() => setEditingWalletId(wallet.id)} aria-label={`Editar ${wallet.name}`}
+                      className={iconButtonClasses('md')}>
+                      <Pencil size={13} aria-hidden="true" />
+                    </button>
+                    <button type="button" onClick={() => setConfirmDeleteId(wallet.id)} aria-label={`Eliminar ${wallet.name}`}
+                      className={iconButtonClasses('md', false, '', 'danger')}>
+                      <Trash2 size={13} aria-hidden="true" />
+                    </button>
                     <button type="button" onClick={() => toggleNets(wallet.id)} aria-expanded={netsExpanded}
                       aria-label={netsExpanded ? 'Contraer redes' : 'Expandir redes'}
                       className={iconButtonClasses('md')}>
                       <ChevronDown size={13} className={`transition-transform ${netsExpanded ? 'rotate-180' : ''}`} />
                     </button>
                   </div>
+                </div>
+
+                <div className="flex items-center gap-4 px-4 pb-3 -mt-1 text-xs">
+                  <Link to={`/portfolio?wallet=${wallet.id}`} className="inline-flex items-center gap-1 text-brand-ink hover:underline rounded-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
+                    <WalletIcon size={11} aria-hidden="true" /> Ver en Portfolio
+                  </Link>
+                  <Link to={`/history?wallet=${wallet.id}`} className="inline-flex items-center gap-1 text-brand-ink hover:underline rounded-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
+                    <HistoryIcon size={11} aria-hidden="true" /> Ver sus operaciones
+                  </Link>
                 </div>
 
                 {/* Panel de redes / direcciones */}
@@ -295,6 +309,12 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
             ))}
           </div>
         </details>
+      )}
+
+      {editTarget && (
+        <WalletEditPanel wallet={editTarget} onClose={() => setEditingWalletId(null)}
+          onSave={edit => handleSaveWallet(editTarget.id, edit,
+            { name: editTarget.name, type: editTarget.type, color: editTarget.color, notes: editTarget.notes })} />
       )}
 
       {confirmTarget && (

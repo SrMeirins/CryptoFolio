@@ -2,13 +2,14 @@ import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
-import { madridYearMonth } from '../../modules/fiscal/madridTime';
+import { localYearMonth } from '../../modules/time/localTime';
+import { DEFAULT_TIMEZONE } from '../../modules/time/appTimezone';
 
 // Planificador de fin de año (#307). Datos sintéticos.
 let testDb: TestDatabase;
 let pool: Pool;
 let app: import('express').Express;
-const Y = madridYearMonth().year;
+const Y = localYearMonth(DEFAULT_TIMEZONE).year;
 let walletId: string;
 
 async function tx(op: string, at: string, asset: string) {
