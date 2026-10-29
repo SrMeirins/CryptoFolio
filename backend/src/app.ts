@@ -37,6 +37,9 @@ app.use(morgan('combined'));
 
 app.use(globalLimiter);
 
+// Las copias de seguridad (#453) viajan enteras en el cuerpo: unos 2,6 MB
+// cifrados por cada 3.000 filas, así que su ruta admite más.
+app.use('/api/settings/backup', express.json({ limit: '100mb' }));
 app.use(express.json({ limit: '10mb' }));
 
 app.use('/health', healthRouter);

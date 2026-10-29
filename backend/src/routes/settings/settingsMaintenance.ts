@@ -156,38 +156,6 @@ router.post('/bulk-set-costs', async (req: Request, res: Response) => {
   res.json({ success: true, updated: updates.length, fifo });
 });
 
-// ── GET /api/settings/backup ──────────────────────────────────────────────
-router.get('/backup', async (_req: Request, res: Response) => {
-  const [txs, walletsRes, assets, config, imports] = await Promise.all([
-    db.query('SELECT * FROM transactions ORDER BY timestamp ASC'),
-    db.query(`
-      SELECT w.*, COALESCE(json_agg(
-        json_build_object(
-          'id', a.id, 'network_name', n.name, 'network_native_asset', n.native_asset,
-          'custom_network', a.custom_network, 'address', a.address, 'explorer_url',
-          COALESCE(a.custom_explorer_url, n.explorer_url)
-        )
-      ) FILTER (WHERE a.id IS NOT NULL), '[]') AS addresses
-      FROM wallets w
-      LEFT JOIN wallet_addresses a ON a.wallet_id = w.id
-      LEFT JOIN networks n ON n.id = a.network_id
-      GROUP BY w.id ORDER BY w.created_at
-    `),
-    db.query('SELECT * FROM asset_metadata ORDER BY symbol'),
-    db.query('SELECT * FROM app_config'),
-    db.query('SELECT id, filename, imported_at, row_count, skipped_count FROM csv_imports ORDER BY imported_at'),
-  ]);
-  res.json({
-    version:      '1.0',
-    exported_at:  new Date().toISOString(),
-    transactions: txs.rows,
-    wallets:      walletsRes.rows,
-    assets:       assets.rows,
-    config:       config.rows,
-    imports:      imports.rows,
-  });
-});
-
 // ── DELETE /api/settings/data/transactions ────────────────────────────────
 // Elimina todas las transacciones, lotes FIFO e importaciones.
 // La configuración (wallets, activos, app_config) se conserva.

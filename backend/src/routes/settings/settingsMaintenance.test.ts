@@ -193,15 +193,6 @@ describe('routes/settings — mantenimiento', () => {
     });
   });
 
-  describe('GET /backup', () => {
-    it('devuelve las 5 secciones esperadas', async () => {
-      const res = await request(app).get('/api/settings/backup');
-      expect(res.status).toBe(200);
-      expect(Object.keys(res.body).sort()).toEqual(
-        ['assets', 'config', 'exported_at', 'imports', 'transactions', 'version', 'wallets'].sort()
-      );
-    });
-  });
   describe('POST /transactions/fix-stale-withdrawals (#374)', () => {
     // Datos sintéticos: dos retiros pendientes importados. Solo el que viene de
     // un «Asset Recovery» (según la fila original del CSV) pasa a pérdida.

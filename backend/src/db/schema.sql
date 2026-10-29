@@ -427,6 +427,15 @@ CREATE TABLE irpf_escalas (
   )
 );
 
+-- Copias previas a una restauración (#453): el estado anterior, para volver atrás.
+CREATE TABLE backup_snapshots (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  schema      INTEGER NOT NULL,
+  counts      JSONB NOT NULL,
+  data        JSONB NOT NULL
+);
+
 CREATE TABLE asset_icons (
   symbol        TEXT PRIMARY KEY,
   status        TEXT NOT NULL,
