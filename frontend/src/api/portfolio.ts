@@ -804,7 +804,6 @@ export const portfolioApi = {
     api.put<{ success: boolean }>(`/wallets/networks/${networkId}/api-key`, { api_key: apiKey }),
   deleteNetworkApiKey: (networkId: string) =>
     api.delete<{ success: boolean }>(`/wallets/networks/${networkId}/api-key`),
-  exportBackup: () => api.get<Record<string, unknown>>('/settings/backup'),
   getConfig: () => api.get<Record<string, string>>('/settings/config'),
   /** Zona horaria efectiva (#388, #390): zona, origen y ajuste guardado inválido. */
   getTimezone: () => api.get<TimezoneInfo>('/settings/timezone'),

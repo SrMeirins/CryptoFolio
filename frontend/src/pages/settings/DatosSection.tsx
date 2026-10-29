@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
-import { RefreshCw, Trash2, Zap, Download, ArrowLeftRight, Layers, FileUp, Tag, Wallet, Coins, BarChart3, Wrench, AlertTriangle, type LucideIcon } from 'lucide-react'
+import { RefreshCw, Trash2, Zap, ArrowLeftRight, Layers, FileUp, Tag, Wallet, Coins, BarChart3, Wrench, AlertTriangle, type LucideIcon } from 'lucide-react'
 import { useToast } from '../../hooks/useToast'
 import { useRunFifo } from '../../hooks/useRunFifo'
 import { T } from '../../utils/colors'
 import { buttonClasses, fieldClasses, StatCard } from '../../components/ui'
 import { SettingsCard } from './SettingsCard'
 import { formatNumber } from '../../utils/format'
-import { backupFilename } from '../../constants/appInfo'
+import { BackupCard } from './backup/BackupCard'
 
 const CONFIRM_WORD = 'CONFIRMAR'
 
@@ -23,7 +23,6 @@ export function DatosSection() {
   const [clearingCache, setClearingCache] = useState(false)
   const [cacheResult, setCacheResult]     = useState<number | null>(null)
   const { running: runningFifo, result: fifoResult, run: handleRunFifo } = useRunFifo()
-  const [exporting, setExporting]         = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [resetInput, setResetInput]       = useState('')
   const [resetting, setResetting]         = useState(false)
@@ -40,20 +39,6 @@ export function DatosSection() {
     } finally {
       setClearingCache(false)
     }
-  }
-
-  async function handleExport() {
-    setExporting(true)
-    try {
-      const data = await portfolioApi.exportBackup()
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const url  = URL.createObjectURL(blob)
-      const a    = document.createElement('a')
-      a.href     = url
-      a.download = backupFilename()
-      a.click()
-      URL.revokeObjectURL(url)
-    } finally { setExporting(false) }
   }
 
   async function handleReset() {
@@ -96,8 +81,11 @@ export function DatosSection() {
         </div>
       </SettingsCard>
 
+      {/* Copias de seguridad (#453) */}
+      <BackupCard index={1} />
+
       {/* Mantenimiento */}
-      <SettingsCard index={1} icon={Wrench} title="Mantenimiento">
+      <SettingsCard index={2} icon={Wrench} title="Mantenimiento">
         <div className="space-y-2">
 
           {/* Limpiar caché */}
@@ -119,7 +107,7 @@ export function DatosSection() {
           </div>
 
           {/* Re-ejecutar FIFO */}
-          <div className="flex items-center justify-between py-3 border-b border-border/50">
+          <div className="flex items-center justify-between py-3">
             <div>
               <p className="text-sm font-medium">Re-ejecutar motor FIFO</p>
               <p className="text-xs text-fg-subtle mt-0.5">Recalcula todos los lotes y plusvalías desde cero.</p>
@@ -138,24 +126,11 @@ export function DatosSection() {
             </div>
           </div>
 
-          {/* Exportar backup */}
-          <div className="flex items-center justify-between py-3">
-            <div>
-              <p className="text-sm font-medium">Exportar backup</p>
-              <p className="text-xs text-fg-subtle mt-0.5">Descarga un JSON con todas las transacciones, wallets y configuración.</p>
-            </div>
-            <button type="button" onClick={handleExport} disabled={exporting}
-              className={buttonClasses('secondary', 'md', 'flex')}>
-              {exporting ? <RefreshCw size={13} className="animate-spin" /> : <Download size={13} />}
-              Descargar
-            </button>
-          </div>
-
         </div>
       </SettingsCard>
 
       {/* Zona de peligro */}
-      <SettingsCard index={2} icon={AlertTriangle} title="Zona de peligro" tone="danger">
+      <SettingsCard index={3} icon={AlertTriangle} title="Zona de peligro" tone="danger">
 
         {!showResetConfirm ? (
           <div className="flex items-center justify-between">
