@@ -15,5 +15,8 @@
   },
   "devDependencies": {
     "markdownlint-cli2": "0.24.0"
+  },
+  "overrides": {
+    "re2js": "2.8.7"
   }
 }
