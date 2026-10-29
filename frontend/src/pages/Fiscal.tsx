@@ -49,7 +49,6 @@ export function Fiscal() {
   })
   const vista = parseVista(searchParams.get('vista'))
   const queryClient = useQueryClient()
-  const tramos = useTramos()
 
   const { data: years = [] } = useQuery({ queryKey: ['fiscal-years'], queryFn: portfolioApi.getFiscalYears })
   const { data: overview = [] } = useQuery({ queryKey: ['fiscal-overview'], queryFn: portfolioApi.getFiscalOverview, staleTime: FISCAL_STALE_TIME })
@@ -59,6 +58,9 @@ export function Fiscal() {
   const { data: declaraciones = [] } = useQuery({ queryKey: ['fiscal-declaraciones'], queryFn: portfolioApi.getDeclaraciones })
 
   const activeYear = selectedYear ?? (years.length > 0 ? years[0] : null)
+  // Escala del ahorro de cada ejercicio (#452): la del activo y la del anterior, para compararlos.
+  const tramos = useTramos(activeYear ?? undefined)
+  const tramosPrev = useTramos((activeYear ?? new Date().getFullYear()) - 1)
 
   // Al cambiar de año se mantiene el anterior (atenuado) mientras llega el
   // nuevo, en vez de vaciar la página (#295). Con year 0 la consulta está
@@ -185,7 +187,7 @@ export function Fiscal() {
   // Comparación con el año anterior: mismo periodo en el año en curso; año completo si está cerrado.
   const ovPrev = overview.find(o => o.year === activeYear - 1)
   const cfPrev = carryforward?.detalle.find(d => d.year === activeYear - 1)
-  const prevCuota = ovPrev ? cuotaAhorro(baseTramosCompensada(cfPrev, ovPrev.netoPatrimonial, ovPrev.totalRendimientos), tramos).cuota : null
+  const prevCuota = ovPrev ? cuotaAhorro(baseTramosCompensada(cfPrev, ovPrev.netoPatrimonial, ovPrev.totalRendimientos), tramosPrev).cuota : null
   const comparison = summary ? yearComparison({
     year: activeYear,
     esAnioEnCurso: summary.esAnioEnCurso,
@@ -253,7 +255,7 @@ export function Fiscal() {
             {breakdown.length > 0 && <Block i={3}><DesglosePorActivo data={breakdown} onSelectAsset={a => openOperaciones({ activo: a })} /></Block>}
             {baseCompensada > 0 && (
               <Block i={4}>
-                <TramosIRPF base={baseCompensada} label={`Tramos IRPF — estimación ${activeYear}${huboCompensacion ? ' (tras compensar pérdidas)' : ''}`} />
+                <TramosIRPF base={baseCompensada} year={activeYear} label={`Tramos IRPF — estimación ${activeYear}${huboCompensacion ? ' (tras compensar pérdidas)' : ''}`} />
               </Block>
             )}
             {carryforward && <Block i={5}><PerdidasPendientes data={carryforward} /></Block>}

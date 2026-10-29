@@ -1,35 +1,30 @@
-// Tramos de la base del ahorro vigentes desde 2025 (Ley 7/2024). Los límites en
-// euros son fijos por ley; los porcentajes son configurables en Ajustes → Fiscal
-// (app_config.irpf_tramos_tipos, array JSON de 5 porcentajes) — misma fuente
-// que usa el frontend.
-// Object.freeze: son constantes compartidas por toda la app (vía import del
-// módulo) — una mutación accidental (ej. .push() en un caller) corrompería
-// el cálculo fiscal globalmente de forma silenciosa.
-export const TRAMOS_LIMITES = Object.freeze([6_000, 50_000, 200_000, 300_000, Infinity]);
-export const TIPOS_DEFECTO = Object.freeze([19, 21, 23, 27, 30]);
+import { escalaOficial, type Escala } from './escalasAhorro';
 
-export function parseTiposConfig(raw: string | undefined | null): readonly number[] {
-  if (!raw) return TIPOS_DEFECTO;
-  try {
-    const arr = JSON.parse(raw);
-    if (
-      Array.isArray(arr) && arr.length === TIPOS_DEFECTO.length &&
-      arr.every(n => typeof n === 'number' && n > 0 && n <= 100)
-    ) return arr;
-  } catch { /* config corrupta → defaults */ }
-  return TIPOS_DEFECTO;
+// Cálculo del IRPF de la base del ahorro sobre la escala de un ejercicio
+// (#452): límites y tipos de escalasAhorro.ts, con los tipos cambiados a mano
+// en Ajustes. Por defecto, la escala vigente.
+// Object.freeze: constantes compartidas por toda la app; una mutación
+// accidental corrompería el cálculo fiscal de forma silenciosa.
+const VIGENTE = escalaOficial(new Date().getUTCFullYear());
+export const TRAMOS_LIMITES = Object.freeze([...VIGENTE.limites]);
+export const TIPOS_DEFECTO = Object.freeze([...VIGENTE.tipos]);
+
+/** Escala con los tipos dados sobre los límites vigentes (compatibilidad con llamadas antiguas). */
+function comoEscala(tipos: readonly number[] | Escala): Escala {
+  return Array.isArray(tipos) ? { limites: TRAMOS_LIMITES, tipos: tipos as readonly number[] } : tipos as Escala;
 }
 
-export function calcularIrpfAhorro(base: number, tipos: readonly number[] = TIPOS_DEFECTO): number {
+export function calcularIrpfAhorro(base: number, escalaOTipos: readonly number[] | Escala = TIPOS_DEFECTO): number {
+  const { limites, tipos } = comoEscala(escalaOTipos);
   let restante = base;
   let anterior = 0;
   let cuota = 0;
-  for (let i = 0; i < TRAMOS_LIMITES.length; i++) {
+  for (let i = 0; i < limites.length; i++) {
     if (restante <= 0) break;
-    const tramo = Math.min(restante, TRAMOS_LIMITES[i] - anterior);
+    const tramo = Math.min(restante, limites[i] - anterior);
     cuota += tramo * (tipos[i] / 100);
     restante -= tramo;
-    anterior = TRAMOS_LIMITES[i];
+    anterior = limites[i];
   }
   // Redondeo a céntimos (2 decimales): sin esto, la suma de tramos con
   // floats produce ruido visible en casos reales (ej. base=468.53 →
@@ -45,20 +40,21 @@ export interface TramoMarginal { tipo: number; desde: number; hasta: number; bas
  * el impuesto marginal de una operación es la suma de sus cuotas. Si la base
  * baja (venta con pérdida), los tramos se devuelven con base y cuota negativas.
  */
-export function desgloseMarginal(baseAntes: number, baseDespues: number, tipos: readonly number[] = TIPOS_DEFECTO): TramoMarginal[] {
+export function desgloseMarginal(baseAntes: number, baseDespues: number, escalaOTipos: readonly number[] | Escala = TIPOS_DEFECTO): TramoMarginal[] {
+  const { limites, tipos } = comoEscala(escalaOTipos);
   const lo = Math.max(0, Math.min(baseAntes, baseDespues));
   const hi = Math.max(0, Math.max(baseAntes, baseDespues));
   const sign = baseDespues >= baseAntes ? 1 : -1;
   const out: TramoMarginal[] = [];
   let anterior = 0;
-  for (let i = 0; i < TRAMOS_LIMITES.length; i++) {
+  for (let i = 0; i < limites.length; i++) {
     const desde = Math.max(lo, anterior);
-    const hasta = Math.min(hi, TRAMOS_LIMITES[i]);
+    const hasta = Math.min(hi, limites[i]);
     if (hasta > desde) {
       const base = hasta - desde;
       out.push({ tipo: tipos[i], desde, hasta, base: sign * base, cuota: sign * Math.round(base * tipos[i]) / 100 });
     }
-    anterior = TRAMOS_LIMITES[i];
+    anterior = limites[i];
   }
   return out;
 }

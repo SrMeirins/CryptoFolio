@@ -2,9 +2,9 @@ import type { CarryforwardDetalle } from '../pages/fiscal/types'
 
 export interface Tramo { hasta: number; tipo: number; label: string }
 
-// Tramos por defecto — base del ahorro, vigentes desde 2025 (Ley 7/2024).
-// El último tramo subió del 28% al 30%. Verifica el tramo vigente cada año;
-// puedes personalizarlo sin tocar código en Ajustes → Fiscal.
+// Escala vigente de la base del ahorro (desde 2025, Ley 7/2024): solo es el
+// valor provisional mientras llega la escala del ejercicio desde la API (#452),
+// que guarda las oficiales de cada año y los tipos cambiados en Ajustes.
 export const TRAMOS_DEFAULT: Tramo[] = [
   { hasta: 6_000,    tipo: 19, label: '0 – 6.000 €' },
   { hasta: 50_000,   tipo: 21, label: '6.001 – 50.000 €' },
@@ -13,14 +13,20 @@ export const TRAMOS_DEFAULT: Tramo[] = [
   { hasta: Infinity, tipo: 30, label: '> 300.000 €' },
 ]
 
-/** Parsea y valida el override de tipos guardado en config (Ajustes → Fiscal). */
-export function parseTipos(stored: string): number[] | null {
-  try {
-    const arr = JSON.parse(stored)
-    if (Array.isArray(arr) && arr.length === TRAMOS_DEFAULT.length && arr.every(n => typeof n === 'number' && n > 0 && n <= 100))
-      return arr
-  } catch { /* noop */ }
-  return null
+// Miles con punto siempre, también con cuatro cifras («6.000»): Intl en español no agrupa esas.
+const eur = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+
+/**
+ * Tramos con su etiqueta a partir de la escala de un ejercicio (#452): «0 –
+ * 6.000 €», «6.001 – 50.000 €» y «> X €» en el último (sin límite).
+ */
+export function tramosDeEscala(escala: ReadonlyArray<{ hasta: number | null; tipo: number }>): Tramo[] {
+  return escala.map((t, i) => {
+    const desde = i === 0 ? 0 : (escala[i - 1].hasta ?? 0)
+    const hasta = t.hasta ?? Infinity
+    const label = t.hasta === null ? `> ${eur(desde)} €` : `${i === 0 ? '0' : eur(desde + 1)} – ${eur(hasta)} €`
+    return { hasta, tipo: t.tipo, label }
+  })
 }
 
 export interface TramoDesglose { tramo: string; tipo: number; cuota: number; base: number }

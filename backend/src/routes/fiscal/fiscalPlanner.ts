@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { db } from '../../db/client';
 import { FIFO_DUST_EPSILON } from '../../modules/fifo/constants';
 import { cargarAniosFiscales, compensarPerdidas } from '../../modules/fiscal/carryforward';
-import { parseTiposConfig } from '../../modules/fiscal/irpf';
+import { escalaDe } from '../../modules/fiscal/escalasAhorro';
 import { colchonSinTributar, cuotaConExtra } from '../../modules/fiscal/planificador';
 import { sendZodError } from './fiscalShared';
 import { sendInternalError } from '../../middleware/errorHandler';
@@ -20,7 +20,8 @@ async function contexto() {
   const tz = await getAppTimezone(db);
   const year = localYearMonth(tz).year;
   const anios = await cargarAniosFiscales(year);
-  const tipos = parseTiposConfig((await db.query("SELECT value FROM app_config WHERE key = 'irpf_tramos_tipos'")).rows[0]?.value);
+  // Escala del ejercicio en curso (#452), con los tipos cambiados a mano si los hay.
+  const tipos = await escalaDe(db, year);
   return { year, anios, tipos };
 }
 

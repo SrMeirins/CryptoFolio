@@ -1,6 +1,7 @@
 import { db } from '../../db/client';
 import { cargarAniosFiscales, baseAhorro, compensarPerdidas } from './carryforward';
-import { calcularIrpfAhorro, parseTiposConfig } from './irpf';
+import { calcularIrpfAhorro } from './irpf';
+import { escalaDe } from './escalasAhorro';
 import { localYearMonth } from '../time/localTime';
 import { getAppTimezone } from '../time/appTimezone';
 import type { CifrasRenta, Presentacion721 } from './declaraciones';
@@ -26,7 +27,8 @@ export async function cifrasRenta(year: number): Promise<CifrasRenta> {
     SELECT COALESCE(SUM(amount_net * COALESCE(price_per_unit, 0)), 0) AS total, COUNT(*) AS n
     FROM transactions
     WHERE EXTRACT(YEAR FROM timestamp AT TIME ZONE $2) = $1 AND operation_type IN ${RENDIMIENTOS}`, [year, tz])).rows[0];
-  const tipos = parseTiposConfig((await db.query("SELECT value FROM app_config WHERE key = 'irpf_tramos_tipos'")).rows[0]?.value);
+  // Escala del ejercicio declarado (#452).
+  const tipos = await escalaDe(db, year);
   const detalle = compensarPerdidas(await cargarAniosFiscales(localYearMonth(tz).year)).detalle.find(d => d.year === year);
   const neto = parseFloat(gp.neto);
   const rendimientos = parseFloat(rend.total);

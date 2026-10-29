@@ -15,7 +15,8 @@ const router = Router();
 // valores cortos; un límite evita cargas enormes en app_config.
 export const MAX_CONFIG_VALUE = 2000;
 // Claves con API propia: no se escriben con el PUT genérico.
-const PROTECTED_KEYS = new Set([VIEWS_KEY, DISMISSED_KEY]);
+// irpf_tramos_tipos (#452): los tipos IRPF van por ejercicio en /fiscal/escalas.
+const PROTECTED_KEYS = new Set([VIEWS_KEY, DISMISSED_KEY, 'irpf_tramos_tipos']);
 
 const configSchema = z.object({
   key:   z.string().min(1, 'key es requerido').max(MAX_LENGTH_SHORT, `key no puede superar ${MAX_LENGTH_SHORT} caracteres`)

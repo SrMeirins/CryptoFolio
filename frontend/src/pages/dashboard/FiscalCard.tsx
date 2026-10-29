@@ -31,7 +31,8 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
   const currentYear = new Date().getFullYear()
   const current = data.find((fy) => fy.fiscal_year === currentYear) ?? data[data.length - 1]
   const year = current?.fiscal_year
-  const tramos = useTramos()
+  // Escala del ejercicio que se muestra (#452).
+  const tramos = useTramos(year)
 
   // Mismas consultas (y caché) que la página Fiscal.
   const { data: summary } = useQuery({

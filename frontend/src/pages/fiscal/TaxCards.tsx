@@ -8,8 +8,9 @@ import { tramosScale } from '../../utils/fiscalCharts'
 import { FiscalChartCard } from './FiscalChartCard'
 import { panelSurface } from '../../components/ui'
 
-export function TramosIRPF({ base, label }: { base: number; label: string }) {
-  const tramosConfig = useTramos()
+export function TramosIRPF({ base, label, year }: { base: number; label: string; year: number }) {
+  // Escala del ejercicio (#452).
+  const tramosConfig = useTramos(year)
   // Con una base pequeña, una línea basta; la escala completa se despliega (#313).
   const [abierto, setAbierto] = useState(false)
   const tramos = calcularTramos(base, tramosConfig)

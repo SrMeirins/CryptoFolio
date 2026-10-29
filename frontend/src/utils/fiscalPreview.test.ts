@@ -25,3 +25,12 @@ describe('fiscalPreview', () => {
     expect(preview721(60_000, 50_000, true)).toEqual({ obligado: true, seguro: true })
   })
 })
+
+describe('tramosDeEscala (#452)', () => {
+  it('etiqueta los tramos de cualquier escala y deja abierto el último', async () => {
+    const { tramosDeEscala } = await import('./tramosIrpf')
+    const t = tramosDeEscala([{ hasta: 6000, tipo: 19 }, { hasta: 50000, tipo: 21 }, { hasta: 200000, tipo: 23 }, { hasta: null, tipo: 26 }])
+    expect(t.map(x => x.label)).toEqual(['0 – 6.000 €', '6.001 – 50.000 €', '50.001 – 200.000 €', '> 200.000 €'])
+    expect(t.at(-1)!.hasta).toBe(Infinity)
+  })
+})

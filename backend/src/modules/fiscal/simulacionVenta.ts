@@ -1,5 +1,6 @@
 import { db } from '../../db/client';
-import { calcularIrpfAhorro, desgloseMarginal, parseTiposConfig, type TramoMarginal } from './irpf';
+import { calcularIrpfAhorro, desgloseMarginal, type TramoMarginal } from './irpf';
+import { escalaDe, type Escala } from './escalasAhorro';
 import { baseAhorro, cargarAniosFiscales, compensarPerdidas, type AnioFiscal } from './carryforward';
 import { consumirFifo, type ConsumoFifo, type LoteAbierto } from './simularVenta';
 import { localYearMonth } from '../time/localTime';
@@ -20,7 +21,7 @@ export interface ContextoVenta {
   lotes: LoteAbierto[];
   anios: AnioFiscal[];
   year: number;
-  tipos: readonly number[];
+  tipos: Escala;
   baseAntes: number;
 }
 
@@ -69,7 +70,8 @@ export async function cargarContextoVenta(asset: string, walletId?: string): Pro
 
   const year = localYearMonth(await getAppTimezone(db)).year;
   const anios = await cargarAniosFiscales(year);
-  const tipos = parseTiposConfig((await db.query("SELECT value FROM app_config WHERE key = 'irpf_tramos_tipos'")).rows[0]?.value);
+  // Escala del ejercicio en curso (#452).
+  const tipos = await escalaDe(db, year);
   const baseAntes = baseAhorro(compensarPerdidas(anios).detalle.at(-1)!);
   return { asset, wallet, wallets, lotes, anios, year, tipos, baseAntes };
 }

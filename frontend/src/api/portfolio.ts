@@ -677,6 +677,13 @@ export interface FiatBalance {
   balance: string
 }
 
+/** Escala del ahorro de un ejercicio (#452). `hasta` null en el último tramo. */
+export interface EscalaAhorro {
+  ejercicio: number
+  personalizada: boolean
+  tramos: { hasta: number | null; tipo: number; tipoOficial: number }[]
+}
+
 export interface Notification {
   id: string
   type: 'error' | 'warning' | 'info'
@@ -841,6 +848,10 @@ export const portfolioApi = {
     netInvested: number
   }>(`/fifo/eur-flow?currency=${currency}`),
   getNotifications: () => api.get<Notification[]>('/settings/notifications'),
+  // Escala del ahorro por ejercicio (#452): la oficial del año y los tipos cambiados a mano.
+  getEscala: (year: number) => api.get<EscalaAhorro>(`/fiscal/escalas/${year}`),
+  setEscala: (year: number, tipos: number[]) => api.put<EscalaAhorro>(`/fiscal/escalas/${year}`, { tipos }),
+  resetEscala: (year: number) => api.delete<EscalaAhorro>(`/fiscal/escalas/${year}`),
   // Todos los avisos con su estado, para el resumen por categoría de Ajustes (#447).
   getAllNotifications: () => api.get<NotificationWithState[]>('/settings/notifications?incluir=todas'),
   // Descartar hasta que cambie su contenido (#447); sin ids, todos los visibles.

@@ -72,6 +72,20 @@ test('los recordatorios se silencian con Deshacer y es la misma opción que en G
   await expect(page.getByRole('region', { name: 'Notificaciones' }).getByRole('switch', { name: /^Fiscal/ })).toBeChecked()
 })
 
+test('cada ejercicio muestra los tramos de su escala oficial (#452)', async ({ page }) => {
+  await page.goto('/settings?tab=fiscal')
+  const card = page.getByRole('region', { name: 'Tramos IRPF de la base del ahorro' })
+  const selector = card.getByRole('button', { name: /Ejercicio de la escala/ })
+  await selector.waitFor({ timeout: 15_000 })
+  await selector.click()
+  const opcion = page.getByRole('option', { name: '2022' })
+  test.skip(await opcion.count() === 0, 'Sin el ejercicio 2022 en estos datos')
+  await opcion.click()
+  await expect(card.getByRole('textbox', { name: /^Tipo del tramo / })).toHaveCount(4)
+  await expect(card.getByText('> 200.000 €')).toBeVisible()
+  await expect(card.getByRole('textbox', { name: /^Tipo del tramo > 200\.000 € en 2022$/ })).toHaveValue('26')
+})
+
 for (const theme of ['dark', 'light'] as const) {
   test(`Fiscal en Ajustes sin violaciones de axe (tema ${theme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })

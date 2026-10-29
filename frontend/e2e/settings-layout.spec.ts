@@ -73,8 +73,24 @@ test('el umbral del 721: un valor no válido se rechaza y uno válido se guarda 
   expect(writes.map(w => w.value)).toEqual(['60000', original])
 })
 
-test('un tramo IRPF se guarda al salir del campo y Deshacer lo devuelve', async ({ page }) => {
-  const writes = await fakeConfig(page)
+test('un tramo IRPF se guarda al salir del campo y Deshacer lo devuelve (por ejercicio, #452)', async ({ page }) => {
+  // La escala se intercepta: la base de datos real no se toca.
+  const writes: Array<{ method: string; tipos?: number[] }> = []
+  let override: number[] | null = null
+  await page.route(/\/api\/fiscal\/escalas\/\d{4}$/, async route => {
+    const method = route.request().method()
+    if (method === 'GET') {
+      const real = await (await route.fetch()).json() as { tramos: Array<{ tipo: number; tipoOficial: number }> }
+      const tramos = real.tramos.map((t, i) => ({ ...t, tipo: override?.[i] ?? t.tipo }))
+      await route.fulfill({ json: { ...real, personalizada: !!override, tramos } })
+      return
+    }
+    const real = await (await route.fetch({ method: 'GET' })).json() as { tramos: Array<{ tipo: number; tipoOficial: number }> }
+    const tipos = method === 'PUT' ? (route.request().postDataJSON() as { tipos: number[] }).tipos : undefined
+    writes.push({ method, tipos })
+    override = tipos ?? null
+    await route.fulfill({ json: { ...real, personalizada: !!override, tramos: real.tramos.map((t, i) => ({ ...t, tipo: override?.[i] ?? t.tipoOficial })) } })
+  })
   await page.goto('/settings?tab=fiscal')
   const input = page.getByRole('textbox', { name: /^Tipo del tramo 0/ })
   const original = await input.inputValue()
@@ -84,10 +100,12 @@ test('un tramo IRPF se guarda al salir del campo y Deshacer lo devuelve', async 
   const toast = page.getByRole('status').filter({ hasText: 'Guardado' })
   await expect(toast).toBeVisible()
   await expect(input).toHaveValue(next)
+  expect(writes[0]).toMatchObject({ method: 'PUT' })
+  expect(writes[0].tipos![0]).toBe(Number(next))
   await toast.getByRole('button', { name: 'Deshacer' }).click()
   await expect(input).toHaveValue(original)
-  expect(writes).toHaveLength(2)
-  expect(JSON.parse(writes[1].value)[0]).toBe(Number(original))
+  // Volver a los oficiales quita la personalización.
+  expect(writes[1].method).toBe('DELETE')
 })
 
 for (const theme of ['dark', 'light'] as const) {
