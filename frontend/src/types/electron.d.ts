@@ -1,6 +1,5 @@
 interface ElectronBridge {
   isElectron: boolean
-  openExternal: (url: string) => void
   getUpdateStatus: () => Promise<{ available: boolean; downloaded: boolean; version: string | null }>
   downloadAndInstall: () => Promise<void>
   onUpdateAvailable: (cb: (info: { version: string }) => void) => void

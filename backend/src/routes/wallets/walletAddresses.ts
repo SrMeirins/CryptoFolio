@@ -2,9 +2,8 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../../db/client';
 import { syncWalletAddress, verificarEnSegundoPlano } from '../../modules/walletSync/walletSync';
-import { MAX_LENGTH_LONG } from '../../modules/validation/textLength';
 import {
-  sendZodError, shortText,
+  explorerUrl, sendZodError, shortText,
   walletIdParamSchema, walletAddressParamsSchema, walletSyncParamsSchema,
 } from './shared';
 
@@ -17,7 +16,7 @@ const router = Router();
 const addressFields = {
   network_id:          z.uuid('network_id debe ser un UUID válido').nullish(),
   custom_network:      shortText('custom_network').nullish(),
-  custom_explorer_url: z.url('custom_explorer_url debe ser una URL válida').max(MAX_LENGTH_LONG, `custom_explorer_url no puede superar ${MAX_LENGTH_LONG} caracteres`).nullish(),
+  custom_explorer_url: explorerUrl('custom_explorer_url').nullish(),
   address:             shortText('address').nullish(),
 };
 

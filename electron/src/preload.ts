@@ -3,7 +3,7 @@
  * contextIsolation: true → este script tiene acceso a Node.js pero el renderer NO.
  * Solo exponemos lo estrictamente necesario vía contextBridge.
  */
-import { contextBridge, ipcRenderer, shell } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 
 // apiUrl/wsUrl no se exponen: el frontend se sirve siempre desde el propio
 // backend (mismo origen), así que usa rutas relativas (/api, /ws) — no
@@ -13,7 +13,9 @@ import { contextBridge, ipcRenderer, shell } from 'electron';
 contextBridge.exposeInMainWorld('__CRYPTOFOLIO__', {
   isElectron: true,
 
-  openExternal: (url: string) => shell.openExternal(url),
+  // openExternal se retiró (#471): no lo usaba la web y abría cualquier
+  // esquema. Los enlaces salen por el manejador de ventanas de window.ts,
+  // que solo deja pasar http y https.
 
   // ── Actualizaciones ───────────────────────────────────────────────────────
   // Estado actual: si hay update pendiente y si ya está descargado
