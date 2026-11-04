@@ -70,5 +70,19 @@ export interface FifoRunResult {
 export const FIFO_DUST_EPSILON = 1e-6;
 export const FIFO_SHORTFALL_EPSILON = 1e-4;
 
+// Comisión de red en traspasos a wallets propias registradas (#532): se trata
+// como transmisión (por defecto, consume lotes con ganancia o pérdida) o su
+// coste se suma al de las unidades que llegan al destino, sin efecto fiscal.
+// No hay criterio expreso de la DGT para este caso: es una elección del usuario.
+export const COMISION_RED_KEY = 'fifo_comision_red_traspaso';
+export const COMISION_RED_CRITERIOS = ['transmision', 'coste'] as const;
+export type ComisionRedCriterio = typeof COMISION_RED_CRITERIOS[number];
+
+export interface OpcionesMotor {
+  comisionRed: ComisionRedCriterio;
+  /** «Wallets externas»: no es una wallet propia registrada, siempre transmisión. */
+  walletExterna: string | null;
+}
+
 // Activos fiat: nunca tienen lotes FIFO, las transferencias internas son no-ops silenciosas
 export const FIAT_NO_LOT = new Set(['EUR', 'USD', 'GBP', 'CHF', 'BRL', 'ARS']);

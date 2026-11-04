@@ -1,6 +1,6 @@
 import { PoolClient } from 'pg';
 import { db } from '../../db/client';
-import { Transaction, FifoRunResult, FifoShortfall } from './constants';
+import { Transaction, FifoRunResult, FifoShortfall, COMISION_RED_KEY, type OpcionesMotor } from './constants';
 import { getOpenLots } from './lotPrimitives';
 import { reorderTransactions } from './ordering';
 import { fifoOrderBy } from './orderSql';
@@ -37,6 +37,8 @@ export async function runFifoEngine(onProgress?: (done: number, total: number) =
     // espera aquí hasta que la primera haga COMMIT/ROLLBACK, en vez de
     // entrelazar sus DELETE/INSERT sobre las mismas filas.
     await client.query(`SELECT pg_advisory_xact_lock(hashtext(${FIFO_ENGINE_LOCK_KEY}))`);
+
+    const opciones = await cargarOpciones(client);
 
     await client.query('DELETE FROM fifo_shortfalls');
     await client.query('DELETE FROM fifo_lot_consumptions');
@@ -81,7 +83,7 @@ export async function runFifoEngine(onProgress?: (done: number, total: number) =
     const processBorrow = async (tx: Transaction) => {
       const key = `${tx.asset}|${tx.wallet_id}`;
       marginDebt.set(key, (marginDebt.get(key) ?? 0) + tx.amount);
-      await processTransaction(tx, result, marginDebt, client);
+      await processTransaction(tx, result, marginDebt, client, opciones);
     };
 
     const processedIds = new Set<string>();
@@ -124,7 +126,7 @@ export async function runFifoEngine(onProgress?: (done: number, total: number) =
         if (tx.operation_type === 'MARGIN_BORROW') {
           await processBorrow(tx);
         } else {
-          await processTransaction(tx, result, marginDebt, client);
+          await processTransaction(tx, result, marginDebt, client, opciones);
         }
         processedIds.add(tx.id);
       } catch (e) {
@@ -160,7 +162,18 @@ async function saveShortfalls(shortfalls: readonly FifoShortfall[], client: Pool
   }
 }
 
-async function processTransaction(tx: Transaction, result: FifoRunResult, marginDebt: Map<string, number>, client: PoolClient): Promise<void> {
+/** Ajustes que cambian el cálculo, leídos en la misma transacción que el recálculo. */
+async function cargarOpciones(client: PoolClient): Promise<OpcionesMotor> {
+  const criterio = await client.query(`SELECT value FROM app_config WHERE key = $1`, [COMISION_RED_KEY]);
+  const externa = await client.query(`SELECT id FROM wallets WHERE name = 'Wallets externas' LIMIT 1`);
+  return {
+    // Cualquier valor distinto de «coste» cuenta como el criterio por defecto.
+    comisionRed: criterio.rows[0]?.value === 'coste' ? 'coste' : 'transmision',
+    walletExterna: (externa.rows[0]?.id as string | undefined) ?? null,
+  };
+}
+
+async function processTransaction(tx: Transaction, result: FifoRunResult, marginDebt: Map<string, number>, client: PoolClient, opciones: OpcionesMotor): Promise<void> {
   switch (tx.operation_type) {
     case 'BUY':
     case 'BUY_FIAT':
@@ -195,7 +208,7 @@ async function processTransaction(tx: Transaction, result: FifoRunResult, margin
       break;
     case 'TRANSFER_INTERNAL':
     case 'WITHDRAW':
-      await processTransfer(tx, result, client);
+      await processTransfer(tx, result, client, opciones);
       break;
     case 'STAKING_LOCK':
     case 'STAKING_UNLOCK':

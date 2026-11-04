@@ -60,6 +60,19 @@ describe('routes/settings — config y stats', () => {
     });
   });
 
+  describe('PUT /config — comisión de red en traspasos (#532)', () => {
+    it('acepta transmision y coste, y rechaza cualquier otro valor', async () => {
+      for (const value of ['coste', 'transmision']) {
+        expect((await request(app).put('/api/settings/config').send({ key: 'fifo_comision_red_traspaso', value })).status).toBe(200);
+      }
+      for (const value of ['Coste', 'gasto', '', 1, true]) {
+        expect((await request(app).put('/api/settings/config').send({ key: 'fifo_comision_red_traspaso', value })).status).toBe(400);
+      }
+      const get = await request(app).get('/api/settings/config');
+      expect(get.body.fifo_comision_red_traspaso).toBe('transmision');
+    });
+  });
+
   describe('PUT /config — display_currency (#176)', () => {
     it('acepta EUR y USD y GET /config lo refleja', async () => {
       for (const currency of ['USD', 'EUR']) {
