@@ -14,8 +14,10 @@ const fmtDate = (iso: string) => {
   return `${d}/${m}/${y}`;
 };
 
-// Formato compatible con la importación de la herramienta Renta Web (AEAT).
-// Claves AEAT: D=Dinero, V=Valores/cripto, O=Otros/sin contrapartida.
+// Datos para la casilla 1800 de Renta WEB, sin tildes.
+// Claves de contraprestación (#531, ver contrapartida.ts): F dinero de curso
+// legal, N otra moneda virtual, B pago de un bien o servicio; vacía si hay que
+// revisarla (donaciones y pérdidas).
 // - valorTransmision = BRUTO (proceeds_neto + gastosTx) para que AEAT reste gastosTx correctamente.
 // - gastosAdquisicion = 0 porque el cost_basis ya incluye las comisiones de compra.
 // - Decimal: coma (,). Fecha: DD/MM/YYYY.
