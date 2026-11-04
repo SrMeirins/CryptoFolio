@@ -369,7 +369,7 @@ export interface OriginalRows {
 /** Papel de un consumo FIFO (#405), espejo de modules/history/consumptionRole.ts. */
 export type ConsumptionRole =
   | 'traslado' | 'comision_red' | 'venta' | 'permuta' | 'comision' | 'perdida' | 'donacion'
-  | 'devolucion_margen' | 'intereses_margen' | 'otro'
+  | 'devolucion_margen' | 'intereses_margen' | 'reubicacion' | 'otro'
 
 export interface TransactionDetail {
   transaction: Transaction
@@ -521,7 +521,7 @@ export interface SimulationResult {
   quantity:       number
   priceEur:       number
   feePct:         number
-  /** Wallet donde se simula la venta: FIFO de sus lotes (#279). */
+  /** Wallet donde se simula la venta: limita la cantidad; el coste sigue el FIFO global (#476). */
   walletId:       string
   wallets:        Array<{ walletId: string; walletName: string; quantity: number }>
   totalProceeds:  number   // bruto

@@ -36,7 +36,7 @@ router.get('/planificador', async (_req: Request, res: Response) => {
               fl.opened_at, fl.quantity_remaining::float AS quantity, fl.price_per_unit_eur::float AS unit_cost
        FROM fifo_lots fl JOIN wallets w ON w.id = fl.wallet_id
        WHERE fl.is_closed = FALSE AND fl.quantity_remaining > $1
-       ORDER BY fl.asset, w.name, fl.opened_at ASC, fl.created_at ASC`,
+       ORDER BY fl.asset, fl.opened_at ASC, fl.created_at ASC -- orden FIFO global (#476)`,
       [FIFO_DUST_EPSILON],
     );
     // Adquisiciones de los últimos 2 meses (regla de recompra, art. 33.5 LIRPF).

@@ -25,4 +25,13 @@ describe('consumptionRole (#405)', () => {
     expect(consumptionRole('MARGIN_REPAY', 'USDT', 'LOSS')).toBe('intereses_margen');
     expect(consumptionRole('AIRDROP', 'X', 'NONE')).toBe('otro');
   });
+
+  it('reubicación del FIFO global (#476): consumo sin efecto fiscal en una transmisión', () => {
+    expect(consumptionRole('SELL', 'BTC', 'NONE')).toBe('reubicacion');
+    expect(consumptionRole('BUY_CRYPTO', 'XRP', 'NONE')).toBe('reubicacion');
+    expect(consumptionRole('FEE_EXCHANGE', 'BNB', 'NONE')).toBe('reubicacion');
+    expect(consumptionRole('LOST', 'X', 'NONE')).toBe('reubicacion');
+    // Un traslado sigue siendo traslado.
+    expect(consumptionRole('WITHDRAW', 'BTC', 'NONE')).toBe('traslado');
+  });
 });

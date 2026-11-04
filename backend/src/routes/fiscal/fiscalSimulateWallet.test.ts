@@ -41,18 +41,19 @@ describe('POST /api/fiscal/simulate-sale — wallet, IRPF marginal, recompra y c
     if (testDb) await testDb.teardown();
   });
 
-  it('por defecto vende en la wallet con más cantidad y aplica FIFO solo con sus lotes', async () => {
+  it('por defecto vende en la wallet con más cantidad y aplica el FIFO global del motor (#476)', async () => {
     const res = await request(app).post('/api/fiscal/simulate-sale').send({ asset: 'ADA', quantity: 150, priceEur: 1 });
     expect(res.status).toBe(200);
     expect(res.body.walletId).toBe(ids['Binance Spot']);
     expect(res.body.wallets.map((w: { walletName: string; quantity: number }) => [w.walletName, w.quantity]))
       .toEqual([['Binance Spot', 200], ['Binance Funding', 50]]);
-    // 100 × 0,5 + 50 × 0,8 = 90 de coste (el lote de Funding, más antiguo, no se toca)
-    expect(res.body.totalCostBasis).toBeCloseTo(90, 6);
-    expect(res.body.lotsConsumed.map((l: { partial: boolean }) => l.partial)).toEqual([false, true]);
+    // FIFO global: primero el lote más antiguo (Funding, 50 × 0,1) y luego 100 × 0,5 de Spot = 55 de coste
+    expect(res.body.totalCostBasis).toBeCloseTo(55, 6);
+    expect(res.body.lotsConsumed.map((l: { walletName: string; partial: boolean }) => [l.walletName, l.partial]))
+      .toEqual([['Binance Funding', false], ['Binance Spot', false]]);
   });
 
-  it('se puede elegir la wallet; vender más de lo que tiene da 400', async () => {
+  it('se puede elegir la wallet, que solo limita la cantidad; vender más de lo que tiene da 400', async () => {
     const ok = await request(app).post('/api/fiscal/simulate-sale').send({ asset: 'ADA', quantity: 50, priceEur: 1, walletId: ids['Binance Funding'] });
     expect(ok.body.totalCostBasis).toBeCloseTo(5, 6);
     const tooMuch = await request(app).post('/api/fiscal/simulate-sale').send({ asset: 'ADA', quantity: 60, priceEur: 1, walletId: ids['Binance Funding'] });
@@ -62,23 +63,25 @@ describe('POST /api/fiscal/simulate-sale — wallet, IRPF marginal, recompra y c
   it('la comisión reduce la ganancia', async () => {
     const res = await request(app).post('/api/fiscal/simulate-sale').send({ asset: 'ADA', quantity: 100, priceEur: 1, feePct: 0.1 });
     expect(res.body.totalFee).toBeCloseTo(0.1, 6);
-    expect(res.body.netGainLoss).toBeCloseTo(49.9, 2);
+    // FIFO global: 50 × 0,1 + 50 × 0,5 = 30 de coste; 100 - 30 - 0,1 de comisión
+    expect(res.body.netGainLoss).toBeCloseTo(69.9, 2);
   });
 
   it('IRPF marginal: depende de lo ya realizado en el año', async () => {
     const sin = await request(app).post('/api/fiscal/simulate-sale').send({ asset: 'ADA', quantity: 100, priceEur: 1 });
     expect(sin.body.irpf.baseAntes).toBeCloseTo(0, 6);
-    expect(sin.body.irpf.marginal).toBeCloseTo(9.5, 2);   // 50 € al 19 %
+    expect(sin.body.irpf.marginal).toBeCloseTo(13.3, 2);  // 70 € al 19 %
 
     // Ganancia ya realizada este año: 6.000 € (llena el primer tramo).
-    const { lotId, txId } = await lot('Binance Funding', '2023-02-01T10:00:00Z', 1, 0);
+    // Lote posterior a los que consume la venta, para no alterar su coste FIFO.
+    const { lotId, txId } = await lot('Binance Funding', '2025-06-01T10:00:00Z', 1, 0);
     await pool.query(
       `INSERT INTO fifo_lot_consumptions (lot_id, consuming_transaction_id, quantity_consumed, cost_basis_consumed_eur, proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at)
        VALUES ($1, $2, 1, 0, 6000, 6000, 'GAIN', NOW())`, [lotId, txId],
     );
     const con = await request(app).post('/api/fiscal/simulate-sale').send({ asset: 'ADA', quantity: 100, priceEur: 1 });
     expect(con.body.irpf.baseAntes).toBeCloseTo(6_000, 6);
-    expect(con.body.irpf.marginal).toBeCloseTo(10.5, 2);  // 50 € al 21 %
+    expect(con.body.irpf.marginal).toBeCloseTo(14.7, 2);  // 70 € al 21 %
     expect(con.body.irpf.desglose.map((t: { tipo: number }) => t.tipo)).toEqual([21]);
   });
 
@@ -99,13 +102,13 @@ describe('POST /api/fiscal/simulate-sale — wallet, IRPF marginal, recompra y c
 
   it('curva (#280): resultado neto por precio, coherente con la simulación puntual', async () => {
     const res = await request(app).post('/api/fiscal/simulate-sale/curve')
-      .send({ asset: 'ADA', quantity: 100, prices: [0, 0.5, 1, 2] });
+      .send({ asset: 'ADA', quantity: 100, prices: [0, 0.3, 1, 2] });
     expect(res.status).toBe(200);
     expect(res.body.points).toHaveLength(4);
     const prices = res.body.points.map((p: { price: number }) => p.price);
-    expect(prices).toEqual([0, 0.5, 1, 2]);
+    expect(prices).toEqual([0, 0.3, 1, 2]);
     const results = res.body.points.map((p: { resultadoNeto: number }) => p.resultadoNeto);
-    expect(results[1]).toBeCloseTo(0, 6);                    // a 0,5 € (precio medio de esos 100) no se gana ni se pierde
+    expect(results[1]).toBeCloseTo(0, 6);                    // a 0,3 € (precio medio de esos 100 con FIFO global) no se gana ni se pierde
     expect(results[3]).toBeGreaterThan(results[2]);           // crece con el precio
     const puntual = await request(app).post('/api/fiscal/simulate-sale').send({ asset: 'ADA', quantity: 100, priceEur: 2 });
     expect(res.body.points[3].netoEnMano).toBeCloseTo(puntual.body.netoEnMano, 6);

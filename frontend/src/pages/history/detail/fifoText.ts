@@ -6,12 +6,16 @@ import { amountsAreHidden, formatMoney } from '../../../utils/format'
 export const ROLE_LABELS: Record<ConsumptionRole, string> = {
   traslado: 'Traslado', comision_red: 'Comisión de red', venta: 'Venta', permuta: 'Permuta', comision: 'Comisión',
   perdida: 'Pérdida', donacion: 'Donación', devolucion_margen: 'Devolución de margen', intereses_margen: 'Intereses de margen',
-  otro: 'Otro',
+  reubicacion: 'Reubicación sin efecto fiscal', otro: 'Otro',
 }
 
-/** Papel con su destino si es un traslado («Traslado a Fría»); `inline` lo pone en minúscula sin tocar el nombre de la wallet. */
+/**
+ * Papel con su destino si es un traslado («Traslado a Fría») o una reubicación
+ * del FIFO global (#476); `inline` lo pone en minúscula sin tocar el nombre de la wallet.
+ */
 export function roleText(role: ConsumptionRole, destination: string | null, inline = false): string {
   const name = inline ? ROLE_LABELS[role].charAt(0).toLowerCase() + ROLE_LABELS[role].slice(1) : ROLE_LABELS[role]
+  if (role === 'reubicacion' && destination) return `${inline ? 'reubicación' : 'Reubicación'} a ${destination}, sin efecto fiscal`
   return role === 'traslado' && destination ? `${name} a ${destination}` : name
 }
 

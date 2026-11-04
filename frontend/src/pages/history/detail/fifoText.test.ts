@@ -14,6 +14,10 @@ describe('fifoText (#405)', () => {
     // En línea, en minúscula sin tocar el nombre de la wallet.
     expect(roleText('traslado', 'Tangem Fría', true)).toBe('traslado a Tangem Fría')
     expect(roleText('comision_red', null, true)).toBe('comisión de red')
+    // Reubicación del FIFO global (#476), con y sin destino conocido.
+    expect(roleText('reubicacion', 'Fría')).toBe('Reubicación a Fría, sin efecto fiscal')
+    expect(roleText('reubicacion', 'Fría', true)).toBe('reubicación a Fría, sin efecto fiscal')
+    expect(roleText('reubicacion', null)).toBe('Reubicación sin efecto fiscal')
   })
 
   it('importes pequeños con 2 cifras significativas y signo', () => {

@@ -20,7 +20,7 @@ import { ink } from '../../utils/colors'
 
 // Panel de detalle de un activo en Portfolio (#272): resumen con break-even
 // y simulador, reparto por wallet con lo bloqueado y los lotes FIFO abiertos,
-// con el próximo que se vendería en cada wallet destacado.
+// con el próximo que se vendería destacado (FIFO global, #476).
 
 function Stat({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -193,7 +193,7 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
           <h3 id={`${titleId}-lotes`} className="text-[11px] font-semibold uppercase tracking-widest text-fg-subtle">
             Lotes FIFO abiertos{data ? ` (${lots.length})` : ''}
           </h3>
-          <p className="text-[11px] text-fg-subtle">En cada wallet se vende primero el lote más antiguo; está marcado como «Siguiente».</p>
+          <p className="text-[11px] text-fg-subtle">Se vende primero el lote más antiguo, esté en la wallet que esté (FIFO global); está marcado como «Siguiente».</p>
           {isLoading && <div role="status" aria-label="Cargando los lotes" className="space-y-2">{[0, 1, 2].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>}
           {isError && <p className="text-xs text-fg-subtle">No se pudieron cargar los lotes.</p>}
           {data && lots.length === 0 && <p className="text-xs text-fg-subtle">No hay lotes abiertos.</p>}
@@ -210,7 +210,7 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
                   <span className="truncate max-w-full" style={{ color: ink(l.walletColor) }}>{l.walletName}</span>
                   {l.next && (
                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-brand/12 text-brand-ink shrink-0"
-                      title="Es el primero que se vendería en esta wallet (FIFO)">Siguiente</span>
+                      title="Es el primero que se vendería, desde cualquier wallet (FIFO global)">Siguiente</span>
                   )}
                 </div>
                 <div className="text-right mono tabular-nums text-xs">
