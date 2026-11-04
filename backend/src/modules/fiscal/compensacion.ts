@@ -28,6 +28,12 @@ export interface OrigenPerdida {
   caducado: number;
   /** Último ejercicio en que se puede compensar (31 de diciembre de ese año). */
   caducaEn: number;
+  /**
+   * Pérdida del último ejercicio del cálculo, el año en curso (#534): es
+   * provisional, porque aún puede compensarse con ganancias del mismo año, y
+   * no cuenta en `pendienteTotal`.
+   */
+  provisional: boolean;
 }
 
 /** Ejercicios siguientes en que una pérdida se puede compensar. */
@@ -35,7 +41,16 @@ export const ANIOS_COMPENSACION = 4;
 
 const EPS = 0.01;
 
-export function compensarPerdidas(rows: readonly AnioFiscal[]): { pendienteTotal: number; detalle: DetalleCompensacion[]; origenes: OrigenPerdida[] } {
+export interface ResultadoCompensacion {
+  /** Pendiente de ejercicios cerrados, sin la pérdida provisional del año en curso (#534). */
+  pendienteTotal: number;
+  /** Pérdida neta del año en curso, aún provisional; 0 si no hay. */
+  pendienteProvisional: number;
+  detalle: DetalleCompensacion[];
+  origenes: OrigenPerdida[];
+}
+
+export function compensarPerdidas(rows: readonly AnioFiscal[]): ResultadoCompensacion {
   const origenes: OrigenPerdida[] = [];
   const vivos = () => origenes.filter(o => o.pendiente > EPS);
 
@@ -73,7 +88,7 @@ export function compensarPerdidas(rows: readonly AnioFiscal[]): { pendienteTotal
 
     // La pérdida de este año queda pendiente para los siguientes.
     if (perdidaEsteAnio > EPS) {
-      origenes.push({ year, original: perdidaEsteAnio, compensadoPatrim: 0, compensadoRend: 0, pendiente: perdidaEsteAnio, caducado: 0, caducaEn: year + ANIOS_COMPENSACION });
+      origenes.push({ year, original: perdidaEsteAnio, compensadoPatrim: 0, compensadoRend: 0, pendiente: perdidaEsteAnio, caducado: 0, caducaEn: year + ANIOS_COMPENSACION, provisional: false });
     }
 
     return {
@@ -91,7 +106,11 @@ export function compensarPerdidas(rows: readonly AnioFiscal[]): { pendienteTotal
 
   // Los restos por debajo del céntimo no se arrastran.
   for (const o of origenes) if (o.pendiente <= EPS) o.pendiente = 0;
-  return { pendienteTotal: origenes.reduce((s, o) => s + o.pendiente, 0), detalle, origenes };
+  // La del último ejercicio (el año en curso) es provisional y va aparte (#534).
+  const ultimo = rows.at(-1)?.year;
+  for (const o of origenes) o.provisional = o.year === ultimo;
+  const suma = (provisional: boolean) => origenes.filter(o => o.provisional === provisional).reduce((s, o) => s + o.pendiente, 0);
+  return { pendienteTotal: suma(false), pendienteProvisional: suma(true), detalle, origenes };
 }
 
 /** Base del ahorro de un ejercicio tras compensar (misma fórmula que el panel Fiscal). */

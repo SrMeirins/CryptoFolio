@@ -36,6 +36,21 @@ describe('compensarPerdidas — orígenes y caducidad', () => {
     expect(r.detalle[1].compensadoRend).toBe(10);
   });
 
+  it('la pérdida del año en curso es provisional y no suma al pendiente (#534)', () => {
+    // 2022 cerrado con pérdida; 2024 (último ejercicio, el año en curso) también con pérdida.
+    const r = compensarPerdidas(anios(2022, [[-100, 0], [30, 0], [-50, 0]]));
+    expect(r.origenes.map(o => `${o.year}:${o.pendiente}:${o.provisional}`)).toEqual(['2022:70:false', '2024:50:true']);
+    expect(r.pendienteTotal).toBeCloseTo(70, 9);
+    expect(r.pendienteProvisional).toBeCloseTo(50, 9);
+  });
+
+  it('sin pérdida en el año en curso: provisional 0 y el total no cambia', () => {
+    const r = compensarPerdidas(anios(2023, [[-40, 0], [10, 0]]));
+    expect(r.pendienteTotal).toBeCloseTo(30, 9);
+    expect(r.pendienteProvisional).toBe(0);
+    expect(r.origenes.every(o => !o.provisional)).toBe(true);
+  });
+
   it('sin pérdidas: sin orígenes y el detalle no cambia', () => {
     const r = compensarPerdidas(anios(2024, [[100, 0], [50, 8]]));
     expect(r.origenes).toEqual([]);

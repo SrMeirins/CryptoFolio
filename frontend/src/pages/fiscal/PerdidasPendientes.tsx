@@ -9,11 +9,15 @@ import type { Carryforward } from './types'
 // queda y cuándo caduca cada una. Sustituye a «Compensación de pérdidas».
 
 const ESTADO: Record<OrigenView['estado'], { label: string; cls: string }> = {
+  provisional: { label: 'año en curso, provisional', cls: 'bg-overlay/8 text-fg-muted' },
   'caduca-este-anio': { label: 'caduca este año', cls: 'bg-warning/15 text-warning-ink' },
   vigente: { label: 'vigente', cls: 'bg-info/10 text-info-ink' },
   agotada: { label: 'compensada', cls: 'bg-positive/10 text-positive-ink' },
   caducada: { label: 'caducada', cls: 'bg-overlay/8 text-fg-subtle' },
 }
+
+/** Rayado: la pérdida del año en curso es provisional (#534). */
+const PROVISIONAL_CLS = 'bg-info/35 bg-[repeating-linear-gradient(45deg,transparent_0_3px,rgb(0_0_0/0.12)_3px_6px)]'
 
 /** Aviso de las pérdidas que caducan el 31 de diciembre; también lo usa la cabecera del año. */
 export function AvisoCaducidad({ importe, years, compact = false }: { importe: number; years: number[]; compact?: boolean }) {
@@ -37,7 +41,9 @@ function Fila({ o }: { o: OrigenView }) {
         <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${e.cls}`}>{e.label}</span>
         <span className="text-fg-subtle">pérdida <span className="mono text-negative">{formatEur(o.original)}</span></span>
         <span className="ml-auto text-right">
-          {o.pendiente > 0.005
+          {o.estado === 'provisional'
+            ? <><span className="mono font-semibold text-fg-muted">{formatEur(o.pendiente)}</span> <span className="text-fg-subtle">provisional · no suma al total pendiente</span></>
+            : o.pendiente > 0.005
             ? <><span className="mono font-semibold text-fg">{formatEur(o.pendiente)}</span> <span className="text-fg-subtle">pendiente · hasta el 31 dic {o.caducaEn}</span></>
             : o.caducado > 0.005
               ? <span className="text-fg-subtle"><span className="mono">{formatEur(o.caducado)}</span> caducó sin usar en {o.caducaEn}</span>
@@ -45,9 +51,9 @@ function Fila({ o }: { o: OrigenView }) {
         </span>
       </div>
       <div className="flex h-2 rounded-full overflow-hidden bg-background-tertiary" role="img"
-        aria-label={`${o.year}: compensado ${formatEur(o.compensado)}, pendiente ${formatEur(o.pendiente)}, caducado ${formatEur(o.caducado)}`}>
+        aria-label={`${o.year}: compensado ${formatEur(o.compensado)}, ${o.estado === 'provisional' ? 'provisional' : 'pendiente'} ${formatEur(o.pendiente)}, caducado ${formatEur(o.caducado)}`}>
         <span className="h-full bg-positive/70" style={{ width: `${o.pct.compensado}%` }} />
-        <span className={`h-full ${o.estado === 'caduca-este-anio' ? 'bg-warning' : 'bg-info/70'}`} style={{ width: `${o.pct.pendiente}%` }} />
+        <span className={`h-full ${o.estado === 'caduca-este-anio' ? 'bg-warning' : o.estado === 'provisional' ? PROVISIONAL_CLS : 'bg-info/70'}`} style={{ width: `${o.pct.pendiente}%` }} />
         <span className="h-full bg-fg-subtle/30 bg-[repeating-linear-gradient(45deg,transparent_0_3px,rgb(0_0_0/0.15)_3px_6px)]" style={{ width: `${o.pct.caducado}%` }} />
       </div>
       {o.compensado > 0.005 && (
@@ -79,8 +85,14 @@ export function PerdidasPendientes({ data }: { data: Carryforward }) {
           <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-positive/70" aria-hidden="true" />Compensado</span>
           <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-info/70" aria-hidden="true" />Pendiente</span>
           <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-warning" aria-hidden="true" />Caduca este año</span>
+          {view.some(o => o.estado === 'provisional') && (
+            <span className="inline-flex items-center gap-1.5"><span className={`w-2.5 h-2.5 rounded-sm ${PROVISIONAL_CLS}`} aria-hidden="true" />Año en curso (provisional)</span>
+          )}
           <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-fg-subtle/30" aria-hidden="true" />Caducado</span>
         </p>
+        {view.some(o => o.estado === 'provisional') && (
+          <p>La pérdida del año en curso es provisional: aún puede compensarse con ganancias de este año y solo pasa a pendiente al cerrar el ejercicio.</p>
+        )}
         <p>Las pérdidas compensan ganancias patrimoniales sin límite y hasta el 25 % de los rendimientos durante los 4 ejercicios siguientes; se usan primero las más antiguas.</p>
         {caducado > 0.005 && <p>Caducadas sin usar en total: <span className="mono text-fg-muted">{formatEur(caducado)}</span>.</p>}
       </div>

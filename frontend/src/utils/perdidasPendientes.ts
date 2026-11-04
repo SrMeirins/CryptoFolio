@@ -9,16 +9,19 @@ export interface OrigenView extends OrigenPerdida {
   compensado: number
   /** Porcentajes de la barra: compensado, pendiente y caducado (suman 100). */
   pct: { compensado: number; pendiente: number; caducado: number }
-  estado: 'caduca-este-anio' | 'vigente' | 'agotada' | 'caducada'
+  estado: 'provisional' | 'caduca-este-anio' | 'vigente' | 'agotada' | 'caducada'
 }
 
 export function origenesView(origenes: readonly OrigenPerdida[], currentYear: number): OrigenView[] {
   return [...origenes].sort((a, b) => a.year - b.year).map(o => {
     const compensado = o.compensadoPatrim + o.compensadoRend
     const base = o.original > 0 ? o.original : 1
-    const estado: OrigenView['estado'] = o.pendiente > EPS
-      ? (o.caducaEn <= currentYear ? 'caduca-este-anio' : 'vigente')
-      : o.caducado > EPS ? 'caducada' : 'agotada'
+    // La del año en curso aún puede compensarse con ganancias del mismo año (#534).
+    const estado: OrigenView['estado'] = o.provisional && o.pendiente > EPS
+      ? 'provisional'
+      : o.pendiente > EPS
+        ? (o.caducaEn <= currentYear ? 'caduca-este-anio' : 'vigente')
+        : o.caducado > EPS ? 'caducada' : 'agotada'
     return {
       ...o, compensado, estado,
       pct: { compensado: (compensado / base) * 100, pendiente: (o.pendiente / base) * 100, caducado: (o.caducado / base) * 100 },
