@@ -6,11 +6,12 @@ import { consumirFifo, type ConsumoFifo, type LoteAbierto } from './simularVenta
 import { localYearMonth } from '../time/localTime';
 import { getAppTimezone } from '../time/appTimezone';
 
-// Contexto de una venta simulada (#279, #280): se carga una vez (lotes de la
-// wallet, años fiscales y tipos del IRPF) y permite evaluar cualquier
-// cantidad y precio con exactamente la misma regla: FIFO de la wallet,
-// comisión e IRPF marginal con compensación de pérdidas entre años. Lo usan
-// el resultado, la curva por precio y la cantidad para un neto objetivo.
+// Contexto de una venta simulada (#279, #280): se carga una vez (lotes del
+// activo, años fiscales y tipos del IRPF) y permite evaluar cualquier
+// cantidad y precio con exactamente la misma regla que el motor: FIFO global
+// por activo (#476), comisión e IRPF marginal con compensación de pérdidas
+// entre años. La wallet donde se vende solo limita la cantidad disponible.
+// Lo usan el resultado, la curva por precio y la cantidad para un neto objetivo.
 
 export interface WalletDisponible { walletId: string; walletName: string; quantity: number }
 
@@ -50,14 +51,14 @@ export async function cargarContextoVenta(asset: string, walletId?: string): Pro
   const wallet = walletId ? wallets.find(w => w.walletId === walletId) : wallets[0];
   if (!wallet) return { status: 404, error: `No hay lotes abiertos de ${asset} en esa wallet` };
 
-  // Lotes de esa wallet en el orden del motor FIFO.
+  // Lotes del activo en todas las wallets, en el orden del motor FIFO (#476).
   const lotsRes = await db.query(
     `SELECT fl.id, fl.quantity_remaining::float AS quantity, fl.cost_basis_eur::float AS cost_basis,
             fl.price_per_unit_eur::float AS price_per_unit, fl.opened_at, w.name AS wallet_name
      FROM fifo_lots fl JOIN wallets w ON w.id = fl.wallet_id
-     WHERE fl.asset = $1 AND fl.wallet_id = $2 AND fl.is_closed = FALSE AND fl.quantity_remaining > 0.0000001
+     WHERE fl.asset = $1 AND fl.is_closed = FALSE AND fl.quantity_remaining > 0.0000001
      ORDER BY fl.opened_at ASC, fl.created_at ASC`,
-    [asset, wallet.walletId],
+    [asset],
   );
   const lotes: LoteAbierto[] = (lotsRes.rows as Array<Record<string, unknown>>).map(r => ({
     id: r.id as string,

@@ -36,7 +36,7 @@ function Fila({ s, nota, onSimular }: { s: Sugerencia; nota: React.ReactNode; on
             )}
           </span>
           <span className="block text-[11px] text-fg-subtle">
-            Vender <span className="mono text-fg-muted">{formatFiscalQty(s.quantity)}</span> de {formatFiscalQty(s.disponible)} (FIFO)
+            Vender <span className="mono text-fg-muted">{formatFiscalQty(s.quantity)}</span> de {formatFiscalQty(s.disponible)} (FIFO global)
           </span>
         </span>
       </span>
@@ -142,7 +142,7 @@ export function PlanificadorTab() {
             {sug.perdidas.map((s, i) => {
               const a = i < 50 ? ahorro(i) : null
               return (
-                <Fila key={`${s.asset}-${s.walletId}`} s={s} onSimular={() => setSimular(s)}
+                <Fila key={s.asset} s={s} onSimular={() => setSimular(s)}
                   nota={a === null ? '…' : a > 0.005
                     ? <>ahorra <span className="mono text-positive">{formatEur(a)}</span> de IRPF este año</>
                     : 'sin ganancias que compensar: queda pendiente 4 años'} />
@@ -166,7 +166,7 @@ export function PlanificadorTab() {
           ) : (
             <ul className="space-y-2">
               {sug.ganancias.map(s => (
-                <Fila key={`${s.asset}-${s.walletId}`} s={s} onSimular={() => setSimular(s)} nota="sin tributar" />
+                <Fila key={s.asset} s={s} onSimular={() => setSimular(s)} nota="sin tributar" />
               ))}
             </ul>
           )}
@@ -175,7 +175,7 @@ export function PlanificadorTab() {
       )}
 
       <p className="text-[11px] text-fg-subtle">
-        Cálculos con los precios en vivo y sin comisión; «Simular» muestra el resultado exacto con comisión e IRPF. Las ventas respetan FIFO dentro de cada wallet.
+        Cálculos con los precios en vivo y sin comisión; «Simular» muestra el resultado exacto con comisión e IRPF. Las ventas siguen el FIFO global por activo: salen primero las unidades compradas antes, estén en la wallet que estén.
       </p>
 
       {simular && (

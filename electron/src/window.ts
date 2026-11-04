@@ -1,5 +1,6 @@
 import { BrowserWindow, shell } from 'electron';
 import path from 'path';
+import { openExternalSafely } from './shared/external-url';
 
 /**
  * Crea la ventana principal. `backendPort` es el puerto REAL ya resuelto
@@ -61,12 +62,13 @@ export async function createWindow(
     const allowed = isDev ? 'http://localhost:5173' : `http://127.0.0.1:${backendPort}`;
     if (!url.startsWith(allowed)) {
       event.preventDefault();
-      shell.openExternal(url);
+      // Fuera de la app solo salen http y https (#471).
+      openExternalSafely(url, u => shell.openExternal(u));
     }
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    openExternalSafely(url, u => shell.openExternal(u));
     return { action: 'deny' };
   });
 

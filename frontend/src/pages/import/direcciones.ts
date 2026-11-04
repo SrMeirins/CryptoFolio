@@ -1,5 +1,6 @@
 import type { WalletFull } from '../../api/portfolio'
 import type { PreviewTransaction } from './types'
+import { explorerLink } from '../../utils/externalLink'
 
 // Direcciones de destino de los retiros en la revisión (#320). Lógica pura.
 
@@ -17,13 +18,14 @@ export function abreviarDireccion(address: string, cabeza = 6, cola = 4): string
 }
 
 /**
- * URL del explorador a partir de la plantilla de la red. Solo https y con el
- * valor codificado: una plantilla o un valor manipulados no producen un enlace
- * javascript: ni cambian de dominio.
+ * URL del explorador a partir de la plantilla de la red: exige el marcador y,
+ * como todos los enlaces externos (#471), solo http o https y con el valor
+ * codificado, así que una plantilla o un valor manipulados no producen un
+ * enlace javascript: ni cambian de dominio.
  */
 export function urlExplorador(plantilla: string | null | undefined, marcador: '{address}' | '{tx_hash}', valor: string | null | undefined): string | null {
-  if (!plantilla || !valor || !plantilla.startsWith('https://') || !plantilla.includes(marcador)) return null
-  return plantilla.replace(marcador, encodeURIComponent(valor))
+  if (!plantilla?.includes(marcador)) return null
+  return explorerLink(plantilla, marcador, valor)
 }
 
 export interface GrupoDireccion {

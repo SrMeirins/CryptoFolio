@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { mejorGananciaHasta, mejorPerdida, sugerencias, type PlanLot } from './planificador'
 
 // Planificador de fin de año (#307). Datos sintéticos.
-const lot = (asset: string, quantity: number, unitCost: number, walletId = 'w1'): PlanLot =>
-  ({ asset, walletId, walletName: `W ${walletId}`, walletColor: '#123456', walletKind: 'exchange', openedAt: '2024-01-01T00:00:00Z', quantity, unitCost })
+const lot = (asset: string, quantity: number, unitCost: number, walletId = 'w1', openedAt = '2024-01-01T00:00:00Z'): PlanLot =>
+  ({ asset, walletId, walletName: `W ${walletId}`, walletColor: '#123456', walletKind: 'exchange', openedAt, quantity, unitCost })
 
 describe('mejorPerdida (FIFO)', () => {
   it('vende solo los lotes antiguos con pérdida si los nuevos tienen ganancia', () => {
@@ -34,14 +34,24 @@ describe('mejorGananciaHasta', () => {
 })
 
 describe('sugerencias', () => {
-  it('por activo y wallet, recompras al final y sin precio fuera', () => {
+  it('por activo con FIFO global, recompras al final y sin precio fuera', () => {
+    // B: el lote más antiguo (5 a 1 €, en w2) sale primero aunque se venda desde w1,
+    // la wallet con más cantidad; vendiendo lo de w1 (10) salen 5 de w2 y 5 de w1.
     const s = sugerencias(
-      [lot('A', 10, 5), lot('B', 10, 3), lot('B', 5, 1, 'w2'), lot('C', 1, 1)],
+      [lot('A', 10, 5), lot('B', 5, 1, 'w2', '2023-01-01T00:00:00Z'), lot('B', 10, 3), lot('C', 1, 1)],
       { A: 1, B: 1, NOPRICE: 0 },
       100,
       { A: '2026-10-01T00:00:00Z' },
     )
-    expect(s.perdidas.map(p => `${p.asset}/${p.walletId}:${p.pnl}:${p.recompra}`)).toEqual(['B/w1:-20:false', 'A/w1:-40:true'])
+    expect(s.perdidas.map(p => `${p.asset}/${p.walletId}:${p.quantity}/${p.disponible}:${p.pnl}:${p.recompra}`))
+      .toEqual(['B/w1:10/10:-10:false', 'A/w1:10/10:-40:true'])
     expect(s.ganancias).toEqual([])
+  })
+
+  it('una sola sugerencia por activo aunque esté en varias wallets', () => {
+    const s = sugerencias([lot('A', 2, 5, 'w1'), lot('A', 3, 5, 'w2')], { A: 1 }, 0, {})
+    expect(s.perdidas).toHaveLength(1)
+    expect(s.perdidas[0].walletId).toBe('w2')
+    expect(s.perdidas[0].quantity).toBe(3)
   })
 })

@@ -12,6 +12,21 @@ export const shortText = (field: string) =>
 export const longText = (field: string) =>
   z.string().max(MAX_LENGTH_LONG, `${field} no puede superar ${MAX_LENGTH_LONG} caracteres`);
 
+// URL de explorador (#471): solo http y https, que son las que abren el
+// navegador. Las de red son plantillas con {address} o {tx_hash}, así que se
+// comprueban con un valor de ejemplo en su lugar.
+const EXPLORER_SCHEMES = new Set(['http:', 'https:']);
+export function isExplorerUrl(raw: string): boolean {
+  try {
+    const url = new URL(raw.replace(/\{(address|tx_hash)\}/g, 'x'));
+    return EXPLORER_SCHEMES.has(url.protocol) && url.hostname !== '' && url.username === '' && url.password === '';
+  } catch {
+    return false;
+  }
+}
+export const explorerUrl = (field: string) =>
+  longText(field).refine(isExplorerUrl, `${field} debe ser una URL http o https`);
+
 export const walletIdParamSchema = z.object({
   id: z.uuid('id debe ser un UUID válido'),
 });

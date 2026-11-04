@@ -51,6 +51,22 @@ export async function openLot(
   );
 }
 
+/**
+ * Disposición con efecto fiscal (#476): FIFO global por activo. Se consumen los
+ * lotes abiertos más antiguos del activo en todas las wallets, por su fecha de
+ * adquisición original (un traslado la conserva), como indica la AEAT para
+ * monedas virtuales homogéneas aunque estén en plataformas distintas.
+ *
+ * Para que cada wallet conserve sus unidades reales, si se consume un lote de
+ * otra wallet V se reubica la misma cantidad de los lotes de `walletId` (donde
+ * se dispone) a V: un consumo sin efecto fiscal y un lote nuevo en V con la
+ * fecha y el coste de origen, igual que un traslado. Solo cambian el coste y la
+ * ganancia de la operación; nunca las cantidades por wallet.
+ *
+ * Solo se dispone de lo que la wallet tiene: si los datos dicen que vende más,
+ * el exceso es un hueco de datos de esa wallet (déficit, como antes) y no se
+ * cubre con unidades de otras wallets, que las siguen teniendo.
+ */
 export async function consumeLots(
   txId: string,
   asset: string,
@@ -61,9 +77,9 @@ export async function consumeLots(
   result: FifoRunResult,
   client: PoolClient
 ): Promise<void> {
-  const lots = await getOpenLots(asset, walletId, client);
+  const inWallet = (await getOpenLots(asset, walletId, client)).reduce((sum, l) => sum + l.quantityRemaining, 0);
 
-  if (lots.length === 0) {
+  if (inWallet <= 0) {
     result.errors.push(`Sin lotes abiertos para ${asset} en wallet ${walletId} (tx ${txId})`);
     if (quantityToConsume > FIFO_SHORTFALL_EPSILON) {
       result.shortfalls.push({ txId, asset, walletId, requested: quantityToConsume, missing: quantityToConsume });
@@ -71,8 +87,11 @@ export async function consumeLots(
     return;
   }
 
-  let remaining = quantityToConsume;
+  const lots = await getOpenLots(asset, null, client);
+  let remaining = Math.min(quantityToConsume, inWallet);
   const proceedsPerUnit = totalProceedsEur / quantityToConsume;
+  // Cantidad consumida de otras wallets, que se reubica desde `walletId`.
+  const relocations = new Map<string, number>();
 
   for (const lot of lots) {
     if (remaining <= 0) break;
@@ -102,30 +121,94 @@ export async function consumeLots(
     if (gainLoss >= 0) result.totalGainEur += gainLoss;
     else result.totalLossEur += gainLoss;
 
+    if (lot.walletId !== walletId) relocations.set(lot.walletId, (relocations.get(lot.walletId) ?? 0) + consumed);
+
     result.lotsConsumed++;
     remaining -= consumed;
   }
 
-  // Igual que el shortfall de WITHDRAW en processTransfer: si tras consumir todos
-  // los lotes disponibles queda cantidad sin cubrir, es una señal real de datos
-  // incompletos (venta/permuta/fee mayor que lo que la app cree que posees) —
-  // se reporta en vez de desaparecer en silencio.
-  if (remaining > FIFO_SHORTFALL_EPSILON) {
+  // Igual que el shortfall de WITHDRAW en processTransfer: lo que la wallet no
+  // tiene es una señal real de datos incompletos (venta/permuta/fee mayor que
+  // lo que la app cree que posees en ella) — se reporta en vez de desaparecer
+  // en silencio.
+  const missing = quantityToConsume - Math.min(quantityToConsume, inWallet) + Math.max(0, remaining);
+  if (missing > FIFO_SHORTFALL_EPSILON) {
     result.errors.push(
       `Lotes insuficientes para ${asset} en wallet ${walletId} (tx ${txId}): ` +
-      `faltan ${remaining.toFixed(6)} de ${quantityToConsume.toFixed(6)} solicitados`
+      `faltan ${missing.toFixed(6)} de ${quantityToConsume.toFixed(6)} solicitados`
     );
-    result.shortfalls.push({ txId, asset, walletId, requested: quantityToConsume, missing: remaining });
+    result.shortfalls.push({ txId, asset, walletId, requested: quantityToConsume, missing });
+  }
+
+  // Reubicación: la wallet tiene al menos lo consumido, así que siempre puede
+  // devolver a las otras lo que se tomó de ellas.
+  let unmoved = 0;
+  for (const [toWalletId, quantity] of relocations) {
+    unmoved += await moveLots(client, { txId, asset, fromWalletId: walletId, toWalletId, quantity, timestamp });
+  }
+  if (unmoved > FIFO_SHORTFALL_EPSILON) {
+    result.errors.push(`Reubicación incompleta de ${asset} desde wallet ${walletId} (tx ${txId}): faltan ${unmoved.toFixed(6)}`);
   }
 }
 
-export async function getOpenLots(asset: string, walletId: string, client: PoolClient): Promise<FifoLot[]> {
+/**
+ * Traslada `quantity` de los lotes más antiguos de una wallet a otra sin efecto
+ * fiscal: consumo NONE en el origen y lote nuevo en el destino que hereda la
+ * fecha de adquisición, el precio y el tipo USD del lote de origen (#174).
+ * Devuelve la cantidad que no se pudo trasladar por falta de lotes.
+ */
+export async function moveLots(
+  client: PoolClient,
+  move: { txId: string; asset: string; fromWalletId: string; toWalletId: string; quantity: number; timestamp: Date },
+): Promise<number> {
+  let quantityToMove = move.quantity;
+  const lots = await getOpenLots(move.asset, move.fromWalletId, client);
+
+  for (const lot of lots) {
+    if (quantityToMove <= 0) break;
+
+    const consumed = Math.min(lot.quantityRemaining, quantityToMove);
+    const proportion = consumed / lot.quantityRemaining;
+    const costMoved = lot.costBasisEur * proportion;
+
+    await updateLot(client, lot.id, lot.quantityRemaining - consumed, lot.costBasisEur - costMoved);
+
+    // Registrar como consumo NONE para reconstrucción histórica correcta
+    await client.query(
+      `INSERT INTO fifo_lot_consumptions (
+        lot_id, consuming_transaction_id,
+        quantity_consumed, cost_basis_consumed_eur,
+        proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
+      ) VALUES ($1, $2, $3, $4, $4, 0, 'NONE', $5)`,
+      [lot.id, move.txId, consumed, costMoved, move.timestamp]
+    );
+
+    await client.query(
+      `INSERT INTO fifo_lots (
+        asset, quantity_original, quantity_remaining,
+        cost_basis_eur, price_per_unit_eur, fee_eur,
+        open_transaction_id, opened_at, wallet_id, usd_per_eur
+      ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9)`,
+      [move.asset, consumed, consumed, costMoved, lot.pricePerUnitEur, move.txId, lot.openedAt, move.toWalletId, lot.usdPerEur]
+    );
+
+    quantityToMove -= consumed;
+  }
+  return Math.max(0, quantityToMove);
+}
+
+/**
+ * Lotes abiertos de un activo por fecha de adquisición original y, a igualdad,
+ * por orden de creación. Con `walletId` null, los de todas las wallets (FIFO
+ * global, #476); con una wallet, solo los suyos (traslados y margen).
+ */
+export async function getOpenLots(asset: string, walletId: string | null, client: PoolClient): Promise<FifoLot[]> {
   const res = await client.query(
     `SELECT id, asset, quantity_original, quantity_remaining,
             cost_basis_eur, price_per_unit_eur, opened_at, wallet_id, open_transaction_id, usd_per_eur
      FROM fifo_lots
      WHERE asset = $1
-       AND wallet_id = $2
+       AND ($2::uuid IS NULL OR wallet_id = $2::uuid)
        AND is_closed = FALSE
        AND quantity_remaining > ${FIFO_DUST_EPSILON}
      ORDER BY opened_at ASC, created_at ASC`,

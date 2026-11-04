@@ -5,6 +5,7 @@ import { OTHER_NETWORK, getAddressPlaceholder, inputClass } from './helpers'
 import { NetworkPicker } from './NetworkPicker'
 import { NetworkApiKeyField } from './NetworkApiKeyField'
 import { buttonClasses, fieldClasses } from '../../../components/ui'
+import { explorerLink } from '../../../utils/externalLink'
 
 export function AddAddressForm({ networks, onSave, onCancel }: {
   networks: Network[]
@@ -18,8 +19,8 @@ export function AddAddressForm({ networks, onSave, onCancel }: {
 
   const isCustom   = selected === OTHER_NETWORK
   const selectedNetwork  = networks.find(n => n.id === selected)
-  const explorerHref     = selectedNetwork?.explorer_url && address
-    ? selectedNetwork.explorer_url.replace('{address}', address) : null
+  // Solo http y https, con la dirección codificada (#471).
+  const explorerHref     = explorerLink(selectedNetwork?.explorer_url, '{address}', address)
   const canSave = isCustom ? !!customName : !!selected
 
   function handleSave() {

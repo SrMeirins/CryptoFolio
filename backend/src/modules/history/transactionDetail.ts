@@ -38,6 +38,9 @@ export function explorerUrl(template: string | null, placeholder: '{tx_hash}' | 
   }
 }
 
+/** Mismo instante aunque el driver devuelva Date o texto. */
+const sameInstant = (a: unknown, b: unknown) => new Date(a as string).getTime() === new Date(b as string).getTime();
+
 export async function getTransactionDetail(db: Queryable, id: string, tz: string) {
   const defaults = historyExportSchema.parse({});
   const row = historyRowsSql(defaults, tz, undefined, true, id);
@@ -115,15 +118,24 @@ export async function getTransactionDetail(db: Queryable, id: string, tz: string
   return {
     transaction: tx,
     fifo: {
-      consumed: consumed.rows.map(c => ({
-        id: c.id, lot_id: c.lot_id, asset: c.asset, wallet_name: c.wallet_name,
-        origin: { id: c.origin_id, operation_type: c.origin_type, timestamp: c.origin_timestamp },
-        opened_at: c.opened_at, quantity: num(c.quantity_consumed), cost_eur: num(c.cost_basis_consumed_eur),
-        proceeds_eur: num(c.proceeds_eur), gain_loss_eur: num(c.gain_loss_eur), fiscal_event_type: c.fiscal_event_type,
-        // Papel en esta operación y adónde van las unidades si se trasladan (#405).
-        role: consumptionRole(tx.operation_type, tx.asset, c.fiscal_event_type),
-        destination_name: tx.destination_wallet_name ?? null,
-      })),
+      consumed: consumed.rows.map(c => {
+        // Papel en esta operación y adónde van las unidades si se trasladan (#405)
+        // o se reubican por el FIFO global (#476): el lote que abre esta misma
+        // operación con la cantidad y la fecha de adquisición del consumido.
+        const role = consumptionRole(tx.operation_type, tx.asset, c.fiscal_event_type);
+        const relocatedTo = role === 'reubicacion'
+          ? opened.rows.find(l => l.asset === c.asset && sameInstant(l.opened_at, c.opened_at)
+              && Math.abs(Number(l.quantity_original) - Number(c.quantity_consumed)) < 1e-12)?.wallet_name ?? null
+          : null;
+        return {
+          id: c.id, lot_id: c.lot_id, asset: c.asset, wallet_name: c.wallet_name,
+          origin: { id: c.origin_id, operation_type: c.origin_type, timestamp: c.origin_timestamp },
+          opened_at: c.opened_at, quantity: num(c.quantity_consumed), cost_eur: num(c.cost_basis_consumed_eur),
+          proceeds_eur: num(c.proceeds_eur), gain_loss_eur: num(c.gain_loss_eur), fiscal_event_type: c.fiscal_event_type,
+          role,
+          destination_name: role === 'reubicacion' ? relocatedTo : tx.destination_wallet_name ?? null,
+        };
+      }),
       totals: {
         cost_eur: fiscal.reduce((s, c) => s + Number(c.cost_basis_consumed_eur), 0),
         proceeds_eur: fiscal.reduce((s, c) => s + Number(c.proceeds_eur), 0),

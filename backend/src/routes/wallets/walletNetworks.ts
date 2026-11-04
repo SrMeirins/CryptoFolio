@@ -2,15 +2,15 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../../db/client';
 import { encryptApiKey } from '../../modules/walletSync/apiKeyCrypto';
-import { longText, networkIdParamSchema, sendZodError, shortText } from './shared';
+import { explorerUrl, networkIdParamSchema, sendZodError, shortText } from './shared';
 
 const router = Router();
 
 const networkCreateBodySchema = z.object({
   name:            shortText('name').min(1, 'name es requerido'),
   native_asset:    shortText('native_asset').min(1, 'native_asset es requerido'),
-  explorer_url:    longText('explorer_url').nullish(),
-  explorer_tx_url: longText('explorer_tx_url').nullish(),
+  explorer_url:    explorerUrl('explorer_url').nullish(),
+  explorer_tx_url: explorerUrl('explorer_tx_url').nullish(),
 });
 
 const apiKeyBodySchema = z.object({

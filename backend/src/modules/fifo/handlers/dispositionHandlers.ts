@@ -1,7 +1,7 @@
 import { PoolClient } from 'pg';
 import { getHistoricalPriceEur } from '../../prices/binance';
 import { Transaction, FifoRunResult, FIAT_NO_LOT, FIFO_SHORTFALL_EPSILON } from '../constants';
-import { openLot, consumeLots, getOpenLots, updateLot } from '../lotPrimitives';
+import { openLot, consumeLots, getOpenLots, moveLots, updateLot } from '../lotPrimitives';
 
 // ── SELL ──────────────────────────────────────────────────────────────────
 export async function processSell(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
@@ -89,9 +89,10 @@ export async function processLost(tx: Transaction, result: FifoRunResult, client
 }
 
 // ── MARGIN_REPAY ──────────────────────────────────────────────────────────
-// Devolver un préstamo no es disposición patrimonial (NONE).
-// Si el repayment supera el principal pendiente (intereses de margen),
-// el exceso se registra como LOSS — gasto deducible de G/P.
+// Devolver un préstamo no es disposición patrimonial (NONE): el principal se
+// devuelve con unidades de la wallet del préstamo. Si el repayment supera el
+// principal pendiente, el exceso son intereses pagados en cripto: una
+// transmisión con pérdida deducible que sigue el FIFO global (#476).
 //
 // La deuda pendiente se rastrea en `marginDebt` (mapa en memoria mantenido
 // por runFifoEngine) para que la distinción principal/interés sea exacta
@@ -99,76 +100,38 @@ export async function processLost(tx: Transaction, result: FifoRunResult, client
 export async function processMarginRepay(tx: Transaction, result: FifoRunResult, marginDebt: Map<string, number>, client: PoolClient): Promise<void> {
   if (FIAT_NO_LOT.has(tx.asset)) return;
   const lots = await getOpenLots(tx.asset, tx.wallet_id, client);
-  if (lots.length === 0) return; // Sin lotes — silencioso
+  if (lots.length === 0) return; // Sin lotes en la wallet del préstamo — silencioso
 
   const key = `${tx.asset}|${tx.wallet_id}`;
   const debtBefore = marginDebt.get(key) ?? 0;
-
-  // Principal = lo que se devuelve del préstamo; interés = exceso sobre la deuda
-  let principalLeft = Math.min(tx.amount, Math.max(0, debtBefore));
-
-  // Actualizar deuda restante
+  const principal = Math.min(tx.amount, Math.max(0, debtBefore));
+  const interest = tx.amount - principal;
   marginDebt.set(key, Math.max(0, debtBefore - tx.amount));
 
-  let remaining = tx.amount;
-
+  // Principal: sin impacto fiscal, sale de los lotes de la wallet del préstamo.
+  let remaining = principal;
   for (const lot of lots) {
     if (remaining <= 0) break;
-
     const consumed = Math.min(lot.quantityRemaining, remaining);
-    const proportion = consumed / lot.quantityRemaining;
-    const costConsumed = lot.costBasisEur * proportion;
-
-    // Calcular cuánto de este consumo es principal y cuánto interés
-    const consumedAsPrincipal = Math.min(consumed, principalLeft);
-    const consumedAsInterest  = consumed - consumedAsPrincipal;
-    principalLeft -= consumedAsPrincipal;
-
-    if (consumedAsInterest === 0) {
-      // Todo principal: sin impacto fiscal
-      await client.query(
-        `INSERT INTO fifo_lot_consumptions (
-          lot_id, consuming_transaction_id,
-          quantity_consumed, cost_basis_consumed_eur,
-          proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
-        ) VALUES ($1, $2, $3, $4, $4, 0, 'NONE', $5)`,
-        [lot.id, tx.id, consumed, costConsumed, tx.timestamp]
-      );
-    } else if (consumedAsPrincipal === 0) {
-      // Todo interés: pérdida deducible
-      await client.query(
-        `INSERT INTO fifo_lot_consumptions (
-          lot_id, consuming_transaction_id,
-          quantity_consumed, cost_basis_consumed_eur,
-          proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
-        ) VALUES ($1, $2, $3, $4, 0, $5, 'LOSS', $6)`,
-        [lot.id, tx.id, consumed, costConsumed, -costConsumed, tx.timestamp]
-      );
-    } else {
-      // Lote mixto: dividir en dos registros (principal → NONE, interés → LOSS)
-      const costPrincipal = costConsumed * (consumedAsPrincipal / consumed);
-      const costInterest  = costConsumed - costPrincipal;
-      await client.query(
-        `INSERT INTO fifo_lot_consumptions (
-          lot_id, consuming_transaction_id,
-          quantity_consumed, cost_basis_consumed_eur,
-          proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
-        ) VALUES ($1, $2, $3, $4, $4, 0, 'NONE', $5)`,
-        [lot.id, tx.id, consumedAsPrincipal, costPrincipal, tx.timestamp]
-      );
-      await client.query(
-        `INSERT INTO fifo_lot_consumptions (
-          lot_id, consuming_transaction_id,
-          quantity_consumed, cost_basis_consumed_eur,
-          proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
-        ) VALUES ($1, $2, $3, $4, 0, $5, 'LOSS', $6)`,
-        [lot.id, tx.id, consumedAsInterest, costInterest, -costInterest, tx.timestamp]
-      );
-    }
-
+    const costConsumed = lot.costBasisEur * (consumed / lot.quantityRemaining);
+    await client.query(
+      `INSERT INTO fifo_lot_consumptions (
+        lot_id, consuming_transaction_id,
+        quantity_consumed, cost_basis_consumed_eur,
+        proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
+      ) VALUES ($1, $2, $3, $4, $4, 0, 'NONE', $5)`,
+      [lot.id, tx.id, consumed, costConsumed, tx.timestamp]
+    );
     await updateLot(client, lot.id, lot.quantityRemaining - consumed, lot.costBasisEur - costConsumed);
     result.lotsConsumed++;
     remaining -= consumed;
+  }
+
+  // Intereses: transmisión sin contraprestación, pérdida igual al coste consumido.
+  // Cualquier cantidad, por pequeña que sea (como el motor anterior): el umbral
+  // de déficit solo decide qué se avisa, no qué se consume.
+  if (interest > 0) {
+    await consumeLots(tx.id, tx.asset, tx.wallet_id, interest, 0, tx.timestamp, result, client);
   }
 }
 
@@ -195,42 +158,11 @@ export async function processTransfer(tx: Transaction, result: FifoRunResult, cl
     await consumeLots(tx.id, tx.asset, tx.wallet_id, tx.fee_amount, feeProceedsEur, tx.timestamp, result, client);
   }
 
-  const toWalletId = tx.destination_wallet_id;
-  let quantityToMove = tx.amount;
-  const lots = await getOpenLots(tx.asset, tx.wallet_id, client);
-
-  for (const lot of lots) {
-    if (quantityToMove <= 0) break;
-
-    const consumed = Math.min(lot.quantityRemaining, quantityToMove);
-    const proportion = consumed / lot.quantityRemaining;
-    const costMoved = lot.costBasisEur * proportion;
-
-    await updateLot(client, lot.id, lot.quantityRemaining - consumed, lot.costBasisEur - costMoved);
-
-    // Registrar como consumo NONE para reconstrucción histórica correcta
-    await client.query(
-      `INSERT INTO fifo_lot_consumptions (
-        lot_id, consuming_transaction_id,
-        quantity_consumed, cost_basis_consumed_eur,
-        proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
-      ) VALUES ($1, $2, $3, $4, $4, 0, 'NONE', $5)`,
-      [lot.id, tx.id, consumed, costMoved, tx.timestamp]
-    );
-
-    // El lote destino hereda fecha de apertura y tipo USD del lote de origen:
-    // una transferencia entre wallets propias no cambia el coste (#174).
-    await client.query(
-      `INSERT INTO fifo_lots (
-        asset, quantity_original, quantity_remaining,
-        cost_basis_eur, price_per_unit_eur, fee_eur,
-        open_transaction_id, opened_at, wallet_id, usd_per_eur
-      ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9)`,
-      [tx.asset, consumed, consumed, costMoved, lot.pricePerUnitEur, tx.id, lot.openedAt, toWalletId, lot.usdPerEur]
-    );
-
-    quantityToMove -= consumed;
-  }
+  // Traslado sin efecto fiscal: el lote conserva su fecha de adquisición (#174, #476).
+  const quantityToMove = await moveLots(client, {
+    txId: tx.id, asset: tx.asset, fromWalletId: tx.wallet_id, toWalletId: tx.destination_wallet_id,
+    quantity: tx.amount, timestamp: tx.timestamp,
+  });
 
   // WITHDRAW externo: cualquier shortfall es un error real (el dinero salió y los lotes deben existir).
   // TRANSFER_INTERNAL: sin impacto fiscal — el shortfall puede deberse a saldo pre-importación

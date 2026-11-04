@@ -11,15 +11,16 @@ const lot = (wallet: string, openedAt: string, original: number, remaining: numb
 const now = new Date('2026-10-16T00:00:00Z')
 
 describe('lotsView', () => {
+  // En el orden FIFO global del backend (#476): el más antiguo primero, en cualquier wallet.
   const lots = [
-    lot('funding', '2024-02-01T00:00:00Z', 10, 10, 0.5),
     lot('spot', '2024-01-01T00:00:00Z', 50, 50, 1),
+    lot('funding', '2024-02-01T00:00:00Z', 10, 10, 0.5),
     lot('spot', '2025-10-16T00:00:00Z', 100, 40, 3),
   ]
 
-  it('P&L por lote al precio actual y el primero de cada wallet como siguiente en venderse', () => {
+  it('P&L por lote al precio actual y solo el más antiguo como siguiente en venderse (FIFO global)', () => {
     const v = lotsView(lots, 2, 'EUR', null, now)
-    expect(v.map(l => [l.walletId, l.next, l.pnl])).toEqual([['funding', true, 15], ['spot', true, 50], ['spot', false, -40]])
+    expect(v.map(l => [l.walletId, l.next, l.pnl])).toEqual([['spot', true, 50], ['funding', false, 15], ['spot', false, -40]])
     expect(v[2].pnlPct).toBeCloseTo(-33.33, 2)
   })
 
@@ -75,6 +76,9 @@ describe('fecha del lote', () => {
 
 describe('lotSourceLabel', () => {
   const labels = { BUY: { label: 'Compra' }, WITHDRAW: { label: 'Retirada' } }
+  it('un lote reubicado por el FIFO global (#476) no se muestra como la venta que lo reubicó', () => {
+    expect(lotSourceLabel('REUBICACION', labels)).toBe('Reubicado por el FIFO global')
+  })
   it('los lotes llegados por transferencia se muestran como traspaso, no como retirada', () => {
     expect(lotSourceLabel('WITHDRAW', labels)).toBe('Traspaso desde otra wallet')
     expect(lotSourceLabel('TRANSFER_INTERNAL', labels)).toBe('Traspaso desde otra wallet')
