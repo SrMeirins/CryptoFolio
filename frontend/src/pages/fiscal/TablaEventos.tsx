@@ -125,7 +125,7 @@ export function TablaEventos({ events, summary, initialFilters }: {
                         </button>
                       </th>
                       <th className="text-right px-4 py-2.5">Cantidad</th>
-                      <th className="text-center px-3 py-2.5" title="Clave de la contrapartida en el modelo de la AEAT">Clave</th>
+                      <th className="text-center px-3 py-2.5">Clave 1800</th>
                       <th className="text-right px-4 py-2.5" title="Valor de transmisión y gastos de la venta">
                         <button type="button" onClick={() => toggleSort('valorTransmisionEur')} className="flex items-center gap-1 hover:text-fg ml-auto">
                           Transmisión <SortIcon col="valorTransmisionEur" activeCol={sortKey} dir={sortDir} />

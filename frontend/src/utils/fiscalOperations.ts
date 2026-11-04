@@ -102,7 +102,7 @@ const num = (n: number | null | undefined, d = 2) => (n === null || n === undefi
 
 /** CSV de las operaciones filtradas (separador «;», campos de texto saneados). */
 export function buildEventsCsv(events: readonly FiscalEvent[]): string {
-  const header = ['Fecha', 'Tipo', 'Activo transmitido', 'Activo recibido', 'Wallet', 'Cantidad', 'Clave AEAT', 'Contrapartida',
+  const header = ['Fecha', 'Tipo', 'Activo transmitido', 'Activo recibido', 'Wallet', 'Cantidad', 'Clave casilla 1800', 'Contraprestación',
     'Valor transmisión (EUR)', 'Gastos venta (EUR)', 'Valor adquisición (EUR)', 'Gastos compra (EUR)', 'G/P (EUR)', 'Avisos'].join(';')
   const lines = events.map(e => {
     const avisos = [e.posiblePerdidaDiferida && 'recompra', e.permutaWrapStaking && 'wrap staking', e.lostSinMotivo && 'pérdida sin motivo'].filter(Boolean).join(', ')

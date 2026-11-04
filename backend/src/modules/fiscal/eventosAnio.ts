@@ -1,7 +1,7 @@
 import { db } from '../../db/client';
 import { localDate } from '../time/localTime';
 import { getAppTimezone } from '../time/appTimezone';
-import { getContrapartidaClave } from './contrapartida';
+import { activoRecibido as recibidoDe, getContraprestacion } from './contrapartida';
 import { hayRecompra, type Adquisicion } from './antiRecompra';
 import { getHistoricalPriceEur } from '../prices/binance';
 
@@ -28,6 +28,8 @@ export interface EventoFiscal {
   cantidadTransmitida: number;
   contrapartidaClave: string;
   contrapartidaDescripcion: string;
+  /** Sin clave segura (donación, pérdida): revisar antes de declarar (#531). */
+  contrapartidaRevisar: boolean;
   valorTransmisionEur: number;
   gastosTransmisionEur: number;
   valorAdquisicionEur: number;
@@ -101,8 +103,6 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
     asset: r.asset as string, fecha: new Date(r.fecha as string), lotId: r.lot_id as string,
   }));
 
-  const FEE_OR_LOSS_OPS = new Set(['FEE_EXCHANGE', 'FEE_NETWORK', 'FEE', 'LOST', 'GIFT_SENT']);
-
   const fiscalEvents: EventoFiscal[] = await Promise.all(
     gpRows.rows.map(async (row: Record<string, unknown>) => {
       const opType    = row.operation_type as string;
@@ -110,20 +110,10 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
       const txAsset   = row.tx_asset as string | null;
       const costAsset = row.cost_asset as string | null;
 
-      // Determinar qué se recibió a cambio:
-      // - BUY permuta (comprar B con A): tx_asset = B (distinto de fl.asset = A)
-      // - SELL (vender A por B): cost_asset = B, tx_asset = fl.asset
-      // - FEE/LOST: sin contrapartida directa
-      let activoRecibido: string | null;
-      if (FEE_OR_LOSS_OPS.has(opType)) {
-        activoRecibido = null;
-      } else if (txAsset && txAsset !== asset) {
-        activoRecibido = txAsset;      // permuta: compraron txAsset vendiendo asset
-      } else {
-        activoRecibido = costAsset || null;  // SELL: recibieron costAsset
-      }
-
-      const contrapartida = getContrapartidaClave(activoRecibido);
+      // Qué se recibió a cambio y clave de la casilla 1800 (#531).
+      const consumo = { operationType: opType, activoTransmitido: asset, txAsset, costAsset, feeAsset: row.fee_asset as string | null };
+      const activoRecibido = recibidoDe(consumo);
+      const contrapartida = getContraprestacion(consumo);
 
       let gastosTransmision = 0;
       if (row.fee_asset && row.fee_amount) {
@@ -147,6 +137,7 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
         cantidadTransmitida:      parseFloat(row.cantidad as string),
         contrapartidaClave:       contrapartida.clave,
         contrapartidaDescripcion: contrapartida.descripcion,
+        contrapartidaRevisar:     contrapartida.revisar,
         valorTransmisionEur:      parseFloat(row.valor_transmision as string),
         gastosTransmisionEur:     gastosTransmision,
         valorAdquisicionEur:      parseFloat(row.valor_adquisicion as string),

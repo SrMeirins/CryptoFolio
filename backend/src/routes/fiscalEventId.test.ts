@@ -57,4 +57,9 @@ describe('GET /api/fiscal/:year/events — identificador único por evento (#201
     expect(typeof events[0].eventId).toBe('string');
     expect(new Set(events.map(e => e.eventId)).size).toBe(2);
   });
+
+  it('la venta por EUR lleva la clave F de la casilla 1800 (#531)', async () => {
+    const events = (await request(app).get('/api/fiscal/2025/events')).body.fiscalEvents as Array<{ contrapartidaClave: string; contrapartidaRevisar: boolean }>;
+    expect(events.every(e => e.contrapartidaClave === 'F' && e.contrapartidaRevisar === false)).toBe(true);
+  });
 });

@@ -5,7 +5,7 @@ import { cardClasses, buttonClasses } from '../../components/ui'
 
 const FORMATS = [
   { key: 'csv',      label: 'CSV Modelo 100', desc: 'Todas las operaciones', icon: FileText, color: 'text-brand'  },
-  { key: 'rentaweb', label: 'Renta Web',      desc: 'Formato oficial AEAT',  icon: Landmark,  color: 'text-positive' },
+  { key: 'rentaweb', label: 'Renta Web',      desc: 'Para la casilla 1800',  icon: Landmark,  color: 'text-positive' },
   { key: 'excel',    label: 'Excel',          desc: 'Para asesor fiscal',    icon: Table,     color: 'text-warning' },
   { key: 'pdf',      label: 'PDF',            desc: 'Resumen formal',       icon: Download,  color: 'text-negative'   },
 ]

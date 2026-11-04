@@ -4,7 +4,20 @@ import { CryptoIcon } from '../../components/CryptoIcon'
 import { PNL_THRESHOLD } from './constants'
 import { EventWarnings } from './EventWarnings'
 import type { FiscalEvent } from './types'
-import { tableRowClasses } from '../../components/ui'
+import { Tooltip, tableRowClasses } from '../../components/ui'
+
+/** Clave de la casilla 1800 (#531): la letra, o «Revisar» si no hay una segura; el significado, en el tooltip. */
+export function ClaveCell({ e }: { e: FiscalEvent }) {
+  const revisar = e.contrapartidaRevisar || !e.contrapartidaClave
+  return (
+    <Tooltip label={revisar ? 'Clave por revisar' : `Clave ${e.contrapartidaClave}`}
+      triggerLabel={revisar ? `Clave por revisar: ${e.contrapartidaDescripcion}` : `Clave ${e.contrapartidaClave}: ${e.contrapartidaDescripcion}`}
+      triggerClassName={`px-1.5 py-0.5 rounded-lg text-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${revisar ? 'bg-warning/12 text-warning-ink' : 'bg-background-tertiary text-fg mono'}`}
+      trigger={revisar ? 'Revisar' : e.contrapartidaClave}>
+      {e.contrapartidaDescripcion}
+    </Tooltip>
+  )
+}
 
 // Color del tipo de operación (#295): el texto también lo dice, el color solo refuerza.
 const TONE_CLASS: Record<FiscalTone, string> = {
@@ -61,9 +74,9 @@ export function FiscalEventRow({ e }: { e: FiscalEvent }) {
         <div className="text-xs text-fg-subtle mt-0.5">{e.wallet}</div>
       </td>
       <td className="px-4 py-2.5 text-right mono text-xs text-fg-subtle">{formatFiscalQty(e.cantidadTransmitida)}</td>
-      {/* Clave AEAT compacta: la descripción va en el tooltip (#299) */}
+      {/* Clave de la casilla 1800 compacta: el significado va en el tooltip (#299, #531) */}
       <td className="px-3 py-2.5 text-center">
-        <abbr title={e.contrapartidaDescripcion} className="no-underline bg-background-tertiary px-1.5 py-0.5 rounded-lg text-fg mono text-xs cursor-help">{e.contrapartidaClave}</abbr>
+        <ClaveCell e={e} />
       </td>
       {/* Valor con sus gastos debajo: 8 columnas en lugar de 10, el G/P siempre a la vista */}
       <td className="px-4 py-2.5 text-right mono whitespace-nowrap">
@@ -104,7 +117,7 @@ export function FiscalEventCard({ e }: { e: FiscalEvent }) {
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
         <div><dt className="text-fg-subtle">Transmisión</dt><dd className="mono text-fg">{formatEur(e.valorTransmisionEur)} <span className="text-fg-subtle">− {formatEur(e.gastosTransmisionEur)}</span></dd></div>
         <div><dt className="text-fg-subtle">Adquisición</dt><dd className="mono text-fg">{formatEur(e.valorAdquisicionEur)} <span className="text-fg-subtle">+ {formatEur(e.gastosAdquisicionEur)}</span></dd></div>
-        <div className="col-span-2 text-fg-subtle truncate">{e.wallet} · <span className="mono">{e.contrapartidaClave}</span> {e.contrapartidaDescripcion}</div>
+        <div className="col-span-2 text-fg-subtle truncate">{e.wallet} · {e.contrapartidaClave ? <span className="mono">{e.contrapartidaClave}</span> : <span className="text-warning-ink">Revisar</span>} {e.contrapartidaDescripcion}</div>
       </dl>
     </li>
   )

@@ -206,7 +206,7 @@ export function writePdfExport(
       { text: e.fecha,                                      w: tc[0].w, color: C_GRAY5 },
       { text: e.activoTransmitido,                         w: tc[1].w, bold: true },
       { text: (e.cantidadTransmitida ?? 0).toFixed(4),     w: tc[2].w, align: 'right', color: C_GRAY5 },
-      { text: e.contrapartidaClave,                        w: tc[3].w, align: 'center', color: C_GRAY5 },
+      { text: e.contrapartidaClave || 'Rev.',               w: tc[3].w, align: 'center', color: C_GRAY5 },
       { text: fmtEurPdf(e.valorTransmisionEur),            w: tc[4].w, align: 'right' },
       { text: fmtEurPdf(e.valorAdquisicionEur),            w: tc[5].w, align: 'right', color: C_GRAY5 },
       { text: fmtEurPdf(e.gananciaPerdidaEur, true),       w: tc[6].w, align: 'right', bold: true, color: e.gananciaPerdidaEur >= 0 ? C_GREEN : C_RED },

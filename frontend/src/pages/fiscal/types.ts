@@ -26,6 +26,8 @@ export interface FiscalEvent {
   cantidadTransmitida: number
   contrapartidaClave: string
   contrapartidaDescripcion: string
+  /** Sin clave segura (donación, pérdida): revisar antes de declarar (#531). */
+  contrapartidaRevisar?: boolean
   valorTransmisionEur: number
   gastosTransmisionEur: number
   valorAdquisicionEur: number
