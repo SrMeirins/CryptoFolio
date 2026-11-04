@@ -10,6 +10,7 @@ import { usePricesStore } from '../../store/pricesStore'
 import { ink } from '../../utils/colors'
 import { formatEur } from '../../utils/format'
 import { formatFiscalQty } from '../../utils/fiscalTable'
+import { ahorroDe, importesPendientes, trocear } from '../../utils/ahorroIrpf'
 import { sugerencias, type Sugerencia } from '../../utils/planificador'
 import { FiscalChartCard } from './FiscalChartCard'
 
@@ -54,7 +55,7 @@ function Fila({ s, nota, onSimular }: { s: Sugerencia; nota: React.ReactNode; on
 
 export function PlanificadorTab() {
   const prices = usePricesStore(s => s.prices)
-  const { data, isLoading, isError } = useQuery({ queryKey: ['fiscal-planner'], queryFn: portfolioApi.getFiscalPlanner, staleTime: 60_000 })
+  const { data, isLoading, isError, dataUpdatedAt } = useQuery({ queryKey: ['fiscal-planner'], queryFn: portfolioApi.getFiscalPlanner, staleTime: 60_000 })
   const [simular, setSimular] = useState<Sugerencia | null>(null)
   const [extraInput, setExtraInput] = useState('')
   const extra = useDebounce(parseFloat(extraInput.replace(',', '.')), 350)
@@ -63,14 +64,35 @@ export function PlanificadorTab() {
     () => (data ? sugerencias(data.lotes, prices, data.colchon, data.comprasRecientes) : { perdidas: [], ganancias: [] }),
     [data, prices],
   )
-  // Ahorro de IRPF de cada pérdida sugerida: importes al euro para no pedirlo en cada tic del precio.
-  const perdidasKey = useDebounce(sug.perdidas.slice(0, 50).map(p => Math.round(p.pnl)), 800)
-  const { data: cuotas } = useQuery({
-    queryKey: ['fiscal-cuotas', perdidasKey],
-    queryFn: () => portfolioApi.getFiscalCuotas(perdidasKey),
-    enabled: perdidasKey.length > 0,
+  // Ahorro de IRPF de cada pérdida sugerida (#533): caché de cuotas por importe
+  // al euro, válida mientras no cambien los datos del planificador. Solo se
+  // piden los importes que faltan, en trozos dentro del límite de la API, así
+  // que con precios en vivo no hay una petición en cada tic ni se pierde el dato.
+  const [cache, setCache] = useState<{ version: number; base: number | null; cuotas: Map<number, number> }>(
+    () => ({ version: 0, base: null, cuotas: new Map() }))
+  const vigente = cache.version === dataUpdatedAt ? cache : { version: dataUpdatedAt, base: null, cuotas: new Map<number, number>() }
+  const pendientes = useMemo(
+    () => importesPendientes(sug.perdidas.map(p => p.pnl), vigente.cuotas),
+    [sug.perdidas, vigente.cuotas],
+  )
+  const cuotasQuery = useQuery({
+    queryKey: ['fiscal-cuotas', dataUpdatedAt, pendientes],
+    queryFn: async () => {
+      const partes = await Promise.all(trocear(pendientes).map(t => portfolioApi.getFiscalCuotas(t).then(r => ({ t, r }))))
+      return { version: dataUpdatedAt, base: partes[0].r.cuotaBase, pares: partes.flatMap(({ t, r }) => t.map((g, i) => [g, r.cuotas[i]] as const)) }
+    },
+    enabled: pendientes.length > 0,
     staleTime: 60_000,
   })
+  // Cada respuesta nueva se incorpora a la caché una sola vez, durante el render
+  // (patrón de React para derivar estado de un dato externo, sin efecto).
+  const nuevas = cuotasQuery.data
+  const [incorporadas, setIncorporadas] = useState(nuevas)
+  if (nuevas && nuevas !== incorporadas) {
+    setIncorporadas(nuevas)
+    const previas = vigente.version === nuevas.version ? vigente.cuotas : new Map<number, number>()
+    setCache({ version: nuevas.version, base: nuevas.base, cuotas: new Map([...previas, ...nuevas.pares]) })
+  }
   const { data: rapida } = useQuery({
     queryKey: ['fiscal-cuotas', 'rapida', extra],
     queryFn: () => portfolioApi.getFiscalCuotas([extra]),
@@ -81,7 +103,6 @@ export function PlanificadorTab() {
   if (isLoading) return <div className="space-y-3">{[0, 1, 2].map(i => <Skeleton key={i} className="h-28 rounded-xl" />)}</div>
   if (isError || !data) return <p className="text-sm text-fg-subtle">No se pudo cargar el planificador.</p>
 
-  const ahorro = (i: number) => (cuotas && cuotas.cuotas.length === perdidasKey.length ? Math.max(0, cuotas.cuotaBase - (cuotas.cuotas[i] ?? cuotas.cuotaBase)) : null)
   const rapidaCuota = rapida?.cuotas[0]
 
   return (
@@ -139,11 +160,15 @@ export function PlanificadorTab() {
           <p className="text-xs text-fg-subtle">No tienes posiciones con pérdida latente a los precios actuales.</p>
         ) : (
           <ul className="space-y-2">
-            {sug.perdidas.map((s, i) => {
-              const a = i < 50 ? ahorro(i) : null
+            {sug.perdidas.map(s => {
+              const a = ahorroDe(s.pnl, vigente.base, vigente.cuotas)
               return (
                 <Fila key={s.asset} s={s} onSimular={() => setSimular(s)}
-                  nota={a === null ? '…' : a > 0.005
+                  nota={a === null
+                    ? (cuotasQuery.isError
+                      ? <>No se pudo calcular el ahorro. <button type="button" onClick={() => void cuotasQuery.refetch()} className="text-brand-ink underline rounded-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">Reintentar</button></>
+                      : <span role="status" aria-label="Calculando el ahorro">…</span>)
+                    : a > 0.005
                     ? <>ahorra <span className="mono text-positive">{formatEur(a)}</span> de IRPF este año</>
                     : 'sin ganancias que compensar: queda pendiente 4 años'} />
               )
