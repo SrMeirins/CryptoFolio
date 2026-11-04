@@ -38,13 +38,36 @@ describe('GET /api/v1/fifo/lots/:asset (#272)', () => {
     if (testDb) await testDb.teardown();
   });
 
-  it('devuelve los lotes abiertos en orden FIFO por wallet, sin los cerrados', async () => {
+  it('devuelve los lotes abiertos en orden FIFO global (#476), sin los cerrados', async () => {
     const res = await request(app).get('/api/v1/fifo/lots/xrp');
     expect(res.status).toBe(200);
     expect(res.body.asset).toBe('XRP');
     expect(res.body.lots.map((l: { wallet_name: string; quantity_remaining: string }) => `${l.wallet_name}:${parseFloat(l.quantity_remaining)}`))
-      .toEqual(['Binance Funding:10', 'Binance Spot:50', 'Binance Spot:40']);
-    expect(res.body.lots[1]).toMatchObject({ source_type: 'BUY', wallet_kind: 'exchange' });
+      .toEqual(['Binance Spot:50', 'Binance Funding:10', 'Binance Spot:40']);
+    expect(res.body.lots[0]).toMatchObject({ source_type: 'BUY', wallet_kind: 'exchange' });
+  });
+
+  it('un lote reubicado por una venta en otra wallet se marca como REUBICACION, no como la venta', async () => {
+    const ids = Object.fromEntries((await pool.query(`SELECT id, name FROM wallets WHERE name IN ('Binance Spot', 'Bitvavo')`)).rows.map(r => [r.name, r.id]));
+    const openedAt = '2022-05-01T10:00:00Z';
+    const buy = await pool.query(
+      `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id) VALUES ('BUY', $1, 'DOT', 2, 2, $2) RETURNING id`,
+      [openedAt, ids['Binance Spot']]);
+    const sell = await pool.query(
+      `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id) VALUES ('SELL', '2024-05-01T10:00:00Z', 'DOT', 1, 1, $1) RETURNING id`,
+      [ids['Binance Spot']]);
+    const origen = await pool.query(
+      `INSERT INTO fifo_lots (asset, quantity_original, quantity_remaining, cost_basis_eur, price_per_unit_eur, open_transaction_id, opened_at, wallet_id)
+       VALUES ('DOT', 2, 1, 5, 5, $1, $2, $3) RETURNING id`, [buy.rows[0].id, openedAt, ids['Binance Spot']]);
+    await pool.query(
+      `INSERT INTO fifo_lot_consumptions (lot_id, consuming_transaction_id, quantity_consumed, cost_basis_consumed_eur, proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at)
+       VALUES ($1, $2, 1, 5, 5, 0, 'NONE', '2024-05-01T10:00:00Z')`, [origen.rows[0].id, sell.rows[0].id]);
+    await pool.query(
+      `INSERT INTO fifo_lots (asset, quantity_original, quantity_remaining, cost_basis_eur, price_per_unit_eur, open_transaction_id, opened_at, wallet_id)
+       VALUES ('DOT', 1, 1, 5, 5, $1, $2, $3)`, [sell.rows[0].id, openedAt, ids['Bitvavo']]);
+
+    const lots = (await request(app).get('/api/v1/fifo/lots/DOT')).body.lots as Array<{ wallet_name: string; source_type: string }>;
+    expect(lots.map(l => `${l.wallet_name}:${l.source_type}`)).toEqual(['Binance Spot:BUY', 'Bitvavo:REUBICACION']);
   });
 
   it('la suma de los lotes coincide con la fila agregada de /api/fifo/lots', async () => {

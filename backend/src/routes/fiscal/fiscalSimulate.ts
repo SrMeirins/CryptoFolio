@@ -7,8 +7,9 @@ import { cantidadParaNeto, cargarContextoVenta, curvaVenta, evaluarVenta, type C
 
 const router = Router();
 
-// Campos comunes: activo, wallet donde se vende (#279: el motor fiscal aplica
-// FIFO por wallet; sin ella, la de mayor cantidad) y comisión de venta en %.
+// Campos comunes: activo, wallet donde se vende (sin ella, la de mayor
+// cantidad; solo limita la cantidad, el coste sigue el FIFO global, #476) y
+// comisión de venta en %.
 const base = {
   asset:    z.string().min(1, 'asset es requerido'),
   walletId: z.uuid('walletId inválido').optional(),

@@ -46,14 +46,14 @@ const wrapCls = `
 const chipCls = (on: boolean) => `px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
   on ? 'border-brand/50 bg-brand/12 text-brand-ink' : 'border-border text-fg-muted hover:text-fg hover:bg-overlay/5'}`
 
-// Simulador de venta (#279, #280): FIFO de la wallet elegida, comisión e IRPF
+// Simulador de venta (#279, #280): FIFO global por activo (#476), comisión e IRPF
 // marginal; en dos columnas, con atajos de cantidad y precio, modo «importe a
 // recibir» y gráfico del resultado según el precio.
 export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose, initialWalletId, initialQty }: Props) {
   const titleId = useId()
   const livePrice = usePricesStore(s => s.prices[asset]) ?? currentPrice
 
-  // Wallets con el activo: el motor fiscal aplica FIFO por wallet (#279).
+  // Wallets con el activo: la elegida limita la cantidad; el coste sigue el FIFO global (#476).
   const { data: openLots } = useQuery({
     queryKey: ['open-lots', asset],
     queryFn: () => portfolioApi.getOpenLots(asset),
@@ -171,7 +171,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose, ini
                   onChange={v => { setWalletChoice(v); setQtyInput(null) }}
                   options={wallets.map(w => ({ value: w.walletId, label: `${w.walletName} · ${formatAmount(w.quantity)}` }))} />
               ) : <p className="text-xs text-fg-subtle py-2">Cargando wallets…</p>}
-              <p className="mt-1.5 text-[11px] text-fg-subtle">Se venden primero los lotes más antiguos de esta wallet (FIFO).</p>
+              <p className="mt-1.5 text-[11px] text-fg-subtle">Salen primero los lotes más antiguos del activo, estén en la wallet que estén (FIFO global).</p>
             </div>
 
             <div className="space-y-2">

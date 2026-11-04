@@ -4,7 +4,8 @@ import { zonedFormat } from './zonedFormat'
 
 // Lotes FIFO de un activo para el panel de detalle de Portfolio (#272).
 // Funciones puras: importes en la moneda de visualización, P&L por lote,
-// antigüedad y el próximo lote que se vendería en cada wallet.
+// antigüedad y el próximo lote que se vendería: el más antiguo del activo en
+// cualquier wallet (FIFO global, #476; el backend los da en ese orden).
 
 export interface LotView {
   walletId: string
@@ -20,7 +21,7 @@ export interface LotView {
   pnl: number | null        // null sin precio actual
   pnlPct: number | null
   ageDays: number
-  next: boolean             // el primero que se vendería en su wallet
+  next: boolean             // el primero que se vendería (FIFO global)
   source: string
 }
 
@@ -35,15 +36,13 @@ function toDisplay(eur: number, usdPerEur: string | null, currency: Currency, li
 }
 
 export function lotsView(lots: readonly OpenLot[], price: number, currency: Currency, liveRate: number | null, now: Date = new Date()): LotView[] {
-  const seen = new Set<string>()
-  return lots.map(l => {
+  return lots.map((l, i) => {
     const quantity = parseFloat(l.quantity_remaining)
     const quantityOriginal = parseFloat(l.quantity_original)
     const cost = toDisplay(parseFloat(l.cost_basis_eur), l.usd_per_eur, currency, liveRate)
     const value = quantity * price
     const pnl = price > 0 ? value - cost : null
-    const next = !seen.has(l.wallet_id)
-    seen.add(l.wallet_id)
+    const next = i === 0
     return {
       walletId: l.wallet_id,
       walletName: l.wallet_name,
@@ -108,5 +107,6 @@ export function lotDateDetail(iso: string, days: number): string {
  */
 export function lotSourceLabel(source: string, labels: Readonly<Record<string, { label: string }>>): string {
   if (source === 'WITHDRAW' || source === 'TRANSFER_INTERNAL') return 'Traspaso desde otra wallet'
+  if (source === 'REUBICACION') return 'Reubicado por el FIFO global'
   return labels[source]?.label ?? source
 }

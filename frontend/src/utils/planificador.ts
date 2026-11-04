@@ -1,6 +1,7 @@
-// Planificador de fin de año (#307): mejor venta parcial respetando FIFO por
-// wallet y sugerencias de pérdidas a realizar y de ganancias que caben en el
-// colchón. Funciones puras; los precios llegan en EUR del feed en vivo.
+// Planificador de fin de año (#307): mejor venta parcial respetando el FIFO
+// global por activo (#476: salen primero las unidades compradas antes, estén en
+// la wallet que estén) y sugerencias de pérdidas a realizar y de ganancias que
+// caben en el colchón. Funciones puras; los precios llegan en EUR del feed en vivo.
 
 export interface PlanLot {
   asset: string
@@ -58,23 +59,42 @@ export interface Sugerencia {
   walletName: string
   walletColor: string
   quantity: number
-  /** Cantidad total de la wallet, para mostrar la proporción. */
+  /** Cantidad de la wallet donde se vendería, para mostrar la proporción. */
   disponible: number
   pnl: number
   /** Compras del activo en los últimos 2 meses: la pérdida podría diferirse. */
   recompra: boolean
 }
 
-/** Agrupa los lotes por activo y wallet manteniendo el orden FIFO del backend. */
-export function porActivoWallet(lots: readonly PlanLot[]): PlanLot[][] {
+/** Agrupa los lotes por activo manteniendo el orden FIFO global del backend (#476). */
+export function porActivo(lots: readonly PlanLot[]): PlanLot[][] {
   const groups = new Map<string, PlanLot[]>()
   for (const l of lots) {
-    const k = `${l.asset}|${l.walletId}`
-    const g = groups.get(k) ?? []
+    const g = groups.get(l.asset) ?? []
     g.push(l)
-    groups.set(k, g)
+    groups.set(l.asset, g)
   }
   return [...groups.values()]
+}
+
+/**
+ * Wallet donde se vendería (la de más cantidad) y los lotes FIFO que saldrían
+ * vendiendo como mucho esa cantidad: el coste sigue el orden global, pero solo
+ * se puede vender lo que hay en la wallet (igual que el simulador).
+ */
+export function ventaDesdeWallet(lots: readonly PlanLot[]): { wallet: PlanLot; disponible: number; lotes: PlanLot[] } {
+  const porWallet = new Map<string, number>()
+  for (const l of lots) porWallet.set(l.walletId, (porWallet.get(l.walletId) ?? 0) + l.quantity)
+  const [walletId, disponible] = [...porWallet].reduce((a, b) => (b[1] > a[1] ? b : a))
+  const lotes: PlanLot[] = []
+  let resto = disponible
+  for (const l of lots) {
+    if (resto <= 1e-12) break
+    const q = Math.min(l.quantity, resto)
+    lotes.push(q < l.quantity ? { ...l, quantity: q } : l)
+    resto -= q
+  }
+  return { wallet: lots.find(l => l.walletId === walletId)!, disponible, lotes }
 }
 
 export function sugerencias(
@@ -85,16 +105,17 @@ export function sugerencias(
 ): { perdidas: Sugerencia[]; ganancias: Sugerencia[] } {
   const perdidas: Sugerencia[] = []
   const ganancias: Sugerencia[] = []
-  for (const g of porActivoWallet(lots)) {
+  for (const g of porActivo(lots)) {
     const price = prices[g[0].asset]
     if (!(price && price > 0)) continue
+    const { wallet, disponible, lotes } = ventaDesdeWallet(g)
     const base = {
-      asset: g[0].asset, walletId: g[0].walletId, walletName: g[0].walletName, walletColor: g[0].walletColor,
-      disponible: g.reduce((s, l) => s + l.quantity, 0), recompra: !!comprasRecientes[g[0].asset],
+      asset: wallet.asset, walletId: wallet.walletId, walletName: wallet.walletName, walletColor: wallet.walletColor,
+      disponible, recompra: !!comprasRecientes[wallet.asset],
     }
-    const p = mejorPerdida(g, price)
+    const p = mejorPerdida(lotes, price)
     if (p) perdidas.push({ ...base, ...p })
-    const gan = mejorGananciaHasta(g, price, colchon)
+    const gan = mejorGananciaHasta(lotes, price, colchon)
     if (gan) ganancias.push({ ...base, ...gan })
   }
   // Las afectadas por la regla de recompra van después; dentro, por importe.
