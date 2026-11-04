@@ -63,4 +63,21 @@ describe('/api/fiscal/planificador (#307)', () => {
     expect((await request(app).post('/api/fiscal/planificador/cuotas').send({ ganancias: ['1'] })).status).toBe(400);
     expect((await request(app).post('/api/fiscal/planificador/cuotas').send({ ganancias: [1], x: 1 })).status).toBe(400);
   });
+
+  // Va al final: añade una pérdida en el año en curso que cambia el contexto de los anteriores.
+  it('la pérdida del año en curso cuenta en el neto del año, no en las pendientes (#534)', async () => {
+    const sell = await tx('SELL', `${Y}-01-10T10:00:00Z`, 'DOT');
+    const lot = (await pool.query(
+      `INSERT INTO fifo_lots (asset, quantity_original, quantity_remaining, cost_basis_eur, price_per_unit_eur, open_transaction_id, opened_at, wallet_id, is_closed)
+       VALUES ('DOT', 1, 0, 0, 0, $1, '2020-01-01T00:00:00Z', $2, TRUE) RETURNING id`, [sell, walletId])).rows[0].id;
+    await pool.query(
+      `INSERT INTO fifo_lot_consumptions (lot_id, consuming_transaction_id, quantity_consumed, cost_basis_consumed_eur, proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at)
+       VALUES ($1, $2, 1, 80, 0, -80, 'LOSS', $3)`, [lot, sell, `${Y}-01-10T10:00:00Z`]);
+    const r = (await request(app).get('/api/fiscal/planificador')).body;
+    expect(r.netoAnio).toBeCloseTo(-80, 6);
+    expect(r.pendienteVigente).toBeCloseTo(300, 6);
+    const cf = (await request(app).get('/api/fiscal/carryforward')).body;
+    expect(cf.pendienteTotal).toBeCloseTo(300, 6);
+    expect(cf.pendienteProvisional).toBeCloseTo(80, 6);
+  });
 });

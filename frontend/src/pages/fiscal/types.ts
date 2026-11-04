@@ -120,10 +120,14 @@ export interface OrigenPerdida {
   caducado: number
   /** Último ejercicio en que se puede compensar. */
   caducaEn: number
+  /** Pérdida del año en curso: provisional, no suma al pendiente (#534). */
+  provisional?: boolean
 }
 
 export interface Carryforward {
+  /** Pendiente de ejercicios cerrados, sin la pérdida provisional del año en curso (#534). */
   pendienteTotal: number
+  pendienteProvisional?: number
   detalle: CarryforwardDetalle[]
   origenes?: OrigenPerdida[]
 }

@@ -19,6 +19,13 @@ describe('origenesView', () => {
   })
 })
 
+describe('origenesView — año en curso (#534)', () => {
+  it('la pérdida del año en curso se clasifica como provisional, no como vigente', () => {
+    const v = origenesView([o(2023, 100, 0, 100), { ...o(2026, 40, 0, 40), provisional: true }], 2026)
+    expect(v.map(x => `${x.year}:${x.estado}`)).toEqual(['2023:vigente', '2026:provisional'])
+  })
+})
+
 describe('caducanEsteAnio', () => {
   it('importe y años de las que caducan este año', () => {
     expect(caducanEsteAnio(origenes, 2026)).toEqual({ importe: 10, years: [2022] })

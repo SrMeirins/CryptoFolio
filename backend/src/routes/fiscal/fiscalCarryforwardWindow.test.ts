@@ -47,7 +47,9 @@ describe('GET /api/fiscal/carryforward — ventana completa (#305)', () => {
     const old = r.origenes.find((o: { year: number }) => o.year === Y - 5);
     expect(old).toMatchObject({ original: 100, compensadoPatrim: 40, pendiente: 0, caducado: 60, caducaEn: Y - 1 });
     expect(r.detalle.find((d: { year: number }) => d.year === Y - 2)).toMatchObject({ compensadoPatrim: 40, netoDespues: 0 });
-    expect(r.pendienteTotal).toBeCloseTo(10, 6);
+    // La pérdida de 10 del año en curso es provisional y no suma al pendiente (#534).
+    expect(r.pendienteTotal).toBeCloseTo(0, 6);
+    expect(r.pendienteProvisional).toBeCloseTo(10, 6);
     expect(r.detalle.at(-1).year).toBe(Y);
   });
 });

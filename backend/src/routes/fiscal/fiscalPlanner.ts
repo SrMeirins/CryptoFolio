@@ -51,7 +51,8 @@ router.get('/planificador', async (_req: Request, res: Response) => {
       rendimientosAnio: actual.rendimientos,
       cuotaActual: cuotaConExtra(anios, year, tipos, 0),
       colchon: colchonSinTributar(anios, year),
-      pendienteVigente: origenes.reduce((s, o) => s + o.pendiente, 0),
+      // Solo ejercicios cerrados: la pérdida del año ya está en «Neto del año» (#534).
+      pendienteVigente: origenes.filter(o => !o.provisional).reduce((s, o) => s + o.pendiente, 0),
       caducanEsteAnio: origenes.filter(o => o.pendiente > 0.01 && o.caducaEn === year).reduce((s, o) => s + o.pendiente, 0),
       lotes: lotes.rows.map((r: Record<string, unknown>) => ({
         asset: r.asset, walletId: r.wallet_id, walletName: r.wallet_name, walletColor: r.wallet_color, walletKind: r.wallet_kind,
