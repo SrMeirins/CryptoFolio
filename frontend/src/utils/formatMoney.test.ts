@@ -69,3 +69,52 @@ describe('precios muy pequeños (#337)', () => {
     expect(formatSignificant(0.0000094963)).toBe('0,0000094963')
   })
 })
+
+// Importes diminutos y cero con signo (#489). Datos sintéticos.
+import { formatMoneyPrecise, setAmountsHidden } from './format'
+
+describe('sin «-0,00» y con «< 0,01» (#489)', () => {
+  it('cero y menos cero: «0,00», nunca con signo', () => {
+    // -1e-12: ruido de coma flotante de una suma, no un importe.
+    for (const v of [0, -0, -1e-12]) expect(norm(formatMoney(v))).toBe('0,00 €')
+    expect(norm(formatMoney(-0, 'USD'))).toBe('0,00 $')
+  })
+  it('distinto de cero que redondea a cero: «< 0,01» o «-< 0,01» con el signo delante', () => {
+    expect(norm(formatMoney(0.004))).toBe('< 0,01 €')
+    expect(norm(formatMoney(-0.004))).toBe('-< 0,01 €')
+    expect(norm(formatMoney(0.004, 'USD'))).toBe('< 0,01 $')
+    expect(norm(formatMoney(-0.004, 'USD'))).toBe('-< 0,01 $')
+  })
+  it('lo que ya se ve con dos decimales no cambia', () => {
+    expect(norm(formatMoney(0.005))).toBe('0,01 €')
+    expect(norm(formatMoney(-0.005))).toBe('-0,01 €')
+    expect(norm(formatMoney(1234.5))).toBe('1.234,50 €')
+    expect(norm(formatMoney(-1234.5, 'USD'))).toBe('-1.234,50 $')
+  })
+  it('compacto: «0 €», «< 1 €» y «-< 1 €»', () => {
+    expect(norm(formatMoneyCompact(-0.2))).toBe('-< 1 €')
+    expect(norm(formatMoneyCompact(0.2))).toBe('< 1 €')
+    expect(norm(formatMoneyCompact(-0))).toBe('0 €')
+    expect(norm(formatEurCompact(-203.4))).toBe('-203 €')
+  })
+  it('porcentajes y números sin «-0»', () => {
+    expect(formatPercent(-0.001)).toBe('-< 0,01%')
+    expect(formatPercent(0.001, 2, true)).toBe('+< 0,01%')
+    expect(formatPercent(-0)).toBe('0,00%')
+    expect(formatPct(-0.001)).toBe('-< 0,01%')
+    expect(formatPct(-0)).toBe('+0,00%')
+    expect(formatNumber(-0.0001, 2)).toBe('0')
+  })
+  it('versión precisa para trazabilidad: dos cifras significativas bajo 0,01', () => {
+    expect(norm(formatMoneyPrecise(0.004))).toBe('0,004 €')
+    expect(norm(formatMoneyPrecise(-0.0042))).toBe('-0,0042 €')
+    expect(norm(formatMoneyPrecise(12.5))).toBe('12,50 €')
+  })
+  it('la privacidad manda: con importes ocultos, la máscara, nunca «< 0,01»', () => {
+    setAmountsHidden(true)
+    try {
+      expect(formatMoney(0.004)).not.toContain('<')
+      expect(formatMoneyPrecise(0.004)).not.toContain('0,004')
+    } finally { setAmountsHidden(false) }
+  })
+})

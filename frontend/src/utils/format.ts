@@ -57,6 +57,28 @@ function significantMoneyFmt(currency: Currency): Intl.NumberFormat {
 
 const _numberFormatters = new Map<string, Intl.NumberFormat>()
 
+// Importes diminutos y cero con signo (#489): un valor que redondea a cero se
+// muestra sin signo («0,00 €», nunca «-0,00 €»); si no es cero pero no llega al
+// mínimo visible, «< 0,01 €» o, en negativo, «-< 0,01 €» (el signo delante),
+// para no confundirlo con cero. Lo mismo en porcentajes y cantidades.
+
+/** Por debajo de esto es ruido de coma flotante de las sumas, no un importe: cuenta como cero. */
+const RUIDO = 1e-9
+
+/** Mínimo visible con `decimals` decimales: 0,01 con 2, 1 con 0. */
+const minimo = (decimals: number) => 10 ** -decimals
+
+/** Redondea a cero lo que con esos decimales no se ve, sin dejar -0. */
+function sinCeroNegativo(value: number, decimals: number): number {
+  return Math.abs(value) < minimo(decimals) / 2 ? 0 : value // también quita el -0
+}
+
+/** «< 0,01 €» / «-< 0,01 €» si el valor no es cero pero redondea a cero; null si no aplica. */
+function bajoMinimo(value: number, decimals: number, format: (v: number) => string): string | null {
+  if (!Number.isFinite(value) || Math.abs(value) < RUIDO || Math.abs(value) >= minimo(decimals) / 2) return null
+  return `${value < 0 ? '-' : ''}< ${format(minimo(decimals))}`
+}
+
 /**
  * Número en formato español con separador de miles siempre y coma decimal
  * (p. ej. "1.234,5"). `maxDecimals` y `minDecimals` acotan los decimales.
@@ -68,24 +90,41 @@ export function formatNumber(value: number, maxDecimals = 2, minDecimals = 0): s
     fmt = esFormat({ minimumFractionDigits: minDecimals, maximumFractionDigits: maxDecimals })
     _numberFormatters.set(key, fmt)
   }
-  return fmt.format(value)
+  return fmt.format(sinCeroNegativo(value, maxDecimals))
 }
 
 /** Porcentaje con coma decimal y decimales fijos (p. ej. "-17,84%"); `signed` añade "+" a los positivos. */
 export function formatPercent(value: number, decimals = 2, signed = false): string {
+  const tiny = bajoMinimo(value, decimals, v => `${formatNumber(v, decimals, decimals)}%`)
+  if (tiny) return signed && value > 0 ? `+${tiny}` : tiny
   return `${signed && value > 0 ? '+' : ''}${formatNumber(value, decimals, decimals)}%`
 }
 
 /** Importe con 2 decimales en la moneda indicada (p. ej. "1.234,56 €", "-10,00 $"). */
 export function formatMoney(value: number, currency: Currency = 'EUR'): string {
   if (amountsHidden) return hiddenMoney(currency)
-  return moneyFmt(currency, 2).format(value)
+  const fmt = moneyFmt(currency, 2)
+  return bajoMinimo(value, 2, v => fmt.format(v)) ?? fmt.format(sinCeroNegativo(value, 2))
 }
 
 /** Importe sin decimales en la moneda indicada, para espacios reducidos (p. ej. "-203 $"). */
 export function formatMoneyCompact(value: number, currency: Currency = 'EUR'): string {
   if (amountsHidden) return hiddenMoney(currency)
-  return moneyFmt(currency, 0).format(value)
+  const fmt = moneyFmt(currency, 0)
+  return bajoMinimo(value, 0, v => fmt.format(v)) ?? fmt.format(sinCeroNegativo(value, 0))
+}
+
+/**
+ * Importe exacto para trazabilidad (#489, antes preciseEur del detalle de
+ * Historial): por debajo de 0,01 con 2 cifras significativas («0,004 €») en
+ * lugar de «< 0,01 €».
+ */
+export function formatMoneyPrecise(value: number, currency: Currency = 'EUR'): string {
+  if (amountsHidden) return hiddenMoney(currency)
+  if (value !== 0 && Number.isFinite(value) && Math.abs(value) < 0.01) {
+    return esFormat({ style: 'currency', currency, currencyDisplay: 'narrowSymbol', maximumSignificantDigits: 2 }).format(value)
+  }
+  return formatMoney(value, currency)
 }
 
 export function formatEur(value: number): string {
@@ -150,7 +189,10 @@ export function pnlColor(value: number): string {
 }
 
 export function formatPct(value: number): string {
-  return (value >= 0 ? '+' : '') + formatNumber(value, 2, 2) + '%'
+  const tiny = bajoMinimo(value, 2, v => `${formatNumber(v, 2, 2)}%`)
+  if (tiny) return value > 0 ? `+${tiny}` : tiny
+  const v = sinCeroNegativo(value, 2)
+  return (v >= 0 ? '+' : '') + formatNumber(v, 2, 2) + '%'
 }
 
 /** Importe en EUR sin decimales, para espacios reducidos (p. ej. "-203 €"). */
