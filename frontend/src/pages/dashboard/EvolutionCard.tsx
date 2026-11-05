@@ -92,8 +92,11 @@ export function EvolutionCard() {
         extra={<Tabs label="Evolución del portfolio" idBase={baseId} value={tab} onChange={setTab}
           items={TABS.map(t => ({ value: t.id, label: t.label }))} />}
         actions={<>
-          <SegmentedControl label="Periodo del gráfico de evolución" variant="accent" value={period} onChange={p => { setPeriod(p); setRange(null) }}
-            options={PNL_PERIODS.map(p => ({ value: p, label: p, title: PERIOD_TITLES[p] }))} />
+          {/* En pantallas estrechas (#499) los periodos se desplazan dentro de su caja en vez de ensanchar la página. */}
+          <div className="max-w-full overflow-x-auto py-0.5">
+            <SegmentedControl label="Periodo del gráfico de evolución" variant="accent" value={period} onChange={p => { setPeriod(p); setRange(null) }}
+              options={PNL_PERIODS.map(p => ({ value: p, label: p, title: PERIOD_TITLES[p] }))} />
+          </div>
           <DateRangePicker
             placeholder="Rango"
             align="right"

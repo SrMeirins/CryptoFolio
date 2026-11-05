@@ -53,10 +53,11 @@ export default function App() {
       <ToastProvider>
       <div className="flex h-screen overflow-hidden">
         <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden bg-background-primary">
+        {/* min-w-0: el contenido nunca empuja la página a lo ancho (#499) */}
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-background-primary">
           <UpdateBanner />
           <TopBar />
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto min-w-0">
             <RoutedContent />
           </main>
         </div>

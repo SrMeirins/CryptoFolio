@@ -28,7 +28,8 @@ export function PanelHeader({ icon: Icon, title, help, subtitle, extra, actions,
         </div>
         {subtitle && <p className="text-xs text-fg-subtle mt-1 ml-8">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
+      {/* Nunca más ancho que el panel (#499): lo que no quepa se reparte o se desplaza dentro. */}
+      {actions && <div className="flex items-center gap-2 flex-wrap max-w-full min-w-0">{actions}</div>}
     </div>
   )
 }

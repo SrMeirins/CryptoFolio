@@ -115,14 +115,15 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
                   aria-expanded={expandable ? isOpen : undefined}
                   onClick={() => expandable && setOpen(o => (o === i.key ? null : i.key))}
                   onMouseEnter={() => setActive(i.key)} onFocus={() => setActive(i.key)} onBlur={() => setActive(null)}
-                  className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition-[opacity,background-color] duration-200
+                  className={`w-full flex items-center gap-2 sm:gap-3 px-2 py-1.5 rounded-lg text-left transition-[opacity,background-color] duration-200
                     hover:bg-overlay/4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${dimmed ? 'opacity-45' : ''} ${expandable ? 'cursor-pointer' : 'cursor-default'}`}
                 >
                   {i.kind === 'crypto'
                     ? <CryptoIcon symbol={i.label} size={24} ring={i.color} />
                     : <span aria-hidden="true" className="w-6 h-6 rounded-md shrink-0" style={{ background: i.kind === 'fiat' ? `repeating-linear-gradient(45deg, ${NEUTRAL_COLOR} 0 3px, rgba(255,255,255,0.35) 3px 5px)` : i.color }} />}
-                  <span className={`${mode === 'wallet' ? 'w-40' : 'w-16'} shrink-0 text-[13px] font-semibold text-fg truncate`} title={i.label}>{i.label}</span>
-                  <span className="flex-1 h-1.5 rounded-full bg-overlay/6 overflow-hidden flex" aria-hidden="true">
+                  {/* En pantallas estrechas (#499) el nombre ocupa el hueco y la barra, decorativa, se oculta. */}
+                  <span className={`min-w-0 flex-1 sm:flex-none ${mode === 'wallet' ? 'sm:w-40' : 'sm:w-16'} sm:shrink-0 text-[13px] font-semibold text-fg truncate`} title={i.label}>{i.label}</span>
+                  <span className="hidden sm:flex flex-1 h-1.5 rounded-full bg-overlay/6 overflow-hidden" aria-hidden="true">
                     {i.breakdown.length > 0
                       // Por wallet: la barra se reparte por activo con los colores de la vista por activo.
                       ? <span className="flex h-full rounded-full overflow-hidden transition-[width] duration-500" style={{ width: `${i.pct}%` }}>
@@ -131,7 +132,7 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
                       : <span className="block h-full rounded-full transition-[width] duration-500" style={{ width: `${i.pct}%`, background: i.color }} />}
                   </span>
                   <span className="w-12 text-right text-xs mono text-fg-muted shrink-0">{formatPercent(i.pct, 1)}</span>
-                  <span className="w-24 text-right text-xs mono text-fg shrink-0">{formatMoney(i.value, currency)}</span>
+                  <span className="w-20 sm:w-24 text-right text-xs mono text-fg shrink-0">{formatMoney(i.value, currency)}</span>
                   <span className={`w-14 text-right text-xs mono shrink-0 ${i.change24h === null ? 'text-fg-subtle' : i.change24h >= 0 ? 'text-positive' : 'text-negative'}`}>
                     {expandable
                       ? <ChevronDown size={14} aria-hidden="true" className={`inline transition-transform ${isOpen ? 'rotate-180' : ''}`} />

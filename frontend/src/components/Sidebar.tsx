@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, type LucideIcon } from 'lucide-react'
 import { NAV_ITEMS } from '../constants/navigation'
+import { MEDIUM_QUERY, NARROW_QUERY, useMediaQuery } from '../hooks/useMediaQuery'
+import { useModalA11y } from '../hooks/useModalA11y'
+import { useNavStore } from '../store/navStore'
 
 const COLLAPSED_KEY = 'cflio_sidebar_collapsed'
 
@@ -57,11 +60,54 @@ function SidebarNavItem({ to, icon: Icon, label, collapsed }: SidebarNavItemProp
   )
 }
 
+/**
+ * Menú lateral adaptable (#499): a partir de 1024 px, el de siempre (plegable
+ * y recordado); entre 768 y 1023 px, plegado a iconos sin tocar la preferencia
+ * guardada; por debajo de 768 px, oculto y abierto como cajón superpuesto
+ * desde el botón de menú de la barra superior.
+ */
 export function Sidebar() {
+  const narrow = useMediaQuery(NARROW_QUERY)
+  const medium = useMediaQuery(MEDIUM_QUERY)
+  const mobileOpen = useNavStore(s => s.mobileOpen)
+  const setMobileOpen = useNavStore(s => s.setMobileOpen)
+  if (narrow) return mobileOpen ? <MobileNav onClose={() => setMobileOpen(false)} /> : null
+  return <SidebarPanel forceCollapsed={medium} />
+}
+
+/** Cajón del menú en pantallas estrechas: Escape, clic fuera y navegar lo cierran; el foco vuelve al botón. */
+function MobileNav({ onClose }: { onClose: () => void }) {
+  const panelRef = useModalA11y<HTMLDivElement>(onClose)
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      <div aria-hidden="true" className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div ref={panelRef} id="menu-principal" role="dialog" aria-modal="true" aria-label="Menú principal"
+        className="relative h-full w-[240px] max-w-[85vw] flex flex-col bg-background-secondary border-r border-border shadow-2xl">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-border shrink-0">
+          <span className="flex items-center gap-3">
+            <img src="/favicon.svg" width={36} height={36} alt="CryptoFolio" className="shrink-0" />
+            <span className="font-bold text-base bg-linear-to-r from-blue-400 to-accent-purple bg-clip-text text-transparent">CryptoFolio</span>
+          </span>
+          <button type="button" onClick={onClose} aria-label="Cerrar el menú"
+            className="p-2 rounded-lg text-fg-subtle hover:text-fg hover:bg-overlay/4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+        <nav aria-label="Principal" className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto" onClick={e => { if ((e.target as Element).closest('a')) onClose() }}>
+          {NAV_ITEMS.map(item => <SidebarNavItem key={item.to} {...item} collapsed={false} />)}
+        </nav>
+      </div>
+    </div>
+  )
+}
+
+function SidebarPanel({ forceCollapsed }: { forceCollapsed: boolean }) {
   // Persistido: un usuario que colapsa el menú espera que siga colapsado
   // tras recargar, igual que el resto de preferencias de UI del proyecto
   // (ver SETUP_KEY en pages/Import.tsx / pages/Settings.tsx).
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === 'true')
+  const [savedCollapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === 'true')
+  // En pantallas medianas se pliega sin cambiar la preferencia guardada.
+  const collapsed = forceCollapsed || savedCollapsed
 
   function toggleCollapsed() {
     setCollapsed(c => {
@@ -102,8 +148,8 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Botón de colapsar */}
-      <div className="px-2 py-3 border-t border-border">
+      {/* Botón de colapsar: no aplica mientras el ancho obliga a plegarlo */}
+      {!forceCollapsed && <div className="px-2 py-3 border-t border-border">
         <button
           type="button"
           onClick={toggleCollapsed}
@@ -126,7 +172,7 @@ export function Sidebar() {
             }
           </div>
         </button>
-      </div>
+      </div>}
     </aside>
   )
 }
