@@ -13,7 +13,7 @@ import { AssetHealth } from './assets/AssetHealth'
 import { AssetEditDrawer } from './assets/AssetEditDrawer'
 import { matchesFilter, priceHealth, sortAssets, type AssetFilter, type SortColumn, type SortDirection } from './assets/assetRows'
 import { T, alpha, ink } from '../../utils/colors'
-import { buttonClasses, fieldClasses, iconButtonClasses, panelSurface, Pagination } from '../../components/ui'
+import { buttonClasses, fieldClasses, iconButtonClasses, panelSurface, Pagination, SectionHeader } from '../../components/ui'
 import { paginate, type PageSize } from '../../utils/pagination'
 
 // Activos en Ajustes (#450): salud de los precios, filtros rápidos (también
@@ -103,12 +103,8 @@ export function AssetsSection() {
     <div className="h-full flex flex-col">
       {/* Cabecera fija */}
       <div className="shrink-0 pb-4 space-y-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h2 className="font-medium">Activos y precios</h2>
-            <p className="text-xs text-fg-subtle mt-0.5">Pares de precio en Binance. Se detectan solos al importar.</p>
-          </div>
-          <div className="flex items-center gap-2">
+        <SectionHeader title="Activos y precios" subtitle="Pares de precio en Binance. Se detectan solos al importar."
+          actions={<>
             {unknown.length > 0 && !detectingAll && (
               <button type="button" onClick={handleDetectAll}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
@@ -124,8 +120,7 @@ export function AssetsSection() {
             <button type="button" onClick={() => setShowAdd(s => !s)} className={buttonClasses('primary', 'md', 'flex')}>
               <Plus size={14} aria-hidden="true" /> Añadir activo
             </button>
-          </div>
-        </div>
+          </>} />
 
         {detectResult && (
           <div role="status" className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-positive/30 bg-positive/8 text-sm">

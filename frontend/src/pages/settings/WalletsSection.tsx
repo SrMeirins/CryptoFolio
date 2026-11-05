@@ -17,7 +17,7 @@ import { useSettingFeedback } from '../../hooks/useSettingFeedback'
 import { formatMoney, formatNumber } from '../../utils/format'
 import { daysSince, formatAge } from '../../utils/portfolioLots'
 import { alpha, ink } from '../../utils/colors'
-import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses } from '../../components/ui'
+import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses, SectionHeader } from '../../components/ui'
 import { explorerLink } from '../../utils/externalLink'
 
 export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => void }) {
@@ -113,16 +113,10 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-medium">Wallets</h2>
-          <p className="text-xs text-fg-subtle mt-0.5">Gestiona tus wallets y direcciones blockchain.</p>
-        </div>
-        <button type="button" onClick={() => setShowAdd(true)}
-          className={buttonClasses('primary', 'md', 'flex')}>
-          <Plus size={14} /> Nueva wallet
-        </button>
-      </div>
+      <SectionHeader title="Wallets" subtitle="Gestiona tus wallets y direcciones blockchain."
+        actions={<button type="button" onClick={() => setShowAdd(true)} className={buttonClasses('primary', 'md', 'flex')}>
+          <Plus size={14} aria-hidden="true" /> Nueva wallet
+        </button>} />
 
       {showAdd && (
         <AddWalletForm

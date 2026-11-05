@@ -28,7 +28,7 @@ import { DeclaracionRenta } from './fiscal/DeclaracionRenta'
 import type { FiscalHito } from '../api/portfolio'
 import { useFiscalShortcuts } from './fiscal/useFiscalShortcuts'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
-import { cardClasses, EmptyState, ErrorState, Skeleton, PageHeader, Tabs, panelEnterStyle, tabId, tabPanelId } from '../components/ui'
+import { cardClasses, EmptyState, ErrorState, Skeleton, PageHeader, Tabs, panelEnterStyle, tabId, tabPanelId, SectionHeader } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 
 const VISTA_LABELS: Record<FiscalVista, string> = { resumen: 'Resumen', operaciones: 'Operaciones', modelo721: 'Modelo 721', planificar: 'Planificar' }
@@ -38,6 +38,16 @@ const ID_BASE = 'fiscal-vista'
 /** Bloque con la entrada escalonada de paneles (#297). */
 function Block({ i, children }: { i: number; children: ReactNode }) {
   return <div className="panel-in" style={panelEnterStyle(i)}>{children}</div>
+}
+
+/** Título y contexto de cada vista (#491). */
+function vistaHeader(vista: FiscalVista, year: number): { title: string; subtitle: string } {
+  switch (vista) {
+    case 'resumen': return { title: `Resumen del ejercicio ${year}`, subtitle: 'Neto a declarar, plazos, comparativas y pérdidas pendientes.' }
+    case 'operaciones': return { title: `Operaciones de ${year}`, subtitle: 'Ganancia o pérdida de cada transmisión y rendimientos del ejercicio.' }
+    case 'modelo721': return { title: `Modelo 721 de ${year}`, subtitle: 'Saldos en custodia de terceros a 31 de diciembre.' }
+    case 'planificar': return { title: 'Planificar el ejercicio en curso', subtitle: 'Pérdidas que puedes realizar y ganancias que caben sin tributar.' }
+  }
 }
 
 export function Fiscal() {
@@ -228,6 +238,8 @@ export function Fiscal() {
 
       <div id={tabPanelId(ID_BASE)} role="tabpanel" aria-labelledby={tabId(ID_BASE, vista)} aria-busy={switching}
         className={`space-y-5 transition-opacity duration-200 ${switching ? 'opacity-60' : ''}`}>
+        {/* Cabecera común de la vista (#491): un h2 con título y contexto en todas las pestañas. */}
+        <SectionHeader {...vistaHeader(vista, activeYear)} />
         {/* Planificar trabaja siempre con el año en curso, sea cual sea el seleccionado (#307) */}
         {vista === 'planificar' ? (
           <Block i={0}>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Coins, Settings, Wallet } from 'lucide-react'
-import { PageHeader, StatCard, StatStrip } from '../../components/ui'
+import { PageHeader, SectionHeader, StatCard, StatStrip, buttonClasses } from '../../components/ui'
 import { formatMoney } from '../../utils/format'
 
 // Página de prueba de los componentes comunes (épica #479). Solo existe en
@@ -14,7 +14,12 @@ export function ComponentesDev() {
   const [ultimo, setUltimo] = useState('ninguna')
   return (
     <div className="p-6 space-y-8 max-w-5xl mx-auto">
-      <PageHeader icon={Settings} title="Componentes comunes" subtitle="Página de prueba (solo en desarrollo)" />
+      <PageHeader icon={Settings} title="Componentes comunes" eyebrow="Base común" subtitle="Página de prueba (solo en desarrollo)"
+        actions={<button type="button" className={buttonClasses('primary', 'sm')}>Acción principal</button>}
+        secondaryActions={<button type="button" className={buttonClasses('secondary', 'sm')}>Exportar</button>} />
+
+      <SectionHeader title="Cabecera de sección" eyebrow="Pestaña" subtitle="Mismo orden de huecos, un h2."
+        secondaryActions={<button type="button" className={buttonClasses('secondary', 'sm')}>Opciones</button>} />
 
       <section aria-labelledby="dev-statstrip" className="space-y-3">
         <h2 id="dev-statstrip" className="text-sm font-semibold">StatStrip</h2>
