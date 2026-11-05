@@ -43,4 +43,13 @@ describe('GET /api/v1/prices/closes', () => {
     expect((await request(app).get('/api/v1/prices/closes?assets=XRP&days=1')).status).toBe(400);
     expect((await request(app).get('/api/v1/prices/closes')).status).toBe(400);
   });
+
+  it('rangos largos (#523): hasta 3.660 días para pocos activos; más, 400', async () => {
+    expect((await request(app).get('/api/v1/prices/closes?assets=XRP&days=1500')).status).toBe(200);
+    expect((await request(app).get('/api/v1/prices/closes?assets=XRP&days=3660')).status).toBe(200);
+    expect((await request(app).get('/api/v1/prices/closes?assets=XRP&days=3661')).status).toBe(400);
+    const muchos = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'].join(',');
+    expect((await request(app).get(`/api/v1/prices/closes?assets=${muchos}&days=401`)).status).toBe(400);
+    expect((await request(app).get(`/api/v1/prices/closes?assets=${muchos}&days=400`)).status).toBe(200);
+  });
 });

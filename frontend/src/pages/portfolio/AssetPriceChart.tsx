@@ -8,7 +8,7 @@ import { useChartColors } from '../../hooks/useChartColors'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { formatAmount, formatPercent, formatPrice, type Currency } from '../../utils/format'
 import { zeroSplit } from '../../utils/zeroSplit'
-import { axisPrice, chartMarkers, labelSide, priceSeries, rangeDays, rangeStats, type ChartMarker, type ChartPoint, type ChartRange } from '../../utils/assetPriceChart'
+import { axisPrice, chartMarkers, labelSide, operationDays, priceSeries, rangeDays, rangeStats, samplePoints, type ChartMarker, type ChartPoint, type ChartRange } from '../../utils/assetPriceChart'
 import { zonedFormat } from '../../utils/zonedFormat'
 
 // Gráfico de precio del panel de detalle (#284): cierres diarios y precio en
@@ -19,7 +19,7 @@ const RANGES: { value: ChartRange; label: string; title: string; phrase: string 
   { value: '30d', label: '30 d', title: 'Últimos 30 días', phrase: 'en los últimos 30 días' },
   { value: '90d', label: '90 d', title: 'Últimos 90 días', phrase: 'en los últimos 90 días' },
   { value: '1y', label: '1 a', title: 'Último año', phrase: 'en el último año' },
-  { value: 'all', label: 'Todo', title: 'Desde la primera compra abierta (máx. 400 días)', phrase: 'desde la primera compra abierta' },
+  { value: 'all', label: 'Todo', title: 'Desde la primera compra', phrase: 'desde la primera compra' },
 ]
 // Posición de la etiqueta de máximo/mínimo según su lado (no se corta en los bordes).
 const SIDE_POSITION = {
@@ -63,12 +63,14 @@ export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice,
   avgPrice: number | null
   buys: ReadonlyArray<{ openedAt: string; quantity: number; unitCost: number }>
   sales: readonly AssetSale[]
+  /** Primera compra del activo, también de lo ya vendido: inicio de «Todo» (#523). */
   firstOpenedAt: string | null
 }) {
   const id = useId().replace(/:/g, '')
   const c = useChartColors()
   const reduceMotion = useReducedMotion()
-  const [range, setRange] = useState<ChartRange>('90d')
+  // «Todo» por defecto: toda la historia del activo con sus compras y ventas (#523).
+  const [range, setRange] = useState<ChartRange>('all')
   const days = rangeDays(range, firstOpenedAt)
   const { data, isLoading, isError } = useQuery({
     queryKey: ['price-closes', days, asset],
@@ -77,9 +79,10 @@ export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice,
     placeholderData: prev => prev,
   })
 
+  const keepDays = useMemo(() => operationDays(buys, sales), [buys, sales])
   const points = useMemo(
-    () => (data && rate !== null ? priceSeries(data.closes[asset] ?? [], livePriceEur, rate) : []),
-    [data, asset, livePriceEur, rate],
+    () => (data && rate !== null ? samplePoints(priceSeries(data.closes[asset] ?? [], livePriceEur, rate), keepDays) : []),
+    [data, asset, livePriceEur, rate, keepDays],
   )
   const stats = useMemo(() => rangeStats(points), [points])
   const markers = useMemo(

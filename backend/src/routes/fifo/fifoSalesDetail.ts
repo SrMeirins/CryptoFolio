@@ -47,6 +47,9 @@ router.get('/sales/:asset', async (req, res) => {
        ORDER BY sold_at ASC`,
       [asset],
     );
+    // Primera adquisición del activo, con lotes ya cerrados incluidos (#523): el
+    // rango «Todo» del gráfico empieza ahí y muestra todas sus ventas.
+    const first = await db.query<{ first: Date | null }>(`SELECT MIN(opened_at) AS first FROM fifo_lots WHERE asset = $1`, [asset]);
     const round2 = (n: number) => Math.round(n * 100) / 100;
     let realized = 0;
     let other = 0;
@@ -73,6 +76,7 @@ router.get('/sales/:asset', async (req, res) => {
       realizedEur: round2(realized),
       otherRealizedEur: round2(other),
       lastSaleAt: sales.at(-1)?.soldAt ?? null,
+      firstAcquiredAt: first.rows[0]?.first ? new Date(first.rows[0].first).toISOString() : null,
       sales,
     });
   } catch (e) {

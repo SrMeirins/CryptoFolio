@@ -145,6 +145,8 @@ export interface AssetSales {
   /** Parte del realizado que no viene de ventas ni permutas (comisiones, margen…). */
   otherRealizedEur: number
   lastSaleAt: string | null
+  /** Primera adquisición del activo, con lotes ya cerrados (#523). */
+  firstAcquiredAt?: string | null
   sales: AssetSale[]
 }
 

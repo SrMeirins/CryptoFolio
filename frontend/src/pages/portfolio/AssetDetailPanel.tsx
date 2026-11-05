@@ -56,7 +56,11 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
     staleTime: 60_000,
   })
   const livePriceEur = usePricesStore(s => s.prices[row.asset])
-  const firstOpenedAt = useMemo(() => lots.reduce<string | null>((min, l) => (min === null || l.openedAt < min ? l.openedAt : min), null), [lots])
+  // Inicio de «Todo»: la primera compra del activo, también de lo ya vendido (#523).
+  const firstOpenedAt = useMemo(
+    () => sales?.firstAcquiredAt ?? lots.reduce<string | null>((min, l) => (min === null || l.openedAt < min ? l.openedAt : min), null),
+    [lots, sales],
+  )
 
   const hasPrice = price > 0
   const pnl = hasPrice ? row.value - row.totalCostBasis : null

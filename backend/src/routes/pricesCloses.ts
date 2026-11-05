@@ -6,25 +6,35 @@ import { sendInternalError } from '../middleware/errorHandler';
 import { getAppTimezone } from '../modules/time/appTimezone';
 
 // Cierres diarios (hora de Madrid) de varios activos en una sola consulta
-// (#282): alimentan los mini-gráficos de 7 días de la tabla de Portfolio.
+// (#282): alimentan los mini-gráficos de 7 días de la tabla de Portfolio y el
+// gráfico del detalle del activo, cuyo rango «Todo» llega a la primera compra
+// (#523). Los rangos largos solo se sirven para pocos activos a la vez.
 const router = Router();
 
 const MAX_ASSETS = 100;
+/** Hasta 10 años de cierres diarios; por encima de 400 días, como mucho 5 activos. */
+export const MAX_DAYS = 3660;
+const LONG_RANGE_DAYS = 400;
+const LONG_RANGE_MAX_ASSETS = 5;
 const querySchema = z.strictObject({
   assets: z.string().min(1).max(1200),
-  days:   z.coerce.number().int().min(2).max(400).default(7),
+  days:   z.coerce.number().int().min(2).max(MAX_DAYS).default(7),
 });
 
 // GET /api/v1/prices/closes?assets=BTC,XRP&days=7
 router.get('/closes', async (req: Request, res: Response) => {
   const parsed = querySchema.safeParse(req.query);
   if (!parsed.success) {
-    res.status(400).json({ error: 'Parámetros inválidos: assets (lista separada por comas) y days entre 2 y 400' });
+    res.status(400).json({ error: `Parámetros inválidos: assets (lista separada por comas) y days entre 2 y ${MAX_DAYS}` });
     return;
   }
   const assets = [...new Set(parsed.data.assets.split(',').map(a => validateSymbol(a)))];
   if (assets.some(a => a === null) || assets.length > MAX_ASSETS) {
     res.status(400).json({ error: `Símbolos inválidos o más de ${MAX_ASSETS} activos` });
+    return;
+  }
+  if (parsed.data.days > LONG_RANGE_DAYS && assets.length > LONG_RANGE_MAX_ASSETS) {
+    res.status(400).json({ error: `Más de ${LONG_RANGE_DAYS} días solo para ${LONG_RANGE_MAX_ASSETS} activos como mucho` });
     return;
   }
   try {
