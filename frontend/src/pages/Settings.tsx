@@ -11,8 +11,15 @@ import { SetupBanner } from './settings/SetupBanner'
 import { SettingsNav } from './settings/SettingsNav'
 import { VALID_TABS } from './settings/validTabs'
 import { useSetupSeen } from '../hooks/useSetupSeen'
-import { tabId, tabPanelId, PageHeader } from '../components/ui'
+import { tabId, tabPanelId, PageHeader, SectionHeader } from '../components/ui'
 import { navIcon } from '../constants/navigation'
+
+// Título y contexto de las secciones sin cabecera propia (#491).
+const SECTION_HEADERS = {
+  fiscal: { title: 'Fiscal', subtitle: 'Normativa, Modelo 721, tramos del IRPF y comisión de red.' },
+  datos: { title: 'Datos', subtitle: 'Copias de seguridad, mantenimiento y borrado de datos.' },
+  general: { title: 'General', subtitle: 'Tema, zona horaria, moneda, preferencias y avisos.' },
+} as const
 
 export function Settings() {
   const { setupSeen, markSetupSeen } = useSetupSeen()
@@ -67,9 +74,10 @@ export function Settings() {
           <div key={activeTab} className="settings-section-in h-full">
             {activeTab === 'wallets' && <div className={scroll}><WalletsSection onWalletCreated={markSetupSeen} /></div>}
             {activeTab === 'assets'  && <AssetsSection />}
-            {activeTab === 'fiscal'  && <div className={scroll}><FiscalSection /></div>}
-            {activeTab === 'datos'   && <div className={scroll}><DatosSection /></div>}
-            {activeTab === 'general' && <div className={scroll}><GeneralSection /></div>}
+            {/* Cabecera común de sección (#491): un h2 por pestaña. Wallets y Activos llevan la suya con acciones. */}
+            {activeTab === 'fiscal'  && <div className={scroll}><SectionHeader className="mb-4" {...SECTION_HEADERS.fiscal} /><FiscalSection /></div>}
+            {activeTab === 'datos'   && <div className={scroll}><SectionHeader className="mb-4" {...SECTION_HEADERS.datos} /><DatosSection /></div>}
+            {activeTab === 'general' && <div className={scroll}><SectionHeader className="mb-4" {...SECTION_HEADERS.general} /><GeneralSection /></div>}
           </div>
         </div>
       </div>
