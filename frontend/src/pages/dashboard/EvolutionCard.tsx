@@ -1,10 +1,10 @@
-import { useId, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { PnlChart, type PnlUnit } from './PnlChart'
 import { ValueChart } from './ValueChart'
 import { EvolutionSummary } from './EvolutionSummary'
 import { CalendarDayDetail } from './calendar/CalendarDayDetail'
 import { DateRangePicker } from '../../components/DateRangePicker'
-import { SegmentedControl, Tabs, tabId, tabPanelId, PanelHeader, panelSurface } from '../../components/ui'
+import { SegmentedControl, PanelHeader, panelSurface } from '../../components/ui'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
 import { usePreparacionHistoricos } from '../../hooks/usePreparacionHistoricos'
 import { PreparandoHistoricos } from '../../components/PreparandoHistoricos'
@@ -36,7 +36,6 @@ export function EvolutionCard() {
   const [unit, setUnit] = useState<PnlUnit>('pct')
   // Día del mejor o peor resultado cuyo detalle se muestra bajo el resumen (#250).
   const [openDay, setOpenDay] = useState<{ day: string; key: string } | null>(null)
-  const baseId = useId()
   const today = localToday()
   const query = evolutionQuery(period, today, range)
 
@@ -89,8 +88,9 @@ export function EvolutionCard() {
         title="Evolución"
         className="mb-3"
         subtitle={evolutionSubtitle(period, series[0]?.x ?? null, range)}
-        extra={<Tabs label="Evolución del portfolio" idBase={baseId} value={tab} onChange={setTab}
-          items={TABS.map(t => ({ value: t.id, label: t.label }))} />}
+        // Nivel 3 de la norma de selección (#492): opción del panel, sin URL.
+        extra={<SegmentedControl label="Curva de evolución" variant="accent" value={tab} onChange={setTab}
+          options={TABS.map(t => ({ value: t.id, label: t.label }))} />}
         actions={<>
           {/* En pantallas estrechas (#499) los periodos se desplazan dentro de su caja en vez de ensanchar la página. */}
           <div className="max-w-full overflow-x-auto py-0.5">
@@ -108,7 +108,7 @@ export function EvolutionCard() {
         </>}
       />
 
-      <div id={tabPanelId(baseId)} role="tabpanel" aria-labelledby={tabId(baseId, tab)}>
+      <div>
         {/* Sin todos los cierres no hay curva fiable: progreso en vez de cifras (#334). 24h no depende de ellos. */}
         {!query.intraday && !preparacion.listo ? <PreparandoHistoricos datos={preparacion.datos} /> : <>
         <EvolutionSummary

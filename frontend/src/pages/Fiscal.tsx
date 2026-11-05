@@ -28,7 +28,7 @@ import { DeclaracionRenta } from './fiscal/DeclaracionRenta'
 import type { FiscalHito } from '../api/portfolio'
 import { useFiscalShortcuts } from './fiscal/useFiscalShortcuts'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
-import { cardClasses, EmptyState, ErrorState, Skeleton, PageHeader, Tabs, panelEnterStyle, tabId, tabPanelId, SectionHeader } from '../components/ui'
+import { cardClasses, EmptyState, ErrorState, Skeleton, PageHeader, panelEnterStyle, tabId, tabPanelId, SectionHeader, ViewTabs } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 
 const VISTA_LABELS: Record<FiscalVista, string> = { resumen: 'Resumen', operaciones: 'Operaciones', modelo721: 'Modelo 721', planificar: 'Planificar' }
@@ -233,8 +233,8 @@ export function Fiscal() {
         </p>
       )}
 
-      <Tabs items={TAB_ITEMS} value={vista} onChange={setVista} label="Secciones de Fiscal" idBase={ID_BASE} variant="underline"
-        className="overflow-x-auto [scrollbar-width:none] [&>button]:shrink-0 max-sm:[&>button]:px-3" />
+      {/* Nivel 2 de la norma de selección (#492): vistas con URL. */}
+      <ViewTabs items={TAB_ITEMS} value={vista} onChange={setVista} label="Secciones de Fiscal" idBase={ID_BASE} />
 
       <div id={tabPanelId(ID_BASE)} role="tabpanel" aria-labelledby={tabId(ID_BASE, vista)} aria-busy={switching}
         className={`space-y-5 transition-opacity duration-200 ${switching ? 'opacity-60' : ''}`}>

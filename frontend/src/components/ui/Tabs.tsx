@@ -48,3 +48,12 @@ export function Tabs<T extends string>({ items, value, onChange, label, idBase, 
     </div>
   )
 }
+
+/**
+ * Nivel 2 de la norma de selección (#492): vistas dentro de una sección, con
+ * URL. Pestañas subrayadas que se desplazan en horizontal si no caben.
+ */
+export function ViewTabs<T extends string>({ className = '', ...props }: Omit<TabsProps<T>, 'variant'>) {
+  return <Tabs {...props} variant="underline"
+    className={`overflow-x-auto [scrollbar-width:none] [&>button]:shrink-0 max-sm:[&>button]:px-3 ${className}`} />
+}
