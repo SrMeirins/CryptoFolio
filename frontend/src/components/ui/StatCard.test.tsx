@@ -86,4 +86,13 @@ describe('StatCard (#410)', () => {
     expect(html).toContain('data-pie="1"')
     expect(html).not.toContain('<svg viewBox="0 0 100 28"')
   })
+
+  it('huecos reservados (#490): sin chip ni serie, ocupan su sitio para alinear la fila', () => {
+    const html = render({ reserveSlots: true })
+    expect(html).toContain('data-slot="chip"')
+    expect(html).toContain('data-slot="serie"')
+    const conDatos = render({ reserveSlots: true, chip: <span>chip</span>, series: [1, 2, 3] })
+    expect(conDatos).not.toContain('data-slot=')
+    expect(render()).not.toContain('data-slot=')
+  })
 })
