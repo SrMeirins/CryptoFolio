@@ -6,6 +6,7 @@ import { Fiscal } from './pages/Fiscal'
 import { ImportPage } from './pages/Import'
 import { History } from './pages/History'
 import { Settings } from './pages/Settings'
+import { NotFound } from './pages/NotFound'
 import { useLivePrices } from './hooks/useLivePrices'
 import { ToastProvider } from './components/Toast'
 import { UpdateBanner } from './components/UpdateBanner'
@@ -35,6 +36,8 @@ function RoutedContent() {
         <Route path="/import"   element={<ImportPage />} />
         <Route path="/history"  element={<History />} />
         <Route path="/settings" element={<Settings />} />
+        {/* Cualquier otra ruta (#487): antes dejaba el contenido en blanco. */}
+        <Route path="*"         element={<NotFound />} />
       </Routes>
     </div>
   )
