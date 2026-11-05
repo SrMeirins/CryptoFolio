@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { axisPrice, chartMarkers, labelSide, priceSeries, rangeDays, rangeStats, totalReturn } from './assetPriceChart'
+import { axisPrice, chartMarkers, labelSide, operationDays, priceSeries, rangeDays, rangeStats, samplePoints, totalReturn } from './assetPriceChart'
 import type { AssetSale } from '../api/portfolio'
 
 // Gráfico de precio y rentabilidad total del panel de detalle (#284). Datos sintéticos.
@@ -11,9 +11,10 @@ describe('rangeDays', () => {
     expect(rangeDays('90d', null)).toBe(90)
     expect(rangeDays('1y', null)).toBe(365)
   })
-  it('«Todo» desde la primera compra, con tope de 400 días', () => {
+  it('«Todo» desde la primera compra, sin el antiguo tope de 400 días (#523)', () => {
     expect(rangeDays('all', '2026-01-01T10:00:00Z', NOW)).toBe(31)
-    expect(rangeDays('all', '2020-01-01T10:00:00Z', NOW)).toBe(400)
+    expect(rangeDays('all', '2023-01-01T10:00:00Z', NOW)).toBeGreaterThan(400)
+    expect(rangeDays('all', '2000-01-01T10:00:00Z', NOW)).toBe(3660)
     expect(rangeDays('all', '2026-01-31T09:00:00Z', NOW)).toBe(2)
     expect(rangeDays('all', null, NOW)).toBe(365)
   })
@@ -76,5 +77,35 @@ describe('eje y etiquetas', () => {
     expect(labelSide(50, 0, 100)).toBe('center')
     expect(labelSide(95, 0, 100)).toBe('left')
     expect(labelSide(5, 5, 5)).toBe('center')
+  })
+})
+
+describe('samplePoints (#523)', () => {
+  const DAY = 86_400_000
+  const T0 = Date.parse('2022-01-01T12:00:00Z')
+  // 1.200 días con precio en dientes de sierra; el máximo y el mínimo, en días sueltos.
+  const serie = Array.from({ length: 1200 }, (_, i) => ({ t: T0 + i * DAY, price: 10 + (i % 7) }))
+  serie[333].price = 99
+  serie[777].price = 1
+  const dia = (i: number) => new Date(T0 + i * DAY).toISOString().slice(0, 10)
+
+  it('deja la serie corta como está', () => {
+    expect(samplePoints(serie.slice(0, 300), new Set())).toHaveLength(300)
+  })
+  it('reduce la serie larga y conserva extremos, máximo, mínimo y días con operaciones', () => {
+    const r = samplePoints(serie, new Set([dia(501), dia(1001)]))
+    expect(r.length).toBeLessThanOrEqual(420)
+    expect(r[0]).toBe(serie[0])
+    expect(r.at(-1)).toBe(serie.at(-1))
+    expect(r).toContain(serie[333])
+    expect(r).toContain(serie[777])
+    expect(r).toContain(serie[501])
+    expect(r).toContain(serie[1001])
+    expect(rangeStats(r)).toEqual(rangeStats(serie))
+  })
+  it('días con compras y ventas', () => {
+    const d = operationDays([{ openedAt: '2023-05-04T10:00:00Z' }],
+      [{ soldAt: '2024-02-01T09:00:00Z', kind: 'venta', quantity: 1, priceEur: 1, proceedsEur: 1, gainLossEur: 0 }])
+    expect([...d]).toEqual(['2023-05-04', '2024-02-01'])
   })
 })

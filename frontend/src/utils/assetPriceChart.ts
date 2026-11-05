@@ -9,14 +9,17 @@ import type { AssetSale } from '../api/portfolio'
 // pasados; el último punto (precio en vivo) es exacto.
 
 export type ChartRange = '30d' | '90d' | '1y' | 'all'
-export const MAX_CHART_DAYS = 400
+/** Tope de la API de cierres (MAX_DAYS en backend/src/routes/pricesCloses.ts): 10 años. */
+export const MAX_CHART_DAYS = 3660
+/** Por encima de estos puntos se muestrea para mantener el gráfico fluido (#523). */
+export const MAX_CHART_POINTS = 400
 const RANGE_DAYS: Record<Exclude<ChartRange, 'all'>, number> = { '30d': 30, '90d': 90, '1y': 365 }
 const DAY_MS = 86_400_000
 
 export interface ChartPoint { t: number; price: number }
 export interface ChartMarker { t: number; price: number; quantity: number; kind: 'compra' | 'venta' }
 
-/** Días a pedir para un rango; «Todo» va desde la primera compra abierta (máx. 400). */
+/** Días a pedir para un rango; «Todo» va desde la primera compra del activo, también de lo ya vendido (#523). */
 export function rangeDays(range: ChartRange, firstOpenedAt: string | null, now: Date = new Date()): number {
   if (range !== 'all') return RANGE_DAYS[range]
   if (!firstOpenedAt) return RANGE_DAYS['1y']
@@ -55,6 +58,25 @@ export function rangeStats(points: readonly ChartPoint[]): RangeStats | null {
 }
 
 const dayKey = (iso: string) => iso.slice(0, 10)
+
+/**
+ * Reduce una serie larga a unos `max` puntos repartidos por igual (#523), sin
+ * perder el primero, el último, el máximo, el mínimo ni los días con compras o
+ * ventas (`keepDays`, fechas AAAA-MM-DD en UTC, como las marcas).
+ */
+export function samplePoints(points: readonly ChartPoint[], keepDays: ReadonlySet<string>, max = MAX_CHART_POINTS): ChartPoint[] {
+  if (points.length <= max) return [...points]
+  const step = Math.ceil(points.length / max)
+  const stats = rangeStats(points)
+  const keep = new Set<ChartPoint>([points[0], points[points.length - 1]])
+  if (stats) { keep.add(stats.max); keep.add(stats.min) }
+  return points.filter((p, i) => i % step === 0 || keep.has(p) || keepDays.has(new Date(p.t).toISOString().slice(0, 10)))
+}
+
+/** Días con compras o ventas, para no perderlos al muestrear. */
+export function operationDays(buys: ReadonlyArray<{ openedAt: string }>, sales: readonly AssetSale[]): Set<string> {
+  return new Set([...buys.map(b => dayKey(b.openedAt)), ...sales.map(s => dayKey(s.soldAt))])
+}
 
 /**
  * Marcas del gráfico dentro del rango, una por día y tipo: cantidad sumada y

@@ -76,6 +76,14 @@ describe('GET /api/v1/fifo/sales/:asset (#284)', () => {
     expect(res.body.sales[1]).toMatchObject({ kind: 'permuta', quantity: 49, gainLossEur: -15 });
   });
 
+  it('devuelve la primera adquisición del activo, aunque sus lotes ya estén cerrados (#523)', async () => {
+    const res = await request(app).get('/api/v1/fifo/sales/XRP');
+    const first = (await pool.query(`SELECT MIN(opened_at) AS f FROM fifo_lots WHERE asset = 'XRP'`)).rows[0].f;
+    expect(res.body.firstAcquiredAt).toBe(new Date(first).toISOString());
+    const none = await request(app).get('/api/v1/fifo/sales/ADA');
+    expect(none.body.firstAcquiredAt).toBeNull();
+  });
+
   it('el realizado coincide con /api/fifo/realized-pnl', async () => {
     const sales = (await request(app).get('/api/v1/fifo/sales/XRP')).body;
     const agg = (await request(app).get('/api/fifo/realized-pnl')).body.byAsset.find((r: { asset: string }) => r.asset === 'XRP');
