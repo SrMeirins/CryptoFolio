@@ -5,18 +5,19 @@ export function SetupBanner({ onDismiss, onAddWallet }: { onDismiss: () => void;
   return (
     <div className={cardClasses('md', 'border-brand/30 bg-brand/5')}>
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
+        {/* min-w-0 y botones que se reparten: cabe en pantallas estrechas (#499) */}
+        <div className="flex items-start gap-4 min-w-0">
           <div className="p-2.5 bg-brand/10 rounded-lg shrink-0">
             <HardDrive size={20} className="text-brand" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h3 className="font-medium text-sm">Configura tus wallets antes de importar</h3>
             <p className="text-xs text-fg-muted mt-1 leading-relaxed">
               Si tienes wallets frías (Tangem, Ledger, Trezor...) añádelas aquí para que
               los retiros de Binance se asignen correctamente. Si solo operas en Binance
               no necesitas hacer nada más.
             </p>
-            <div className="flex items-center gap-3 mt-4">
+            <div className="flex items-center gap-3 mt-4 flex-wrap">
               <button type="button" onClick={onAddWallet}
                 className={buttonClasses('primary', 'md', 'flex')}>
                 <Plus size={14} /> Añadir wallet fría
