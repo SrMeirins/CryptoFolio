@@ -6,7 +6,7 @@ import { usePortfolioValuation } from '../../hooks/usePortfolioValuation'
 import { useDisplayMarket } from '../../hooks/useDisplayMarket'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { formatMoney, formatPercent } from '../../utils/format'
-import { NEUTRAL_COLOR, allocationByAsset, allocationByWallet, concentration, type AllocationItem, type AllocationMode } from '../../utils/allocation'
+import { NEUTRAL_COLOR, allocationByAsset, allocationByWallet, assetColors, concentration, type AllocationItem, type AllocationMode } from '../../utils/allocation'
 import { allocationSubtitle } from '../../utils/panelSubtitles'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { PanelHeader, SegmentedControl, badgeClasses, panelSurface } from '../../components/ui'
@@ -25,18 +25,21 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
   const reduceMotion = useReducedMotion()
   const [mode, setMode] = useState<AllocationMode>(readMode)
   const [active, setActive] = useState<string | null>(null)
-  const [othersOpen, setOthersOpen] = useState(false)
+  // Fila desplegada: «Otros» o una wallet con su desglose por activo (#506).
+  const [open, setOpen] = useState<string | null>(null)
 
   const { assets, totalValue: total } = usePortfolioValuation(lots, fiatBalances)
   const items = useMemo<AllocationItem[]>(
-    () => (mode === 'asset' ? allocationByAsset(assets, open24) : allocationByWallet(lots, fiatBalances, prices, rate ?? 0, undefined, dustThreshold)),
+    () => (mode === 'asset'
+      ? allocationByAsset(assets, open24)
+      : allocationByWallet(lots, fiatBalances, prices, rate ?? 0, undefined, dustThreshold, assetColors(assets))),
     [mode, assets, open24, lots, fiatBalances, prices, rate, dustThreshold],
   )
   const warn = mode === 'asset' ? concentration(items) : null
   if (total === 0 || items.length === 0) return null
 
   const activeItem = items.find(i => i.key === active) ?? null
-  const changeMode = (m: AllocationMode) => { setMode(m); setActive(null); setOthersOpen(false); try { localStorage.setItem(MODE_KEY, m) } catch { /* solo esta sesión */ } }
+  const changeMode = (m: AllocationMode) => { setMode(m); setActive(null); setOpen(null); try { localStorage.setItem(MODE_KEY, m) } catch { /* solo esta sesión */ } }
   const fill = (i: AllocationItem) => (i.kind === 'fiat' ? `url(#${FIAT_PATTERN})` : i.color)
 
   return (
@@ -102,33 +105,52 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
         <ul className="space-y-0.5" onMouseLeave={() => setActive(null)}>
           {items.map(i => {
             const isOthers = i.kind === 'other'
+            const expandable = isOthers || i.breakdown.length > 0
+            const isOpen = open === i.key
             const dimmed = active !== null && active !== i.key
             return (
               <li key={i.key}>
                 <button
                   type="button"
-                  aria-expanded={isOthers ? othersOpen : undefined}
-                  onClick={() => isOthers && setOthersOpen(o => !o)}
+                  aria-expanded={expandable ? isOpen : undefined}
+                  onClick={() => expandable && setOpen(o => (o === i.key ? null : i.key))}
                   onMouseEnter={() => setActive(i.key)} onFocus={() => setActive(i.key)} onBlur={() => setActive(null)}
                   className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition-[opacity,background-color] duration-200
-                    hover:bg-overlay/4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${dimmed ? 'opacity-45' : ''} ${isOthers ? 'cursor-pointer' : 'cursor-default'}`}
+                    hover:bg-overlay/4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${dimmed ? 'opacity-45' : ''} ${expandable ? 'cursor-pointer' : 'cursor-default'}`}
                 >
                   {i.kind === 'crypto'
                     ? <CryptoIcon symbol={i.label} size={24} ring={i.color} />
                     : <span aria-hidden="true" className="w-6 h-6 rounded-md shrink-0" style={{ background: i.kind === 'fiat' ? `repeating-linear-gradient(45deg, ${NEUTRAL_COLOR} 0 3px, rgba(255,255,255,0.35) 3px 5px)` : i.color }} />}
                   <span className={`${mode === 'wallet' ? 'w-40' : 'w-16'} shrink-0 text-[13px] font-semibold text-fg truncate`} title={i.label}>{i.label}</span>
-                  <span className="flex-1 h-1.5 rounded-full bg-overlay/6 overflow-hidden" aria-hidden="true">
-                    <span className="block h-full rounded-full transition-[width] duration-500" style={{ width: `${i.pct}%`, background: i.color }} />
+                  <span className="flex-1 h-1.5 rounded-full bg-overlay/6 overflow-hidden flex" aria-hidden="true">
+                    {i.breakdown.length > 0
+                      // Por wallet: la barra se reparte por activo con los colores de la vista por activo.
+                      ? <span className="flex h-full rounded-full overflow-hidden transition-[width] duration-500" style={{ width: `${i.pct}%` }}>
+                          {i.breakdown.map(b => <span key={b.key} className="h-full" style={{ width: `${b.pct}%`, background: b.color }} />)}
+                        </span>
+                      : <span className="block h-full rounded-full transition-[width] duration-500" style={{ width: `${i.pct}%`, background: i.color }} />}
                   </span>
                   <span className="w-12 text-right text-xs mono text-fg-muted shrink-0">{formatPercent(i.pct, 1)}</span>
                   <span className="w-24 text-right text-xs mono text-fg shrink-0">{formatMoney(i.value, currency)}</span>
                   <span className={`w-14 text-right text-xs mono shrink-0 ${i.change24h === null ? 'text-fg-subtle' : i.change24h >= 0 ? 'text-positive' : 'text-negative'}`}>
-                    {isOthers
-                      ? <ChevronDown size={14} aria-hidden="true" className={`inline transition-transform ${othersOpen ? 'rotate-180' : ''}`} />
+                    {expandable
+                      ? <ChevronDown size={14} aria-hidden="true" className={`inline transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                       : i.change24h === null ? '' : formatPercent(i.change24h, 1, true)}
                   </span>
                 </button>
-                {isOthers && othersOpen && (
+                {!isOthers && isOpen && (
+                  <ul aria-label={`Composición de ${i.label}`} className="ml-11 mt-0.5 mb-1 space-y-0.5 border-l border-border pl-3">
+                    {i.breakdown.map(b => (
+                      <li key={b.key} className="flex items-center gap-3 text-xs py-0.5">
+                        <span aria-hidden="true" className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: b.color }} />
+                        <span className="flex-1 text-fg-muted truncate">{b.label}</span>
+                        <span className="mono text-fg-subtle w-12 text-right">{formatPercent(b.pct, 1)}</span>
+                        <span className="mono text-fg w-24 text-right">{formatMoney(b.value, currency)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {isOthers && isOpen && (
                   <ul className="ml-11 mt-0.5 mb-1 space-y-0.5 border-l border-border pl-3">
                     {i.members.map(m => (
                       <li key={m.label} className="flex items-center gap-3 text-xs py-0.5">
