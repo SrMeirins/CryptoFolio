@@ -441,6 +441,8 @@ Las contribuciones son bienvenidas. Áreas donde ayudar:
 
 Para cambios grandes, abre primero un issue para discutirlo antes de ponerte a programar.
 
+Los textos de la interfaz siguen la [guía de estilo de textos](docs/guia-estilo-textos.md): tono, puntuación, cifras y cuándo usar cada tipo de aviso.
+
 ### Prueba de humo de la consola del navegador
 
 El CI abre cada vista con datos sintéticos y falla ante cualquier error o aviso en la consola del navegador (`frontend/e2e/`). Para ejecutarla en local, con un backend en marcha sobre una base de datos de prueba cargada con `frontend/e2e/seed.sql`:

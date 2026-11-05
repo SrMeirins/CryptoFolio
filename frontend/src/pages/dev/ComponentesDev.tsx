@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Coins, Settings, Wallet } from 'lucide-react'
-import { PageHeader, SectionHeader, StatCard, StatStrip, buttonClasses } from '../../components/ui'
+import { Notice, PageHeader, SectionHeader, StatCard, StatStrip, buttonClasses } from '../../components/ui'
+import { PieMetodologia } from '../../components/metodologia'
 import { formatMoney } from '../../utils/format'
 
 // Página de prueba de los componentes comunes (épica #479). Solo existe en
@@ -42,6 +43,17 @@ export function ComponentesDev() {
           <StatCard title="Sin serie" icon={Coins} color="var(--cf-warning)" value={42} format={eur} reserveSlots
             chip={<span className="text-xs text-fg-muted">3 activos</span>} />
         </div>
+      </section>
+
+      <section aria-labelledby="dev-notice" className="space-y-3">
+        <h2 id="dev-notice" className="text-sm font-semibold">Notice y pie de metodología (#493)</h2>
+        <Notice tipo="aviso">AAA no tiene precio configurado: valor y P&L no disponibles.</Notice>
+        <Notice tipo="consejo" title="¿Retiraste a tus wallets?"
+          action={<button type="button" className={buttonClasses('secondary', 'sm')}>Añadir historial</button>}>
+          Añade el historial de retiradas y agruparemos los retiros por dirección.
+        </Notice>
+        <Notice tipo="informacion" compact>Se detectaron 3 operaciones de staking.</Notice>
+        <PieMetodologia tema="rentabilidad">Texto de prueba del método.</PieMetodologia>
       </section>
     </div>
   )

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { CheckCircle2, MapPin, X } from 'lucide-react'
-import { buttonClasses } from '../../components/ui'
+import { buttonClasses, Notice } from '../../components/ui'
 import { esArchivoRetiradas } from './direcciones'
 import { validateFile } from './wizard'
 
@@ -40,21 +40,16 @@ export function RetiradasCard({ resumen, nombre, cargando, onAnadir, onQuitar }:
   }
 
   return (
-    <div className="rounded-xl border border-brand/25 bg-brand/5 px-4 py-3 space-y-2">
-      <div className="flex items-center gap-3 flex-wrap">
-        <MapPin size={16} className="text-brand shrink-0" aria-hidden="true" />
-        <div className="flex-1 min-w-56">
-          <p className="text-sm font-medium text-fg">¿Retiraste a tus wallets?</p>
-          <p className="text-xs text-fg-muted">Añade el historial de retiradas de Binance y agruparemos los retiros por dirección; las que guardes se reconocerán solas.</p>
-        </div>
-        <button type="button" onClick={() => inputRef.current?.click()} disabled={cargando} className={buttonClasses('secondary', 'sm')}>
-          {cargando ? 'Leyendo…' : 'Añadir historial de retiradas'}
-        </button>
-        <input ref={inputRef} type="file" accept=".csv" className="hidden" tabIndex={-1}
-          onChange={e => { void elegir(e.target.files?.[0]); e.target.value = '' }} />
-      </div>
-      <p className="text-[11px] text-fg-subtle">En Binance: Orders › Assets History › Export Withdrawal History › Customize dates › CSV.</p>
-      {error && <p role="alert" className="text-xs text-negative">{error}</p>}
-    </div>
+    <Notice tipo="consejo" icon={MapPin} title="¿Retiraste a tus wallets?" action={<>
+      <button type="button" onClick={() => inputRef.current?.click()} disabled={cargando} className={buttonClasses('secondary', 'sm')}>
+        {cargando ? 'Leyendo…' : 'Añadir historial de retiradas'}
+      </button>
+      <input ref={inputRef} type="file" accept=".csv" className="hidden" tabIndex={-1}
+        onChange={e => { void elegir(e.target.files?.[0]); e.target.value = '' }} />
+    </>}>
+      <p>Añade el historial de retiradas de Binance y agruparemos los retiros por dirección; las que guardes se reconocerán solas.</p>
+      <p className="mt-1 text-[11px] text-fg-subtle">En Binance: Orders, Assets History, Export Withdrawal History, Customize dates, CSV.</p>
+      {error && <p role="alert" className="mt-1 text-negative">{error}</p>}
+    </Notice>
   )
 }

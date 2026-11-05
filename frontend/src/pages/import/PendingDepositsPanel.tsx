@@ -73,7 +73,7 @@ export function PendingDepositsPanel({ deposits }: { deposits: PendingDeposit[] 
         </div>
         <div className="flex-1">
           <h3 className="font-semibold text-sm text-fg">
-            Revisión obligatoria — depósitos sin coste de adquisición
+            Revisión obligatoria: depósitos sin coste de adquisición
           </h3>
           <p className="text-xs text-fg-muted mt-1 leading-relaxed">
             {deposits.length} depósito{deposits.length > 1 ? 's' : ''} recibido{deposits.length > 1 ? 's' : ''} desde fuera de Binance

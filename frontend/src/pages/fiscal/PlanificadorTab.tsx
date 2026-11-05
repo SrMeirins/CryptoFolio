@@ -4,7 +4,7 @@ import { Calculator, Hourglass, PiggyBank, Repeat, TrendingDown, TrendingUp } fr
 import { portfolioApi } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { SaleSimulatorModal } from '../../components/SaleSimulatorModal'
-import { buttonClasses, cardClasses, fieldClasses, Skeleton } from '../../components/ui'
+import { buttonClasses, cardClasses, fieldClasses, Notice, Skeleton } from '../../components/ui'
 import { useDebounce } from '../../hooks/useDebounce'
 import { usePricesStore } from '../../store/pricesStore'
 import { ink } from '../../utils/colors'
@@ -127,10 +127,9 @@ export function PlanificadorTab() {
           </dl>
         </div>
         {data.caducanEsteAnio > 0.01 && (
-          <p className="mt-4 flex items-start gap-2 text-xs text-fg-muted rounded-xl border border-warning/25 bg-warning/5 px-3 py-2">
-            <Hourglass size={13} className="text-warning shrink-0 mt-0.5" aria-hidden="true" />
-            <span><span className="mono font-semibold text-warning">{formatEur(data.caducanEsteAnio)}</span> de ese colchón son pérdidas que caducan el 31 de diciembre: si no las usas este año, se pierden.</span>
-          </p>
+          <Notice tipo="aviso" icon={Hourglass} compact className="mt-4">
+            <span className="mono font-semibold text-warning-ink">{formatEur(data.caducanEsteAnio)}</span> de ese colchón son pérdidas que caducan el 31 de diciembre: si no las usas este año, se pierden.
+          </Notice>
         )}
       </section>
 
@@ -176,10 +175,9 @@ export function PlanificadorTab() {
           </ul>
         )}
         {sug.perdidas.some(s => s.recompra) && (
-          <p className="text-[11px] text-fg-subtle mt-3 flex items-start gap-1.5">
-            <Repeat size={11} className="text-warning shrink-0 mt-0.5" aria-hidden="true" />
+          <Notice tipo="consejo" icon={Repeat} compact className="mt-3">
             Si vendes con pérdida, no vuelvas a comprar ese activo en los 2 meses siguientes, o la pérdida no computará hasta que vendas la recompra.
-          </p>
+          </Notice>
         )}
       </FiscalChartCard>
 

@@ -1,7 +1,7 @@
-import { AlertTriangle, Hourglass } from 'lucide-react'
+import { Hourglass } from 'lucide-react'
 import { formatEur } from '../../utils/format'
 import { origenesView, totalCaducado, type OrigenView } from '../../utils/perdidasPendientes'
-import { badgeClasses } from '../../components/ui'
+import { badgeClasses, Notice } from '../../components/ui'
 import { FiscalChartCard } from './FiscalChartCard'
 import type { Carryforward } from './types'
 
@@ -22,13 +22,10 @@ const PROVISIONAL_CLS = 'bg-info/35 bg-[repeating-linear-gradient(45deg,transpar
 /** Aviso de las pérdidas que caducan el 31 de diciembre; también lo usa la cabecera del año. */
 export function AvisoCaducidad({ importe, years, compact = false }: { importe: number; years: number[]; compact?: boolean }) {
   return (
-    <p role="status" className={`flex items-start gap-2 rounded-xl border border-warning/25 bg-warning/5 text-xs text-fg-muted ${compact ? 'px-3 py-2' : 'p-3'}`}>
-      <AlertTriangle size={13} className="text-warning shrink-0 mt-0.5" aria-hidden="true" />
-      <span>
-        <span className="mono font-semibold text-warning">{formatEur(importe)}</span> de pérdidas de {years.join(' y ')} caducan el 31 de diciembre:
-        puedes realizar esa ganancia este año sin tributar por ella.
-      </span>
-    </p>
+    <Notice tipo="aviso" icon={Hourglass} compact={compact}>
+      <span className="mono font-semibold text-warning-ink">{formatEur(importe)}</span> de pérdidas de {years.join(' y ')} caducan el 31 de diciembre:
+      puedes realizar esa ganancia este año sin tributar por ella.
+    </Notice>
   )
 }
 

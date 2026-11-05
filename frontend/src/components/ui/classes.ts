@@ -176,3 +176,22 @@ export function panelClasses(extra = ''): string {
 export function panelSurface(padding: CardPadding = 'md', extra = ''): string {
   return cardClasses(padding, twMerge('panel-soft', extra))
 }
+
+// ── Notice (#493) ──
+// Tres tipos con significado propio, no solo de color: aviso (algo requiere
+// atención), consejo (acción recomendada) e información (contexto). El tipo se
+// anuncia también como texto para el lector de pantalla.
+export type NoticeTipo = 'aviso' | 'consejo' | 'informacion'
+export const NOTICE_LABEL: Record<NoticeTipo, string> = { aviso: 'Aviso', consejo: 'Consejo', informacion: 'Información' }
+const NOTICE_TONES: Record<NoticeTipo, { box: string; icon: string }> = {
+  aviso: { box: 'border-warning/30 bg-warning/5', icon: 'text-warning-ink' },
+  consejo: { box: 'border-brand/30 bg-brand/5', icon: 'text-brand-ink' },
+  informacion: { box: 'border-info/30 bg-info/5', icon: 'text-info-ink' },
+}
+export function noticeClasses(tipo: NoticeTipo, compact = false, extra = ''): string {
+  return twMerge('flex items-start gap-x-2.5 gap-y-2 flex-wrap rounded-xl border text-xs',
+    compact ? 'px-3 py-2' : 'px-3.5 py-3', NOTICE_TONES[tipo].box, extra)
+}
+export function noticeIconClasses(tipo: NoticeTipo): string {
+  return `shrink-0 mt-px ${NOTICE_TONES[tipo].icon}`
+}

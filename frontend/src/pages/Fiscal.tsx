@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
-import { FileText, Info } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { portfolioApi } from '../api/portfolio'
 import { FISCAL_STALE_TIME } from './fiscal/constants'
 import { fiscalYearQueries, prefetchOrder } from './fiscal/fiscalYearQueries'
@@ -30,10 +30,14 @@ import { useFiscalShortcuts } from './fiscal/useFiscalShortcuts'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
 import { cardClasses, EmptyState, ErrorState, Skeleton, PageHeader, panelEnterStyle, tabId, tabPanelId, SectionHeader, ViewTabs } from '../components/ui'
 import { navIcon } from '../constants/navigation'
+import { PieMetodologia, type TemaMetodo } from '../components/metodologia'
 
 const VISTA_LABELS: Record<FiscalVista, string> = { resumen: 'Resumen', operaciones: 'Operaciones', modelo721: 'Modelo 721', planificar: 'Planificar' }
 const TAB_ITEMS = FISCAL_VISTAS.map((v, i) => ({ value: v, label: <span title={`Atajo: ${i + 1}`}>{VISTA_LABELS[v]}</span> }))
 const ID_BASE = 'fiscal-vista'
+
+/** Tema de «Cómo calculamos» que abre el pie en cada vista (#493). */
+const TEMA_VISTA: Record<FiscalVista, TemaMetodo> = { resumen: 'fifo', operaciones: 'fifo', planificar: 'compensacion', modelo721: 'modelo721' }
 
 /** Bloque con la entrada escalonada de paneles (#297). */
 function Block({ i, children }: { i: number; children: ReactNode }) {
@@ -289,11 +293,9 @@ export function Fiscal() {
         ) : null}
       </div>
 
-      <div className="flex items-start gap-2 p-4 bg-background-tertiary/50 rounded-xl text-xs text-fg-subtle border border-border">
-        <Info size={12} className="shrink-0 mt-0.5" />
-        Información orientativa. Los cálculos se basan en el método FIFO según la normativa española vigente.
-        Consulta con un asesor fiscal antes de presentar tu declaración de la renta.
-      </div>
+      <PieMetodologia tema={TEMA_VISTA[vista]}>
+        Método FIFO global por activo según la normativa española. Información orientativa: consulta con un asesor fiscal antes de presentar tu declaración.
+      </PieMetodologia>
     </div>
   )
 }

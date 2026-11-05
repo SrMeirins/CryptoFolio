@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { BadgeCheck, ChevronDown, ExternalLink, Network as NetworkIcon, Wallet } from 'lucide-react'
 import type { Network } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import { buttonClasses } from '../../components/ui'
+import { buttonClasses, Notice } from '../../components/ui'
 import { ink } from '../../utils/colors'
 import { DireccionTag } from './DireccionTag'
 import { urlExplorador, type GrupoDireccion, type WalletReconocida } from './direcciones'
@@ -78,11 +78,10 @@ export function WithdrawalAddressGroup({ id, grupo, red, destinations, coldWalle
               </span>
             </span>
           ) : valor === '__external__' ? (
-            <div className="flex items-center gap-3 flex-wrap rounded-lg border border-brand/30 bg-brand/5 px-3 py-2">
-              <Wallet size={15} className="text-brand shrink-0" aria-hidden="true" />
-              <p className="text-xs text-fg-muted flex-1 min-w-48">¿Es una wallet tuya? Guárdala y la próxima vez estos retiros se asignarán solos.</p>
-              <button type="button" onClick={onGuardar} className={buttonClasses('primary', 'sm')}>Guardar en mi wallet</button>
-            </div>
+            <Notice tipo="consejo" icon={Wallet} compact
+              action={<button type="button" onClick={onGuardar} className={buttonClasses('primary', 'sm')}>Guardar en mi wallet</button>}>
+              ¿Es una wallet tuya? Guárdala y la próxima vez estos retiros se asignarán solos.
+            </Notice>
           ) : (
             <button type="button" onClick={onGuardar}
               className="inline-flex items-center gap-1.5 text-xs text-brand hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 rounded">
