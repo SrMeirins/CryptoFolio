@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
+import { HISTORY_CSV_HEADER } from '../../modules/history/csvFormat';
 
 // Comisiones agrupadas con su compra o venta (#371). Datos sintéticos: cada
 // caso de la regla de emparejamiento en un instante distinto.
@@ -93,10 +94,11 @@ describe('comisiones agrupadas (#371)', () => {
     const res = await request(app).get('/api/transactions/export.csv').buffer(true)
       .parse((r, cb) => { let d = ''; r.setEncoding('utf8'); r.on('data', (c: string) => { d += c; }); r.on('end', () => cb(null, d)); });
     const lines = (res.body as string).replace(/^\uFEFF/, '').trimEnd().split('\n');
-    expect(lines[0].endsWith(';Operación asociada')).toBe(true);
+    expect(lines[0].endsWith(';Operación asociada;Código')).toBe(true);
     expect(lines).toHaveLength(1 + 11);
     const fila = lines.find(l => l.split(';')[20] === ids.feeEth)!;
-    expect(fila.split(';').at(-1)).toBe(ids.buyEth);
+    // Columna por nombre: el código del tipo va después (#488).
+    expect(fila.split(';')[HISTORY_CSV_HEADER.split(';').indexOf('Operación asociada')]).toBe(ids.buyEth);
   });
 
   it('group_fees inválido → 400', async () => {

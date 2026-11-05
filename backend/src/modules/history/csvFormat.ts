@@ -1,4 +1,5 @@
 import { sanitizeCsvField } from '../csv/csvSafety';
+import { displayOperationLabel } from './operationLabels';
 
 // Formato del CSV del Historial (#349): separador ';', punto decimal (como el
 // CSV de Fiscal) y fechas ISO 8601 locales con desfase, sin ambigüedad.
@@ -9,7 +10,7 @@ export const HISTORY_CSV_HEADER = [
   'Fecha', 'Tipo', 'Activo', 'Importe', 'Coste', 'Activo coste', 'Precio unitario',
   'Comisión', 'Activo comisión', 'Valor EUR', 'Comisión EUR', 'Valor USD', 'Comisión USD',
   'Origen del valor', 'Wallet', 'Wallet destino', 'Cuenta', 'Manual', 'Editada', 'Notas',
-  'ID', 'Archivo de origen', 'Hash', 'Operación asociada',
+  'ID', 'Archivo de origen', 'Hash', 'Operación asociada', 'Código',
 ].join(';');
 
 /** Fila tal como la devuelve historyRowsSql (solo los campos que se exportan). */
@@ -92,7 +93,8 @@ export function historyCsvLine(r: HistoryCsvRow, tz: string): string {
   const text = (v: string | null) => sanitizeCsvField(v ?? '');
   return [
     isoLocal(new Date(r.timestamp), tz),
-    r.operation_type,
+    // Nombre que ve el usuario (#488); el código interno va en la última columna.
+    displayOperationLabel(r.operation_type, r.asset, r.cost_asset, r.destination_wallet_name),
     text(r.asset),
     plainNumber(r.amount_net),
     plainNumber(r.cost_amount),
@@ -115,6 +117,7 @@ export function historyCsvLine(r: HistoryCsvRow, tz: string): string {
     text(r.import_filename),
     text(r.tx_hash),
     r.fee_parent_id ?? '',
+    r.operation_type,
   ].join(';');
 }
 

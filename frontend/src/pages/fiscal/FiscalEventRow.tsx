@@ -29,8 +29,8 @@ const TONE_CLASS: Record<FiscalTone, string> = {
   other:  'bg-background-tertiary text-fg-muted',
 }
 
-function TypeBadge({ tipo }: { tipo: string }) {
-  const type = fiscalTypeLabel(tipo)
+function TypeBadge({ tipo, recibido }: { tipo: string; recibido: string | null }) {
+  const type = fiscalTypeLabel(tipo, recibido)
   return <span className={`text-xs px-1.5 py-0.5 rounded-lg whitespace-nowrap ${TONE_CLASS[type.tone]}`}>{type.label}</span>
 }
 
@@ -39,7 +39,7 @@ function FechaCell({ e }: { e: FiscalEvent }) {
 }
 
 function Operacion({ e }: { e: FiscalEvent }) {
-  const isFee = fiscalTypeLabel(e.tipo).tone === 'fee'
+  const isFee = fiscalTypeLabel(e.tipo, e.activoRecibido).tone === 'fee'
   return (
     <div className="flex items-center gap-1 whitespace-nowrap min-w-0">
       <CryptoIcon symbol={e.activoTransmitido} size={15} />
@@ -68,7 +68,7 @@ export function FiscalEventRow({ e }: { e: FiscalEvent }) {
   return (
     <tr className={tableRowClasses()}>
       <td className="px-4 py-2.5 text-fg-muted text-xs whitespace-nowrap"><FechaCell e={e} /></td>
-      <td className="px-4 py-2.5"><TypeBadge tipo={e.tipo} /></td>
+      <td className="px-4 py-2.5"><TypeBadge tipo={e.tipo} recibido={e.activoRecibido} /></td>
       <td className="px-4 py-2.5 min-w-[140px]">
         <Operacion e={e} />
         <div className="text-xs text-fg-subtle mt-0.5">{e.wallet}</div>
@@ -104,7 +104,7 @@ export function FiscalEventCard({ e }: { e: FiscalEvent }) {
   return (
     <li className="px-4 py-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-xs text-fg-muted"><FechaCell e={e} /><TypeBadge tipo={e.tipo} /></span>
+        <span className="flex items-center gap-2 text-xs text-fg-muted"><FechaCell e={e} /><TypeBadge tipo={e.tipo} recibido={e.activoRecibido} /></span>
         <span className={`inline-flex items-center gap-1 mono text-sm font-bold ${pnlColor(gp)}`}>
           <EventWarnings e={e} />
           <GananciaPerdida gp={gp} />

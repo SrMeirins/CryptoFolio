@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, PenLine, Trash2, X } from 'lucide-react'
 import type { Transaction } from '../../../api/portfolio'
 import { Drawer } from '../../../components/ui/Drawer'
 import { LoadingState, iconButtonClasses } from '../../../components/ui'
-import { OP_META } from '../../../constants/operations'
+import { opMetaOf } from '../../../constants/operations'
 import type { Currency } from '../../../utils/format'
 import { fmtDate } from '../helpers'
 import { isTypingTarget } from '../../../utils/fiscalHeader'
@@ -39,7 +39,7 @@ export function TransactionDetailPanel({ id, currency, onClose, onOpen, prev, ne
   const { data, isLoading, error } = useQuery(detailQuery(id))
   const tx = data?.transaction
 
-  const meta = tx ? OP_META[tx.operation_type] : undefined
+  const meta = tx ? opMetaOf(tx) : undefined
   const when = tx ? fmtDate(tx.timestamp) : null
 
   return (

@@ -1,5 +1,6 @@
 import { HIDDEN_AMOUNT, amountsAreHidden, formatNumber } from './format'
 import { zonedFormat } from './zonedFormat'
+import { FIAT_CURRENCIES } from '../constants/operations'
 
 // Tabla de operaciones de Fiscal (#295): tipos en castellano, fechas en hora
 // de Madrid y cantidades sin notación científica. Funciones puras.
@@ -18,8 +19,17 @@ const TYPE_LABELS: Record<string, { label: string; tone: FiscalTone }> = {
   MARGIN_REPAY:  { label: 'Margen',    tone: 'margin' },
 }
 
-/** Tipo de operación fiscal en castellano con su tono de color. */
-export function fiscalTypeLabel(tipo: string): { label: string; tone: FiscalTone } {
+const TRADES = new Set(['BUY', 'BUY_FIAT', 'BUY_CRYPTO', 'SELL', 'SELL_FIAT', 'SELL_CRYPTO'])
+
+/**
+ * Tipo de operación fiscal en castellano con su tono de color. En compras y
+ * ventas manda lo que se recibe (#488): dinero de curso legal es una venta;
+ * otra moneda virtual, stablecoins incluidas, una permuta.
+ */
+export function fiscalTypeLabel(tipo: string, activoRecibido?: string | null): { label: string; tone: FiscalTone } {
+  if (TRADES.has(tipo) && activoRecibido) {
+    return FIAT_CURRENCIES.has(activoRecibido.toUpperCase()) ? { label: 'Venta', tone: 'sale' } : { label: 'Permuta', tone: 'swap' }
+  }
   return TYPE_LABELS[tipo] ?? { label: tipo, tone: 'other' }
 }
 

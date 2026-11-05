@@ -3,7 +3,7 @@ import { Trash2, PenLine, PanelRightOpen, ArrowRight } from 'lucide-react'
 import type { Transaction } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { formatMoney, formatAmount, type Currency } from '../../utils/format'
-import { OP_META } from '../../constants/operations'
+import { opMetaOf, type OpLike } from '../../constants/operations'
 import { fmtDate, calcEurValue, formatPriceLine, toDisplayAmount, valuationHint, rowFlowSign, walletFlow, fiatSideNote } from './helpers'
 import { T, alpha, ink } from '../../utils/colors'
 import { iconButtonClasses } from '../../components/ui'
@@ -43,8 +43,8 @@ function ValuedAmount({ value, hint, currency, className }: {
   )
 }
 
-function OpChip({ type }: { type: string }) {
-  const meta = OP_META[type] ?? { label: type, color: T.muted }
+function OpChip({ tx }: { tx: OpLike }) {
+  const meta = opMetaOf(tx)
   return (
     <span
       className="inline-flex items-center font-semibold rounded-lg text-xs px-1.5 py-0.5 whitespace-nowrap shrink-0"
@@ -91,7 +91,7 @@ export function TxRow({
     requestAnimationFrame(() => deleteRef.current?.focus())
   }
 
-  const meta   = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: T.muted, group: 'other', rowBg: 'transparent' }
+  const meta   = opMetaOf(tx)
   const sign = rowFlowSign(tx, walletId)
   const sideNote = fiatSideNote(tx)
   const flow = walletFlow(tx, walletId)
@@ -126,7 +126,7 @@ export function TxRow({
         {/* Tipo */}
         <td className="px-3 py-2.5 align-middle">
           <div className="flex items-center gap-1.5">
-            <OpChip type={tx.operation_type} />
+            <OpChip tx={tx} />
             {tx.manually_added && (
               <span className="text-xs px-1 py-0.5 rounded-lg bg-brand/15 text-brand-ink font-bold shrink-0" title="Añadida manualmente">
                 <span aria-hidden="true">M</span><span className="sr-only">Añadida manualmente</span>

@@ -44,7 +44,7 @@ export function filterEvents(events: readonly FiscalEvent[], f: EventFilters): F
     if (f.result === 'loss' && gp >= -PNL_EPS) return false
     if (f.from && e.fecha < f.from) return false
     if (f.to && e.fecha > f.to) return false
-    if (f.tones.length > 0 && !f.tones.includes(fiscalTypeLabel(e.tipo).tone)) return false
+    if (f.tones.length > 0 && !f.tones.includes(fiscalTypeLabel(e.tipo, e.activoRecibido).tone)) return false
     if (f.onlyWarnings && !hasWarning(e)) return false
     if (f.onlyRecompra && !e.posiblePerdidaDiferida) return false
     if (q) {
@@ -73,7 +73,7 @@ export function sortEvents(events: readonly FiscalEvent[], key: SortKey, dir: So
 export function toneCounts(events: readonly FiscalEvent[]): { tone: FiscalTone; label: string; count: number }[] {
   const map = new Map<FiscalTone, { label: string; count: number }>()
   for (const e of events) {
-    const t = fiscalTypeLabel(e.tipo)
+    const t = fiscalTypeLabel(e.tipo, e.activoRecibido)
     const cur = map.get(t.tone) ?? { label: t.tone === 'loss' ? 'Pérdida' : t.label, count: 0 }
     cur.count++
     map.set(t.tone, cur)
@@ -107,7 +107,7 @@ export function buildEventsCsv(events: readonly FiscalEvent[]): string {
   const lines = events.map(e => {
     const avisos = [e.posiblePerdidaDiferida && 'recompra', e.permutaWrapStaking && 'wrap staking', e.lostSinMotivo && 'pérdida sin motivo'].filter(Boolean).join(', ')
     return [
-      e.fecha, fiscalTypeLabel(e.tipo).label, sanitizeCsvField(e.activoTransmitido), sanitizeCsvField(e.activoRecibido ?? ''),
+      e.fecha, fiscalTypeLabel(e.tipo, e.activoRecibido).label, sanitizeCsvField(e.activoTransmitido), sanitizeCsvField(e.activoRecibido ?? ''),
       sanitizeCsvField(e.wallet), num(e.cantidadTransmitida, 12).replace(/\.?0+$/, ''), sanitizeCsvField(e.contrapartidaClave),
       sanitizeCsvField(e.contrapartidaDescripcion), num(e.valorTransmisionEur), num(e.gastosTransmisionEur),
       num(e.valorAdquisicionEur), num(e.gastosAdquisicionEur), num(e.gananciaPerdidaEur), avisos,

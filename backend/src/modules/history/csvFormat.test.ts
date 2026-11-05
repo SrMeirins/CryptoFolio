@@ -31,7 +31,8 @@ describe('csvFormat (#349)', () => {
   it('una línea por fila con tantas columnas como la cabecera', () => {
     const line = historyCsvLine(row, TZ);
     expect(line.split(';')).toHaveLength(HISTORY_CSV_HEADER.split(';').length);
-    expect(line).toBe('2026-01-15T11:30:00+01:00;BUY;ETH;2;0.5;BTC;0.25;0.01;BNB;56.00;4.00;61.60;4.40;fifo;Exchange;;Spot;No;No;;00000000-0000-0000-0000-000000000001;export.csv;;');
+    // Compra de ETH pagada con BTC: «Permuta» en «Tipo» y el código interno al final (#488).
+    expect(line).toBe('2026-01-15T11:30:00+01:00;Permuta;ETH;2;0.5;BTC;0.25;0.01;BNB;56.00;4.00;61.60;4.40;fifo;Exchange;;Spot;No;No;;00000000-0000-0000-0000-000000000001;export.csv;;;BUY');
   });
 
   it('una importada editada se marca en la columna «Editada» (#378)', () => {
@@ -53,7 +54,7 @@ describe('csvFormat (#349)', () => {
     expect(line).toContain(";'+cmd;");
     expect(line).toContain(';"a;b";');
     expect(line).toContain(`"'@SUM(1)\nx"`);
-    expect(line.split(';').at(-2)).toBe("'-1");
+    expect(line.split(';').at(-3)).toBe("'-1");
   });
 
   it('el nombre del archivo lleva solo la fecha local y el sufijo de filtrado', () => {
@@ -73,7 +74,7 @@ describe('columna «Operación asociada» (#371)', () => {
       account: 'Spot', manually_added: false, notes: null, import_filename: null, tx_hash: null,
       fee_parent_id: '00000000-0000-0000-0000-0000000000aa',
     };
-    expect(historyCsvLine(fee, TZ).split(';').at(-1)).toBe('00000000-0000-0000-0000-0000000000aa');
-    expect(historyCsvLine({ ...fee, fee_parent_id: null }, TZ).split(';').at(-1)).toBe('');
+    expect(historyCsvLine(fee, TZ).split(';')[HISTORY_CSV_HEADER.split(';').indexOf('Operación asociada')]).toBe('00000000-0000-0000-0000-0000000000aa');
+    expect(historyCsvLine({ ...fee, fee_parent_id: null }, TZ).split(';')[HISTORY_CSV_HEADER.split(';').indexOf('Operación asociada')]).toBe('');
   });
 });
