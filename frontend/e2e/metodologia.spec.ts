@@ -52,6 +52,10 @@ for (const theme of ['dark', 'light'] as const) {
     await page.emulateMedia({ colorScheme: theme })
     await page.goto('/portfolio')
     await abrirConTeclado(page)
+    // El cajón entra con opacidad animada: en CI, más lento, axe medía colores a
+    // medio fundido. Se espera a que acaben las animaciones finitas.
+    await page.waitForFunction(() => document.getAnimations()
+      .every(a => a.playState !== 'running' || a.effect?.getComputedTiming().iterations === Infinity))
     const r = await new AxeBuilder({ page }).withTags(WCAG).include('[role="dialog"]').analyze()
     expect(r.violations).toEqual([])
   })
