@@ -12,6 +12,14 @@ describe('fiscalTypeLabel', () => {
     expect(fiscalTypeLabel('MARGIN_REPAY')).toEqual({ label: 'Margen', tone: 'margin' })
     expect(fiscalTypeLabel('RARO')).toEqual({ label: 'RARO', tone: 'other' })
   })
+  it('compras y ventas por lo que se recibe (#488): dinero, venta; moneda virtual, permuta', () => {
+    expect(fiscalTypeLabel('SELL', 'EUR')).toEqual({ label: 'Venta', tone: 'sale' })
+    expect(fiscalTypeLabel('SELL', 'USDT')).toEqual({ label: 'Permuta', tone: 'swap' })
+    expect(fiscalTypeLabel('SELL', 'BBB')).toEqual({ label: 'Permuta', tone: 'swap' })
+    expect(fiscalTypeLabel('BUY', 'EUR')).toEqual({ label: 'Venta', tone: 'sale' })
+    expect(fiscalTypeLabel('BUY', 'BBB')).toEqual({ label: 'Permuta', tone: 'swap' })
+    expect(fiscalTypeLabel('FEE_EXCHANGE', null)).toEqual({ label: 'Comisión', tone: 'fee' })
+  })
 })
 
 describe('fechas', () => {

@@ -4,8 +4,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { History } from 'lucide-react'
 import { portfolioApi, type Transaction } from '../../api/portfolio'
 import { formatAmount, formatMoney } from '../../utils/format'
-import { OP_META, type OpGroup } from '../../constants/operations'
-import { T, alpha, ink } from '../../utils/colors'
+import { OP_META, opMetaOf, type OpGroup } from '../../constants/operations'
+import { alpha, ink } from '../../utils/colors'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
 import { calcEurValue, toDisplayAmount } from '../history/helpers'
 import { localToday } from '../../utils/pnlChart'
@@ -73,7 +73,7 @@ export function RecentActivity() {
               {/* Línea de tiempo: un punto por operación con el color de su tipo */}
               <ol className="relative ml-1.5 border-l border-border space-y-1">
                 {g.items.map(({ tx, group }) => {
-                  const meta = OP_META[tx.operation_type] ?? { label: tx.operation_type, color: T.muted, group: 'other' as const }
+                  const meta = opMetaOf(tx)
                   const value = toDisplayAmount(calcEurValue(tx), tx, currency)
                   const sign = group === 'buy' || group === 'income' ? '+' : group === 'sell' ? '−' : ''
                   const amountTone = group === 'buy' ? 'text-positive' : group === 'sell' ? 'text-negative' : group === 'income' ? 'text-accent-purple' : 'text-fg-muted'
