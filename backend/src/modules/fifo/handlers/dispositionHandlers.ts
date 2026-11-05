@@ -1,7 +1,7 @@
 import { PoolClient } from 'pg';
 import { getHistoricalPriceEur } from '../../prices/binance';
-import { Transaction, FifoRunResult, FIAT_NO_LOT, FIFO_SHORTFALL_EPSILON } from '../constants';
-import { openLot, consumeLots, getOpenLots, moveLots, updateLot } from '../lotPrimitives';
+import { Transaction, FifoRunResult, FIAT_NO_LOT, FIFO_SHORTFALL_EPSILON, type OpcionesMotor } from '../constants';
+import { openLot, consumeLots, consumeWithoutEffect, getOpenLots, moveLots, updateLot } from '../lotPrimitives';
 
 // ── SELL ──────────────────────────────────────────────────────────────────
 export async function processSell(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
@@ -138,7 +138,7 @@ export async function processMarginRepay(tx: Transaction, result: FifoRunResult,
 // ── TRANSFER / WITHDRAW ───────────────────────────────────────────────────
 // Si destination_pending=true o no hay destination_wallet_id, los lotes se
 // quedan en el wallet origen hasta que el usuario asigne el destino.
-export async function processTransfer(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
+export async function processTransfer(tx: Transaction, result: FifoRunResult, client: PoolClient, opciones?: OpcionesMotor): Promise<void> {
   // Transferencia interna de fiat entre sub-cuentas: sin lotes que mover, sin ruido
   if (FIAT_NO_LOT.has(tx.asset)) return;
 
@@ -152,16 +152,29 @@ export async function processTransfer(tx: Transaction, result: FifoRunResult, cl
   // se "vende" a precio de mercado para pagar la red. Se consume ANTES de mover el resto,
   // igual que el fee-en-activo-distinto de processBuy. tx.amount ya viene neto de fee
   // (ver parser Bitvavo/Binance), así que aquí solo consumimos y contabilizamos el G/P.
+  // Con el criterio «Sumar al coste» (#532) y destino propio registrado, la
+  // comisión no es transmisión: sus unidades salen sin efecto fiscal y su coste
+  // pasa a las unidades que llegan.
+  let extraCostEur = 0;
   if (tx.operation_type === 'WITHDRAW' && tx.fee_asset === tx.asset && tx.fee_amount) {
-    const feePrice = await getHistoricalPriceEur(tx.asset, tx.timestamp);
-    const feeProceedsEur = tx.fee_amount * feePrice;
-    await consumeLots(tx.id, tx.asset, tx.wallet_id, tx.fee_amount, feeProceedsEur, tx.timestamp, result, client);
+    const alCoste = opciones?.comisionRed === 'coste' && tx.destination_wallet_id !== opciones.walletExterna;
+    if (alCoste) {
+      const fee = await consumeWithoutEffect(client, tx.id, tx.asset, tx.wallet_id, tx.fee_amount, tx.timestamp);
+      extraCostEur = fee.costEur;
+      if (fee.missing > FIFO_SHORTFALL_EPSILON) {
+        result.shortfalls.push({ txId: tx.id, asset: tx.asset, walletId: tx.wallet_id, requested: tx.fee_amount, missing: fee.missing });
+      }
+    } else {
+      const feePrice = await getHistoricalPriceEur(tx.asset, tx.timestamp);
+      const feeProceedsEur = tx.fee_amount * feePrice;
+      await consumeLots(tx.id, tx.asset, tx.wallet_id, tx.fee_amount, feeProceedsEur, tx.timestamp, result, client);
+    }
   }
 
   // Traslado sin efecto fiscal: el lote conserva su fecha de adquisición (#174, #476).
   const quantityToMove = await moveLots(client, {
     txId: tx.id, asset: tx.asset, fromWalletId: tx.wallet_id, toWalletId: tx.destination_wallet_id,
-    quantity: tx.amount, timestamp: tx.timestamp,
+    quantity: tx.amount, timestamp: tx.timestamp, extraCostEur,
   });
 
   // WITHDRAW externo: cualquier shortfall es un error real (el dinero salió y los lotes deben existir).

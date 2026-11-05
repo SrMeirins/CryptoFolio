@@ -155,14 +155,19 @@ export async function consumeLots(
  * Traslada `quantity` de los lotes más antiguos de una wallet a otra sin efecto
  * fiscal: consumo NONE en el origen y lote nuevo en el destino que hereda la
  * fecha de adquisición, el precio y el tipo USD del lote de origen (#174).
- * Devuelve la cantidad que no se pudo trasladar por falta de lotes.
+ * `extraCostEur` (#532, comisión de red sumada al coste) se reparte entre los
+ * lotes que llegan en proporción a su cantidad y se anota como gasto de
+ * adquisición (`fee_eur`). Devuelve la cantidad que no se pudo trasladar.
  */
 export async function moveLots(
   client: PoolClient,
-  move: { txId: string; asset: string; fromWalletId: string; toWalletId: string; quantity: number; timestamp: Date },
+  move: { txId: string; asset: string; fromWalletId: string; toWalletId: string; quantity: number; timestamp: Date; extraCostEur?: number },
 ): Promise<number> {
   let quantityToMove = move.quantity;
   const lots = await getOpenLots(move.asset, move.fromWalletId, client);
+  // Lo que de verdad se mueve: el reparto del coste extra va sobre eso.
+  const movable = Math.min(move.quantity, lots.reduce((s, l) => s + l.quantityRemaining, 0));
+  const extra = move.extraCostEur ?? 0;
 
   for (const lot of lots) {
     if (quantityToMove <= 0) break;
@@ -183,13 +188,16 @@ export async function moveLots(
       [lot.id, move.txId, consumed, costMoved, move.timestamp]
     );
 
+    const extraShare = extra > 0 && movable > 0 ? extra * (consumed / movable) : 0;
     await client.query(
       `INSERT INTO fifo_lots (
         asset, quantity_original, quantity_remaining,
         cost_basis_eur, price_per_unit_eur, fee_eur,
         open_transaction_id, opened_at, wallet_id, usd_per_eur
-      ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9)`,
-      [move.asset, consumed, consumed, costMoved, lot.pricePerUnitEur, move.txId, lot.openedAt, move.toWalletId, lot.usdPerEur]
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [move.asset, consumed, consumed, costMoved + extraShare,
+        extraShare > 0 ? (costMoved + extraShare) / consumed : lot.pricePerUnitEur, extraShare,
+        move.txId, lot.openedAt, move.toWalletId, lot.usdPerEur]
     );
 
     quantityToMove -= consumed;
@@ -202,6 +210,35 @@ export async function moveLots(
  * por orden de creación. Con `walletId` null, los de todas las wallets (FIFO
  * global, #476); con una wallet, solo los suyos (traslados y margen).
  */
+/**
+ * Retira `quantity` de los lotes más antiguos de una wallet sin efecto fiscal
+ * (consumo NONE) y devuelve su coste: la comisión de red sumada al coste del
+ * traslado (#532). `missing` es lo que la wallet no tenía.
+ */
+export async function consumeWithoutEffect(
+  client: PoolClient, txId: string, asset: string, walletId: string, quantity: number, timestamp: Date,
+): Promise<{ costEur: number; missing: number }> {
+  let remaining = quantity;
+  let costEur = 0;
+  for (const lot of await getOpenLots(asset, walletId, client)) {
+    if (remaining <= 0) break;
+    const consumed = Math.min(lot.quantityRemaining, remaining);
+    const cost = lot.costBasisEur * (consumed / lot.quantityRemaining);
+    await client.query(
+      `INSERT INTO fifo_lot_consumptions (
+        lot_id, consuming_transaction_id,
+        quantity_consumed, cost_basis_consumed_eur,
+        proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at
+      ) VALUES ($1, $2, $3, $4, $4, 0, 'NONE', $5)`,
+      [lot.id, txId, consumed, cost, timestamp]
+    );
+    await updateLot(client, lot.id, lot.quantityRemaining - consumed, lot.costBasisEur - cost);
+    costEur += cost;
+    remaining -= consumed;
+  }
+  return { costEur, missing: Math.max(0, remaining) };
+}
+
 export async function getOpenLots(asset: string, walletId: string | null, client: PoolClient): Promise<FifoLot[]> {
   const res = await client.query(
     `SELECT id, asset, quantity_original, quantity_remaining,

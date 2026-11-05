@@ -10,6 +10,7 @@ import { autoBackupAvailability } from '../../modules/backup/autoBackup';
 import { listAutoBackups } from '../../modules/backup/autoBackupStore';
 import { DISMISSED_KEY } from '../../modules/notifications/preferences';
 import { DEFAULT_TIMEZONE, TIMEZONE_CONFIG_KEY, getTimezoneInfo, invalidateTimezoneCache, isValidTimeZone } from '../../modules/time/appTimezone';
+import { COMISION_RED_CRITERIOS, COMISION_RED_KEY } from '../../modules/fifo/constants';
 
 const router = Router();
 
@@ -36,6 +37,8 @@ const restrictedValues: Record<string, z.ZodType<string>> = {
   [TIMEZONE_CONFIG_KEY]: z.string().refine(v => v === '' || isValidTimeZone(v), 'timezone debe ser una zona horaria IANA válida (p. ej. Europe/Madrid)'),
   // Preferencias de General (#446): umbral de polvo, privacidad al abrir y página de inicio.
   ...preferenceSchemas,
+  // Comisión de red en traspasos a wallets propias (#532).
+  [COMISION_RED_KEY]: z.enum(COMISION_RED_CRITERIOS, { error: `${COMISION_RED_KEY} debe ser transmision o coste` }),
 };
 
 // ── GET /api/settings/config ───────────────────────────────────────────────
