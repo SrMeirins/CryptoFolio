@@ -34,6 +34,23 @@ for (const width of [390, 768]) {
   })
 }
 
+// En una instalación nueva Ajustes muestra el aviso de primer uso: también debe caber.
+test.describe('Ajustes con el aviso de primer uso a 390 px', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+  test('sin scroll horizontal', async ({ page }) => {
+    await soloLectura(page)
+    await page.addInitScript(() => { try { localStorage.removeItem('cflio_setup_seen') } catch { /* sin almacenamiento */ } })
+    await page.route('**/api/wallets', async route => {
+      const real = await route.fetch()
+      const wallets = (await real.json()) as Array<{ is_system: boolean }>
+      await route.fulfill({ response: real, json: wallets.filter(w => w.is_system) })
+    })
+    await page.goto('/settings')
+    await expect(page.getByRole('heading', { name: 'Configura tus wallets antes de importar' })).toBeVisible()
+    expect(await desborde(page)).toBe(0)
+  })
+})
+
 test.describe('menú en cajón a 390 px', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
