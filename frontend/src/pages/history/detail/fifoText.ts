@@ -1,5 +1,5 @@
 import type { ConsumptionRole, TransactionDetail } from '../../../api/portfolio'
-import { amountsAreHidden, formatMoney } from '../../../utils/format'
+import { formatMoneyPrecise } from '../../../utils/format'
 
 // Textos de la trazabilidad FIFO del detalle (#405). Funciones puras.
 
@@ -19,12 +19,9 @@ export function roleText(role: ConsumptionRole, destination: string | null, inli
   return role === 'traslado' && destination ? `${name} a ${destination}` : name
 }
 
-const tiny = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumSignificantDigits: 2 })
-
-/** Importe en EUR; por debajo de 0,01 € con 2 cifras significativas («0,004 €») en lugar de «0,00 €». */
+/** Importe exacto en EUR (#489: la lógica vive en formatMoneyPrecise, común a toda la app). */
 export function preciseEur(v: number): string {
-  if (!amountsAreHidden() && v !== 0 && Math.abs(v) < 0.01) return tiny.format(v)
-  return formatMoney(v, 'EUR')
+  return formatMoneyPrecise(v, 'EUR')
 }
 
 /** G/P con signo explícito. */
