@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { Dashboard } from './pages/Dashboard'
@@ -7,6 +8,12 @@ import { ImportPage } from './pages/Import'
 import { History } from './pages/History'
 import { Settings } from './pages/Settings'
 import { NotFound } from './pages/NotFound'
+
+// Página de prueba de los componentes comunes (#490): solo en desarrollo; en el
+// build de producción import.meta.env.DEV es false y no se incluye.
+const ComponentesDev = import.meta.env.DEV
+  ? lazy(() => import('./pages/dev/ComponentesDev').then(m => ({ default: m.ComponentesDev })))
+  : null
 import { useLivePrices } from './hooks/useLivePrices'
 import { ToastProvider } from './components/Toast'
 import { UpdateBanner } from './components/UpdateBanner'
@@ -36,6 +43,7 @@ function RoutedContent() {
         <Route path="/import"   element={<ImportPage />} />
         <Route path="/history"  element={<History />} />
         <Route path="/settings" element={<Settings />} />
+        {ComponentesDev && <Route path="/__componentes" element={<Suspense fallback={null}><ComponentesDev /></Suspense>} />}
         {/* Cualquier otra ruta (#487): antes dejaba el contenido en blanco. */}
         <Route path="*"         element={<NotFound />} />
       </Routes>

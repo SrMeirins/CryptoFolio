@@ -13,6 +13,10 @@ import { Tooltip } from './Tooltip'
 // «Reducir movimiento» la deja quieta (regla global de index.css).
 // Clicable, el botón cubre la tarjeta por encima del contenido y el chip y la
 // ayuda quedan sobre él: pueden ser controles propios sin anidarse (#412).
+// Norma de la base común (#490): StatCard solo para los KPI principales de
+// Dashboard e Historial, con los tres huecos (cifra, chip y mini gráfica)
+// reservados para que las tarjetas de una fila queden alineadas aunque a
+// alguna le falte un dato. El resto de métricas, en una StatStrip.
 
 export interface StatCardProps {
   title: string
@@ -48,6 +52,8 @@ export interface StatCardProps {
   compact?: boolean
   /** Retraso de la entrada escalonada, en ms. */
   delay?: number
+  /** Reserva el hueco del chip y el de la mini gráfica aunque falten (#490): tarjetas alineadas en fila. */
+  reserveSlots?: boolean
 }
 
 const TONE = { positive: 'text-positive', negative: 'text-negative' } as const
@@ -66,8 +72,9 @@ function Value({ value, format, tone, flash, compact }: Pick<StatCardProps, 'val
 export function StatCard(props: StatCardProps) {
   const {
     title, icon: Icon, visual, color, value, format, loading, chip, series, footer, help, helpLabel,
-    onSelect, active = false, expands = false, actionLabel, compact = false, delay = 0,
+    onSelect, active = false, expands = false, actionLabel, compact = false, delay = 0, reserveSlots = false,
   } = props
+  const hasSeries = !footer && series !== undefined && series.length > 1
   const text = typeof value === 'number' && format ? format(value) : String(value)
   const iconSize = compact ? 'w-6 h-6' : 'w-7 h-7'
 
@@ -87,12 +94,15 @@ export function StatCard(props: StatCardProps) {
         {loading ? <span className={`block ${compact ? 'mt-2 h-5' : 'mt-3 h-7'} w-32 skeleton rounded-lg`} /> : <Value {...props} />}
         {/* Sobre el botón que cubre la tarjeta: el chip puede ser un control propio. */}
         {chip && !loading && <span className="relative z-10 block mt-1.5 w-fit">{chip}</span>}
+        {/* Hueco del chip vacío: misma altura que un chip para alinear la fila (#490). */}
+        {reserveSlots && (!chip || loading) && <span aria-hidden="true" data-slot="chip" className="block mt-1.5 h-5" />}
         {footer && !loading && <span className="block mt-2.5">{footer}</span>}
-        {!footer && series && series.length > 1 && !loading && (
+        {hasSeries && !loading && (
           <span className="block mt-2 h-7">
             <Sparkline values={series} days={series.length} color={color} decorative className="w-full h-7" />
           </span>
         )}
+        {reserveSlots && !footer && (!hasSeries || loading) && <span aria-hidden="true" data-slot="serie" className="block mt-2 h-7" />}
       </div>
       {onSelect && (
         <button type="button" onClick={onSelect}
