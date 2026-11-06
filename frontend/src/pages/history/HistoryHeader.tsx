@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Download } from 'lucide-react'
 import type { TransactionFlows } from '../../api/portfolio'
-import { PageHeader, Skeleton, buttonClasses } from '../../components/ui'
+import { PageHeader, Skeleton, buttonClasses, Hint, TextTooltip } from '../../components/ui'
 import { navIcon } from '../../constants/navigation'
 import { formatMoney, formatNumber, type Currency } from '../../utils/format'
 import { formatBalance } from './balance/balanceFormat'
@@ -33,10 +33,8 @@ export function HistoryHeader({ loaded, total, filtered, flows, currency, views,
       subtitle={<>
         {subtitle}
         {filtered && flows && (flows.entradas > 0 || flows.salidas > 0) && (
-          <span className="ml-2 mono" title="Suma del valor de las operaciones de entrada y de salida; no incluye movimientos entre tus wallets">
-            {flows.entradas > 0 && <> · <span className="text-positive font-semibold">+{formatMoney(flows.entradas, currency)}</span> entradas</>}
-            {flows.salidas > 0 && <> · <span className="text-negative font-semibold">−{formatMoney(flows.salidas, currency)}</span> salidas</>}
-          </span>
+          <span className="ml-2 mono"><TextTooltip label="Entradas y salidas" tip="Suma del valor de las operaciones de entrada y de salida; no incluye movimientos entre tus wallets">{flows.entradas > 0 && <> · <span className="text-positive font-semibold">+{formatMoney(flows.entradas, currency)}</span> entradas</>}
+            {flows.salidas > 0 && <> · <span className="text-negative font-semibold">−{formatMoney(flows.salidas, currency)}</span> salidas</>}</TextTooltip></span>
         )}
         {currentBalance && (
           <span className="ml-2"> · Saldo actual{currentBalance.wallet ? ' en la wallet' : ''}: <span className="mono font-semibold text-fg">{formatBalance(currentBalance.amount, currentBalance.asset)}</span></span>
@@ -44,12 +42,13 @@ export function HistoryHeader({ loaded, total, filtered, flows, currency, views,
       </>}
       actions={<>
         {views}
-        <button type="button" onClick={onExport} disabled={total === 0}
-          title={total > 0 ? `Exporta las ${formatNumber(total, 0)} transacciones${filtered ? ' filtradas' : ''}` : 'No hay transacciones que exportar'}
-          aria-label={`Exportar a CSV ${formatNumber(total, 0)} transacciones`}
-          className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
-          <Download size={13} aria-hidden="true" /> CSV{total > 0 && <span className="mono text-fg-subtle">({formatNumber(total, 0)})</span>}
-        </button>
+        <Hint label={total > 0 ? `Exporta las ${formatNumber(total, 0)} transacciones${filtered ? ' filtradas' : ''}` : 'No hay transacciones que exportar'}>
+          <button type="button" onClick={onExport} disabled={total === 0}
+            aria-label={`Exportar a CSV ${formatNumber(total, 0)} transacciones`}
+            className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
+            <Download size={13} aria-hidden="true" /> CSV{total > 0 && <span className="mono text-fg-subtle">({formatNumber(total, 0)})</span>}
+          </button>
+        </Hint>
         <button type="button" onClick={onNew}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-brand/15 border border-brand/30 rounded-lg text-xs text-brand-ink hover:bg-brand/25 transition-colors font-medium focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
           + Nueva

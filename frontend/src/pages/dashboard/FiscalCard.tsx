@@ -5,7 +5,7 @@ import { portfolioApi, type FiscalYear } from '../../api/portfolio'
 import { formatEur, formatPercent } from '../../utils/format'
 import { EurOnlyBadge } from '../../components/EurOnlyBadge'
 import { AnimatedNumber } from '../../components/AnimatedNumber'
-import { PanelHeader, badgeClasses, panelSurface } from '../../components/ui'
+import { PanelHeader, badgeClasses, panelSurface, TextTooltip } from '../../components/ui'
 import { fiscalSubtitle } from '../../utils/panelSubtitles'
 import { baseTramosCompensada } from '../../utils/tramosIrpf'
 import { deadlineFromHito, deadlineUrgency, estimatedTax, gainLossShares } from '../../utils/fiscalPanel'
@@ -124,9 +124,7 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
                   const status = modelo721Status(modelo721)
                   return (
                     <span className={badgeClasses(status === 'obligatorio' ? 'negative' : status === 'incompleto' ? 'warning' : 'positive')}
-                      title={pendingPricesText(modelo721.preciosPendientes) ?? undefined}>
-                      {MODELO721_LABELS[status]}
-                    </span>
+><TextTooltip label="Precios pendientes" tip={pendingPricesText(modelo721.preciosPendientes)}>{MODELO721_LABELS[status]}</TextTooltip></span>
                   )
                 })()}
                 <div className="h-1.5 rounded-full bg-overlay/6 overflow-hidden" role="img" aria-label={`${formatPercent(umbralPct ?? 0, 0)} del umbral`}>

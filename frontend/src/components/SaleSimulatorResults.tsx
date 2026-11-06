@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, ChevronDown, AlertTriangle } from 'lucide-rea
 import { formatEur, formatAmount, formatPrice, pnlColor, formatPercent } from '../utils/format'
 import { type SimulationResult } from '../api/portfolio'
 import { T, alpha } from '../utils/colors'
+import { TextTooltip } from './ui'
 
 // Resultado del simulador de venta (#279): importe bruto, comisión, coste y
 // G/P; IRPF marginal sobre la base del ahorro del ejercicio (lo ya realizado y
@@ -165,7 +166,7 @@ export function SaleSimulatorResults({ result, loading }: {
                     <td className="px-3 py-2 text-fg-muted mono">{lot.openedAt}</td>
                     <td className="px-3 py-2 text-right mono text-fg">
                       {formatAmount(lot.qtyConsumed)}
-                      {lot.partial && <span className="text-fg-subtle" title="Se vende solo una parte del lote"> de {formatAmount(lot.qtyAvailable)}</span>}
+                      {lot.partial && <span className="text-fg-subtle"><TextTooltip label="Lote parcial" tip="Se vende solo una parte del lote">de {formatAmount(lot.qtyAvailable)}</TextTooltip></span>}
                     </td>
                     <td className="px-3 py-2 text-right mono text-fg-muted">{formatPrice(lot.pricePerUnit)}</td>
                     <td className={`px-3 py-2 text-right mono font-medium ${pnlColor(lot.gainLossEur)}`}>

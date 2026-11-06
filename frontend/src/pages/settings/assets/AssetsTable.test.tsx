@@ -36,12 +36,15 @@ describe('AssetsTable (#450)', () => {
     expect(html).toContain('3 operaciones')
   })
 
-  it('sin operaciones se puede borrar; con ellas, el botón se desactiva', () => {
+  it('sin operaciones se puede borrar; con ellas, el botón se desactiva pero sigue enfocable (#495)', () => {
     const libre = render([a('SINTB')])
     expect(libre).toContain('Sin uso, se puede borrar')
-    expect(libre.match(/<button[^>]*aria-label="Eliminar SINTB"[^>]*>/)![0]).not.toContain('disabled=""')
+    expect(libre.match(/<button[^>]*aria-label="Eliminar SINTB"[^>]*>/)![0]).not.toContain('aria-disabled="true"')
     const usado = render([a('SINTC', { operaciones: 1 })])
-    expect(usado).toMatch(/aria-label="Eliminar SINTC" disabled=""/)
+    const boton = usado.match(/<button[^>]*aria-label="Eliminar SINTC"[^>]*>/)![0]
+    // aria-disabled y no disabled: el foco llega y el Hint explica por qué no se puede borrar.
+    expect(boton).toContain('aria-disabled="true"')
+    expect(boton).not.toContain('disabled=""')
     expect(usado).toContain('Sin precio')
   })
 })

@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { cloneElement, type MouseEvent, type ReactElement, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { computeTooltipPosition, type Placement, type TooltipPosition } from './tooltipPosition'
+import type { Placement, TooltipPosition } from './tooltipPosition'
+import { useTooltipCore } from './useTooltipCore'
 
 // Tooltip común (#199 / #211). Se pinta en un portal con posición fija, así
 // que ningún contenedor con overflow lo recorta, y se recoloca para no salirse
 // nunca de la ventana. Se abre con el ratón, con el foco del teclado o al
-// tocar; se cierra con Escape, al tocar fuera o al perder el foco.
+// tocar; se cierra con Escape, al tocar fuera o al perder el foco. Hint es su
+// variante para un botón o enlace que ya existe (#495).
 
 export interface TooltipProps {
   /** Título del tooltip y nombre accesible del disparador por defecto. */
@@ -15,73 +17,40 @@ export interface TooltipProps {
   direction?: Placement
   /** Contenido visible del disparador en lugar del «?» (p. ej. el chip de 24h). */
   trigger?: ReactNode
-  /** Nombre accesible del disparador; por defecto, `label`. */
-  triggerLabel?: string
+  /**
+   * Nombre accesible del disparador; por defecto, `label`. Con `null` el nombre
+   * es el contenido visible del disparador (p. ej. una fecha o una cifra, #495).
+   */
+  triggerLabel?: string | null
   /** Acción del disparador al pulsarlo (p. ej. refrescar); sustituye a fijar el tooltip. */
   onActivate?: () => void
   /** Clases del botón disparador cuando se usa `trigger`. */
   triggerClassName?: string
+  /** Clases del envoltorio (p. ej. `w-full` para un disparador de ancho completo). */
+  className?: string
+  /** tabIndex del disparador: -1 en filas que no son la activa de una tabla con tabulación itinerante. */
+  triggerTabIndex?: number
 }
 
-export function Tooltip({ label, children, direction = 'down', trigger, triggerLabel, onActivate, triggerClassName }: TooltipProps) {
-  const [hovered, setHovered] = useState(false)
-  const [pinned, setPinned] = useState(false)
-  const [position, setPosition] = useState<TooltipPosition | null>(null)
-  const anchorRef = useRef<HTMLButtonElement>(null)
-  const tipRef = useRef<HTMLDivElement>(null)
-  const tooltipId = useId()
-  const open = hovered || pinned
-
-  const place = useCallback(() => {
-    const anchor = anchorRef.current?.getBoundingClientRect()
-    const tip = tipRef.current?.getBoundingClientRect()
-    if (!anchor || !tip) return
-    setPosition(computeTooltipPosition({
-      anchor: { top: anchor.top, left: anchor.left, width: anchor.width, height: anchor.height },
-      size: { width: tip.width, height: tip.height },
-      viewport: { width: window.innerWidth, height: window.innerHeight },
-      preferred: direction,
-    }))
-  }, [direction])
-
-  // Se mide antes de pintar para no mostrar el tooltip en una posición errónea.
-  useLayoutEffect(() => {
-    if (open) place()
-  }, [open, place])
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setPinned(false); setHovered(false) } }
-    const onPointer = (e: PointerEvent) => {
-      if (!anchorRef.current?.contains(e.target as Node) && !tipRef.current?.contains(e.target as Node)) setPinned(false)
-    }
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('pointerdown', onPointer)
-    window.addEventListener('resize', place)
-    window.addEventListener('scroll', place, true)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('pointerdown', onPointer)
-      window.removeEventListener('resize', place)
-      window.removeEventListener('scroll', place, true)
-    }
-  }, [open, place])
+export function Tooltip({ label, children, direction = 'down', trigger, triggerLabel, onActivate, triggerClassName, className = '', triggerTabIndex }: TooltipProps) {
+  const { open, pinned, setHovered, setPinned, position, anchorRef, tipRef, tooltipId } = useTooltipCore(direction)
 
   const triggerProps = {
-    ref: anchorRef,
+    ref: anchorRef as RefObject<HTMLButtonElement>,
     type: 'button' as const,
-    'aria-label': triggerLabel ?? label,
+    'aria-label': triggerLabel === null ? undefined : triggerLabel ?? label,
     'aria-describedby': open ? tooltipId : undefined,
     'aria-expanded': pinned,
+    tabIndex: triggerTabIndex,
     onMouseEnter: () => setHovered(true),
     onMouseLeave: () => setHovered(false),
     onFocus: () => setHovered(true),
     onBlur: () => { setHovered(false); setPinned(false) },
-    onClick: onActivate ?? (() => setPinned(p => !p)),
+    onClick: onActivate ?? ((e: MouseEvent) => { e.stopPropagation(); setPinned(p => !p) }),
   }
 
   return (
-    <span className="relative inline-flex items-center">
+    <span className={`relative inline-flex items-center ${className}`}>
       {trigger ? (
         <button {...triggerProps} className={triggerClassName ?? 'cursor-default rounded-lg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60'}>
           {trigger}
@@ -95,20 +64,80 @@ export function Tooltip({ label, children, direction = 'down', trigger, triggerL
         </button>
       )}
 
-      {open && createPortal(
-        <div ref={tipRef} id={tooltipId} role="tooltip"
-          className="fixed z-100 w-64 max-w-[calc(100vw-16px)] pointer-events-none"
-          style={{ top: position?.top ?? 0, left: position?.left ?? 0, visibility: position ? 'visible' : 'hidden' }}>
-          {position?.placement === 'down' && <Arrow left={position.arrowLeft} side="down" />}
-          <div className="relative rounded-xl border border-overlay/10 bg-tooltip/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.35)] p-4 animate-slide-in">
-            <div className="absolute inset-x-0 top-0 h-px rounded-t-xl bg-linear-to-r from-transparent via-brand/40 to-transparent" />
-            <p className="text-[11px] font-semibold tracking-widest text-brand uppercase mb-2">{label}</p>
-            <div className="text-xs text-fg leading-relaxed space-y-2">{children}</div>
-          </div>
-          {position?.placement === 'up' && <Arrow left={position.arrowLeft} side="up" />}
-        </div>,
-        document.body,
-      )}
+      {open && <Bubble tipRef={tipRef} id={tooltipId} position={position} label={label}>{children}</Bubble>}
+    </span>
+  )
+}
+
+/** Globo del tooltip en un portal; sin `label`, una sola línea sin encabezado (Hint). */
+function Bubble({ tipRef, id, position, label, children }: {
+  tipRef: RefObject<HTMLDivElement>
+  id: string
+  position: TooltipPosition | null
+  label?: string
+  children: ReactNode
+}) {
+  return createPortal(
+    <div ref={tipRef} id={id} role="tooltip"
+      className={`fixed z-100 ${label ? 'w-64' : 'w-max max-w-64'} max-w-[calc(100vw-16px)] pointer-events-none`}
+      style={{ top: position?.top ?? 0, left: position?.left ?? 0, visibility: position ? 'visible' : 'hidden' }}>
+      {position?.placement === 'down' && <Arrow left={position.arrowLeft} side="down" />}
+      <div className={`relative rounded-xl border border-overlay/10 bg-tooltip/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.35)] animate-slide-in ${label ? 'p-4' : 'px-3 py-2'}`}>
+        <div className="absolute inset-x-0 top-0 h-px rounded-t-xl bg-linear-to-r from-transparent via-brand/40 to-transparent" />
+        {label && <p className="text-[11px] font-semibold tracking-widest text-brand uppercase mb-2">{label}</p>}
+        <div className="text-xs text-fg leading-relaxed space-y-2">{children}</div>
+      </div>
+      {position?.placement === 'up' && <Arrow left={position.arrowLeft} side="up" />}
+    </div>,
+    document.body,
+  )
+}
+
+/**
+ * Dato o texto con explicación (#495): el propio contenido abre el Tooltip, con
+ * su texto como nombre accesible. Sin `tip` se muestra solo el contenido.
+ */
+export function TextTooltip({ label, tip, children, tabIndex, className = '' }: {
+  /** Encabezado del globo. */
+  label: string
+  /** Explicación; si está vacía, no hay globo. */
+  tip: ReactNode
+  children: ReactNode
+  /** Para filas con tabulación itinerante. */
+  tabIndex?: number
+  /** Clases extra del disparador (p. ej. su disposición interna). */
+  className?: string
+}) {
+  if (!tip) return <>{children}</>
+  // Un botón centra el texto: el disparador hereda la alineación de la celda.
+  return (
+    <Tooltip label={label} triggerLabel={null} triggerTabIndex={tabIndex} trigger={<>{children}</>}
+      triggerClassName={`cursor-help rounded [text-align:inherit] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${className}`}>
+      <p>{tip}</p>
+    </Tooltip>
+  )
+}
+
+/**
+ * Globo sobre un elemento interactivo que ya existe (#495): un botón de icono,
+ * un enlace o un campo. Se abre al pasar el ratón o al enfocarlo y se cierra
+ * con Escape; no añade paradas de tabulador. Si el texto no coincide con el
+ * nombre accesible del elemento, se enlaza con aria-describedby.
+ */
+export function Hint({ label, children, direction = 'up', className = '' }: {
+  label: string
+  children: ReactElement<{ 'aria-label'?: string; 'aria-describedby'?: string }>
+  direction?: Placement
+  className?: string
+}) {
+  const { open, setHovered, position, anchorRef, tipRef, tooltipId } = useTooltipCore(direction)
+  const describe = open && children.props['aria-label'] !== label
+  return (
+    <span ref={anchorRef as RefObject<HTMLSpanElement>} className={`inline-flex ${className}`}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)} onBlur={() => setHovered(false)}>
+      {describe ? cloneElement(children, { 'aria-describedby': tooltipId }) : children}
+      {open && <Bubble tipRef={tipRef} id={tooltipId} position={position}>{label}</Bubble>}
     </span>
   )
 }

@@ -5,7 +5,7 @@ import { CryptoIcon } from '../../components/CryptoIcon'
 import { TableExpandToggle } from './TableExpandToggle'
 import type { RendimientoEvent } from './types'
 import { fiscalDateDetail, formatFiscalDate, formatFiscalQty } from '../../utils/fiscalTable'
-import { buttonClasses, badgeClasses, tableFootRowClasses, tableHeadRowClasses, tableRowClasses, Dropdown, Pagination, panelSurface } from '../../components/ui'
+import { buttonClasses, badgeClasses, tableFootRowClasses, tableHeadRowClasses, tableRowClasses, Dropdown, Pagination, panelSurface, Hint, TextTooltip } from '../../components/ui'
 import { paginate, type PageSize } from '../../utils/pagination'
 import { buildRendimientosCsv } from '../../utils/fiscalRendimientos'
 import { usePrivacyStore } from '../../store/privacyStore'
@@ -78,12 +78,13 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
               <Dropdown size="sm" label="Filtrar por tipo" value={filterTipo} onChange={setFilterTipo} align="end"
                 options={[{ value: '', label: 'Todos los tipos' }, ...tipos.map(t => ({ value: t, label: t }))]} />
 
-              <button type="button" onClick={exportCsv} disabled={privacy || filtered.length === 0}
-                title={privacy ? 'Desactiva el modo privacidad para exportar' : 'Exportar a CSV los rendimientos de la tabla'}
-                className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
-                <Download size={11} aria-hidden="true" />
-                {filtered.length < rendimientos.length ? 'CSV de lo filtrado' : 'CSV de rendimientos'}
-              </button>
+              <Hint label={privacy ? 'Desactiva el modo privacidad para exportar' : 'Exportar a CSV los rendimientos de la tabla'}>
+                <button type="button" onClick={exportCsv} disabled={privacy || filtered.length === 0}
+                  className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
+                  <Download size={11} aria-hidden="true" />
+                  {filtered.length < rendimientos.length ? 'CSV de lo filtrado' : 'CSV de rendimientos'}
+                </button>
+              </Hint>
             </>
           )}
         </div>
@@ -110,7 +111,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
               ) : view.items.map((r, i) => (
                 <tr key={`${r.fecha}-${r.tipo}-${r.activo}-${i}`} className={tableRowClasses()}>
                   <td className="px-4 py-2.5 text-fg-muted text-xs whitespace-nowrap">
-                    <time dateTime={r.fechaHora ?? r.fecha} title={fiscalDateDetail(r.fechaHora)}>{formatFiscalDate(r.fecha)}</time>
+                    <time dateTime={r.fechaHora ?? r.fecha}><TextTooltip label="Fecha y hora" tip={fiscalDateDetail(r.fechaHora)}>{formatFiscalDate(r.fecha)}</TextTooltip></time>
                   </td>
                   <td className="px-4 py-2.5">
                     <span className="text-xs bg-warning/10 text-warning-ink px-1.5 py-0.5 rounded-lg">{r.tipo}</span>

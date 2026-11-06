@@ -15,7 +15,7 @@ import { sortRows, nextSort, type UnifiedRow, type SortKey, type SortDir } from 
 import { CryptoRowComponent } from './AssetTableCryptoRow'
 import { FiatRowComponent } from './AssetTableFiatRow'
 import { SortTh } from './AssetTableSortTh'
-import { buttonClasses, tableFootRowClasses, tableHeadRowClasses } from './ui'
+import { buttonClasses, tableFootRowClasses, tableHeadRowClasses, Hint, Tooltip } from './ui'
 
 interface AssetTableProps {
   /** Filas ya calculadas por la página (ver utils/portfolioSections.ts). */
@@ -128,18 +128,22 @@ export function AssetTable({ rows, portfolioTotal, compact = false, hideWalletCh
           <div className="flex items-center gap-2 min-w-0">{header}</div>
           <div className="flex items-center gap-2">
             {!defaultOrder && (
-              <button type="button" onClick={() => { setSortKey('value'); setSortDir('desc') }}
-                className={buttonClasses('secondary', 'sm', 'flex gap-1')} title="Restablecer el orden por valor">
-                <ArrowUpDown size={10} aria-hidden="true" /> Orden por valor
-              </button>
+              <Hint label="Restablecer el orden por valor">
+                <button type="button" onClick={() => { setSortKey('value'); setSortDir('desc') }}
+                  className={buttonClasses('secondary', 'sm', 'flex gap-1')}>
+                  <ArrowUpDown size={10} aria-hidden="true" /> Orden por valor
+                </button>
+              </Hint>
             )}
             {exportName && (
               // En modo privacidad no se exportan importes.
-              <button type="button" onClick={exportCsv} disabled={privacy || sorted.length === 0}
-                className={buttonClasses('secondary', 'sm', 'flex gap-1')}
-                title={privacy ? 'Desactiva el modo privacidad para exportar' : 'Exportar las posiciones visibles a CSV'}>
-                <Download size={11} aria-hidden="true" /> CSV
-              </button>
+              <Hint label={privacy ? 'Desactiva el modo privacidad para exportar' : 'Exportar las posiciones visibles a CSV'}>
+                <button type="button" onClick={exportCsv} disabled={privacy || sorted.length === 0}
+                  className={buttonClasses('secondary', 'sm', 'flex gap-1')}
+  >
+                  <Download size={11} aria-hidden="true" /> CSV
+                </button>
+              </Hint>
             )}
           </div>
         </div>
@@ -153,7 +157,7 @@ export function AssetTable({ rows, portfolioTotal, compact = false, hideWalletCh
               <SortTh {...sortProps} label="Activo" sk="asset" right={false} />
               <SortTh {...sortProps} label="Cantidad" sk="quantity" />
               <SortTh {...sortProps} label="Precio" sk="price" />
-              <th scope="col" className="px-2 py-2.5 text-right whitespace-nowrap" title="Tendencia de los últimos 7 días">7 d</th>
+              <th scope="col" className="px-2 py-2.5 text-right whitespace-nowrap"><span className="inline-flex items-center gap-1">7 d <Tooltip label="Tendencia" triggerLabel="Qué es 7 d"><p>Tendencia de los últimos 7 días</p></Tooltip></span></th>
               <SortTh {...sortProps} label="Valor" sk="value" title={`Valor en ${currency}`} />
               <SortTh {...sortProps} label="P&L" sk="pnl" title="P&L no realizado en importe y %" />
               {!compact && <SortTh {...sortProps} label="Break-even" sk="breakeven" title="Precio medio de compra y distancia del precio actual. La subida para recuperar es mayor que la caída: tras caer un 50 %, hace falta subir un 100 %." />}

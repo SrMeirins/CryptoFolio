@@ -5,6 +5,7 @@ import { NAV_ITEMS } from '../constants/navigation'
 import { MEDIUM_QUERY, NARROW_QUERY, useMediaQuery } from '../hooks/useMediaQuery'
 import { useModalA11y } from '../hooks/useModalA11y'
 import { useNavStore } from '../store/navStore'
+import { Hint } from './ui'
 
 const COLLAPSED_KEY = 'cflio_sidebar_collapsed'
 
@@ -150,28 +151,29 @@ function SidebarPanel({ forceCollapsed }: { forceCollapsed: boolean }) {
 
       {/* Botón de colapsar: no aplica mientras el ancho obliga a plegarlo */}
       {!forceCollapsed && <div className="px-2 py-3 border-t border-border">
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          aria-expanded={!collapsed}
-          aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
-          title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
-          className={`
-            group w-full flex items-center rounded-xl py-2.5 text-fg-subtle
-            hover:text-fg hover:bg-overlay/4 transition-all duration-200
-            ${collapsed ? 'justify-center px-0' : 'justify-between px-3'}
-          `}
-        >
-          {!collapsed && (
-            <span className="text-[11px] font-medium tracking-wide uppercase">Colapsar</span>
-          )}
-          <div className="w-5 h-5 flex items-center justify-center">
-            {collapsed
-              ? <ChevronRight size={14} className="transition-transform duration-200 group-hover:translate-x-0.5" />
-              : <ChevronLeft  size={14} className="transition-transform duration-200 group-hover:-translate-x-0.5" />
-            }
-          </div>
-        </button>
+        <Hint label={collapsed ? 'Expandir menú' : 'Colapsar menú'} className="w-full">
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
+            className={`
+              group w-full flex items-center rounded-xl py-2.5 text-fg-subtle
+              hover:text-fg hover:bg-overlay/4 transition-all duration-200
+              ${collapsed ? 'justify-center px-0' : 'justify-between px-3'}
+            `}
+          >
+            {!collapsed && (
+              <span className="text-[11px] font-medium tracking-wide uppercase">Colapsar</span>
+            )}
+            <div className="w-5 h-5 flex items-center justify-center">
+              {collapsed
+                ? <ChevronRight size={14} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+                : <ChevronLeft  size={14} className="transition-transform duration-200 group-hover:-translate-x-0.5" />
+              }
+            </div>
+          </button>
+        </Hint>
       </div>}
     </aside>
   )

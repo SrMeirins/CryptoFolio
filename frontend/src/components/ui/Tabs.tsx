@@ -1,6 +1,7 @@
 import { type KeyboardEvent, type ReactNode } from 'react'
 import { optionForKey } from '../../utils/segmented'
 import { tabClasses, tabId, tabPanelId, type TabsVariant } from './classes'
+import { Hint } from './Tooltip'
 
 // Pestañas (#199): cambian el panel visible. Patrón tablist del WAI-ARIA:
 // flechas, Inicio y Fin mueven entre pestañas; cada pestaña controla el panel
@@ -9,6 +10,8 @@ import { tabClasses, tabId, tabPanelId, type TabsVariant } from './classes'
 export interface TabItem<T extends string> {
   value: T
   label: ReactNode
+  /** Atajo de teclado de la pestaña: se anuncia (aria-keyshortcuts) y se muestra en un Hint. */
+  shortcut?: string
 }
 
 export interface TabsProps<T extends string> {
@@ -37,13 +40,14 @@ export function Tabs<T extends string>({ items, value, onChange, label, idBase, 
       className={`flex items-center ${variant === 'underline' ? 'border-b border-border' : 'gap-1'} ${className}`}>
       {items.map(item => {
         const active = item.value === value
-        return (
+        const tab = (
           <button key={item.value} id={tabId(idBase, item.value)} type="button" role="tab"
             aria-selected={active} aria-controls={tabPanelId(idBase)} tabIndex={active ? 0 : -1}
-            onClick={() => onChange(item.value)} className={tabClasses(active, variant)}>
+            aria-keyshortcuts={item.shortcut} onClick={() => onChange(item.value)} className={tabClasses(active, variant)}>
             {item.label}
           </button>
         )
+        return item.shortcut ? <Hint key={item.value} label={`Atajo: ${item.shortcut}`} className="shrink-0">{tab}</Hint> : tab
       })}
     </div>
   )
@@ -55,5 +59,5 @@ export function Tabs<T extends string>({ items, value, onChange, label, idBase, 
  */
 export function ViewTabs<T extends string>({ className = '', ...props }: Omit<TabsProps<T>, 'variant'>) {
   return <Tabs {...props} variant="underline"
-    className={`overflow-x-auto [scrollbar-width:none] [&>button]:shrink-0 max-sm:[&>button]:px-3 ${className}`} />
+    className={`overflow-x-auto [scrollbar-width:none] [&>button]:shrink-0 max-sm:[&_[role=tab]]:px-3 ${className}`} />
 }

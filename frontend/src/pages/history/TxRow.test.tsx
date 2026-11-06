@@ -54,8 +54,9 @@ describe('TxRow (#346)', () => {
 describe('TxRow — accesibilidad (#351)', () => {
   it('el botón «Ver detalle» anuncia que abre un diálogo (#373)', () => {
     const html = render(tx({}))
-    expect(html).toMatch(/aria-haspopup="dialog"[^>]*aria-label="Ver detalle"/)
-    expect(html).not.toContain('aria-expanded')
+    const boton = html.match(/<button[^>]*aria-label="Ver detalle"[^>]*>/)![0]
+    expect(boton).toContain('aria-haspopup="dialog"')
+    expect(boton).not.toContain('aria-expanded')
   })
 
   it('la fila con el detalle abierto se marca con aria-current (#373)', () => {

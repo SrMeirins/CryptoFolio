@@ -8,7 +8,7 @@ import { OperacionesFilters } from './OperacionesFilters'
 import { RecompraSummary } from './RecompraSummary'
 import { WarningsLegend } from './EventWarnings'
 import type { FiscalEvent, FiscalSummary } from './types'
-import { buttonClasses, Pagination, tableFootRowClasses, tableHeadRowClasses, panelSurface } from '../../components/ui'
+import { buttonClasses, Pagination, tableFootRowClasses, tableHeadRowClasses, panelSurface, Hint, Tooltip } from '../../components/ui'
 import { useDebounce } from '../../hooks/useDebounce'
 import { usePrivacyStore } from '../../store/privacyStore'
 import { paginate, type PageSize } from '../../utils/pagination'
@@ -84,11 +84,13 @@ export function TablaEventos({ events, summary, initialFilters }: {
         <TableExpandToggle icon={TrendingUp} title="Ganancias y Pérdidas Patrimoniales" count={events.length}
           expanded={expanded} onToggle={() => setExpanded(!expanded)} />
         {expanded && (
-          <button type="button" onClick={exportCsv} disabled={privacy || filtered.length === 0}
-            className={buttonClasses('secondary', 'sm', 'flex gap-1')}
-            title={privacy ? 'Desactiva el modo privacidad para exportar' : 'Exportar a CSV las operaciones filtradas'}>
-            <Download size={11} aria-hidden="true" /> {isPartial ? 'CSV de lo filtrado' : 'CSV de operaciones'}
-          </button>
+          <Hint label={privacy ? 'Desactiva el modo privacidad para exportar' : 'Exportar a CSV las operaciones filtradas'}>
+            <button type="button" onClick={exportCsv} disabled={privacy || filtered.length === 0}
+              className={buttonClasses('secondary', 'sm', 'flex gap-1')}
+  >
+              <Download size={11} aria-hidden="true" /> {isPartial ? 'CSV de lo filtrado' : 'CSV de operaciones'}
+            </button>
+          </Hint>
         )}
       </div>
 
@@ -126,12 +128,10 @@ export function TablaEventos({ events, summary, initialFilters }: {
                       </th>
                       <th className="text-right px-4 py-2.5">Cantidad</th>
                       <th className="text-center px-3 py-2.5">Clave 1800</th>
-                      <th className="text-right px-4 py-2.5" title="Valor de transmisión y gastos de la venta">
-                        <button type="button" onClick={() => toggleSort('valorTransmisionEur')} className="flex items-center gap-1 hover:text-fg ml-auto">
+                      <th className="text-right px-4 py-2.5"><span className="inline-flex items-center gap-1"><button type="button" onClick={() => toggleSort('valorTransmisionEur')} className="flex items-center gap-1 hover:text-fg ml-auto">
                           Transmisión <SortIcon col="valorTransmisionEur" activeCol={sortKey} dir={sortDir} />
-                        </button>
-                      </th>
-                      <th className="text-right px-4 py-2.5" title="Valor de adquisición y gastos de la compra">Adquisición</th>
+                        </button> <Tooltip label="Transmisión" triggerLabel="Qué incluye Transmisión"><p>Valor de transmisión y gastos de la venta</p></Tooltip></span></th>
+                      <th className="text-right px-4 py-2.5"><span className="inline-flex items-center gap-1">Adquisición <Tooltip label="Adquisición" triggerLabel="Qué incluye Adquisición"><p>Valor de adquisición y gastos de la compra</p></Tooltip></span></th>
                       <th className="text-right px-4 py-2.5">
                         <button type="button" onClick={() => toggleSort('gananciaPerdidaEur')} className="flex items-center gap-1 hover:text-fg ml-auto">
                           G/P € <SortIcon col="gananciaPerdidaEur" activeCol={sortKey} dir={sortDir} />

@@ -2,6 +2,7 @@ import type { Transaction } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { formatAmount, formatMoney, type Currency } from '../../utils/format'
 import { toDisplayAmount, valuationHint } from './helpers'
+import { TextTooltip } from '../../components/ui'
 
 /**
  * Detalle de comisiones (#371), como grupo de una lista de definiciones del
@@ -21,10 +22,8 @@ export function GroupedFeesDetail({ tx, currency, onOpen }: { tx: Transaction; c
               <li key={f.id} className="flex items-center gap-1.5 text-xs">
                 <CryptoIcon symbol={f.asset} size={12} />
                 <span className="mono text-fg-muted">{formatAmount(f.amount, 8)} {f.asset}</span>
-                <span className="mono text-fg-subtle" title={hint ?? undefined}>
-                  · {v === null ? '—' : `${f.value_source === 'estimado' ? '≈ ' : ''}${formatMoney(v, currency)}`}
-                  {hint && <span className="sr-only"> ({hint})</span>}
-                </span>
+                <span className="mono text-fg-subtle"><TextTooltip label="Comisión" tip={hint}>· {v === null ? '—' : `${f.value_source === 'estimado' ? '≈ ' : ''}${formatMoney(v, currency)}`}
+                  {hint && <span className="sr-only"> ({hint})</span>}</TextTooltip></span>
               </li>
             )
           })}

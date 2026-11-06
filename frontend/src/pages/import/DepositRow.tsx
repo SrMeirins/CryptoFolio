@@ -3,6 +3,7 @@ import type { DepositReview } from './types'
 import { HistoricalPriceButton } from './HistoricalPriceButton'
 import { formatEur, formatNumber } from '../../utils/format'
 import { idDeposito } from './revisionHelpers'
+import { Hint } from '../../components/ui'
 
 // Fila de depósito individual
 export function DepositRow({ dep, cost, reviewed, onSetCost, resaltado }: {
@@ -96,31 +97,33 @@ export function DepositRow({ dep, cost, reviewed, onSetCost, resaltado }: {
           />
         )}
 
-        <button
-          type="button"
-          onClick={() => { setInputVal('0'); onSetCost(dep.txKey, 0) }}
-          className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
-            cost === 0 && reviewed
-              ? 'border-positive/40 bg-positive/10 text-positive-ink'
-              : 'border-border text-fg-subtle hover:text-fg hover:border-fg-subtle bg-background-card'
-          }`}
-          title="Coste 0€ — airdrop, regalo, minería, etc."
-        >
-          Gratis (0€)
-        </button>
+        <Hint label="Coste 0 €: airdrop, regalo, minería, etc.">
+          <button
+            type="button"
+            onClick={() => { setInputVal('0'); onSetCost(dep.txKey, 0) }}
+            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+              cost === 0 && reviewed
+                ? 'border-positive/40 bg-positive/10 text-positive-ink'
+                : 'border-border text-fg-subtle hover:text-fg hover:border-fg-subtle bg-background-card'
+            }`}
+          >
+            Gratis (0€)
+          </button>
+        </Hint>
 
-        <button
-          type="button"
-          onClick={() => { setInputVal(''); onSetCost(dep.txKey, null) }}
-          className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
-            cost == null && reviewed
-              ? 'border-border bg-background-tertiary text-fg'
-              : 'border-border text-fg-subtle hover:text-fg hover:border-fg-subtle bg-background-card'
-          }`}
-          title="Coste desconocido — se usará el precio de mercado en la fecha"
-        >
-          No sé
-        </button>
+        <Hint label="Coste desconocido: se usará el precio de mercado en la fecha">
+          <button
+            type="button"
+            onClick={() => { setInputVal(''); onSetCost(dep.txKey, null) }}
+            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+              cost == null && reviewed
+                ? 'border-border bg-background-tertiary text-fg'
+                : 'border-border text-fg-subtle hover:text-fg hover:border-fg-subtle bg-background-card'
+            }`}
+          >
+            No sé
+          </button>
+        </Hint>
       </div>
     </div>
   )

@@ -2,6 +2,7 @@ import type { HistoryStats } from '../../../api/portfolio'
 import { CryptoIcon } from '../../../components/CryptoIcon'
 import { formatAmount, formatMoney, type Currency } from '../../../utils/format'
 import { T } from '../../../utils/colors'
+import { Hint } from '../../../components/ui'
 
 // Rankings de la analítica del Historial (#376, #413): top activos y
 // comisiones por activo, con barras en degradado y filas que filtran la lista
@@ -11,16 +12,18 @@ function RankRow({ asset, share, color, figure, label, onClick }: {
   asset: string; share: number; color: string; figure: string; label: string; onClick: () => void
 }) {
   return (
-    <button type="button" onClick={onClick} aria-label={label} title={`Filtrar ${asset}`}
-      className="w-full flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-overlay/5 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand group/rank">
-      <CryptoIcon symbol={asset} size={16} />
-      <span className="text-xs mono font-bold text-fg w-14 shrink-0 text-left truncate">{asset}</span>
-      <span className="flex-1 h-2 rounded-full bg-overlay/8 overflow-hidden">
-        <span className="block h-full rounded-full transition-[filter] group-hover/rank:brightness-125"
-          style={{ width: `${Math.max(share, 0.03) * 100}%`, background: `linear-gradient(90deg, color-mix(in srgb, ${color} 35%, transparent), ${color})` }} />
-      </span>
-      <span className="text-xs text-fg-muted mono font-semibold shrink-0 min-w-12 text-right">{figure}</span>
-    </button>
+    <Hint label={`Filtrar ${asset}`} className="w-full">
+      <button type="button" onClick={onClick} aria-label={label}
+        className="w-full flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-overlay/5 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand group/rank">
+        <CryptoIcon symbol={asset} size={16} />
+        <span className="text-xs mono font-bold text-fg w-14 shrink-0 text-left truncate">{asset}</span>
+        <span className="flex-1 h-2 rounded-full bg-overlay/8 overflow-hidden">
+          <span className="block h-full rounded-full transition-[filter] group-hover/rank:brightness-125"
+            style={{ width: `${Math.max(share, 0.03) * 100}%`, background: `linear-gradient(90deg, color-mix(in srgb, ${color} 35%, transparent), ${color})` }} />
+        </span>
+        <span className="text-xs text-fg-muted mono font-semibold shrink-0 min-w-12 text-right">{figure}</span>
+      </button>
+    </Hint>
   )
 }
 

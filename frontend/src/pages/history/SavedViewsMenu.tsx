@@ -2,7 +2,7 @@ import { useId, useRef, useState, type FormEvent } from 'react'
 import { Bookmark, ChevronDown, PenLine, Star, Trash2 } from 'lucide-react'
 import type { SavedView } from '../../api/portfolio'
 import { ApiError } from '../../api/client'
-import { Popover, buttonClasses, fieldClasses, iconButtonClasses } from '../../components/ui'
+import { Popover, buttonClasses, fieldClasses, iconButtonClasses, Hint } from '../../components/ui'
 
 // Desplegable «Vistas» del Historial (#369): aplicar una vista guardada,
 // guardar la actual (con confirmación si el nombre existe), renombrar, borrar
@@ -82,11 +82,13 @@ export function SavedViewsMenu({ views, active, onApply, onSave, onRename, onDel
                         className={`flex-1 min-w-0 text-left px-2 py-1.5 rounded-lg text-sm truncate hover:bg-overlay/6 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${active?.id === v.id ? 'text-brand-ink font-medium' : 'text-fg'}`}>
                         {v.nombre}
                       </button>
-                      <button type="button" onClick={() => void run(() => onToggleDefault(v))} aria-pressed={v.predeterminada}
-                        aria-label={`${v.predeterminada ? 'Quitar' : 'Marcar'} «${v.nombre}» como predeterminada`} title="Predeterminada"
-                        className={iconButtonClasses('sm', false, v.predeterminada ? 'text-warning-ink' : '')}>
-                        <Star size={12} aria-hidden="true" fill={v.predeterminada ? 'currentColor' : 'none'} />
-                      </button>
+                      <Hint label="Predeterminada">
+                        <button type="button" onClick={() => void run(() => onToggleDefault(v))} aria-pressed={v.predeterminada}
+                          aria-label={`${v.predeterminada ? 'Quitar' : 'Marcar'} «${v.nombre}» como predeterminada`}
+                          className={iconButtonClasses('sm', false, v.predeterminada ? 'text-warning-ink' : '')}>
+                          <Star size={12} aria-hidden="true" fill={v.predeterminada ? 'currentColor' : 'none'} />
+                        </button>
+                      </Hint>
                       <button type="button" onClick={() => setPending({ kind: 'rename', id: v.id, nombre: v.nombre })}
                         aria-label={`Renombrar «${v.nombre}»`} className={iconButtonClasses('sm')}><PenLine size={12} aria-hidden="true" /></button>
                       <button type="button" onClick={() => setPending({ kind: 'delete', id: v.id })}

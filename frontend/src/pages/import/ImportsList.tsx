@@ -3,7 +3,7 @@ import { FileText, Loader2, Trash2, Calendar, Hash, ChevronRight } from 'lucide-
 import { Link } from 'react-router-dom'
 import type { ImportRecord } from '../../api/portfolio'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { iconButtonClasses } from '../../components/ui'
+import { iconButtonClasses, Hint } from '../../components/ui'
 
 export function ImportsList({ imports, onDelete }: {
   imports: ImportRecord[]
@@ -95,15 +95,17 @@ export function ImportsList({ imports, onDelete }: {
                 Ver transacciones
               </Link>
 
-              <button
-                type="button"
-                onClick={() => setConfirmId(imp.id)}
-                className={iconButtonClasses('md', false, '', 'danger')}
-                title="Borrar importación" aria-label={isDeleting ? 'Borrando la importación' : 'Borrar importación'}
-                aria-busy={isDeleting || undefined} disabled={isDeleting}
-              >
-                {isDeleting ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Trash2 size={14} aria-hidden="true" />}
-              </button>
+              <Hint label="Borrar importación">
+                <button
+                  type="button"
+                  onClick={() => setConfirmId(imp.id)}
+                  className={iconButtonClasses('md', false, '', 'danger')}
+  aria-label={isDeleting ? 'Borrando la importación' : 'Borrar importación'}
+                  aria-busy={isDeleting || undefined} disabled={isDeleting}
+                >
+                  {isDeleting ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Trash2 size={14} aria-hidden="true" />}
+                </button>
+              </Hint>
             </div>
 
             {/* Tags de resumen */}

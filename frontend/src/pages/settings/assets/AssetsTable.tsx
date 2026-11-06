@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { ArrowDown, ArrowUp, ArrowUpDown, Pencil, Trash2, History } from 'lucide-react'
 import type { AssetMetadata } from '../../../api/portfolio'
 import { CryptoIcon } from '../../../components/CryptoIcon'
-import { iconButtonClasses, tableHeadRowClasses, tableRowClasses } from '../../../components/ui'
+import { iconButtonClasses, tableHeadRowClasses, tableRowClasses, Hint } from '../../../components/ui'
 import { alpha, ink } from '../../../utils/colors'
 import { formatNumber, formatPrice, type Currency } from '../../../utils/format'
 import { SOURCE_META } from './helpers'
@@ -101,7 +101,7 @@ export function AssetsTable({ assets, priceOf, currency, sort, onSort, onEdit, o
                           <span className="sr-only"> de {a.symbol} en el Historial</span>
                         </Link>
                       )
-                      : !a.en_cartera && <span className="text-fg-subtle whitespace-nowrap" title="Sin operaciones: se puede borrar">Sin uso, se puede borrar</span>}
+                      : !a.en_cartera && <span className="text-fg-subtle whitespace-nowrap">Sin uso, se puede borrar</span>}
                   </div>
                 </td>
                 <td className="px-4 py-2.5">
@@ -109,11 +109,14 @@ export function AssetsTable({ assets, priceOf, currency, sort, onSort, onEdit, o
                     <button type="button" onClick={() => onEdit(a.symbol)} aria-label={`Editar ${a.symbol}`} className={iconButtonClasses('md')}>
                       <Pencil size={13} aria-hidden="true" />
                     </button>
-                    <button type="button" onClick={() => onDelete(a.symbol)} aria-label={`Eliminar ${a.symbol}`} disabled={ops > 0}
-                      title={ops > 0 ? 'Tiene operaciones: no se puede borrar' : undefined}
-                      className={iconButtonClasses('md', false, 'disabled:opacity-30 disabled:cursor-not-allowed', 'danger')}>
-                      <Trash2 size={13} aria-hidden="true" />
-                    </button>
+                    {/* aria-disabled y no disabled (#495): sigue enfocable para leer por qué no se puede borrar. */}
+                    <Hint label={ops > 0 ? 'Tiene operaciones: no se puede borrar' : `Eliminar ${a.symbol}`}>
+                      <button type="button" onClick={() => { if (ops === 0) onDelete(a.symbol) }} aria-label={`Eliminar ${a.symbol}`}
+                        aria-disabled={ops > 0 || undefined}
+                        className={iconButtonClasses('md', false, 'aria-disabled:opacity-30 aria-disabled:cursor-not-allowed', 'danger')}>
+                        <Trash2 size={13} aria-hidden="true" />
+                      </button>
+                    </Hint>
                   </div>
                 </td>
               </tr>

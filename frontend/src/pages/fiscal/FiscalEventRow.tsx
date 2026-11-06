@@ -4,7 +4,7 @@ import { CryptoIcon } from '../../components/CryptoIcon'
 import { PNL_THRESHOLD } from './constants'
 import { EventWarnings } from './EventWarnings'
 import type { FiscalEvent } from './types'
-import { Tooltip, tableRowClasses } from '../../components/ui'
+import { Tooltip, tableRowClasses, TextTooltip } from '../../components/ui'
 
 /** Clave de la casilla 1800 (#531): la letra, o «Revisar» si no hay una segura; el significado, en el tooltip. */
 export function ClaveCell({ e }: { e: FiscalEvent }) {
@@ -35,7 +35,7 @@ function TypeBadge({ tipo, recibido }: { tipo: string; recibido: string | null }
 }
 
 function FechaCell({ e }: { e: FiscalEvent }) {
-  return <time dateTime={e.fechaHora ?? e.fecha} title={fiscalDateDetail(e.fechaHora)}>{formatFiscalDate(e.fecha)}</time>
+  return <time dateTime={e.fechaHora ?? e.fecha}><TextTooltip label="Fecha y hora" tip={fiscalDateDetail(e.fechaHora)}>{formatFiscalDate(e.fecha)}</TextTooltip></time>
 }
 
 function Operacion({ e }: { e: FiscalEvent }) {

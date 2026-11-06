@@ -20,7 +20,7 @@ export function CalendarLegend({ maxAbs, currency }: { maxAbs: number; currency:
         <span aria-hidden="true" className="flex items-center gap-0.5">
           {steps.map(value => (
             // Con el mismo marco de intensidad que las celdas (#412).
-            <span key={value} title={stepLabel(value, currency)}
+            <span key={value}
               className={`size-3 rounded-[3px] ${value === 0 ? 'border border-border mx-1 bg-background-card' : 'heat-swatch'}`}
               style={value === 0 ? undefined : heatVars(value, maxAbs) as CSSProperties} />
           ))}
@@ -32,6 +32,7 @@ export function CalendarLegend({ maxAbs, currency }: { maxAbs: number; currency:
         <InfoTooltip label="Escala de color">
           <p>Cada día se colorea según su P&L: rojo si pierde, verde si gana, y más intenso cuanto mayor es el importe.</p>
           <p className="mt-1.5 text-fg-subtle">El color más intenso corresponde al mayor movimiento del mes visible, en pérdida o en ganancia; la casilla del centro es un día sin variación.</p>
+          <ul className="mt-1.5 space-y-0.5 mono">{steps.map(v => <li key={v}>{stepLabel(v, currency)}</li>)}</ul>
         </InfoTooltip>
       </span>
     </div>

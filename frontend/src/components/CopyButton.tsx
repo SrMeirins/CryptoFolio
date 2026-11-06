@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check, Copy } from 'lucide-react'
+import { Hint } from './ui'
 
 /** Botón de copiar al portapapeles con feedback visual breve (check 1.5s). */
 export function CopyButton({ text, size = 11, title = 'Copiar', className = '' }: {
@@ -16,14 +17,15 @@ export function CopyButton({ text, size = 11, title = 'Copiar', className = '' }
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      aria-label={title}
-      title={title}
-      className={`text-fg-subtle hover:text-fg-muted transition-colors inline-flex items-center shrink-0 ${className}`}
-    >
-      {copied ? <Check size={size} className="text-positive" /> : <Copy size={size} />}
-    </button>
+    <Hint label={title}>
+      <button
+        type="button"
+        onClick={handleCopy}
+        aria-label={title}
+        className={`text-fg-subtle hover:text-fg-muted transition-colors inline-flex items-center shrink-0 ${className}`}
+      >
+        {copied ? <Check size={size} className="text-positive" /> : <Copy size={size} />}
+      </button>
+    </Hint>
   )
 }

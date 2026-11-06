@@ -1,8 +1,9 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { iconButtonClasses, type IconButtonSize, type IconButtonTone } from './classes'
+import { Hint } from './Tooltip'
 
 // Botón solo con icono (#199): exige una etiqueta accesible, que también se
-// muestra como tooltip nativo.
+// muestra en un Hint al pasar el ratón o enfocarlo (#495).
 
 export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-label'> {
   label: string
@@ -17,9 +18,11 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   ref,
 ) {
   return (
-    <button ref={ref} type={type} aria-label={label} title={title ?? label}
-      className={iconButtonClasses(size, active, className, tone)} {...rest}>
-      {icon}
-    </button>
+    <Hint label={title ?? label}>
+      <button ref={ref} type={type} aria-label={label}
+        className={iconButtonClasses(size, active, className, tone)} {...rest}>
+        {icon}
+      </button>
+    </Hint>
   )
 })
