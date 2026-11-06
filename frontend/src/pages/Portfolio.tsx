@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { portfolioApi } from '../api/portfolio'
 import { SaleSimulatorModal } from '../components/SaleSimulatorModal'
-import { RefreshCw, Wallet, Search, X, Settings, Rows3, Rows4 } from 'lucide-react'
+import { Wallet, Search, X, Settings, Rows3, Rows4 } from 'lucide-react'
 import { useDisplayLots, useDisplayMarket } from '../hooks/useDisplayMarket'
 import { InventoryStrip } from './portfolio/InventoryStrip'
 import { AssetDetailPanel } from './portfolio/AssetDetailPanel'
@@ -11,7 +11,7 @@ import { usePricesStore } from '../store/pricesStore'
 import { WalletCards } from './portfolio/WalletCards'
 import { WalletSections } from './portfolio/WalletSections'
 import { DustSection } from './portfolio/DustSection'
-import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState, Notice, PageHeader, SegmentedControl, Dropdown, panelClasses, panelEnterStyle, panelSurface } from '../components/ui'
+import { iconButtonClasses, fieldClasses, Button, EmptyState, Notice, PageHeader, Skeleton, SkeletonGroup, SegmentedControl, Dropdown, panelClasses, panelEnterStyle, panelSurface } from '../components/ui'
 import { AssetTable } from '../components/AssetTable'
 import { navIcon } from '../constants/navigation'
 import { PieMetodologia } from '../components/metodologia'
@@ -163,7 +163,7 @@ export function Portfolio() {
       <PageHeader
         icon={navIcon('/portfolio')}
         title="Portfolio"
-        subtitle={!isLoading && (
+        subtitle={isLoading ? <Skeleton className="inline-block h-3.5 w-40 align-middle" /> : (
           <>
             {portfolioSubtitle(assetsTotal, walletCount)}
             {all.unpriced.length > 0 && <span className="text-warning ml-2">· {all.unpriced.length} sin precio</span>}
@@ -171,12 +171,6 @@ export function Portfolio() {
         )}
         actions={
           <>
-            {!hasPrices && (
-              <div className="flex items-center gap-1.5 text-xs text-fg-subtle shrink-0" role="status">
-                <RefreshCw size={12} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
-                Cargando precios…
-              </div>
-            )}
             {/* Buscador: «/» lo enfoca y Esc lo limpia (#269) */}
             <div className="relative">
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" aria-hidden="true" />
@@ -224,6 +218,14 @@ export function Portfolio() {
 
       {/* Inventario y wallets (#270): sustituyen al anillo de distribución, que
           duplicaba el panel del Dashboard. */}
+      {/* Sin precios aún (#494): esqueleto con la forma de las cifras, no un texto suelto. */}
+      {!hasPrices && !isLoading && lots.length > 0 && (
+        <SkeletonGroup label="Cargando los precios" className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border bg-border">
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} className="bg-background-card px-3.5 py-2.5 space-y-2"><Skeleton className="h-2.5 w-16" /><Skeleton className="h-4 w-24" /></div>
+          ))}
+        </SkeletonGroup>
+      )}
       {hasPrices && !isLoading && inventory.wallets.length > 0 && (
         <>
           <InventoryStrip inventory={inventory} />
@@ -246,7 +248,9 @@ export function Portfolio() {
       )}
 
       {isLoading ? (
-        <LoadingState label="Cargando lotes FIFO…" />
+        <SkeletonGroup label="Cargando las posiciones" className="space-y-2">
+          {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+        </SkeletonGroup>
       ) : lots.length === 0 && fiatBalances.length === 0 ? (
         <EmptyState icon={<Wallet size={32} />} title="Sin activos en portfolio" description="Importa tu CSV de Binance para empezar" />
       ) : nothingFound ? (

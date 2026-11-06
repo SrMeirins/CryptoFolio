@@ -1,10 +1,10 @@
 import { useId, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { FileUp, Lock, RefreshCw, RotateCcw, X } from 'lucide-react'
+import { FileUp, Lock, RotateCcw, X } from 'lucide-react'
 import { backupApi, type BackupPreview } from '../../../api/backup'
 import { ApiError } from '../../../api/client'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
-import { Field, buttonClasses, fieldClasses, iconButtonClasses } from '../../../components/ui'
+import { Field, buttonClasses, fieldClasses, iconButtonClasses, Button } from '../../../components/ui'
 import { useToast } from '../../../hooks/useToast'
 import { formatBackupDate, readBackupFile } from '../../../utils/backupFile'
 import { BackupPreviewTable } from './BackupPreviewTable'
@@ -128,15 +128,13 @@ export function BackupRestore() {
 
           <div className="flex justify-end gap-2">
             {!preview ? (
-              <button type="submit" disabled={busy !== null || (chosen.encrypted && !password)} className={buttonClasses('secondary', 'md', 'flex')}>
-                {busy === 'preview' && <RefreshCw size={13} aria-hidden="true" className="animate-spin" />}
+              <Button type="submit" disabled={busy !== null || (chosen.encrypted && !password)} loading={busy === 'preview'}>
                 {busy === 'preview' ? 'Comprobando...' : 'Revisar contenido'}
-              </button>
+              </Button>
             ) : (
-              <button type="button" onClick={() => setConfirming(true)} disabled={busy !== null} className={buttonClasses('danger', 'md', 'flex')}>
-                {busy === 'restore' ? <RefreshCw size={13} aria-hidden="true" className="animate-spin" /> : <RotateCcw size={13} aria-hidden="true" />}
+              <Button variant="danger" onClick={() => setConfirming(true)} disabled={busy !== null} loading={busy === 'restore'} icon={<RotateCcw size={13} aria-hidden="true" />}>
                 {busy === 'restore' ? 'Restaurando...' : 'Restaurar esta copia'}
-              </button>
+              </Button>
             )}
           </div>
         </form>

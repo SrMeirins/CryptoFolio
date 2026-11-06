@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Check, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Check } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
 import { useToast } from '../../hooks/useToast'
 import { PendingDepositRow } from './PendingDepositRow'
-import { cardClasses } from '../../components/ui'
+import { cardClasses, Button } from '../../components/ui'
 
 export type PendingDeposit = {
   id: string
@@ -116,15 +116,10 @@ export function PendingDepositsPanel({ deposits }: { deposits: PendingDeposit[] 
             : 'Todos marcados como desconocidos — guarda para continuar'
           }
         </p>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={!allReviewed || saving}
-          className="flex items-center gap-2 px-5 py-2 bg-warning hover:bg-warning/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium text-on-warning transition-colors"
-        >
-          {saving ? <RefreshCw size={13} className="animate-spin" /> : <Check size={13} />}
+        <Button variant="ghost" onClick={handleSave} disabled={!allReviewed} loading={saving} icon={<Check size={13} aria-hidden="true" />}
+          className="px-5 py-2 bg-warning hover:bg-warning/80 text-on-warning hover:text-on-warning">
           {saving ? 'Guardando...' : 'Guardar y desbloquear importación'}
-        </button>
+        </Button>
       </div>
     </div>
   )

@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from 'react'
-import { Lock, RefreshCw } from 'lucide-react'
+import { Lock } from 'lucide-react'
 import { backupApi } from '../../../api/backup'
-import { Field, Modal, ModalBody, ModalFooter, ModalHeader, buttonClasses, fieldClasses } from '../../../components/ui'
+import { Field, Modal, ModalBody, ModalFooter, ModalHeader, buttonClasses, fieldClasses, Button } from '../../../components/ui'
 import { useToast } from '../../../hooks/useToast'
 import { backupFilename } from '../../../constants/appInfo'
 import { downloadJson, exportPasswordError, formatBackupDate } from '../../../utils/backupFile'
@@ -51,10 +51,9 @@ export function AutoBackupDownload({ name, createdAt, onClose }: { name: string;
         </ModalBody>
         <ModalFooter>
           <button type="button" onClick={onClose} className={buttonClasses('ghost', 'md')}>Cancelar</button>
-          <button type="submit" disabled={busy} className={buttonClasses('primary', 'md', 'flex')}>
-            {busy ? <RefreshCw size={13} aria-hidden="true" className="animate-spin" /> : <Lock size={13} aria-hidden="true" />}
+          <Button type="submit" variant="primary" loading={busy} icon={<Lock size={13} aria-hidden="true" />}>
             {busy ? 'Preparando...' : 'Descargar cifrada'}
-          </button>
+          </Button>
         </ModalFooter>
       </form>
     </Modal>

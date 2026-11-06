@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { RefreshCw, ChevronUp, ChevronDown } from 'lucide-react'
 import { useRunFifo } from '../../hooks/useRunFifo'
-import { cardClasses } from '../../components/ui'
+import { cardClasses, Button } from '../../components/ui'
 
 export function AdvancedSection() {
   const [open, setOpen] = useState(false)
@@ -28,15 +28,10 @@ export function AdvancedSection() {
                 Util si modificaste datos directamente en la DB o borraste un import
               </p>
             </div>
-            <button
-              type="button"
-              onClick={run}
-              disabled={running}
-              className="flex items-center gap-2 px-4 py-2 bg-background-tertiary hover:bg-border disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
-            >
-              <RefreshCw size={13} className={running ? 'animate-spin' : ''} />
+            <Button variant="ghost" onClick={run} loading={running} icon={<RefreshCw size={13} aria-hidden="true" />}
+              className="px-4 py-2 bg-background-tertiary hover:bg-border text-xs text-fg hover:text-fg">
               {running ? 'Calculando...' : 'Recalcular'}
-            </button>
+            </Button>
           </div>
           {result && (
             <p className={`text-xs ${result.startsWith('Error') ? 'text-negative' : 'text-positive'}`}>{result}</p>

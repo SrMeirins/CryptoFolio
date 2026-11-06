@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, PenLine, Trash2, X } from 'lucide-react'
 import type { Transaction } from '../../../api/portfolio'
 import { Drawer } from '../../../components/ui/Drawer'
-import { LoadingState, iconButtonClasses } from '../../../components/ui'
+import { Skeleton, SkeletonGroup, iconButtonClasses } from '../../../components/ui'
 import { opMetaOf } from '../../../constants/operations'
 import type { Currency } from '../../../utils/format'
 import { fmtDate } from '../helpers'
@@ -72,7 +72,12 @@ export function TransactionDetailPanel({ id, currency, onClose, onOpen, prev, ne
       )}
 
       <div className="flex-1 overflow-y-auto">
-        {isLoading && <LoadingState />}
+        {isLoading && (
+          <SkeletonGroup label="Cargando el detalle" className="px-5 py-4 space-y-3">
+            <Skeleton className="h-5 w-1/2" />
+            {[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+          </SkeletonGroup>
+        )}
         {error && <p role="alert" className="px-5 py-4 text-sm text-negative-ink">No se pudo cargar el detalle: {(error as Error).message}</p>}
         {data && <DetailBody data={data} currency={currency} onOpen={onOpen} walletName={walletName} onRestore={onRestore} restoring={restoring} />}
       </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { RefreshCw, Download, ArrowUpCircle } from 'lucide-react'
-import { buttonClasses } from './ui'
+import { Download, ArrowUpCircle } from 'lucide-react'
+import { Button } from './ui'
 
 export function UpdateBanner() {
   const bridge = window.__CRYPTOFOLIO__
@@ -45,23 +45,15 @@ export function UpdateBanner() {
         <ArrowUpCircle size={14} className="shrink-0" />
         <span>
           {state.downloaded
-            ? `Versión ${state.version} lista para instalar — reinicia la aplicación`
-            : `Nueva versión ${state.version} disponible — descargando en segundo plano...`
+            ? `Versión ${state.version} lista para instalar: reinicia la aplicación`
+            : `Nueva versión ${state.version} disponible: descargando en segundo plano...`
           }
         </span>
       </div>
-      <button
-        onClick={handleUpdate}
-        disabled={state.installing}
-        className={buttonClasses('primary', 'sm', 'shrink-0 flex gap-1.5')}
-      >
-        {state.installing
-          ? <><RefreshCw size={12} className="animate-spin" /> Instalando...</>
-          : state.downloaded
-          ? <><Download size={12} /> Reiniciar y actualizar</>
-          : <><Download size={12} /> Actualizar ahora</>
-        }
-      </button>
+      <Button variant="primary" size="sm" onClick={handleUpdate} loading={state.installing}
+        icon={<Download size={12} aria-hidden="true" />} className="shrink-0 gap-1.5">
+        {state.installing ? 'Instalando...' : state.downloaded ? 'Reiniciar y actualizar' : 'Actualizar ahora'}
+      </Button>
     </div>
   )
 }

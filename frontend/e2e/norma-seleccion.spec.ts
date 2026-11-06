@@ -33,12 +33,38 @@ test('nivel 2, Fiscal: pestañas con URL y teclado', async ({ page }) => {
   await expect(page).toHaveURL(/vista=planificar/)
 })
 
+/**
+ * Sigue las peticiones a la API desde antes de cargar la página. `quieta()`
+ * espera a que pasen `ms` sin ninguna en vuelo ni nueva (como mucho `max`):
+ * al responder, una consulta lenta dispara otras que dependen de ella.
+ */
+function vigilarRed(page: Page) {
+  const api = (r: { url(): string }) => r.url().includes('/api/')
+  let enVuelo = 0
+  let ultima = Date.now()
+  page.on('request', r => { if (api(r)) { enVuelo++; ultima = Date.now() } })
+  const acaba = (r: { url(): string }) => { if (api(r)) { enVuelo = Math.max(0, enVuelo - 1); ultima = Date.now() } }
+  page.on('requestfinished', acaba)
+  page.on('requestfailed', acaba)
+  return {
+    async quieta(ms = 1500, max = 30_000) {
+      const inicio = Date.now()
+      while ((enVuelo > 0 || Date.now() - ultima < ms) && Date.now() - inicio < max) await page.waitForTimeout(250)
+    },
+  }
+}
+
 test('nivel 3, Evolución: opción del panel sin URL y sin peticiones nuevas', async ({ page }) => {
   await soloLectura(page)
+  const red = vigilarRed(page)
   await page.goto('/')
   const curva = page.getByRole('radiogroup', { name: 'Curva de evolución' })
   await expect(curva).toBeVisible()
-  await page.waitForLoadState('networkidle')
+  // El Dashboard encadena consultas (una lenta dispara otras al responder): se
+  // espera a una ventana real sin peticiones en vuelo y se desplaza antes, para
+  // medir solo lo que provoca el cambio de curva.
+  await curva.scrollIntoViewIfNeeded()
+  await red.quieta()
   const peticiones: string[] = []
   page.on('request', r => { if (r.url().includes('/api/')) peticiones.push(r.url()) })
   const url = page.url()

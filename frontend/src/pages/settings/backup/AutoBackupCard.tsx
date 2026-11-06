@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, CalendarClock, RefreshCw, Save } from 'lucide-react'
+import { AlertTriangle, CalendarClock, Save } from 'lucide-react'
 import { backupApi, type AutoBackupStatus, type AutoBackupUnavailable } from '../../../api/backup'
 import { portfolioApi } from '../../../api/portfolio'
-import { Dropdown, Switch, buttonClasses } from '../../../components/ui'
+import { Dropdown, Switch, Button } from '../../../components/ui'
 import { useSettingFeedback } from '../../../hooks/useSettingFeedback'
 import { useToast } from '../../../hooks/useToast'
 import { formatBackupDate } from '../../../utils/backupFile'
@@ -86,10 +86,9 @@ export function AutoBackupCard({ index = 0 }: { index?: number }) {
       status={<><SavedMark stamp={saved} id={ENABLED_KEY} /><SavedMark stamp={saved} id={FREQUENCY_KEY} /><SavedMark stamp={saved} id={KEEP_KEY} /></>}
       description="Cifradas con la clave de este equipo: solo se abren aquí. Para llevar una a otro equipo, descárgala con una contraseña."
       action={status?.available && (
-        <button type="button" onClick={() => void runNow()} disabled={running} className={buttonClasses('secondary', 'sm', 'flex')}>
-          {running ? <RefreshCw size={12} aria-hidden="true" className="animate-spin" /> : <Save size={12} aria-hidden="true" />}
+        <Button size="sm" onClick={() => void runNow()} loading={running} icon={<Save size={12} aria-hidden="true" />}>
           {running ? 'Haciendo copia...' : 'Hacer copia ahora'}
-        </button>
+        </Button>
       )}>
       {status && !status.available && status.reason && (
         <p role="note" className="flex items-start gap-2 px-3 py-2.5 rounded-lg border border-warning/40 bg-warning/8 text-xs text-fg-muted">

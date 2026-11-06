@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { RefreshCw, RotateCcw } from 'lucide-react'
+import { RotateCcw } from 'lucide-react'
 import type { Transaction } from '../../../api/portfolio'
-import { buttonClasses } from '../../../components/ui'
+import { buttonClasses, Button } from '../../../components/ui'
 import { importDiff } from './importDiff'
 
 // Cambios de una importada editada a mano (#378): cada campo con su valor
@@ -15,10 +15,9 @@ function RestoreConfirm({ onConfirm, onCancel, restoring }: { onConfirm: () => v
     <div role="group" aria-label="Confirmar la restauración de los valores importados" className="flex flex-wrap items-center gap-1.5"
       onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onCancel() } }}>
       <span className="text-xs text-fg-muted">Se perderán tus cambios (salvo las notas) y se recalculará el FIFO.</span>
-      <button type="button" onClick={onConfirm} disabled={restoring} className={buttonClasses('danger', 'sm', 'px-2 py-0.5 text-xs')}>
-        {restoring && <RefreshCw size={11} aria-hidden="true" className="animate-spin" />}
+      <Button variant="danger" size="sm" onClick={onConfirm} loading={restoring} className="px-2 py-0.5 text-xs">
         {restoring ? 'Restaurando…' : 'Restaurar'}
-      </button>
+      </Button>
       <button type="button" ref={cancelRef} onClick={onCancel} disabled={restoring} className={buttonClasses('ghost', 'sm', 'px-2 py-0.5 text-xs')}>
         Cancelar
       </button>
