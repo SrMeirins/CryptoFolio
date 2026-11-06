@@ -41,7 +41,7 @@ test('cancelar no cambia nada; confirmar guarda, recalcula y ofrece Deshacer', a
   await expect(grupo(page).getByRole('radio', { name: 'Transmisión' })).toBeChecked()
 
   await grupo(page).getByRole('radio', { name: 'Sumar al coste' }).click()
-  await page.getByRole('button', { name: 'Cambiar y recalcular' }).click()
+  await page.getByRole('button', { name: 'Cambiar el criterio y recalcular' }).click()
   await expect(grupo(page).getByRole('radio', { name: 'Sumar al coste' })).toBeChecked()
   expect(calls.put).toEqual(['coste'])
   expect(calls.fifo).toBe(1)

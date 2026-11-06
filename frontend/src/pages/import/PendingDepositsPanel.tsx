@@ -59,7 +59,7 @@ export function PendingDepositsPanel({ deposits }: { deposits: PendingDeposit[] 
       )
       setLocalCosts({})
     } catch (e) {
-      toast.error('Error al guardar', (e as Error).message)
+      toast.fail('No se pudo guardar', e)
     } finally {
       setSaving(false)
     }

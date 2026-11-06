@@ -29,7 +29,7 @@ export function BackupExport() {
       setConfirm('')
       setTouched(false)
     } catch (err) {
-      toast.error('No se pudo exportar', (err as Error).message)
+      toast.fail('No se pudo exportar', err)
     } finally {
       setExporting(false)
     }

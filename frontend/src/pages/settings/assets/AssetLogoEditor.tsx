@@ -35,10 +35,10 @@ export function AssetLogoEditor({ asset }: { asset: AssetMetadata }) {
       await queryClient.invalidateQueries({ queryKey: ['assets'] })
       // El logo nuevo se busca en segundo plano: la lista de logos se vuelve a pedir en unos segundos.
       setTimeout(() => void queryClient.invalidateQueries({ queryKey: ['asset-icons'] }), 4000)
-      toast.success('Logo actualizado', next ? `Se usará el de ${next}` : 'Vuelve al automático')
+      toast.success('Logo cambiado', next ? `Se usará el de ${next}; aparece en unos segundos.` : 'Se vuelve al automático.')
       if (!next) setDraft('')
     } catch (e) {
-      toast.error('No se pudo cambiar el logo', (e as Error).message)
+      toast.fail('No se pudo cambiar el logo', e)
     } finally {
       setSaving(false)
     }

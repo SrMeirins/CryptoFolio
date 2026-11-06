@@ -117,17 +117,17 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
       setStep('done')
       onSuccess()
 
-      const successTitle = isEditMode ? 'Transacción actualizada' : 'Transacción guardada'
+      const successTitle = isEditMode ? 'Operación actualizada' : 'Operación guardada'
       if (result.fifoError) {
         // success:true en la respuesta HTTP pero el recálculo FIFO ha
         // fallado (backend/src/routes/transactions.ts) — la transacción se
         // guardó, pero lotes/ganancias pueden estar desactualizados hasta
         // recalcular a mano. Antes este caso se perdía en silencio.
-        toast.warning(successTitle, `Guardada, pero el recálculo FIFO falló: ${result.fifoError}`)
+        toast.warning(successTitle, 'Guardada, pero no se pudo recalcular el FIFO. Ejecútalo en Ajustes, Datos, Mantenimiento.')
       } else {
         toast.success(
           successTitle,
-          result.fifo ? `FIFO recalculado · ${result.fifo.lotsCreated} lotes creados` : 'FIFO actualizándose...'
+          result.fifo ? `FIFO recalculado: ${result.fifo.lotsCreated} lotes creados.` : 'Recalculando el FIFO.'
         )
       }
     } catch (e) {

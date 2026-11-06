@@ -128,8 +128,8 @@ export function ImportsList({ imports, onDelete }: {
       {confirmImport && (
         <ConfirmDialog
           title="Borrar importación"
-          message={`Se eliminarán las ${parseInt(confirmImport.transaction_count)} transacciones de "${confirmImport.filename}" y se recalculará el FIFO. Esta acción no se puede deshacer.`}
-          confirmLabel="Borrar importación"
+          message={`Se borrarán las ${parseInt(confirmImport.transaction_count)} operaciones de «${confirmImport.filename}» y se recalculará el FIFO, con efecto en tus ganancias y pérdidas. No se puede deshacer.`}
+          confirmLabel={`Borrar ${parseInt(confirmImport.transaction_count)} ${parseInt(confirmImport.transaction_count) === 1 ? 'operación' : 'operaciones'}`}
           danger
           onConfirm={() => handleConfirmDelete(confirmImport.id)}
           onCancel={() => setConfirmId(null)}

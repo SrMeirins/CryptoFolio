@@ -20,7 +20,7 @@ export function DeleteConfirm({ onConfirm, onCancel, isDeleting }: {
       onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onCancel() } }}>
       <span className="text-xs text-fg-subtle">¿Borrar?</span>
       <Button variant="danger" size="sm" onClick={onConfirm} loading={isDeleting} className="px-2 py-0.5 text-xs">
-        {isDeleting ? 'Borrando…' : 'Borrar'}
+        {isDeleting ? 'Borrando…' : 'Borrar la operación'}
       </Button>
       <button type="button" ref={cancelRef} onClick={onCancel} disabled={isDeleting}
         className={buttonClasses('ghost', 'sm', 'px-2 py-0.5 text-xs')}>

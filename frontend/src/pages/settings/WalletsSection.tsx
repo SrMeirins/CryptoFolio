@@ -314,8 +314,8 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
       {confirmTarget && (
         <ConfirmDialog
           title="Borrar wallet"
-          message={`Borrar "${confirmTarget.name}"? Solo es posible si no tiene transacciones asociadas.`}
-          confirmLabel="Borrar"
+          message={`¿Borrar «${confirmTarget.name}»? Solo es posible si no tiene operaciones asociadas.`}
+          confirmLabel={`Borrar la wallet ${confirmTarget.name}`}
           danger
           onConfirm={() => handleDeleteWallet(confirmDeleteId!)}
           onCancel={() => setConfirmDeleteId(null)}

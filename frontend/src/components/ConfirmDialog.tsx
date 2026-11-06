@@ -2,10 +2,12 @@ import { useRef, useId } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { Button, Modal, ModalHeader } from './ui'
 
+// Norma de confirmaciones (#497): el botón de confirmar lleva verbo y objeto,
+// y la cantidad si la hay («Borrar 3 operaciones»); por eso es obligatorio.
 interface ConfirmDialogProps {
   title: string
   message: string
-  confirmLabel?: string
+  confirmLabel: string
   cancelLabel?: string
   danger?: boolean
   onConfirm: () => void
@@ -15,7 +17,7 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({
   title,
   message,
-  confirmLabel = 'Confirmar',
+  confirmLabel,
   cancelLabel = 'Cancelar',
   danger = false,
   onConfirm,

@@ -59,7 +59,7 @@ export function AutoBackupCard({ index = 0 }: { index?: number }) {
       await queryClient.invalidateQueries({ queryKey: ['config'] })
       confirm(key, message, undoable ? () => void save(key, previous, 'Valor anterior restaurado', value, false) : undefined)
     } catch (e) {
-      toast.error('No se pudo guardar', (e as Error).message)
+      toast.fail('No se pudo guardar', e)
     }
   }
 
@@ -69,7 +69,7 @@ export function AutoBackupCard({ index = 0 }: { index?: number }) {
       await backupApi.autoRun()
       toast.success('Copia hecha', 'Cifrada con la clave de este equipo.')
     } catch (e) {
-      toast.error('No se pudo hacer la copia', (e as Error).message)
+      toast.fail('No se pudo hacer la copia', e)
     } finally {
       await queryClient.invalidateQueries({ queryKey: ['backup-auto'] })
       await queryClient.invalidateQueries({ queryKey: ['settings-stats'] })

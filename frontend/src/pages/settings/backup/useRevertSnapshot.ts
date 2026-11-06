@@ -16,9 +16,9 @@ export function useRevertSnapshot() {
       await backupApi.revert(id)
       // Cambian todos los datos: se refresca todo, también la lista de estados previos.
       await queryClient.invalidateQueries({ refetchType: 'all' })
-      toast.success('Datos como antes de restaurar')
+      toast.success('Datos devueltos al estado anterior')
     } catch (err) {
-      toast.error('No se pudo volver atrás', (err as Error).message)
+      toast.fail('No se pudo volver atrás', err)
     } finally {
       setReverting(false)
     }

@@ -47,11 +47,11 @@ export function useHistoryData(queryParams: Record<string, string>, offset: numb
     try {
       const result = await portfolioApi.deleteManualTx(id)
       invalidateTransactionQueries(queryClient)
-      if (result.fifoError) toast.warning('Transacción eliminada', `Eliminada, pero el recálculo FIFO falló: ${result.fifoError}`)
-      else toast.success('Transacción eliminada', 'FIFO recalculado')
+      if (result.fifoError) toast.warning('Operación borrada', 'Borrada, pero no se pudo recalcular el FIFO. Ejecútalo en Ajustes, Datos, Mantenimiento.')
+      else toast.success('Operación borrada', 'FIFO recalculado.')
       return true
     } catch (e) {
-      toast.error('Error al eliminar', (e as Error).message)
+      toast.fail('No se pudo borrar la operación', e)
       return false
     } finally {
       setDeletingId(null)
@@ -64,11 +64,11 @@ export function useHistoryData(queryParams: Record<string, string>, offset: numb
     try {
       const result = await portfolioApi.restoreTransaction(id)
       invalidateTransactionQueries(queryClient)
-      if (result.fifoError) toast.warning('Valores importados restaurados', `Restaurada, pero el recálculo FIFO falló: ${result.fifoError}`)
-      else toast.success('Valores importados restaurados', 'FIFO recalculado')
+      if (result.fifoError) toast.warning('Valores importados restaurados', 'Restaurados, pero no se pudo recalcular el FIFO. Ejecútalo en Ajustes, Datos, Mantenimiento.')
+      else toast.success('Valores importados restaurados', 'FIFO recalculado.')
       return true
     } catch (e) {
-      toast.error('Error al restaurar', (e as Error).message)
+      toast.fail('No se pudieron restaurar los valores importados', e)
       return false
     } finally {
       setRestoringId(null)

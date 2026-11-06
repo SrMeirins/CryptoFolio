@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { useToast } from '../../hooks/useToast'
 import { SavedViewsMenu } from './SavedViewsMenu'
 import { useSavedViews } from './useSavedViews'
 import { activeView, stateFromView, viewFiltersFromState } from './savedViewsLogic'
@@ -17,7 +16,6 @@ export function HistorySavedViews({ filters, sort, applyState, startedEmpty }: {
   applyState: (next: { filters: HistoryFilterState; sort: SortState }) => void
   startedEmpty: boolean
 }) {
-  const toast = useToast()
   const saved = useSavedViews()
   const current = useMemo(() => activeView(saved.views, filters, sort), [saved.views, filters, sort])
 
@@ -34,8 +32,8 @@ export function HistorySavedViews({ filters, sort, applyState, startedEmpty }: {
     <SavedViewsMenu views={saved.views} active={current}
       onApply={v => applyState(stateFromView(v.filtros))}
       onSave={async (nombre, predeterminada, sustituir) => {
-        const r = await saved.create.mutateAsync({ nombre, predeterminada, sustituir, filtros: viewFiltersFromState(filters, sort) })
-        toast.success(r.sustituida ? 'Vista sustituida' : 'Vista guardada', r.vista.nombre)
+        // Éxito con cambio visible (#497): la vista aparece en el menú, sin aviso.
+        await saved.create.mutateAsync({ nombre, predeterminada, sustituir, filtros: viewFiltersFromState(filters, sort) })
       }}
       onRename={async (id, nombre) => { await saved.update.mutateAsync({ id, nombre }) }}
       onDelete={async id => { await saved.remove.mutateAsync(id) }}
