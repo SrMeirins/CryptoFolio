@@ -11,9 +11,10 @@ import { usePricesStore } from '../store/pricesStore'
 import { WalletCards } from './portfolio/WalletCards'
 import { WalletSections } from './portfolio/WalletSections'
 import { DustSection } from './portfolio/DustSection'
-import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState, PageHeader, SegmentedControl, Dropdown, panelClasses, panelEnterStyle, panelSurface } from '../components/ui'
+import { iconButtonClasses, fieldClasses, Button, EmptyState, LoadingState, Notice, PageHeader, SegmentedControl, Dropdown, panelClasses, panelEnterStyle, panelSurface } from '../components/ui'
 import { AssetTable } from '../components/AssetTable'
 import { navIcon } from '../constants/navigation'
+import { PieMetodologia } from '../components/metodologia'
 import { portfolioSubtitle } from '../utils/panelSubtitles'
 import { portfolioSections } from '../utils/portfolioSections'
 import { portfolioInventory } from '../utils/portfolioInventory'
@@ -210,16 +211,15 @@ export function Portfolio() {
 
       {/* Activos sin precio: un único aviso para toda la cartera */}
       {all.unpriced.length > 0 && (
-        <div role="status" className="flex items-center justify-between gap-3 px-4 py-2.5 bg-warning/5 border border-warning/20 rounded-xl text-xs">
-          <span className="text-warning">
-            <span className="mono font-semibold">{all.unpriced.join(', ')}</span>{' '}
-            {all.unpriced.length === 1 ? 'no tiene precio configurado' : 'no tienen precio configurado'}: valor y P&L no disponibles.
-          </span>
-          <Link to="/settings?tab=assets" className="flex items-center gap-1 text-warning hover:text-warning/80 font-medium transition-colors shrink-0">
+        <Notice tipo="aviso" role="status" compact action={
+          <Link to="/settings?tab=assets" className="flex items-center gap-1 text-warning-ink hover:underline font-medium rounded focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
             <Settings size={11} aria-hidden="true" />
             Configurar en Ajustes
           </Link>
-        </div>
+        }>
+          <span className="mono font-semibold text-fg">{all.unpriced.join(', ')}</span>{' '}
+          {all.unpriced.length === 1 ? 'no tiene precio configurado' : 'no tienen precio configurado'}: valor y P&L no disponibles.
+        </Notice>
       )}
 
       {/* Inventario y wallets (#270): sustituyen al anillo de distribución, que
@@ -278,6 +278,10 @@ export function Portfolio() {
             index={mainCount + 1} onOpen={setDetailAsset} />
         </>
       )}
+
+      <PieMetodologia tema="valoracion">
+        Valor con precios en vivo; coste y P&L según el FIFO global por activo.
+      </PieMetodologia>
     </div>
 
     {detailRow && (() => {

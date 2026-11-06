@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
 import { parseImporte, umbralSiguiente721 } from '../../utils/declaraciones'
-import { AlertTriangle, ChevronRight, Download, Landmark, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Download, FileCheck2, Landmark, ShieldCheck } from 'lucide-react'
 import { formatEur, formatPercent, formatPrice } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { InfoTooltip } from '../../components/InfoTooltip'
-import { buttonClasses, fieldClasses, panelSurface } from '../../components/ui'
+import { buttonClasses, fieldClasses, Notice, panelSurface } from '../../components/ui'
 import { usePrivacyStore } from '../../store/privacyStore'
 import { ink } from '../../utils/colors'
 import { formatFiscalDate, formatFiscalQty } from '../../utils/fiscalTable'
@@ -105,8 +105,7 @@ function Presentado({ data, year }: { data: Modelo721; year: number }) {
     )
   }
   return (
-    <div className="flex items-center gap-2 flex-wrap rounded-xl border border-border px-3 py-2.5 text-xs">
-      <p className="flex-1 min-w-[12rem] text-fg-muted">¿Lo presentaste? Guarda el valor declarado para aplicar la regla del incremento los años siguientes.</p>
+    <Notice tipo="consejo" icon={FileCheck2} compact action={<>
       <label className="flex items-center gap-1.5">
         <span className="sr-only">Valor declarado en euros</span>
         <input type="text" inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)} maxLength={16}
@@ -114,8 +113,10 @@ function Presentado({ data, year }: { data: Modelo721; year: number }) {
           title="Por defecto, el valor en exchanges a 31 de diciembre" />
       </label>
       <button type="button" onClick={() => marcar.mutate()} disabled={busy} className={buttonClasses('secondary', 'sm')}>Marcar como presentado</button>
-      {error && <p role="alert" className="w-full text-negative">{error.message}</p>}
-    </div>
+    </>}>
+      ¿Lo presentaste? Guarda el valor declarado para aplicar la regla del incremento los años siguientes.
+      {error && <p role="alert" className="mt-1 text-negative">{error.message}</p>}
+    </Notice>
   )
 }
 
@@ -209,15 +210,13 @@ export function Modelo721Card({ data: snapshot, activeYear }: { data: Modelo721;
         )}
 
         {pending && (
-          <p role="status" className="flex items-start gap-2 p-3 bg-warning/5 border border-warning/20 rounded-xl text-xs text-warning">
-            <AlertTriangle size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
+          <Notice tipo="aviso" role="status">
             {pending}: los totales son un mínimo. Se completarán cuando las fuentes de precios respondan.
-          </p>
+          </Notice>
         )}
 
         {/* Cuándo hay que presentarlo (#311: regla del incremento de 20.000 €) */}
-        <div className="flex items-start gap-2 p-3 rounded-xl border border-border text-xs text-fg-muted">
-          <Landmark size={12} className="shrink-0 mt-0.5 text-fg-subtle" aria-hidden="true" />
+        <Notice tipo="informacion" icon={Landmark}>
           <div className="space-y-1">
             <p>
               Hay que presentarlo si el valor en exchanges extranjeros supera {formatEur(data.umbral)} a 31 de diciembre.
@@ -233,7 +232,7 @@ export function Modelo721Card({ data: snapshot, activeYear }: { data: Modelo721;
               </p>
             )}
           </div>
-        </div>
+        </Notice>
 
         {/* Presentado (solo ejercicios cerrados) */}
         {!data.esAnioEnCurso && <Presentado data={data} year={activeYear} />}

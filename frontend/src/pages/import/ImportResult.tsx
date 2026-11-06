@@ -1,9 +1,9 @@
-import { AlertTriangle, ArrowRight, CalendarRange, CheckCircle2, ChevronDown, History, Landmark, Upload } from 'lucide-react'
+import { ArrowRight, CalendarRange, CheckCircle2, ChevronDown, History, Landmark, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { ProgressEvent, ResumenImportacion } from './types'
 import { ImportLogPanel } from './ImportLogPanel'
-import { buttonClasses, cardClasses } from '../../components/ui'
+import { buttonClasses, cardClasses, Notice } from '../../components/ui'
 import { formatEur, pnlColor } from '../../utils/format'
 import { formatFiscalDate } from '../../utils/fiscalTable'
 import { formatoDuracion } from './progreso'
@@ -155,29 +155,26 @@ export function ImportResult({ resumen, duracion, log, onGoToDashboard, onReset,
 
       {/* Avisos */}
       {(avisos.length > 0 || faltanPrecios > 0) && (
-        <section aria-labelledby="avisos-titulo" className={cardClasses('md', 'space-y-3 border-warning/30')}>
-          <h3 id="avisos-titulo" className="flex items-center gap-2 text-sm font-semibold text-warning">
-            <AlertTriangle size={15} aria-hidden="true" /> Conviene revisar
-          </h3>
-          <ul className="space-y-2">
+        <Notice tipo="aviso" title="Conviene revisar" titleAs="h3">
+          <ul className="space-y-2 mt-1">
             {avisos.map((a, i) => (
               <li key={i} className="flex items-start gap-3 text-xs">
-                <span className="text-fg-muted flex-1">{a.mensaje}{a.veces > 1 && <span className="text-fg-subtle"> ({a.veces} veces)</span>}</span>
-                {a.activo && <Link to={`/history?buscar=${encodeURIComponent(a.activo)}`} className="text-brand hover:underline shrink-0">Ver {a.activo} en Historial</Link>}
+                <span className="flex-1">{a.mensaje}{a.veces > 1 && <span className="text-fg-subtle"> ({a.veces} veces)</span>}</span>
+                {a.activo && <Link to={`/history?buscar=${encodeURIComponent(a.activo)}`} className="text-brand-ink hover:underline shrink-0">Ver {a.activo} en Historial</Link>}
               </li>
             ))}
             {faltanPrecios > 0 && (
               <li className="flex items-start gap-3 text-xs">
-                <span className="text-fg-muted flex-1">
+                <span className="flex-1">
                   {faltanPrecios === 1 ? 'No se encontró 1 precio histórico' : `No se encontraron ${fmt.format(faltanPrecios)} precios históricos`}
                   {sinPrecio.length > 0 && <>: {sinPrecio.slice(0, 6).map(p => `${p.activo} (${formatFiscalDate(p.fecha)})`).join(', ')}{faltanPrecios > 6 ? '…' : ''}</>}.
                   {' '}Esas operaciones se valoran sin precio hasta que lo haya.
                 </span>
-                <Link to="/settings?tab=assets" className="text-brand hover:underline shrink-0">Fuente de precios en Ajustes</Link>
+                <Link to="/settings?tab=assets" className="text-brand-ink hover:underline shrink-0">Fuente de precios en Ajustes</Link>
               </li>
             )}
           </ul>
-        </section>
+        </Notice>
       )}
 
       <div>

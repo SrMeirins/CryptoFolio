@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, ArrowDownToLine, Check, Eye, EyeOff, History, MapPin } from 'lucide-react'
+import { ArrowDownToLine, Check, Eye, EyeOff, History, MapPin } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
-import { buttonClasses } from '../../components/ui'
+import { buttonClasses, Notice } from '../../components/ui'
 import { DepositSection } from './DepositSection'
 import { AssignBar } from './AssignBar'
 import { WithdrawalAssetGroup } from './WithdrawalAssetGroup'
@@ -177,12 +177,11 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
         <p className="text-xs text-fg-subtle">Asigna el destino de cada retiro y el coste de cada depósito externo.</p>
 
         {coldWallets.length === 0 && withdrawals.length > 0 && (
-          <div className="flex items-center gap-2 text-xs text-warning-ink bg-warning/10 rounded-xl px-4 py-2.5 border border-warning/20">
-            <AlertTriangle size={12} className="shrink-0" aria-hidden="true" />
+          <Notice tipo="aviso" compact>
             {grupos.length > 0
               ? 'Aún no tienes wallets propias: usa «¿Es tuya? Guardar en mi wallet» en una dirección para crear la primera.'
-              : 'Sin wallets propias configuradas: solo están disponibles los destinos especiales. Puedes crearlas en Ajustes › Wallets.'}
-          </div>
+              : 'Sin wallets propias configuradas: solo están disponibles los destinos especiales. Puedes crearlas en Ajustes, sección Wallets.'}
+          </Notice>
         )}
 
         {withdrawals.length > 0 && (

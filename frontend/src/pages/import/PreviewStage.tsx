@@ -1,10 +1,10 @@
-import { AlertTriangle, Play, Info, CheckCircle2, Upload, History } from 'lucide-react'
+import { AlertTriangle, Play, CheckCircle2, Upload, History } from 'lucide-react'
 import { WithdrawalDestinations } from './WithdrawalDestinations'
 import { LANG_LABELS } from './types'
 import { UnknownOperationsCard } from './UnknownOperationsCard'
 import { TransactionsTable } from './TransactionsTable'
 import type { PreviewResult, DepositReview, ResultadoExistentes, WizardResult } from './types'
-import { cardClasses, buttonClasses } from '../../components/ui'
+import { cardClasses, buttonClasses, Notice } from '../../components/ui'
 import { loteIlegible, nadaQueImportar, newTransactions, newWithdrawals, txKey } from './reviewSelection'
 import { EXCHANGE_LABEL, textoPendiente } from './wizard'
 import { ExchangeBadge } from './ExchangeBadge'
@@ -235,16 +235,10 @@ export function PreviewStage({
         </div>
 
         {preview.validation.warnings.map((w, i) => (
-          <div key={i} className="flex items-start gap-2 p-3 bg-warning/5 border border-warning/20 rounded-lg text-xs text-warning">
-            <AlertTriangle size={13} className="shrink-0 mt-0.5" />
-            {w}
-          </div>
+          <Notice key={i} tipo="aviso" compact>{w}</Notice>
         ))}
         {preview.validation.info.map((msg, i) => (
-          <div key={i} className="flex items-start gap-2 p-3 bg-info/5 border border-info/20 rounded-lg text-xs text-info">
-            <Info size={13} className="shrink-0 mt-0.5" />
-            {msg}
-          </div>
+          <Notice key={i} tipo="informacion" compact>{msg}</Notice>
         ))}
       </div>
 
