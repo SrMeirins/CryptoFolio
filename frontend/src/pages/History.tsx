@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback, useMemo } from 'react'
-import { Package } from 'lucide-react'
 import type { Transaction } from '../api/portfolio'
 import { ManualTxModal } from '../components/ManualTxModal'
 import { useCurrency } from '../hooks/useDisplayCurrency'
@@ -18,7 +17,7 @@ import { HistoryTable } from './history/HistoryTable'
 import { HistoryPagination, PAGINATION_ID } from './history/HistoryPagination'
 import { StatsBar } from './history/StatsBar'
 import { AnalyticsPanel } from './history/AnalyticsPanel'
-import { Button, EmptyState, RefreshBar, Skeleton, SkeletonGroup } from '../components/ui'
+import { RefreshBar, Skeleton, SkeletonGroup, FilteredEmpty } from '../components/ui'
 import { HistoryHeader } from './history/HistoryHeader'
 import { TransactionDetailPanel } from './history/detail/TransactionDetailPanel'
 import { useDetailNavigation } from './history/detail/useDetailNavigation'
@@ -27,6 +26,7 @@ import { ShortfallBanner } from './history/balance/ShortfallBanner'
 import { selectedYear, stepYear, yearRange } from './history/keyboard/yearNav'
 import { useHistoryShortcuts } from './history/keyboard/useHistoryShortcuts'
 import { ShortcutsHelp } from './history/keyboard/ShortcutsHelp'
+import { FirstUseEmpty } from '../components/FirstUseEmpty'
 
 // Pestaña Historial: orquesta el estado de filtros (useHistoryFilters), los
 // datos (useHistoryData) y los bloques de UI de pages/history/ (#351).
@@ -151,11 +151,10 @@ export function History() {
               {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-10 w-full" />)}
             </SkeletonGroup>
           ) : d.transactions.length === 0 ? (
-            <EmptyState
-              icon={<Package size={28} aria-hidden="true" />}
-              title={f.hasActiveFilters ? 'Sin resultados para estos filtros.' : 'No hay transacciones. Importa un CSV para empezar.'}
-              action={f.hasActiveFilters && <Button variant="ghost" size="sm" onClick={f.clearFilters}>Limpiar filtros</Button>}
-            />
+            // Vacíos (#496): por filtros, con su resumen y «Quitar filtros»; sin filtros, primer uso.
+            f.hasActiveFilters
+              ? <FilteredEmpty summary={`Filtros: ${chips.map(c => c.label).join('; ')}.`} onClear={f.clearFilters} />
+              : <FirstUseEmpty what="aquí todas tus operaciones" onAdd={() => setShowNewTx(true)} />
           ) : (
             <HistoryTable transactions={d.transactions} sort={f.sort} onSort={f.toggleSort} currency={currency}
               searchTerm={f.filters.search} selectedId={f.focusTx} deletingId={d.deletingId}

@@ -8,7 +8,7 @@ import { heatmapCells, moverData, moversSummary, rankLabels, rankMovers, type Mo
 import { formatMoney, formatPercent, formatPrice } from '../../utils/format'
 import { useCurrency } from '../../hooks/useDisplayCurrency'
 import { T, alpha } from '../../utils/colors'
-import { SegmentedControl, PanelHeader, badgeClasses, panelSurface } from '../../components/ui'
+import { SegmentedControl, PanelHeader, badgeClasses, panelSurface, NotApplicable } from '../../components/ui'
 import { moversSubtitle } from '../../utils/panelSubtitles'
 import { Activity } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -83,7 +83,15 @@ export function TopMovers({ lots }: { lots: FifoLot[] }) {
   const labels = rankLabels(data, top, bottom)
   const summary = moversSummary(data)
 
-  if (lots.length === 0) return null
+  // Sin posiciones (#496): el panel no desaparece; dice que no aplica.
+  if (lots.length === 0) {
+    return (
+      <div className={panelSurface('none', 'overflow-hidden')}>
+        <PanelHeader icon={Activity} title="Variación" className="px-5 py-4 border-b border-border" />
+        <NotApplicable>Sin posiciones abiertas que comparar.</NotApplicable>
+      </div>
+    )
+  }
 
   function changeMode(next: MoversMode) {
     setMode(next)
@@ -110,11 +118,11 @@ export function TopMovers({ lots }: { lots: FifoLot[] }) {
       />
 
       {top.length === 0 ? (
-        <p className="px-4 py-6 text-center text-xs text-fg-subtle">
+        <NotApplicable>
           {mode === '24h'
             ? 'Aún no hay precios de hace 24h. Aparecerán en cuanto lleguen del feed en vivo.'
             : 'No hay activos con valor suficiente para comparar.'}
-        </p>
+        </NotApplicable>
       ) : (
         <>
         <div className="px-5 pt-4 pb-4 space-y-3">

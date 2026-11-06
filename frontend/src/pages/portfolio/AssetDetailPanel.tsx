@@ -5,7 +5,7 @@ import { portfolioApi, type LockedAmount } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { BreakEvenCell } from '../../components/BreakEvenCell'
 import { PnlPill } from '../../components/AssetTableCells'
-import { Button, Drawer, Skeleton, iconButtonClasses, SkeletonGroup, TextTooltip } from '../../components/ui'
+import { Button, Drawer, Skeleton, iconButtonClasses, SkeletonGroup, TextTooltip, NotApplicable } from '../../components/ui'
 import { OP_META } from '../../constants/operations'
 import { formatAmount, formatMoney, formatPercent, formatPrice, pnlColor, type Currency } from '../../utils/format'
 import { usePricesStore } from '../../store/pricesStore'
@@ -200,7 +200,7 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
           <p className="text-[11px] text-fg-subtle">Se vende primero el lote más antiguo, esté en la wallet que esté (FIFO global); está marcado como «Siguiente».</p>
           {isLoading && <SkeletonGroup label="Cargando los lotes" className="space-y-2">{[0, 1, 2].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}</SkeletonGroup>}
           {isError && <p className="text-xs text-fg-subtle">No se pudieron cargar los lotes.</p>}
-          {data && lots.length === 0 && <p className="text-xs text-fg-subtle">No hay lotes abiertos.</p>}
+          {data && lots.length === 0 && <NotApplicable>No hay lotes abiertos.</NotApplicable>}
           <ul className="space-y-2">
             {lots.map((l, i) => (
               <li key={`${l.walletId}-${l.openedAt}-${i}`}

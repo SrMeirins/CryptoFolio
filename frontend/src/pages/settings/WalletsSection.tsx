@@ -17,7 +17,7 @@ import { useSettingFeedback } from '../../hooks/useSettingFeedback'
 import { formatMoney, formatNumber } from '../../utils/format'
 import { daysSince, formatAge } from '../../utils/portfolioLots'
 import { alpha, ink } from '../../utils/colors'
-import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses, SectionHeader } from '../../components/ui'
+import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses, SectionHeader, EmptyState, Button } from '../../components/ui'
 import { explorerLink } from '../../utils/externalLink'
 
 export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => void }) {
@@ -127,10 +127,10 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
 
       {/* Wallets de usuario */}
       {userWallets.length === 0 && !showAdd ? (
-        <div className="rounded-xl border border-dashed border-border p-10 text-center space-y-2">
-          <p className="text-sm text-fg-subtle">No tienes wallets configuradas.</p>
-          <button type="button" onClick={() => setShowAdd(true)} className="text-xs text-brand hover:underline">Crear primera wallet</button>
-        </div>
+        <EmptyState className="rounded-xl border border-dashed border-border" icon={<WalletIcon size={28} />}
+          title="No tienes wallets propias configuradas"
+          description="Solo hacen falta si retiras a wallets frías: así los traspasos no cuentan como ventas."
+          action={<Button size="sm" onClick={() => setShowAdd(true)}>Crear primera wallet</Button>} />
       ) : (
         <div className="space-y-3">
           {userWallets.map(wallet => {

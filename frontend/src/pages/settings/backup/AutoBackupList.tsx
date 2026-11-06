@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Download, RotateCcw, Loader2 } from 'lucide-react'
 import { backupApi, type AutoBackupFile } from '../../../api/backup'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
-import { iconButtonClasses } from '../../../components/ui'
+import { iconButtonClasses, NotApplicable } from '../../../components/ui'
 import { useToast } from '../../../hooks/useToast'
 import { formatBackupDate, formatBytes } from '../../../utils/backupFile'
 import { AutoBackupDownload } from './AutoBackupDownload'
@@ -37,7 +37,7 @@ export function AutoBackupList({ files }: { files: readonly AutoBackupFile[] }) 
     }
   }
 
-  if (files.length === 0) return <p className="text-xs text-fg-subtle">Aún no hay copias automáticas.</p>
+  if (files.length === 0) return <NotApplicable>Aún no hay copias automáticas.</NotApplicable>
 
   return (
     <>

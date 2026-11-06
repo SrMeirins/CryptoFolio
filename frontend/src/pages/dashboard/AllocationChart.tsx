@@ -9,7 +9,7 @@ import { formatMoney, formatPercent } from '../../utils/format'
 import { NEUTRAL_COLOR, allocationByAsset, allocationByWallet, assetColors, concentration, type AllocationItem, type AllocationMode } from '../../utils/allocation'
 import { allocationSubtitle } from '../../utils/panelSubtitles'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import { PanelHeader, SegmentedControl, badgeClasses, panelSurface, Hint } from '../../components/ui'
+import { PanelHeader, SegmentedControl, badgeClasses, panelSurface, Hint, NotApplicable } from '../../components/ui'
 
 // Distribución de la cartera (#235): anillo interactivo con el total en el
 // centro y lista con icono, peso, valor y variación 24 h. Se puede ver por
@@ -36,7 +36,15 @@ export function AllocationChart({ lots, fiatBalances }: { lots: FifoLot[]; fiatB
     [mode, assets, open24, lots, fiatBalances, prices, rate, dustThreshold],
   )
   const warn = mode === 'asset' ? concentration(items) : null
-  if (total === 0 || items.length === 0) return null
+  // Sin posiciones (#496): el panel no queda en blanco.
+  if (total === 0 || items.length === 0) {
+    return (
+      <div className={panelSurface('none', 'px-5 py-5 h-full')}>
+        <PanelHeader icon={PieChart} title="Distribución" className="mb-4" />
+        <NotApplicable>Sin posiciones abiertas que repartir.</NotApplicable>
+      </div>
+    )
+  }
 
   const activeItem = items.find(i => i.key === active) ?? null
   const changeMode = (m: AllocationMode) => { setMode(m); setActive(null); setOpen(null); try { localStorage.setItem(MODE_KEY, m) } catch { /* solo esta sesión */ } }

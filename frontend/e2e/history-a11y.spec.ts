@@ -143,7 +143,7 @@ test('filtro «Editadas» (#378): conmutador accesible, en la URL y con su chip'
   await boton.click()
   await expect(boton).toHaveAttribute('aria-pressed', 'true')
   await expect(page).toHaveURL(/[?&]editadas=1/)
-  await expect(page.getByText('Solo editadas')).toBeVisible()
+  await expect(page.getByText('Solo editadas', { exact: true })).toBeVisible()
 })
 
 test('panel de una importada editada (#378): cambios, restaurar con confirmación cancelable y axe', async ({ page }) => {

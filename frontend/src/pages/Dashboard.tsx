@@ -23,11 +23,14 @@ import { useLiveDayPnl } from '../hooks/useLiveDayPnl'
 import { usePreparacionHistoricos } from '../hooks/usePreparacionHistoricos'
 import { PageHeader, panelClasses, panelEnterStyle } from '../components/ui'
 import { navIcon } from '../constants/navigation'
+import { FirstUseEmpty } from '../components/FirstUseEmpty'
+import { useHasTransactions } from '../hooks/useHasTransactions'
 import { dashboardSubtitle } from '../utils/panelSubtitles'
 import { useNow } from '../hooks/useNow'
 import { pnlSparkline, returnSparkline, valueSparkline } from '../utils/sparkline'
 
 export function Dashboard() {
+  const firstUse = useHasTransactions()
   // Precios en la moneda de visualización (#177): en USD sin USDT aún, vacíos.
   const { currency, prices, open24, fiatOpen24 } = useDisplayMarket()
 
@@ -126,6 +129,16 @@ export function Dashboard() {
         : undefined,
     }
   })()
+
+  // Sin ninguna operación (#496): un único vacío de primer uso en lugar de los paneles en blanco.
+  if (firstUse.empty) {
+    return (
+      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+        <PageHeader icon={navIcon('/')} title="Dashboard" />
+        <FirstUseEmpty what="tu cartera, su evolución y el resumen fiscal" />
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
