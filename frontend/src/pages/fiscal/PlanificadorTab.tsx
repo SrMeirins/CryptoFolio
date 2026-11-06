@@ -4,7 +4,7 @@ import { Calculator, Hourglass, PiggyBank, Repeat, TrendingDown, TrendingUp } fr
 import { portfolioApi } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { SaleSimulatorModal } from '../../components/SaleSimulatorModal'
-import { buttonClasses, cardClasses, fieldClasses, Notice, Skeleton } from '../../components/ui'
+import { buttonClasses, cardClasses, fieldClasses, Notice, Skeleton, TextTooltip } from '../../components/ui'
 import { useDebounce } from '../../hooks/useDebounce'
 import { usePricesStore } from '../../store/pricesStore'
 import { ink } from '../../utils/colors'
@@ -31,9 +31,7 @@ function Fila({ s, nota, onSimular }: { s: Sugerencia; nota: React.ReactNode; on
             <span className="text-[11px] truncate" style={{ color: ink(s.walletColor) }}>{s.walletName}</span>
             {s.recompra && (
               <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-warning/10 text-warning-ink"
-                title="Compraste este activo en los últimos 2 meses: la pérdida podría no computar este año (art. 33.5 LIRPF)">
-                <Repeat size={10} aria-hidden="true" />recompra
-              </span>
+><TextTooltip label="Regla de recompra" tip="Compraste este activo en los últimos 2 meses: la pérdida podría no computar este año (art. 33.5 LIRPF)"><Repeat size={10} aria-hidden="true" />recompra</TextTooltip></span>
             )}
           </span>
           <span className="block text-[11px] text-fg-subtle">

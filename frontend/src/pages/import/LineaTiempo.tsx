@@ -4,6 +4,7 @@ import { lineaCombinada } from './lineaTiempo'
 import type { CoberturaExchange } from './types'
 import { formatFiscalDate } from '../../utils/fiscalTable'
 import { formatNumber } from '../../utils/format'
+import { Tooltip } from '../../components/ui'
 
 const f = formatFiscalDate
 const NOMBRE = { binance: 'Binance', bitvavo: 'Bitvavo' } as const
@@ -11,6 +12,8 @@ const RAYADO = 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--color
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic']
 const dias = (n: number) => `${n} ${n === 1 ? 'día' : 'días'}`
 const pos = (s: { left: number; width: number }) => ({ left: `${s.left}%`, width: `${s.width}%` })
+/** Disparador de una fila de la línea de tiempo: todo el ancho, 24 px de alto pulsable (WCAG 2.5.8) y foco visible. */
+const FILA_CLS = 'flex items-center w-full min-h-6 rounded-md cursor-help focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60'
 
 function Muestra({ estilo, clase = '', children }: { estilo?: React.CSSProperties; clase?: string; children: React.ReactNode }) {
   return (
@@ -45,45 +48,68 @@ export function LineaTiempo({ coberturas }: { coberturas: CoberturaExchange[] })
         {l.carriles.map(c => (
           <div key={c.exchange} className="contents">
             <span className="text-[11px] font-medium text-fg-muted truncate">{NOMBRE[c.exchange]}</span>
-            <div className="relative h-3 rounded-full bg-background-tertiary overflow-hidden" role="img"
-              aria-label={`${NOMBRE[c.exchange]}: ${c.tramos.map(t => `${f(t.desde)} – ${f(t.hasta)}`).join('; ')}${c.pendiente ? `; pendiente desde ${f(c.pendiente.desde)}` : ''}`}>
-              {c.tramos.map(t => (
-                <span key={t.desde} className="absolute inset-y-0 rounded-full" style={{ ...pos(seg(t.desde, t.hasta)), backgroundColor: DISTINTIVO[c.exchange].color }}
-                  title={`${NOMBRE[c.exchange]}: ${f(t.desde)} – ${f(t.hasta)} · ${formatNumber(t.transacciones, 0)} transacciones`} />
-              ))}
-              {c.huecos.map(h => (
-                <span key={h.desde} className={`absolute inset-y-0 ${h.revisionId ? 'opacity-40' : ''}`} style={{ ...pos(seg(h.desde, h.hasta)), backgroundImage: RAYADO }}
-                  title={`${NOMBRE[c.exchange]} sin transacciones: ${f(h.desde)} – ${f(h.hasta)} (${dias(h.dias)})${h.revisionId ? ' · revisado' : ''}`} />
-              ))}
-              {c.pendiente && (
-                <span className={`absolute inset-y-0 rounded-full border border-dashed ${c.pendiente.revisionId ? 'border-border' : 'border-warning/80'}`}
-                  style={pos(seg(c.pendiente.desde, c.pendiente.hasta))}
-                  title={`${NOMBRE[c.exchange]} pendiente de importar: ${f(c.pendiente.desde)} – hoy (${dias(c.pendiente.dias)})`} />
-              )}
-            </div>
+            {/* Una fila, un disparador (#495): el globo lista sus tramos, con teclado y al tocar. */}
+            <Tooltip label={NOMBRE[c.exchange]} className="w-full" triggerClassName={FILA_CLS}
+              triggerLabel={`${NOMBRE[c.exchange]}: ${c.tramos.map(t => `${f(t.desde)} a ${f(t.hasta)}`).join('; ')}${c.pendiente ? `; pendiente desde ${f(c.pendiente.desde)}` : ''}`}
+              trigger={
+                <span className="relative block w-full h-3 rounded-full bg-background-tertiary overflow-hidden">
+                  {c.tramos.map(t => (
+                    <span key={t.desde} className="absolute inset-y-0 rounded-full" style={{ ...pos(seg(t.desde, t.hasta)), backgroundColor: DISTINTIVO[c.exchange].color }} />
+                  ))}
+                  {c.huecos.map(h => (
+                    <span key={h.desde} className={`absolute inset-y-0 ${h.revisionId ? 'opacity-40' : ''}`} style={{ ...pos(seg(h.desde, h.hasta)), backgroundImage: RAYADO }} />
+                  ))}
+                  {c.pendiente && (
+                    <span className={`absolute inset-y-0 rounded-full border border-dashed ${c.pendiente.revisionId ? 'border-border' : 'border-warning/80'}`}
+                      style={pos(seg(c.pendiente.desde, c.pendiente.hasta))} />
+                  )}
+                </span>
+              }>
+              <ul className="space-y-1">
+                {c.tramos.map(t => <li key={t.desde}>{f(t.desde)} a {f(t.hasta)}: {formatNumber(t.transacciones, 0)} transacciones</li>)}
+                {c.huecos.map(h => <li key={h.desde}>Sin transacciones: {f(h.desde)} a {f(h.hasta)} ({dias(h.dias)}){h.revisionId ? ', revisado' : ''}</li>)}
+                {c.pendiente && <li>Pendiente de importar: {f(c.pendiente.desde)} a hoy ({dias(c.pendiente.dias)})</li>}
+              </ul>
+            </Tooltip>
           </div>
         ))}
 
         {l.nuevos.length > 0 && (
           <>
             <span className="text-[11px] text-fg-subtle">Nuevos</span>
-            <div className="relative h-1.5" aria-hidden="true">
-              {l.nuevos.map(n => {
-                const s = seg(n.desde, n.hasta)
-                return <span key={`${n.archivo}-${n.desde}`} className="absolute inset-y-0 rounded-full bg-brand-solid" style={{ left: `${s.left}%`, width: `${Math.max(s.width, 0.8)}%` }}
-                  title={`${n.archivo} (${NOMBRE[n.exchange]}): ${f(n.desde)} – ${f(n.hasta)}`} />
-              })}
-            </div>
+            <Tooltip label="Archivos nuevos" className="w-full" triggerClassName={FILA_CLS}
+              triggerLabel={`Archivos nuevos: ${l.nuevos.length}`}
+              trigger={
+                <span className="relative block w-full h-1.5">
+                  {l.nuevos.map(n => {
+                    const s = seg(n.desde, n.hasta)
+                    return <span key={`${n.archivo}-${n.desde}`} className="absolute inset-y-0 rounded-full bg-brand-solid" style={{ left: `${s.left}%`, width: `${Math.max(s.width, 0.8)}%` }} />
+                  })}
+                </span>
+              }>
+              <ul className="space-y-1">
+                {l.nuevos.map(n => <li key={`${n.archivo}-${n.desde}`}><span className="break-all">{n.archivo}</span> ({NOMBRE[n.exchange]}): {f(n.desde)} a {f(n.hasta)}</li>)}
+              </ul>
+            </Tooltip>
           </>
         )}
 
         <span className="text-[11px] text-fg-subtle">Actividad</span>
-        <div className="flex h-2 gap-px" aria-hidden="true">
-          {l.meses.map(m => (
-            <span key={m.mes} className="flex-1 rounded-[1px] bg-brand" style={{ opacity: m.nivel === 0 ? 0.08 : 0.2 + m.nivel * 0.2 }}
-              title={`${MESES[Number(m.mes.slice(5, 7)) - 1]} ${m.mes.slice(0, 4)}: ${m.total} transacciones${m.porExchange.binance && m.porExchange.bitvavo ? ` (Binance ${m.porExchange.binance}, Bitvavo ${m.porExchange.bitvavo})` : ''}`} />
-          ))}
-        </div>
+        <Tooltip label="Actividad por mes" className="w-full" triggerClassName={FILA_CLS}
+          triggerLabel="Actividad por mes"
+          trigger={
+            <span className="flex w-full h-2 gap-px">
+              {l.meses.map(m => (
+                <span key={m.mes} className="flex-1 rounded-[1px] bg-brand" style={{ opacity: m.nivel === 0 ? 0.08 : 0.2 + m.nivel * 0.2 }} />
+              ))}
+            </span>
+          }>
+          <p>
+            {l.meses.filter(m => m.total > 0).map(m =>
+              `${MESES[Number(m.mes.slice(5, 7)) - 1]} ${m.mes.slice(0, 4)}: ${m.total}${m.porExchange.binance && m.porExchange.bitvavo ? ` (Binance ${m.porExchange.binance}, Bitvavo ${m.porExchange.bitvavo})` : ''}`,
+            ).join(' · ') || 'Sin transacciones en el periodo.'}
+          </p>
+        </Tooltip>
 
         <span />
         <div className="relative h-4 text-[10px] text-fg-subtle" aria-hidden="true">

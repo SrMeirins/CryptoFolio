@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react'
 import type { PendingDeposit } from './PendingDepositsPanel'
-import { badgeClasses, fieldClasses } from '../../components/ui'
+import { badgeClasses, fieldClasses, Hint } from '../../components/ui'
 import { formatNumber } from '../../utils/format'
 
 export function PendingDepositRow({ dep, cost, isReviewed, onChangeCost, onUseHistorical, onToggleUnknown }: {
@@ -59,14 +59,15 @@ export function PendingDepositRow({ dep, cost, isReviewed, onChangeCost, onUseHi
               className={fieldClasses('md', false, 'flex-1 bg-background-primary py-1.5 mono')}
             />
             {dep.historicalPrice != null && (
-              <button
-                type="button"
-                onClick={onUseHistorical}
-                title="Precio de mercado en esa fecha — puede no coincidir con lo que pagaste realmente. Corrígelo si sabes tu coste real."
-                className="text-xs px-3 py-1.5 bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand-ink rounded-lg transition-colors whitespace-nowrap"
-              >
-                {formatNumber(dep.historicalPrice, 4)} € (mercado, estimación)
-              </button>
+              <Hint label="Precio de mercado en esa fecha: puede no coincidir con lo que pagaste realmente. Corrígelo si sabes tu coste real.">
+                <button
+                  type="button"
+                  onClick={onUseHistorical}
+                  className="text-xs px-3 py-1.5 bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand-ink rounded-lg transition-colors whitespace-nowrap"
+                >
+                  {formatNumber(dep.historicalPrice, 4)} € (mercado, estimación)
+                </button>
+              </Hint>
             )}
             <button
               type="button"

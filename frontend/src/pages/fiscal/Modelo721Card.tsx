@@ -6,7 +6,7 @@ import { AlertTriangle, ChevronRight, Download, FileCheck2, Landmark, ShieldChec
 import { formatEur, formatPercent, formatPrice } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { InfoTooltip } from '../../components/InfoTooltip'
-import { buttonClasses, fieldClasses, Notice, panelSurface } from '../../components/ui'
+import { buttonClasses, fieldClasses, Notice, panelSurface, Hint } from '../../components/ui'
 import { usePrivacyStore } from '../../store/privacyStore'
 import { ink } from '../../utils/colors'
 import { formatFiscalDate, formatFiscalQty } from '../../utils/fiscalTable'
@@ -108,9 +108,11 @@ function Presentado({ data, year }: { data: Modelo721; year: number }) {
     <Notice tipo="consejo" icon={FileCheck2} compact action={<>
       <label className="flex items-center gap-1.5">
         <span className="sr-only">Valor declarado en euros</span>
-        <input type="text" inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)} maxLength={16}
-          placeholder={formatEur(data.totalValorCustodia)} className={fieldClasses('sm', false, 'w-32 mono text-right')}
-          title="Por defecto, el valor en exchanges a 31 de diciembre" />
+        <Hint label="Por defecto, el valor en exchanges a 31 de diciembre">
+          <input type="text" inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)} maxLength={16}
+            placeholder={formatEur(data.totalValorCustodia)} className={fieldClasses('sm', false, 'w-32 mono text-right')}
+  />
+        </Hint>
       </label>
       <button type="button" onClick={() => marcar.mutate()} disabled={busy} className={buttonClasses('secondary', 'sm')}>Marcar como presentado</button>
     </>}>
@@ -159,11 +161,13 @@ export function Modelo721Card({ data: snapshot, activeYear }: { data: Modelo721;
               : <>Valoración a {formatFiscalDate(data.fecha)} · plazo del 1 de enero al 31 de marzo de {activeYear + 1}</>}
           </p>
         </div>
-        <button type="button" onClick={exportCsv} disabled={privacy || view.exchanges.length === 0}
-          className={buttonClasses('secondary', 'sm', 'flex gap-1')}
-          title={privacy ? 'Desactiva el modo privacidad para exportar' : 'Posiciones en exchanges por activo, para preparar el modelo'}>
-          <Download size={11} aria-hidden="true" /> CSV del 721
-        </button>
+        <Hint label={privacy ? 'Desactiva el modo privacidad para exportar' : 'Posiciones en exchanges por activo, para preparar el modelo'}>
+          <button type="button" onClick={exportCsv} disabled={privacy || view.exchanges.length === 0}
+            className={buttonClasses('secondary', 'sm', 'flex gap-1')}
+  >
+            <Download size={11} aria-hidden="true" /> CSV del 721
+          </button>
+        </Hint>
       </div>
 
       <div className="px-5 py-4 space-y-4">

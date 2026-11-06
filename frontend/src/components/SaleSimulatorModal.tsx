@@ -11,7 +11,7 @@ import { SaleSimulatorResults } from './SaleSimulatorResults'
 import { SaleSimulatorChart } from './SaleSimulatorChart'
 import { AnimatedNumber } from './AnimatedNumber'
 import { EurOnlyBadge } from './EurOnlyBadge'
-import { iconButtonClasses, Modal, Dropdown, SegmentedControl, Skeleton, SkeletonGroup } from './ui'
+import { iconButtonClasses, Modal, Dropdown, SegmentedControl, Skeleton, SkeletonGroup, Hint } from './ui'
 import { parseFeePct, readFeePct, saveFeePct, walletQuantities } from '../utils/saleSimulator'
 import { QTY_PCTS, curvePrices, pctOfWallet, priceScenarios, qtyForPct, saleBreakEven, walletBreakEven } from '../utils/saleSimulatorView'
 
@@ -225,12 +225,14 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose, ini
               <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Escenarios de precio">
                 {scenarios.map(s => {
                   const on = Math.abs((parseFloat(price) || 0) - s.price) < s.price * 1e-6
-                  return (
-                    <button key={s.key} type="button" aria-pressed={on} onClick={() => setPriceValue(s.price)} className={chipCls(on)}
-                      title={s.key === 'breakeven' ? 'Precio al que esta venta no gana ni pierde: coste de los lotes que se venden (FIFO) y la comisión' : undefined}>
+                  const chip = (
+                    <button key={s.key} type="button" aria-pressed={on} onClick={() => setPriceValue(s.price)} className={chipCls(on)}>
                       {s.label} <span className="mono opacity-75">{formatPrice(s.price)}</span>
                     </button>
                   )
+                  return s.key === 'breakeven'
+                    ? <Hint key={s.key} label="Precio al que esta venta no gana ni pierde: coste de los lotes que se venden (FIFO) y la comisión">{chip}</Hint>
+                    : chip
                 })}
               </div>
             </div>

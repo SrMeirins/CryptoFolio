@@ -13,7 +13,7 @@ import { AssetHealth } from './assets/AssetHealth'
 import { AssetEditDrawer } from './assets/AssetEditDrawer'
 import { matchesFilter, priceHealth, sortAssets, type AssetFilter, type SortColumn, type SortDirection } from './assets/assetRows'
 import { T, alpha, ink } from '../../utils/colors'
-import { Button, buttonClasses, fieldClasses, iconButtonClasses, panelSurface, Pagination, SectionHeader, Skeleton, SkeletonGroup } from '../../components/ui'
+import { Button, buttonClasses, fieldClasses, iconButtonClasses, panelSurface, Pagination, SectionHeader, Skeleton, SkeletonGroup, Hint } from '../../components/ui'
 import { paginate, type PageSize } from '../../utils/pagination'
 
 // Activos en Ajustes (#450): salud de los precios, filtros rápidos (también
@@ -145,13 +145,15 @@ export function AssetsSection() {
               const n = f.value === 'todos' ? assets.length : assets.filter(a => matchesFilter(a, priceOf(a), f.value)).length
               const activo = filtro === f.value
               return (
-                <button key={f.value} type="button" aria-pressed={activo} title={f.title}
-                  onClick={() => { setFiltro(f.value); setPage(1) }}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
-                    activo ? 'border-brand bg-brand/10 text-brand-ink' : 'border-border text-fg-muted hover:text-fg'}`}>
-                  {f.label}
-                  <span className={`mono text-[10px] px-1 rounded ${f.value === 'sin_precio' && n > 0 ? 'bg-negative/15 text-negative-ink' : 'bg-overlay/10'}`}>{n}</span>
-                </button>
+                <Hint key={f.value} label={f.title}>
+                  <button type="button" aria-pressed={activo}
+                    onClick={() => { setFiltro(f.value); setPage(1) }}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
+                      activo ? 'border-brand bg-brand/10 text-brand-ink' : 'border-border text-fg-muted hover:text-fg'}`}>
+                    {f.label}
+                    <span className={`mono text-[10px] px-1 rounded ${f.value === 'sin_precio' && n > 0 ? 'bg-negative/15 text-negative-ink' : 'bg-overlay/10'}`}>{n}</span>
+                  </button>
+                </Hint>
               )
             })}
           </div>

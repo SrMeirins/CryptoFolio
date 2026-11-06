@@ -25,15 +25,21 @@ const KIND_ICON: Record<string, LucideIcon> = {
 const hsl = (hue: number) => `hsl(${hue} 65% 55%)`
 
 /** Barra apilada con los activos principales y «otros», con leyenda corta (#283). */
-function Composition({ w }: { w: WalletSummary }) {
+/** Composición completa en texto: lector de pantalla y ayuda de la tarjeta (#495). */
+function compositionText(w: WalletSummary): string {
   const { top, others } = w.composition
-  const hues = distinctHues(top.map(p => assetHue(p.asset)))
-  const detail = [
+  return [
     ...top.map(p => `${p.asset} ${formatPercent(p.pct, 1)}`),
     ...(others.value > 0 ? [`Otros ${formatPercent(others.pct, 1)}`] : []),
   ].join(' · ')
+}
+
+function Composition({ w }: { w: WalletSummary }) {
+  const { top, others } = w.composition
+  const hues = distinctHues(top.map(p => assetHue(p.asset)))
+  const detail = compositionText(w)
   return (
-    <span className="block space-y-1" title={detail}>
+    <span className="block space-y-1">
       <span className="flex h-1.5 rounded-full overflow-hidden bg-overlay/6 gap-px" aria-hidden="true">
         {top.map((p, i) => (
           <span key={p.asset} className="h-full transition-[width] duration-500" style={{ width: `${p.pct}%`, backgroundColor: hsl(hues[i]) }} />
@@ -102,6 +108,7 @@ export function WalletCards({ wallets, selected, onSelect }: {
                   {ageDays !== null && <><dt className="text-fg-muted">Antigüedad media</dt><dd className="text-right">{formatAge(ageDays)}</dd></>}
                 </dl>
                 {pnlText && <p>P&L no realizado de sus posiciones con precio: <span className="mono">{pnlText}</span>.</p>}
+                {compositionText(w) && <p>Composición: <span className="mono">{compositionText(w)}</span>.</p>}
                 <p className="text-fg-muted">Pulsa la tarjeta para ver solo esta wallet en la tabla.</p>
               </>} />
           )

@@ -8,7 +8,7 @@ import { useClickOutside } from '../hooks/useClickOutside'
 import { useToast } from '../hooks/useToast'
 import { useBellStore } from '../store/bellStore'
 import { T, alpha, ink } from '../utils/colors'
-import { buttonClasses, cardClasses, iconButtonClasses } from './ui'
+import { buttonClasses, cardClasses, iconButtonClasses, Hint } from './ui'
 
 // Campana de avisos de la barra superior (#447): la lista completa de avisos
 // activos, cada uno con su acción y Descartar (oculto hasta que cambie su
@@ -63,18 +63,20 @@ export function NotificationsBell() {
 
   return (
     <div className="relative" ref={panelRef}>
-      <button ref={buttonRef} type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls={open ? 'panel-avisos' : undefined}
-        aria-label={total > 0 ? `Avisos del sistema: ${total}` : 'Avisos del sistema: ninguno'} title="Avisos del sistema"
-        className={`relative p-2 rounded-lg transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
-          open ? 'bg-background-tertiary text-fg' : 'text-fg-subtle hover:text-fg hover:bg-background-tertiary'}`}>
-        <Bell size={18} aria-hidden="true" />
-        {total > 0 && (
-          <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-0.5 rounded-full text-white flex items-center justify-center font-bold text-[10px]"
-            style={{ backgroundColor: badgeColor }}>
-            {total > 9 ? '9+' : total}
-          </span>
-        )}
-      </button>
+      <Hint label="Avisos del sistema">
+        <button ref={buttonRef} type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls={open ? 'panel-avisos' : undefined}
+          aria-label={total > 0 ? `Avisos del sistema: ${total}` : 'Avisos del sistema: ninguno'}
+          className={`relative p-2 rounded-lg transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
+            open ? 'bg-background-tertiary text-fg' : 'text-fg-subtle hover:text-fg hover:bg-background-tertiary'}`}>
+          <Bell size={18} aria-hidden="true" />
+          {total > 0 && (
+            <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-0.5 rounded-full text-white flex items-center justify-center font-bold text-[10px]"
+              style={{ backgroundColor: badgeColor }}>
+              {total > 9 ? '9+' : total}
+            </span>
+          )}
+        </button>
+      </Hint>
 
       {open && (
         <div id="panel-avisos" role="dialog" aria-label="Avisos del sistema"
@@ -128,10 +130,12 @@ export function NotificationsBell() {
                           )}
                         </div>
                       </div>
-                      <button type="button" onClick={() => void dismiss([n.id])} aria-label={`Descartar el aviso de ${n.category}`}
-                        title="Descartar hasta que cambie" className={iconButtonClasses('sm', false, 'shrink-0 self-start')}>
-                        <X size={12} aria-hidden="true" />
-                      </button>
+                      <Hint label="Descartar hasta que cambie">
+                        <button type="button" onClick={() => void dismiss([n.id])} aria-label={`Descartar el aviso de ${n.category}`}
+  className={iconButtonClasses('sm', false, 'shrink-0 self-start')}>
+                          <X size={12} aria-hidden="true" />
+                        </button>
+                      </Hint>
                     </li>
                   )
                 })}

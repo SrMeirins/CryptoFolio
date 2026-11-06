@@ -1,5 +1,5 @@
 import { useCurrency } from '../hooks/useDisplayCurrency'
-import { badgeClasses } from './ui'
+import { badgeClasses, TextTooltip } from './ui'
 
 const EUR_ONLY_TEXT = 'La fiscalidad se calcula y se muestra siempre en EUR, la moneda en la que se declara a la AEAT.'
 
@@ -12,11 +12,9 @@ export function EurOnlyBadge() {
   if (currency === 'EUR') return null
   return (
     <span
-      title={EUR_ONLY_TEXT}
+
       className={badgeClasses('warning', 'sm', 'text-[11px] font-semibold tracking-wide uppercase')}
-    >
-      En EUR
-      <span className="sr-only">: {EUR_ONLY_TEXT}</span>
-    </span>
+    ><TextTooltip label="En EUR" tip={EUR_ONLY_TEXT}>En EUR
+      <span className="sr-only">: {EUR_ONLY_TEXT}</span></TextTooltip></span>
   )
 }

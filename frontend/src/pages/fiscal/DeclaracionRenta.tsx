@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, FileCheck2 } from 'lucide-react'
 import { portfolioApi, type Declaracion } from '../../api/portfolio'
-import { buttonClasses, Notice } from '../../components/ui'
+import { buttonClasses, Notice, Hint } from '../../components/ui'
 import { formatEur } from '../../utils/format'
 import { formatFiscalDate } from '../../utils/fiscalTable'
 import { CAMPO_LABEL } from '../../utils/declaraciones'
@@ -39,8 +39,10 @@ export function DeclaracionRenta({ year, declaracion }: { year: number; declarac
     return (
       <Notice tipo="aviso" role="status" title={<>Renta de {year} declarada el {fecha}: las cifras han cambiado desde entonces</>}
         action={<>
-          <button type="button" onClick={() => marcar.mutate()} disabled={busy} className={buttonClasses('secondary', 'sm')}
-            title="Guarda las cifras actuales como las declaradas (p. ej. tras presentar una complementaria)">Actualizar marca</button>
+          <Hint label="Guarda las cifras actuales como las declaradas (p. ej. tras presentar una complementaria)">
+            <button type="button" onClick={() => marcar.mutate()} disabled={busy} className={buttonClasses('secondary', 'sm')}
+  >Actualizar marca</button>
+          </Hint>
           {quitarMarca}
         </>}>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">

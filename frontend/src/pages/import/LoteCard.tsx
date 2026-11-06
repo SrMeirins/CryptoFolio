@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, Copy, MinusCircle, X } from 'lucide-react'
-import { cardClasses } from '../../components/ui'
+import { cardClasses, TextTooltip } from '../../components/ui'
 import { formatNumber } from '../../utils/format'
 import { ExchangeBadge } from './ExchangeBadge'
 import { EXCHANGE_LABEL } from './wizard'
@@ -25,9 +25,7 @@ export function LoteCard({ archivos, repetidas, cambiando, onLeerComo, onQuitar 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 id="lote-titulo" className="text-sm font-medium text-fg">Archivos del lote <span className="text-fg-subtle font-normal">· {archivos.length}</span></h2>
         {repetidas > 0 && (
-          <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted" title="Filas que aparecen en más de un archivo: se importan una sola vez">
-            <Copy size={12} aria-hidden="true" /> {n(repetidas)} fila{repetidas !== 1 ? 's' : ''} repetida{repetidas !== 1 ? 's' : ''} entre archivos, contada{repetidas !== 1 ? 's' : ''} una vez
-          </span>
+          <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted"><TextTooltip label="Filas repetidas" tip="Filas que aparecen en más de un archivo: se importan una sola vez"><Copy size={12} aria-hidden="true" /> {n(repetidas)} fila{repetidas !== 1 ? 's' : ''} repetida{repetidas !== 1 ? 's' : ''} entre archivos, contada{repetidas !== 1 ? 's' : ''} una vez</TextTooltip></span>
         )}
       </div>
       <ul className="space-y-1.5">

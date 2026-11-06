@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { BadgeCheck, ChevronDown, ExternalLink, Network as NetworkIcon, Wallet } from 'lucide-react'
 import type { Network } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import { buttonClasses, Notice } from '../../components/ui'
+import { buttonClasses, Notice, TextTooltip } from '../../components/ui'
 import { ink } from '../../utils/colors'
 import { DireccionTag } from './DireccionTag'
 import { urlExplorador, type GrupoDireccion, type WalletReconocida } from './direcciones'
@@ -101,9 +101,7 @@ export function WithdrawalAddressGroup({ id, grupo, red, destinations, coldWalle
                 <CryptoIcon symbol={tx.asset} size={16} />
                 <span className="mono font-semibold text-negative">−{fmtAmt(tx.amountNet)} <span className="text-fg-subtle font-normal">{tx.asset}</span></span>
                 {tx.destino?.fee ? (
-                  <span className="text-fg-subtle" title="Comisión de red: se descuenta y cuenta como disposición; a destino llega el resto">
-                    llegan <span className="mono text-fg-muted">{fmtAmt(tx.amountNet - tx.destino.fee)}</span> · comisión <span className="mono text-fg-muted">{fmtAmt(tx.destino.fee)}</span>
-                  </span>
+                  <span className="text-fg-subtle"><TextTooltip label="Comisión de red" tip="Comisión de red: se descuenta y cuenta como disposición; a destino llega el resto">llegan <span className="mono text-fg-muted">{fmtAmt(tx.amountNet - tx.destino.fee)}</span> · comisión <span className="mono text-fg-muted">{fmtAmt(tx.destino.fee)}</span></TextTooltip></span>
                 ) : null}
                 <span className="text-fg-subtle">{tx.account}</span>
                 <span className="flex-1" />

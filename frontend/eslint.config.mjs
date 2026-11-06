@@ -24,6 +24,12 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-expressions': ['error', { allowTernary: true, allowShortCircuit: true }],
+      // #495: el title nativo no llega con teclado ni al tocar. Las explicaciones
+      // van en el Tooltip común (components/ui/Tooltip.tsx) o en texto visible.
+      'no-restricted-syntax': ['error', {
+        selector: "JSXOpeningElement[name.name=/^[a-z]/] > JSXAttribute[name.name='title']",
+        message: 'Sin title nativo (#495): usa el Tooltip común o texto visible, y aria-label si es un icono.',
+      }],
     },
   },
 );

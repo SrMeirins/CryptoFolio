@@ -1,6 +1,7 @@
 import { formatPercent, formatPrice, type Currency } from '../utils/format'
 import { breakEvenDistance } from '../utils/portfolioView'
 import { recoveryText } from '../utils/fxEffect'
+import { TextTooltip } from './ui'
 
 // Celda de break-even de Portfolio (#271): precio medio de compra y distancia
 // del precio actual. La barra tiene el break-even en el centro y crece hacia
@@ -16,8 +17,7 @@ export function BreakEvenCell({ price, avgPrice, currency }: { price: number; av
       : `${formatPercent(d.pct, 1, true)}; hace falta subir ${formatPercent(d.toRecover, 1)} para recuperar lo invertido. ${recoveryText(d.pct) ?? ''}`
     : 'Sin precio actual'
   return (
-    <div className="flex flex-col items-end gap-1" title={label}>
-      <span className="text-fg-muted">{formatPrice(avgPrice, currency)}</span>
+    <div className="flex flex-col items-end gap-1"><TextTooltip label="Precio medio" tip={label} className="flex flex-col items-end gap-1"><span className="text-fg-muted">{formatPrice(avgPrice, currency)}</span>
       {d && (
         <>
           <span className="relative block w-16 h-1.5 rounded-full bg-overlay/8" aria-hidden="true">
@@ -30,7 +30,6 @@ export function BreakEvenCell({ price, avgPrice, currency }: { price: number; av
             <span aria-hidden="true">{up ? formatPercent(d.pct, 1, true) : `+${formatPercent(d.toRecover, 1)} para recuperar`}</span>
           </span>
         </>
-      )}
-    </div>
+      )}</TextTooltip></div>
   )
 }

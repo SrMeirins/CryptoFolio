@@ -33,7 +33,7 @@ import { navIcon } from '../constants/navigation'
 import { PieMetodologia, type TemaMetodo } from '../components/metodologia'
 
 const VISTA_LABELS: Record<FiscalVista, string> = { resumen: 'Resumen', operaciones: 'Operaciones', modelo721: 'Modelo 721', planificar: 'Planificar' }
-const TAB_ITEMS = FISCAL_VISTAS.map((v, i) => ({ value: v, label: <span title={`Atajo: ${i + 1}`}>{VISTA_LABELS[v]}</span> }))
+const TAB_ITEMS = FISCAL_VISTAS.map((v, i) => ({ value: v, label: VISTA_LABELS[v], shortcut: String(i + 1) }))
 const ID_BASE = 'fiscal-vista'
 
 /** Tema de «Cómo calculamos» que abre el pie en cada vista (#493). */

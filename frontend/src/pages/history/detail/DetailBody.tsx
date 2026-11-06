@@ -11,6 +11,7 @@ import { ImportEditsSection } from './ImportEditsSection'
 import { OriginSection } from './OriginSection'
 import { OnchainSection } from './OnchainSection'
 import { fiscalLink, portfolioLink } from './detailLinks'
+import { TextTooltip } from '../../../components/ui'
 
 // Contenido del panel de detalle (#373): resumen y valoración, trazabilidad
 // FIFO, origen, datos on-chain y enlaces a Fiscal y Portfolio. Sin estado ni
@@ -46,10 +47,8 @@ export function DetailBody({ data, currency, onOpen, walletName = () => undefine
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
           <div><dt className="text-fg-subtle">Importe</dt><dd className="mono text-fg">{flowSign(tx.operation_type)}{formatAmount(tx.amount_net, 8)} {tx.asset}</dd></div>
           <div><dt className="text-fg-subtle">Valor</dt>
-            <dd className="mono text-fg" title={hint ?? undefined}>
-              {value === null ? '—' : `${tx.value_source === 'estimado' ? '≈ ' : ''}${formatMoney(value, currency)}`}
-              {hint && <span className="sr-only"> ({hint})</span>}
-            </dd></div>
+            <dd className="mono text-fg"><TextTooltip label="Importe estimado" tip={hint}>{value === null ? '—' : `${tx.value_source === 'estimado' ? '≈ ' : ''}${formatMoney(value, currency)}`}
+              {hint && <span className="sr-only"> ({hint})</span>}</TextTooltip></dd></div>
           {priceLine && <div><dt className="text-fg-subtle">Precio unitario</dt><dd className="mono text-fg">{priceLine}</dd></div>}
           <div><dt className="text-fg-subtle">Comisiones</dt><dd><FeeCell tx={tx} currency={currency} verbose /></dd></div>
           <div><dt className="text-fg-subtle">Wallet</dt><dd className="text-fg">{tx.wallet_name}{tx.account ? ` · ${tx.account}` : ''}</dd></div>

@@ -9,7 +9,7 @@ import { assetHue } from '../utils/assetInitials'
 import { Sparkline } from './Sparkline'
 import { CryptoIcon } from './CryptoIcon'
 import { T, alpha } from '../utils/colors'
-import { iconButtonClasses, tableRowClasses } from './ui'
+import { iconButtonClasses, tableRowClasses, Hint, Tooltip, TextTooltip } from './ui'
 import { useFlashOnChange, type FlashDirection } from '../hooks/useFlashOnChange'
 import { BreakEvenCell } from './BreakEvenCell'
 import { PnlPill, WeightCell } from './AssetTableCells'
@@ -106,11 +106,14 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
             {!expanded && (
               <div className="flex items-center gap-1 ml-1 flex-wrap">
                 {/* Un punto por wallet en lugar del chip de texto (#282) */}
-                {!hideWalletChips && row.wallets.length > 1 && row.wallets.map(w => (
-                  <span key={w.wallet_id} title={w.wallet_name}
-                    className="w-2 h-2 rounded-full shrink-0 ring-1 ring-overlay/20" style={{ backgroundColor: w.wallet_color }} />
-                ))}
-                {!hideWalletChips && row.wallets.length > 1 && <span className="sr-only">En {row.wallets.map(w => w.wallet_name).join(', ')}</span>}
+                {!hideWalletChips && row.wallets.length > 1 && (
+                  <Tooltip label="Wallets" triggerLabel={`En ${row.wallets.map(w => w.wallet_name).join(', ')}`}
+                    trigger={<span className="flex items-center gap-1">{row.wallets.map(w => (
+                      <span key={w.wallet_id} className="w-2 h-2 rounded-full shrink-0 ring-1 ring-overlay/20" style={{ backgroundColor: w.wallet_color }} />
+                    ))}</span>}>
+                    <ul className="space-y-1">{row.wallets.map(w => <li key={w.wallet_id}>{w.wallet_name}</li>)}</ul>
+                  </Tooltip>
+                )}
                 {lockedAmounts.length > 0 && (() => {
                   const onlyLaunchpool = lockedAmounts.every(l => l.lock_kind === 'launchpool')
                   return (
@@ -126,17 +129,21 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                 el cursor o con el foco (#282) y siempre en pantallas táctiles */}
             <div className="ml-auto flex items-center gap-0.5">
               {onOpen && (
-                <button type="button" onClick={e => { e.stopPropagation(); open() }} title="Detalle"
-                  aria-label={`Detalle de ${row.asset}`} className={iconButtonClasses('sm', false, 'opacity-60 group-hover/row:opacity-100 group-focus-within/row:opacity-100 transition-opacity')}>
-                  <PanelRight size={13} aria-hidden="true" />
-                </button>
+                <Hint label="Detalle">
+                  <button type="button" onClick={e => { e.stopPropagation(); open() }}
+                    aria-label={`Detalle de ${row.asset}`} className={iconButtonClasses('sm', false, 'opacity-60 group-hover/row:opacity-100 group-focus-within/row:opacity-100 transition-opacity')}>
+                    <PanelRight size={13} aria-hidden="true" />
+                  </button>
+                </Hint>
               )}
               <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100">
               {onSimulate && (
-                <button type="button" onClick={e => { e.stopPropagation(); onSimulate(row.asset, row.totalQuantity) }}
-                  className={iconButtonClasses('sm', false, '', 'brand')} title="Simular venta (s)" aria-label={`Simular venta de ${row.asset}`}>
-                  <Calculator size={13} aria-hidden="true" />
-                </button>
+                <Hint label="Simular venta (s)">
+                  <button type="button" onClick={e => { e.stopPropagation(); onSimulate(row.asset, row.totalQuantity) }}
+                    className={iconButtonClasses('sm', false, '', 'brand')} aria-label={`Simular venta de ${row.asset}`}>
+                    <Calculator size={13} aria-hidden="true" />
+                  </button>
+                </Hint>
               )}
               <Link to={`/history?buscar=${encodeURIComponent(row.asset)}`} onClick={e => e.stopPropagation()}
                 title="Historial" aria-label={`Historial de ${row.asset}`} className={iconButtonClasses('sm')}>
@@ -157,16 +164,14 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
               <span className={`rounded px-0.5 ${flashClass(priceFlash)}`}>{formatPrice(price, currency)}</span>
               {change24h !== null && (
                 // Mismo chip que la tarjeta Valor del Dashboard (#247): ventana visible.
-                <span title="Variación respecto al precio de hace 24 horas"
+                <span
                   className={`inline-flex items-center gap-1 text-[11px] leading-none font-semibold px-1.5 py-0.5 rounded-md border ${
                   change24h >= 0
                     ? 'text-positive-ink bg-positive/8 border-positive/25'
                     : 'text-negative-ink bg-negative/8 border-negative/25'
-                }`}>
-                  <span className="font-medium">24 h</span>
+                }`}><TextTooltip label="Variación 24 h" tip="Variación respecto al precio de hace 24 horas"><span className="font-medium">24 h</span>
                   <span aria-hidden="true">{change24h >= 0 ? '▲' : '▼'}</span>
-                  {formatPercent(change24h, 2, true)}
-                </span>
+                  {formatPercent(change24h, 2, true)}</TextTooltip></span>
               )}
             </div>
           ) : (

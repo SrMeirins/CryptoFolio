@@ -6,7 +6,7 @@ import { formatMoney, formatAmount, type Currency } from '../../utils/format'
 import { opMetaOf, type OpLike } from '../../constants/operations'
 import { fmtDate, calcEurValue, formatPriceLine, toDisplayAmount, valuationHint, rowFlowSign, walletFlow, fiatSideNote } from './helpers'
 import { T, alpha, ink } from '../../utils/colors'
-import { iconButtonClasses } from '../../components/ui'
+import { iconButtonClasses, Hint, TextTooltip } from '../../components/ui'
 import { DeleteConfirm } from './DeleteConfirm'
 import { FeeCell } from './FeeCell'
 import { BalanceCell } from './balance/BalanceCell'
@@ -25,21 +25,17 @@ function Highlight({ text, query }: { text: string; query: string }) {
 }
 
 /** Importe con su marca de estimación (≈) o «—» sin precio, con el motivo como texto accesible (#346). */
-function ValuedAmount({ value, hint, currency, className }: {
-  value: number | null; hint: string | null; currency: Currency; className: string
+function ValuedAmount({ value, hint, currency, className, tabIndex }: {
+  value: number | null; hint: string | null; currency: Currency; className: string; tabIndex?: number
 }) {
   if (value == null) {
     return (
-      <span className="text-fg-subtle text-xs" title={hint ?? undefined}>
-        <span aria-hidden="true">—</span>{hint && <span className="sr-only">{hint}</span>}
-      </span>
+      <span className="text-fg-subtle text-xs"><TextTooltip label="Sin precio" tip={hint} tabIndex={tabIndex}><span aria-hidden="true">—</span>{hint && <span className="sr-only">{hint}</span>}</TextTooltip></span>
     )
   }
   return (
-    <span className={className} title={hint ?? undefined}>
-      {hint && <span aria-hidden="true">≈ </span>}{formatMoney(value, currency)}
-      {hint && <span className="sr-only"> ({hint})</span>}
-    </span>
+    <span className={className}><TextTooltip label="Importe estimado" tip={hint} tabIndex={tabIndex}>{hint && <span aria-hidden="true">≈ </span>}{formatMoney(value, currency)}
+      {hint && <span className="sr-only"> ({hint})</span>}</TextTooltip></span>
   )
 }
 
@@ -128,14 +124,10 @@ export function TxRow({
           <div className="flex items-center gap-1.5">
             <OpChip tx={tx} />
             {tx.manually_added && (
-              <span className="text-xs px-1 py-0.5 rounded-lg bg-brand/15 text-brand-ink font-bold shrink-0" title="Añadida manualmente">
-                <span aria-hidden="true">M</span><span className="sr-only">Añadida manualmente</span>
-              </span>
+              <span className="text-xs px-1 py-0.5 rounded-lg bg-brand/15 text-brand-ink font-bold shrink-0"><TextTooltip label="Añadida manualmente" tip="Añadida manualmente" tabIndex={tabbable ? undefined : -1}><span aria-hidden="true">M</span><span className="sr-only">Añadida manualmente</span></TextTooltip></span>
             )}
             {tx.original_import && (
-              <span className="text-xs px-1 py-0.5 rounded-lg bg-warning/15 text-warning-ink font-bold shrink-0" title="Importada y editada a mano">
-                <span aria-hidden="true">E</span><span className="sr-only">Importada y editada a mano</span>
-              </span>
+              <span className="text-xs px-1 py-0.5 rounded-lg bg-warning/15 text-warning-ink font-bold shrink-0"><TextTooltip label="Editada a mano" tip="Importada y editada a mano" tabIndex={tabbable ? undefined : -1}><span aria-hidden="true">E</span><span className="sr-only">Importada y editada a mano</span></TextTooltip></span>
             )}
           </div>
           {/* Registrada al revés por el exchange (#416): qué es en realidad. */}
@@ -165,7 +157,7 @@ export function TxRow({
         {/* Valor en la moneda de visualización */}
         <td className="px-3 py-2.5 text-right align-middle">
           <div>
-            <ValuedAmount value={eurValue} hint={valueHint} currency={currency}
+            <ValuedAmount value={eurValue} hint={valueHint} currency={currency} tabIndex={tabbable ? undefined : -1}
               className={`text-sm mono font-semibold ${tx.value_source === 'estimado' ? 'text-fg-muted' : 'text-fg'}`} />
           </div>
           {eurValue != null && priceLine && <div className="text-xs text-fg-subtle mono mt-0.5">@ {priceLine}</div>}
@@ -173,7 +165,7 @@ export function TxRow({
 
         {/* Fee: propia y agrupadas (#371) */}
         <td className="px-3 py-2.5 align-middle">
-          <FeeCell tx={tx} currency={currency} paidElsewhere={flow === 'entrada'} />
+          <FeeCell tx={tx} currency={currency} paidElsewhere={flow === 'entrada'} tabIndex={tabbable ? undefined : -1} />
         </td>
 
         {/* Wallet */}
@@ -208,7 +200,7 @@ export function TxRow({
         </td>
 
         {/* Saldo del activo filtrado (#380) */}
-        {balance && <BalanceCell value={balance.value} asset={balance.asset} />}
+        {balance && <BalanceCell value={balance.value} asset={balance.asset} tabIndex={tabbable ? undefined : -1} />}
 
         {/* Acciones */}
         <td className="px-3 py-2.5 align-middle" onClick={e => e.stopPropagation()}>
@@ -217,27 +209,33 @@ export function TxRow({
               // Ocultas en reposo, pero visibles con hover, con foco dentro de la
               // fila y siempre en pantallas táctiles, donde no hay hover (#351).
               <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity flex gap-0.5">
-                <button type="button" onClick={() => onEdit(tx)} tabIndex={tabbable ? undefined : -1}
-                  className={iconButtonClasses('md', false, '', 'brand')}
-                  title="Editar transacción" aria-label="Editar transacción">
-                  <PenLine size={12} aria-hidden="true" />
-                </button>
-                {tx.manually_added && (
-                  <button type="button" ref={deleteRef} onClick={() => setConfirmDelete(true)} tabIndex={tabbable ? undefined : -1}
-                    className={iconButtonClasses('md', false, '', 'danger')}
-                    title="Eliminar transacción" aria-label="Eliminar transacción">
-                    <Trash2 size={12} aria-hidden="true" />
+                <Hint label="Editar transacción">
+                  <button type="button" onClick={() => onEdit(tx)} tabIndex={tabbable ? undefined : -1}
+                    className={iconButtonClasses('md', false, '', 'brand')}
+  aria-label="Editar transacción">
+                    <PenLine size={12} aria-hidden="true" />
                   </button>
+                </Hint>
+                {tx.manually_added && (
+                  <Hint label="Eliminar transacción">
+                    <button type="button" ref={deleteRef} onClick={() => setConfirmDelete(true)} tabIndex={tabbable ? undefined : -1}
+                      className={iconButtonClasses('md', false, '', 'danger')}
+  aria-label="Eliminar transacción">
+                      <Trash2 size={12} aria-hidden="true" />
+                    </button>
+                  </Hint>
                 )}
               </div>
             )}
             {tx.manually_added && confirmDelete && (
               <DeleteConfirm onConfirm={() => onDelete(tx.id)} onCancel={cancelDelete} isDeleting={isDeleting} />
             )}
-            <button type="button" onClick={() => onOpen(tx.id)} aria-haspopup="dialog" tabIndex={tabbable ? undefined : -1}
-              className={iconButtonClasses('sm')} title="Ver detalle" aria-label="Ver detalle">
-              <PanelRightOpen size={12} aria-hidden="true" />
-            </button>
+            <Hint label="Ver detalle">
+              <button type="button" onClick={() => onOpen(tx.id)} aria-haspopup="dialog" tabIndex={tabbable ? undefined : -1}
+                className={iconButtonClasses('sm')} aria-label="Ver detalle">
+                <PanelRightOpen size={12} aria-hidden="true" />
+              </button>
+            </Hint>
           </div>
         </td>
       </tr>

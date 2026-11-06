@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { optionForKey } from '../../utils/segmented'
 import { segmentClasses, segmentThumbClasses, type SegmentedSize, type SegmentedVariant } from './classes'
+import { Hint } from './Tooltip'
 
 // Selector segmentado (#199): elegir un valor entre pocas opciones (moneda,
 // tema, periodo, 24h/Total…). Patrón radiogroup del WAI-ARIA: Tab entra en la
@@ -73,13 +74,15 @@ export function SegmentedControl<T extends string>({
         const active = opt.value === value
         // Sin opción activa (p. ej. un rango personalizado elegido fuera), la primera recibe el foco con Tab.
         const focusable = active || (i === 0 && !values.includes(value))
-        return (
+        const button = (
           <button key={opt.value} ref={el => { refs.current[opt.value] = el }} type="button" role="radio"
-            aria-checked={active} aria-label={opt.title} title={opt.title} tabIndex={focusable ? 0 : -1} disabled={disabled}
+            aria-checked={active} aria-label={opt.title} tabIndex={focusable ? 0 : -1} disabled={disabled}
             onClick={() => onChange(opt.value)} className={segmentClasses(active, size, variant)}>
             {opt.label}
           </button>
         )
+        // Una opción con descripción la muestra en un Hint (#495), no en un title nativo.
+        return opt.title ? <Hint key={opt.value} label={opt.title}>{button}</Hint> : button
       })}
     </div>
   )

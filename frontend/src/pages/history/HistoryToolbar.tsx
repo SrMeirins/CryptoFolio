@@ -2,7 +2,7 @@ import { forwardRef, useState, type ReactNode } from 'react'
 import { YearSelector } from './keyboard/YearSelector'
 import { PenLine, Link2, Layers, FilePen, Keyboard, SlidersHorizontal, ChevronDown } from 'lucide-react'
 import { DateRangePicker } from '../../components/DateRangePicker'
-import { Dropdown, MultiDropdown, iconButtonClasses } from '../../components/ui'
+import { Dropdown, MultiDropdown, iconButtonClasses, Hint } from '../../components/ui'
 import { fmtShort } from '../../utils/date'
 import { typeOptions } from './filterChips'
 import { AmountRange } from './AmountRange'
@@ -23,13 +23,14 @@ function Toggle({ pressed, onClick, icon, children, title, tone = 'brand' }: {
 }) {
   const on = tone === 'warning' ? 'bg-warning/10 border-warning/40 text-warning-ink' : 'bg-brand/10 border-brand/40 text-brand-ink'
   const hover = tone === 'warning' ? 'hover:border-warning/30' : 'hover:border-brand/30'
-  return (
-    <button type="button" onClick={onClick} aria-pressed={pressed} title={title}
+  const button = (
+    <button type="button" onClick={onClick} aria-pressed={pressed}
       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
         pressed ? on : `bg-background-tertiary border-border text-fg-muted ${hover}`}`}>
       {icon} {children}
     </button>
   )
+  return title ? <Hint label={title}>{button}</Hint> : button
 }
 
 export const HistoryToolbar = forwardRef<HTMLInputElement, {
@@ -85,14 +86,18 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
         </button>
 
         <span className="ml-auto flex items-center gap-1">
-          <button type="button" onClick={onHelp} title="Atajos de teclado (?)" aria-keyshortcuts="?"
-            className={iconButtonClasses('md')} aria-label="Atajos de teclado">
-            <Keyboard size={13} aria-hidden="true" />
-          </button>
-          <button type="button" onClick={onCopyLink} title="Copiar el enlace de esta vista"
-            className={iconButtonClasses('md')} aria-label="Copiar el enlace de esta vista">
-            <Link2 size={13} aria-hidden="true" />
-          </button>
+          <Hint label="Atajos de teclado (?)">
+            <button type="button" onClick={onHelp} aria-keyshortcuts="?"
+              className={iconButtonClasses('md')} aria-label="Atajos de teclado">
+              <Keyboard size={13} aria-hidden="true" />
+            </button>
+          </Hint>
+          <Hint label="Copiar el enlace de esta vista">
+            <button type="button" onClick={onCopyLink}
+              className={iconButtonClasses('md')} aria-label="Copiar el enlace de esta vista">
+              <Link2 size={13} aria-hidden="true" />
+            </button>
+          </Hint>
         </span>
       </div>
 

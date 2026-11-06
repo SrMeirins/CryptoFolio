@@ -5,7 +5,7 @@ import { portfolioApi, type LockedAmount } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { BreakEvenCell } from '../../components/BreakEvenCell'
 import { PnlPill } from '../../components/AssetTableCells'
-import { Button, Drawer, Skeleton, iconButtonClasses, SkeletonGroup } from '../../components/ui'
+import { Button, Drawer, Skeleton, iconButtonClasses, SkeletonGroup, TextTooltip } from '../../components/ui'
 import { OP_META } from '../../constants/operations'
 import { formatAmount, formatMoney, formatPercent, formatPrice, pnlColor, type Currency } from '../../utils/format'
 import { usePricesStore } from '../../store/pricesStore'
@@ -207,14 +207,12 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
                 className={`rounded-xl border px-3 py-2.5 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 ${l.next ? 'border-brand/40 bg-brand/5' : 'border-border'}`}>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0 text-xs">
                   {/* Antigüedad en palabras y fecha completa; detalle exacto en el tooltip (#289) */}
-                  <time dateTime={l.openedAt} title={lotDateDetail(l.openedAt, l.ageDays)} className="whitespace-nowrap">
-                    <span className="text-fg">{formatAge(l.ageDays)}</span>
-                    <span className="text-fg-subtle"> · {formatLotDate(l.openedAt)}</span>
-                  </time>
+                  <time dateTime={l.openedAt} className="whitespace-nowrap"><TextTooltip label="Fecha de compra" tip={lotDateDetail(l.openedAt, l.ageDays)}><span className="text-fg">{formatAge(l.ageDays)}</span>
+                    <span className="text-fg-subtle"> · {formatLotDate(l.openedAt)}</span></TextTooltip></time>
                   <span className="truncate max-w-full" style={{ color: ink(l.walletColor) }}>{l.walletName}</span>
                   {l.next && (
                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-brand/12 text-brand-ink shrink-0"
-                      title="Es el primero que se vendería, desde cualquier wallet (FIFO global)">Siguiente</span>
+><TextTooltip label="Siguiente lote" tip="Es el primero que se vendería, desde cualquier wallet (FIFO global)">Siguiente</TextTooltip></span>
                   )}
                 </div>
                 <div className="text-right mono tabular-nums text-xs">
@@ -223,7 +221,7 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
                     : <span className="text-fg-subtle">—</span>}
                 </div>
                 <div className="text-[11px] text-fg-subtle mono tabular-nums truncate">
-                  {formatAmount(l.quantity)}{l.partial && <span title="Ya se vendió una parte del lote"> de {formatAmount(l.quantityOriginal)}</span>}
+                  {formatAmount(l.quantity)}{l.partial && <span><TextTooltip label="Lote parcial" tip="Ya se vendió una parte del lote">de {formatAmount(l.quantityOriginal)}</TextTooltip></span>}
                   {' × '}{formatPrice(l.unitCost, currency)} = {formatMoney(l.cost, currency)}
                   <span className="ml-1.5">· {lotSourceLabel(l.source, OP_META)}</span>
                 </div>

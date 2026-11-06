@@ -2,6 +2,7 @@ import type { Transaction } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { formatAmount, formatMoney, type Currency } from '../../utils/format'
 import { feeSummary } from './helpers'
+import { TextTooltip } from '../../components/ui'
 
 /**
  * Celda «Fee» del Historial (#371): la comisión propia de la operación y, con
@@ -9,8 +10,10 @@ import { feeSummary } from './helpers'
  * comisiones». El desglose está en el detalle de la fila. En una entrada desde
  * otra wallet propia (#395) se atenúa: la pagó la wallet de origen.
  */
-export function FeeCell({ tx, currency, paidElsewhere = false, verbose = false }: {
+export function FeeCell({ tx, currency, paidElsewhere = false, verbose = false, tabIndex }: {
   tx: Transaction; currency: Currency; paidElsewhere?: boolean
+  /** tabIndex de las ayudas: sigue la tabulación itinerante de la fila (#495). */
+  tabIndex?: number
   /** Texto largo («incluida en el coste») para el panel de detalle (#415). */
   verbose?: boolean
 }) {
@@ -19,9 +22,7 @@ export function FeeCell({ tx, currency, paidElsewhere = false, verbose = false }
   // Comisión dentro del precio (#431): el exchange no la desglosa; se dice, sin cifra.
   if (s.count === 0 && included <= 0 && tx.fee_in_price) {
     return (
-      <span className="text-xs text-fg-subtle" title={`${tx.fee_in_price}: el exchange no desglosa la comisión`}>
-        {verbose ? `Incluida en el precio (${tx.fee_in_price}); el exchange no la desglosa` : 'en el precio'}
-      </span>
+      <span className="text-xs text-fg-subtle"><TextTooltip label="Comisión" tip={`${tx.fee_in_price}: el exchange no desglosa la comisión`} tabIndex={tabIndex}>{verbose ? `Incluida en el precio (${tx.fee_in_price}); el exchange no la desglosa` : 'en el precio'}</TextTooltip></span>
     )
   }
   if (s.count === 0 && included <= 0) return <span className="text-fg-subtle text-xs">—</span>
@@ -46,10 +47,8 @@ export function FeeCell({ tx, currency, paidElsewhere = false, verbose = false }
           </div>
         )}
         {s.total !== null && (
-          <div className="text-xs text-fg-subtle mono" title={hint ?? undefined}>
-            {s.estimated && <span aria-hidden="true">≈ </span>}{formatMoney(s.total, currency)}
-            {hint && <span className="sr-only"> ({hint})</span>}
-          </div>
+          <div className="text-xs text-fg-subtle mono"><TextTooltip label="Comisión" tip={hint} tabIndex={tabIndex}>{s.estimated && <span aria-hidden="true">≈ </span>}{formatMoney(s.total, currency)}
+            {hint && <span className="sr-only"> ({hint})</span>}</TextTooltip></div>
         )}
         {grouped > 0 && (
           <div className="text-[11px] text-fg-subtle">+{grouped} {grouped === 1 ? 'comisión' : 'comisiones'}</div>
