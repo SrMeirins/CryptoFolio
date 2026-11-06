@@ -49,6 +49,8 @@ test.describe('StatStrip y StatCard (#490)', () => {
     await soloLectura(page)
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto('/__componentes')
+    // La página es diferida: se espera a las tres tarjetas antes de medirlas.
+    await expect(page.locator('.stat-card')).toHaveCount(3)
     const alturas = await page.locator('.stat-card').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().height)))
     expect(new Set(alturas).size).toBe(1)
   })
