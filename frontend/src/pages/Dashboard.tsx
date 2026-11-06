@@ -21,7 +21,8 @@ import { localToday } from '../utils/pnlChart'
 import { monthRange, ymOf } from '../utils/pnlCalendar'
 import { useLiveDayPnl } from '../hooks/useLiveDayPnl'
 import { usePreparacionHistoricos } from '../hooks/usePreparacionHistoricos'
-import { PageHeader, panelClasses, panelEnterStyle } from '../components/ui'
+import { PageHeader, panelClasses, panelEnterStyle, QueryError } from '../components/ui'
+import { failure } from '../utils/queryFailure'
 import { navIcon } from '../constants/navigation'
 import { FirstUseEmpty } from '../components/FirstUseEmpty'
 import { useHasTransactions } from '../hooks/useHasTransactions'
@@ -34,24 +35,28 @@ export function Dashboard() {
   // Precios en la moneda de visualización (#177): en USD sin USDT aún, vacíos.
   const { currency, prices, open24, fiatOpen24 } = useDisplayMarket()
 
-  const { data: lots = [], isLoading: lotsLoading } = useQuery({
+  const lotsQ = useQuery({
     queryKey: ['fifo-lots'],
     queryFn: portfolioApi.getLots,
     refetchInterval: 60_000,
   })
+  const { data: lots = [], isLoading: lotsLoading } = lotsQ
 
-  const { data: fiscal = [] } = useQuery({
+  const fiscalQ = useQuery({
     queryKey: ['fiscal-summary'],
     queryFn: portfolioApi.getFiscalSummary,
   })
+  const { data: fiscal = [] } = fiscalQ
 
-  const { data: fiatBalances = [] } = useQuery({
+  const fiatQ = useQuery({
     queryKey: ['fiat-balances'],
     queryFn: portfolioApi.getFiatBalances,
     refetchInterval: 60_000,
   })
+  const { data: fiatBalances = [] } = fiatQ
 
-  const { data: eurFlow } = useCurrencyQuery(eurFlowQuery)
+  const eurFlowQ = useCurrencyQuery(eurFlowQuery)
+  const { data: eurFlow } = eurFlowQ
   const flowCurrency = eurFlow?.currency ?? currency
 
 
@@ -65,16 +70,22 @@ export function Dashboard() {
   const now = useNow(60_000)
   const today = localToday()
   const month = monthRange(ymOf(today), today)
-  const { data: monthPnl } = useCurrencyQuery(
+  const monthPnlQ = useCurrencyQuery(
     c => dailyPnlQuery(c, month?.from, month?.to),
     { refetchInterval: 60_000, enabled: month !== null },
   )
+  const { data: monthPnl } = monthPnlQ
   const liveToday = useLiveDayPnl(monthPnl?.currency === currency ? monthPnl.today : null, currency)
   // Sin todos los cierres históricos, ni P&L de hoy ni mini-gráfico (#334).
   const preparacion = usePreparacionHistoricos()
   // Mini-gráfico de la tarjeta Valor (#251): misma consulta (y caché) que el
   // gráfico de evolución en su periodo por defecto, «Todo».
-  const { data: allPnl } = useCurrencyQuery(c => dailyPnlQuery(c), { refetchInterval: 60_000 })
+  const allPnlQ = useCurrencyQuery(c => dailyPnlQuery(c), { refetchInterval: 60_000 })
+  const { data: allPnl } = allPnlQ
+  // Fallos (#498): las posiciones alimentan casi todo el Dashboard; P&L y flujo
+  // de euros, solo las cifras secundarias de las tarjetas.
+  const falloPosiciones = failure(lotsQ, fiatQ)
+  const falloCifras = failure(eurFlowQ, monthPnlQ, allPnlQ)
   const hasPrices = Object.keys(prices).length > 0
   const valueTrend = useMemo(
     () => (preparacion.listo && allPnl?.currency === currency ? valueSparkline(allPnl.days, hasPrices ? totalValue : null) : []),
@@ -145,6 +156,11 @@ export function Dashboard() {
       {/* Header */}
       {/* El estado de los precios vive solo en la barra superior (#200) */}
       <PageHeader icon={navIcon('/')} title="Dashboard" subtitle={dashboardSubtitle(assetCount, new Date(now))} />
+
+      {falloPosiciones && <QueryError what="las posiciones" error={falloPosiciones.error} onRetry={falloPosiciones.retry}
+        className="rounded-xl border border-border" />}
+      {falloCifras && <QueryError what="el P&L y el flujo de euros" error={falloCifras.error} onRetry={falloCifras.retry}
+        className="rounded-xl border border-border" />}
 
       {/* Métricas principales */}
       <PortfolioSummaryCards
@@ -243,7 +259,7 @@ export function Dashboard() {
           <AllocationChart lots={lots} fiatBalances={fiatBalances} />
         </div>
         <div className={panelClasses('rounded-xl h-full')} style={panelEnterStyle(5)}>
-          <FiscalCard data={fiscal} />
+          <FiscalCard data={fiscal} dataQuery={fiscalQ} />
         </div>
       </div>
 

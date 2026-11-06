@@ -22,7 +22,7 @@ import { FlowMarkerLayer, FlowMarkerTooltip, type ActiveMarker } from './FlowMar
 
 export type PnlUnit = 'pct' | 'eur'
 
-export function PnlChart({ points, currency, intraday, unit, animationKey, loading, error }: {
+export function PnlChart({ points, currency, intraday, unit, animationKey, loading, error, onRetry }: {
   points: EvolutionPoint[]
   currency: Currency
   intraday: boolean
@@ -31,6 +31,7 @@ export function PnlChart({ points, currency, intraday, unit, animationKey, loadi
   animationKey: string
   loading: boolean
   error: boolean
+  onRetry?: () => void
 }) {
   const c = useChartColors()
   const reduceMotion = useReducedMotion()
@@ -58,7 +59,7 @@ export function PnlChart({ points, currency, intraday, unit, animationKey, loadi
   const yFormat = (v: number) => (unit === 'pct' ? formatPercent(v, yDecimals) : yDecimals === 0 ? formatMoneyCompact(v, currency) : formatMoney(v, currency))
 
   return (
-    <ChartFrame loading={loading} error={error} empty={points.length === 0} errorText="No se pudo cargar la rentabilidad.">
+    <ChartFrame loading={loading} error={error} onRetry={onRetry} empty={points.length === 0} errorText="No se pudo cargar la rentabilidad.">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={points} margin={{ top: 8, right: 20, left: 0, bottom: 0 }}>
           <defs>

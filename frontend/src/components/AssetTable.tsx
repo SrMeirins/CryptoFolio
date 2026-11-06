@@ -15,7 +15,7 @@ import { sortRows, nextSort, type UnifiedRow, type SortKey, type SortDir } from 
 import { CryptoRowComponent } from './AssetTableCryptoRow'
 import { FiatRowComponent } from './AssetTableFiatRow'
 import { SortTh } from './AssetTableSortTh'
-import { buttonClasses, tableFootRowClasses, tableHeadRowClasses, Hint, Tooltip } from './ui'
+import { buttonClasses, tableFootRowClasses, tableHeadRowClasses, Hint, Tooltip, QueryError } from './ui'
 
 interface AssetTableProps {
   /** Filas ya calculadas por la página (ver utils/portfolioSections.ts). */
@@ -78,12 +78,13 @@ export function AssetTable({ rows, portfolioTotal, compact = false, hideWalletCh
     () => [...new Set(rows.filter(r => r.kind === 'crypto').map(r => r.asset))].sort(),
     [rows],
   )
-  const { data: closes } = useQuery({
+  const closesQ = useQuery({
     queryKey: ['price-closes', 7, cryptoAssets.join(',')],
     queryFn: () => pricesApi.getCloses(cryptoAssets, 7),
     enabled: cryptoAssets.length > 0,
     staleTime: 10 * 60_000,
   })
+  const { data: closes } = closesQ
   const spark = (asset: string) => {
     const series = closes?.closes[asset]
     return series && rate !== null ? sparkSeries(series, rawPrices[asset], rate) : undefined
@@ -150,6 +151,9 @@ export function AssetTable({ rows, portfolioTotal, compact = false, hideWalletCh
       )}
       {/* Cabecera fija al desplazarse (#271): sin contenedor de scroll propio en
           pantallas anchas; en estrechas, desplazamiento horizontal. */}
+      {closesQ.isError && (
+        <QueryError what="la tendencia de 7 días" error={closesQ.error} onRetry={() => void closesQ.refetch()} className="py-4 border-b border-border" />
+      )}
       <div className="max-lg:overflow-x-auto">
         <table className="w-full text-sm tabular-nums">
           <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-background-card [&_th]:shadow-[inset_0_-1px_0_var(--cf-border)]">

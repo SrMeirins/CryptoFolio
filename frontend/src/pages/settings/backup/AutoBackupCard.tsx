@@ -3,13 +3,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CalendarClock, Save } from 'lucide-react'
 import { backupApi, type AutoBackupStatus, type AutoBackupUnavailable } from '../../../api/backup'
 import { portfolioApi } from '../../../api/portfolio'
-import { Dropdown, Switch, Button } from '../../../components/ui'
+import { Dropdown, Switch, Button, QueryError } from '../../../components/ui'
 import { useSettingFeedback } from '../../../hooks/useSettingFeedback'
 import { useToast } from '../../../hooks/useToast'
 import { formatBackupDate } from '../../../utils/backupFile'
 import { SettingsCard } from '../SettingsCard'
 import { SavedMark } from '../SavedMark'
 import { AutoBackupList } from './AutoBackupList'
+import { failure } from '../../../utils/queryFailure'
 
 // Copias automáticas en Datos (#454): activarlas, cada cuánto y cuántas se
 // guardan (al momento, con Deshacer), hacer una ahora y la lista de las que hay.
@@ -46,7 +47,8 @@ export function AutoBackupCard({ index = 0 }: { index?: number }) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const { saved, confirm } = useSettingFeedback()
-  const { data: status } = useQuery({ queryKey: ['backup-auto'], queryFn: backupApi.auto, refetchInterval: 60_000 })
+  const statusQ = useQuery({ queryKey: ['backup-auto'], queryFn: backupApi.auto, refetchInterval: 60_000 })
+  const { data: status } = statusQ
   const [running, setRunning] = useState(false)
   const settings = status?.settings ?? { enabled: true, frequencyHours: 24, keep: 7 }
   // El valor guardado en el momento de aplicar (Deshacer llega más tarde).
@@ -81,6 +83,8 @@ export function AutoBackupCard({ index = 0 }: { index?: number }) {
   const keepOptions = (KEEP_OPTIONS as readonly number[]).includes(settings.keep) ? KEEP_OPTIONS : [...KEEP_OPTIONS, settings.keep].sort((a, b) => a - b)
   const last = status?.files[0]
 
+  // Fallo de sus consultas (#498): se dice en la tarjeta, con Reintentar.
+  const fallo = failure(statusQ)
   return (
     <SettingsCard index={index} icon={CalendarClock} title="Copias automáticas"
       status={<><SavedMark stamp={saved} id={ENABLED_KEY} /><SavedMark stamp={saved} id={FREQUENCY_KEY} /><SavedMark stamp={saved} id={KEEP_KEY} /></>}
@@ -90,6 +94,7 @@ export function AutoBackupCard({ index = 0 }: { index?: number }) {
           {running ? 'Haciendo copia...' : 'Hacer copia ahora'}
         </Button>
       )}>
+      {fallo && <QueryError what="el estado de las copias automáticas" error={fallo.error} onRetry={fallo.retry} className="mb-3 rounded-xl border border-border" />}
       {status && !status.available && status.reason && (
         <p role="note" className="flex items-start gap-2 px-3 py-2.5 rounded-lg border border-warning/40 bg-warning/8 text-xs text-fg-muted">
           <AlertTriangle size={14} aria-hidden="true" className="text-warning-ink shrink-0 mt-px" />

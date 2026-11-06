@@ -11,9 +11,10 @@ import { SaleSimulatorResults } from './SaleSimulatorResults'
 import { SaleSimulatorChart } from './SaleSimulatorChart'
 import { AnimatedNumber } from './AnimatedNumber'
 import { EurOnlyBadge } from './EurOnlyBadge'
-import { iconButtonClasses, Modal, Dropdown, SegmentedControl, Skeleton, SkeletonGroup, Hint } from './ui'
+import { iconButtonClasses, Modal, Dropdown, SegmentedControl, Skeleton, SkeletonGroup, Hint, QueryError } from './ui'
 import { parseFeePct, readFeePct, saveFeePct, walletQuantities } from '../utils/saleSimulator'
 import { QTY_PCTS, curvePrices, pctOfWallet, priceScenarios, qtyForPct, saleBreakEven, walletBreakEven } from '../utils/saleSimulatorView'
+import { failure } from '../utils/queryFailure'
 
 interface Props {
   asset:        string
@@ -54,11 +55,12 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose, ini
   const livePrice = usePricesStore(s => s.prices[asset]) ?? currentPrice
 
   // Wallets con el activo: la elegida limita la cantidad; el coste sigue el FIFO global (#476).
-  const { data: openLots } = useQuery({
+  const openLotsQ = useQuery({
     queryKey: ['open-lots', asset],
     queryFn: () => portfolioApi.getOpenLots(asset),
     staleTime: 60_000,
   })
+  const { data: openLots } = openLotsQ
   const wallets = useMemo(() => walletQuantities(openLots?.lots ?? []), [openLots])
   const [walletChoice, setWalletChoice] = useState<string | null>(initialWalletId ?? null)
   const wallet = wallets.find(w => w.walletId === walletChoice) ?? wallets[0] ?? null
@@ -83,12 +85,13 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose, ini
   const targetNum = parseFloat(debouncedTarget.replace(',', '.'))
 
   // Modo «importe a recibir»: el backend calcula la cantidad con la misma regla fiscal.
-  const { data: solved } = useQuery({
+  const solvedQ = useQuery({
     queryKey: ['simulate-qty', asset, wallet?.walletId, pNum, debouncedFee, targetNum],
     queryFn: () => portfolioApi.simulateSaleQuantity(asset, pNum, targetNum, wallet?.walletId, debouncedFee),
     enabled: mode === 'net' && wallet !== null && pNum > 0 && targetNum > 0,
     retry: false,
   })
+  const { data: solved } = solvedQ
   const effectiveQty = mode === 'net' ? solved?.quantity ?? 0 : parseFloat(debouncedQty)
 
   const valid = effectiveQty > 0 && !isNaN(pNum) && pNum >= 0 && wallet !== null
@@ -105,13 +108,14 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose, ini
 
   // Curva del resultado según el precio: rango fijado al abrir (no con cada tick).
   const prices = useMemo(() => curvePrices(currentPrice, breakEven), [currentPrice, breakEven])
-  const { data: curve } = useQuery({
+  const curveQ = useQuery({
     queryKey: ['simulate-curve', asset, wallet?.walletId, effectiveQty, debouncedFee, prices.length, prices.at(-1)],
     queryFn: () => portfolioApi.simulateSaleCurve(asset, effectiveQty, prices, wallet?.walletId, debouncedFee),
     enabled: valid && prices.length > 1,
     retry: false,
     placeholderData: keepPreviousData,
   })
+  const { data: curve } = curveQ
 
   // Break-even de ESTA venta: coste de los lotes que se venden en FIFO (no el
   // medio de la wallet), que no depende del precio; antes de tener resultado,
@@ -134,6 +138,8 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose, ini
   const marginal = result?.irpf.marginal ?? 0
   const efectivo = result && result.netGainLoss > 0.005 && marginal > 0 ? (marginal / result.netGainLoss) * 100 : null
 
+  // Lotes, precio de equilibrio y curva (#498): sin ellos la simulación no es fiable.
+  const falloDatos = failure(openLotsQ, solvedQ, curveQ)
   return (
     <Modal onClose={onClose} labelledBy={titleId} size="xl">
 
@@ -251,6 +257,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose, ini
 
           {/* ── Resultado ── */}
           <div className="space-y-4 min-w-0">
+            {falloDatos && <QueryError what="los datos de la simulación" error={falloDatos.error} onRetry={falloDatos.retry} />}
             {error && (
               <div role="alert" className="flex items-center gap-2 px-3 py-2.5 bg-negative/10 border border-negative/25 rounded-xl text-xs text-negative">
                 <AlertCircle size={13} className="shrink-0" aria-hidden="true" /> {error}

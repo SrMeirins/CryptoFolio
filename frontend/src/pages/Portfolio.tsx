@@ -11,7 +11,7 @@ import { usePricesStore } from '../store/pricesStore'
 import { WalletCards } from './portfolio/WalletCards'
 import { WalletSections } from './portfolio/WalletSections'
 import { DustSection } from './portfolio/DustSection'
-import { iconButtonClasses, fieldClasses, Button, FilteredEmpty, Notice, NotApplicable, PageHeader, Skeleton, SkeletonGroup, SegmentedControl, Dropdown, panelClasses, panelEnterStyle, panelSurface } from '../components/ui'
+import { iconButtonClasses, fieldClasses, Button, FilteredEmpty, Notice, NotApplicable, PageHeader, Skeleton, SkeletonGroup, SegmentedControl, Dropdown, panelClasses, panelEnterStyle, panelSurface, QueryError } from '../components/ui'
 import { AssetTable } from '../components/AssetTable'
 import { navIcon } from '../constants/navigation'
 import { PieMetodologia } from '../components/metodologia'
@@ -22,6 +22,7 @@ import { portfolioSections } from '../utils/portfolioSections'
 import { portfolioInventory } from '../utils/portfolioInventory'
 import { assetView, filterByPnl, walletParam, type PnlFilter, type PortfolioView } from '../utils/portfolioView'
 import { isSearchShortcut, readDensity, readDustOpen, readView, saveDensity, saveDustOpen, saveView, type Density } from '../utils/portfolioPrefs'
+import { failure } from '../utils/queryFailure'
 
 const VIEW_OPTIONS = [
   { value: 'asset' as const, label: 'Por activo', title: 'Una fila por activo con todas sus wallets' },
@@ -41,20 +42,24 @@ const DENSITY_OPTIONS = [
 
 export function Portfolio() {
   const firstUse = useHasTransactions()
-  const { data: lots = [], isLoading } = useQuery({
+  const lotsQ = useQuery({
     queryKey: ['fifo-lots'],
     queryFn: portfolioApi.getLots,
   })
-  const { data: fiatBalances = [] } = useQuery({
+  const { data: lots = [], isLoading } = lotsQ
+  const fiatQ = useQuery({
     queryKey: ['fiat-balances'],
     queryFn: portfolioApi.getFiatBalances,
   })
+  const { data: fiatBalances = [] } = fiatQ
   // Misma consulta (y caché) que la tabla de posiciones.
-  const { data: lockedAmounts = [] } = useQuery({
+  const lockedQ = useQuery({
     queryKey: ['locked-amounts'],
     queryFn: portfolioApi.getLockedAmounts,
     staleTime: 60_000,
   })
+  const { data: lockedAmounts = [] } = lockedQ
+  const falloPosiciones = failure(lotsQ, fiatQ, lockedQ)
 
   // ?activo=XRP llega desde el mapa de calor del Dashboard (#233): abre el
   // panel de detalle de ese activo (#272).
@@ -267,7 +272,10 @@ export function Portfolio() {
         </div>
       )}
 
-      {isLoading ? (
+      {/* Fallo de las posiciones (#498): antes que el vacío, que diría que no hay ninguna. */}
+      {falloPosiciones ? (
+        <QueryError what="las posiciones" error={falloPosiciones.error} onRetry={falloPosiciones.retry} className="rounded-xl border border-border" />
+      ) : isLoading ? (
         <SkeletonGroup label="Cargando las posiciones" className="space-y-2">
           {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-12 w-full" />)}
         </SkeletonGroup>

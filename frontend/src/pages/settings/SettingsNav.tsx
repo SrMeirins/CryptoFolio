@@ -18,6 +18,7 @@ const META: Record<Section, { label: string; icon: LucideIcon; hint: string }> =
 }
 
 export function SettingsNav({ active, onChange }: { active: Section; onChange: (s: Section) => void }) {
+  // consulta de fondo (#498): solo los contadores del menú; si falla, el menú sale sin ellos.
   const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: portfolioApi.getAssets })
   const { data: wallets = [] } = useQuery({ queryKey: ['wallets'], queryFn: portfolioApi.getWallets })
   const unknown = assets.filter(a => !a.is_stablecoin && a.price_source === 'unknown').length

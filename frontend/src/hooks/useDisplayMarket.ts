@@ -38,6 +38,7 @@ export function useDisplayMarket(): DisplayMarket {
   const fiatOpen24 = liveRate(currency, rawOpen24)
 
   // Umbral de polvo configurable (#446), en euros y convertido a la moneda visible.
+  // consulta de fondo (#498): sin la configuración se usa el umbral de polvo por defecto; precios y cambio vienen del feed en vivo.
   const { data: config } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
   return { currency, rate, prices, open24, fiatOpen24, dustThreshold: dustThresholdEur(config) * (rate ?? 1) }
 }

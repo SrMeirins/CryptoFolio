@@ -8,6 +8,7 @@ import { api } from '../api/client'
  * descarga en curso), se vuelve a consultar cada minuto.
  */
 export function useAssetIcons(): Record<string, number> {
+  // consulta de fondo (#498): sin la lista de logos, cada activo muestra sus iniciales.
   const { data } = useQuery({
     queryKey: ['asset-icons'],
     queryFn: () => api.get<Record<string, number>>('/assets/icons'),

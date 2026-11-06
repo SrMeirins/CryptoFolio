@@ -9,7 +9,7 @@ import { DynamicField } from './DynamicField'
 import { WalletLabel } from './WalletPicker'
 import { buildInitialFields } from '../utils/operationWizardFields'
 import { T } from '../utils/colors'
-import { buttonClasses, iconButtonClasses, Skeleton, SkeletonGroup } from './ui'
+import { buttonClasses, iconButtonClasses, Skeleton, SkeletonGroup, QueryError } from './ui'
 import { formatNumber } from '../utils/format'
 
 interface OperationWizardProps {
@@ -66,9 +66,11 @@ const CATEGORIES_ORDER = ['ACQUISITION', 'DISPOSITION', 'INCOME', 'MOVEMENT', 'F
 // ── Componente principal ───────────────────────────────────────────────────
 // Espera al catálogo y monta el formulario solo cuando está disponible.
 export function OperationWizard(props: OperationWizardProps) {
-  const { data: catalog } = useQuery({ queryKey: ['operation-catalog'], queryFn: portfolioApi.getCatalog })
+  const catalogQ = useQuery({ queryKey: ['operation-catalog'], queryFn: portfolioApi.getCatalog })
+  const { data: catalog } = catalogQ
 
   if (!catalog) {
+    if (catalogQ.isError) return <QueryError what="el catálogo de operaciones" error={catalogQ.error} onRetry={() => void catalogQ.refetch()} />
     return (
       <SkeletonGroup label="Cargando el catálogo de operaciones" className="h-64 space-y-3 p-1">
         <Skeleton className="h-9 w-full" />

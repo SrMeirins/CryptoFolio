@@ -12,6 +12,7 @@ const SONDEO_MS = 3_000
  */
 export function usePreparacionHistoricos(): { listo: boolean; cargando: boolean; datos: PreparacionHistoricos | undefined } {
   const queryClient = useQueryClient()
+  // consulta de fondo (#498): si falla, se trata como en preparación: sin mini-gráficos ni P&L de hoy hasta el siguiente intento.
   const { data, isLoading } = useQuery({
     queryKey: ['pnl-preparacion'],
     queryFn: portfolioApi.getPreparacionHistoricos,

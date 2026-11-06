@@ -2,7 +2,7 @@ import { useId, useRef, useState, type FormEvent } from 'react'
 import { Bookmark, ChevronDown, PenLine, Star, Trash2 } from 'lucide-react'
 import type { SavedView } from '../../api/portfolio'
 import { ApiError } from '../../api/client'
-import { Popover, buttonClasses, fieldClasses, iconButtonClasses, Hint } from '../../components/ui'
+import { Popover, buttonClasses, fieldClasses, iconButtonClasses, Hint, QueryError } from '../../components/ui'
 
 // Desplegable «Vistas» del Historial (#369): aplicar una vista guardada,
 // guardar la actual (con confirmación si el nombre existe), renombrar, borrar
@@ -10,9 +10,11 @@ import { Popover, buttonClasses, fieldClasses, iconButtonClasses, Hint } from '.
 
 type Pending = { kind: 'rename'; id: string; nombre: string } | { kind: 'delete'; id: string } | null
 
-export function SavedViewsMenu({ views, active, onApply, onSave, onRename, onDelete, onToggleDefault }: {
+export function SavedViewsMenu({ views, active, fallo, onApply, onSave, onRename, onDelete, onToggleDefault }: {
   views: readonly SavedView[]
   active: SavedView | null
+  /** Fallo al cargar las vistas (#498): se dice en el menú, con Reintentar. */
+  fallo?: { error: unknown; retry: () => void } | null
   onApply: (view: SavedView) => void
   onSave: (nombre: string, predeterminada: boolean, sustituir: boolean) => Promise<void>
   onRename: (id: string, nombre: string) => Promise<void>
@@ -57,7 +59,9 @@ export function SavedViewsMenu({ views, active, onApply, onSave, onRename, onDel
 
       <Popover open={open} onClose={() => { setOpen(false); setPending(null); setConflict(null) }} anchorRef={triggerRef} align="end"
         className="p-3 w-80" ariaProps={{ role: 'dialog', 'aria-label': 'Vistas guardadas' }}>
-        {views.length === 0
+        {fallo
+          ? <QueryError what="tus vistas" error={fallo.error} onRetry={fallo.retry} className="mb-3 py-4" />
+          : views.length === 0
           ? <p className="text-xs text-fg-subtle mb-3">Aún no hay vistas guardadas.</p>
           : (
             <ul className="space-y-0.5 mb-3 max-h-64 overflow-auto">

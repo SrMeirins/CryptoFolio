@@ -5,13 +5,14 @@ import { Trash2, Zap, ArrowLeftRight, Layers, FileUp, Tag, Wallet, Coins, BarCha
 import { useToast } from '../../hooks/useToast'
 import { useRunFifoStream } from '../../hooks/useRunFifoStream'
 import { T } from '../../utils/colors'
-import { buttonClasses, fieldClasses, StatCard, Button } from '../../components/ui'
+import { buttonClasses, fieldClasses, StatCard, Button, QueryError } from '../../components/ui'
 import { SettingsCard } from './SettingsCard'
 import { formatNumber } from '../../utils/format'
 import { BackupCard } from './backup/BackupCard'
 import { AutoBackupCard } from './backup/AutoBackupCard'
 import { FifoRunPanel } from './FifoRunPanel'
 import { healthCards, type HealthCard } from '../../utils/dataHealth'
+import { failure } from '../../utils/queryFailure'
 
 const CONFIRM_WORD = 'CONFIRMAR'
 const HEALTH_ICON: Record<HealthCard['key'], LucideIcon> = { size: HardDrive, import: Upload, fifo: Calculator, backup: CalendarClock }
@@ -19,11 +20,12 @@ const HEALTH_ICON: Record<HealthCard['key'], LucideIcon> = { size: HardDrive, im
 export function DatosSection() {
   const queryClient = useQueryClient()
   const toast = useToast()
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const statsQ = useQuery({
     queryKey: ['settings-stats'],
     queryFn: portfolioApi.getStats,
     refetchInterval: 10000,
   })
+  const { data: stats, isLoading: statsLoading } = statsQ
   const [clearingCache, setClearingCache] = useState(false)
   const [cacheResult, setCacheResult]     = useState<number | null>(null)
   const { state: fifoState, running: runningFifo, run: handleRunFifo } = useRunFifoStream()
@@ -74,11 +76,14 @@ export function DatosSection() {
   // Salud (#454): tamaño y lo último hecho; lo que conviene revisar lleva su motivo.
   const health = stats ? healthCards(stats, new Date()) : []
 
+  // Fallo de sus consultas (#498): se dice en la tarjeta, con Reintentar.
+  const fallo = failure(statsQ)
   return (
     <div className="space-y-4 max-w-3xl">
 
       {/* Stats */}
       <SettingsCard index={0} icon={BarChart3} title="Estadísticas de la base de datos">
+        {fallo && <QueryError what="las estadísticas" error={fallo.error} onRetry={fallo.retry} className="mb-3 rounded-xl border border-border" />}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {statCards.map((s, i) => (
             <StatCard key={s.label} compact title={s.label} icon={s.icon} color={s.color} delay={i * 40}

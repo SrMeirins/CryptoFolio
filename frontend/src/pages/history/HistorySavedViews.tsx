@@ -29,7 +29,7 @@ export function HistorySavedViews({ filters, sort, applyState, startedEmpty }: {
   }, [startedEmpty, saved.loaded, saved.views, applyState])
 
   return (
-    <SavedViewsMenu views={saved.views} active={current}
+    <SavedViewsMenu views={saved.views} active={current} fallo={saved.fallo}
       onApply={v => applyState(stateFromView(v.filtros))}
       onSave={async (nombre, predeterminada, sustituir) => {
         // Éxito con cambio visible (#497): la vista aparece en el menú, sin aviso.

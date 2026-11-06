@@ -177,6 +177,17 @@ export function panelSurface(padding: CardPadding = 'md', extra = ''): string {
   return cardClasses(padding, twMerge('panel-soft', extra))
 }
 
+// ── QueryError (#498) ──
+/**
+ * Título del fallo con concordancia: «No se pudieron cargar las posiciones»,
+ * «No se pudo cargar la tendencia». Plural si empieza por un determinante
+ * plural o une dos elementos con «y».
+ */
+export function queryErrorTitle(what: string): string {
+  const plural = /^(las|los|tus|sus|unas|unos)\s/.test(what) || /\s(y|e)\s/.test(what)
+  return `No se ${plural ? 'pudieron' : 'pudo'} cargar ${what}`
+}
+
 // ── Notice (#493) ──
 // Tres tipos con significado propio, no solo de color: aviso (algo requiere
 // atención), consejo (acción recomendada) e información (contexto). El tipo se

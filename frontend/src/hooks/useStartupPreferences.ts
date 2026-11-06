@@ -11,6 +11,7 @@ import { privacyOnStart, startPage } from '../utils/preferences'
 let applied = false
 
 export function useStartupPreferences(): void {
+  // consulta de fondo (#498): sin interfaz propia; si falla, se abre con las preferencias por defecto.
   const { data: config } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
   const navigate = useNavigate()
   const { pathname } = useLocation()

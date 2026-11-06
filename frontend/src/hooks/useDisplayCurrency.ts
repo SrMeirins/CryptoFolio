@@ -13,6 +13,7 @@ const storage = typeof window !== 'undefined' ? window.localStorage : undefined
 
 /** Solo lectura de la moneda de visualización, para las vistas que formatean importes. */
 export function useCurrency(): Currency {
+  // consulta de fondo (#498): sin la preferencia del servidor se usa la última moneda elegida en este navegador; un fallo al guardarla ya avisa.
   const { data: config } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
   return resolveCurrency(config, readStoredCurrency(storage))
 }

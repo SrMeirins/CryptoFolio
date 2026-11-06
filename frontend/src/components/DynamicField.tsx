@@ -2,8 +2,8 @@ import { useId } from 'react'
 import { Zap } from 'lucide-react'
 import { type FieldDefinition } from '../api/portfolio'
 import { WalletPicker } from './WalletPicker'
-import { useWalletsQuery } from '../hooks/useWallets'
-import { fieldClasses, Dropdown } from './ui'
+import { useWalletsResult } from '../hooks/useWallets'
+import { fieldClasses, Dropdown, QueryError } from './ui'
 import { getAppTimezone } from '../constants/timezone'
 import { fromZonedInput, toZonedInput } from '../utils/zonedDateTime'
 
@@ -13,7 +13,7 @@ const baseInput = fieldClasses()
 export function DynamicField({ field, value, onChange }: {
   field: FieldDefinition; value: unknown; onChange: (val: unknown) => void
 }) {
-  const wallets = useWalletsQuery()
+  const { wallets, fallo: falloWallets } = useWalletsResult()
   // Etiqueta asociada a su campo (#378): antes no lo estaba y el lector de
   // pantalla anunciaba campos sin nombre.
   const id = useId()
@@ -78,7 +78,9 @@ export function DynamicField({ field, value, onChange }: {
       )}
 
       {field.type === 'wallet' && (
-        <WalletPicker id={id} label={field.label} wallets={wallets} value={value as string} onChange={onChange} />
+        falloWallets
+          ? <QueryError what="tus wallets" error={falloWallets.error} onRetry={falloWallets.retry} className="py-4 rounded-xl border border-border" />
+          : <WalletPicker id={id} label={field.label} wallets={wallets} value={value as string} onChange={onChange} />
       )}
 
       {field.type === 'select' && field.options && (

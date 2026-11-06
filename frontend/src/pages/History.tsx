@@ -17,7 +17,7 @@ import { HistoryTable } from './history/HistoryTable'
 import { HistoryPagination, PAGINATION_ID } from './history/HistoryPagination'
 import { StatsBar } from './history/StatsBar'
 import { AnalyticsPanel } from './history/AnalyticsPanel'
-import { RefreshBar, Skeleton, SkeletonGroup, FilteredEmpty } from '../components/ui'
+import { RefreshBar, Skeleton, SkeletonGroup, FilteredEmpty, QueryError } from '../components/ui'
 import { HistoryHeader } from './history/HistoryHeader'
 import { TransactionDetailPanel } from './history/detail/TransactionDetailPanel'
 import { useDetailNavigation } from './history/detail/useDetailNavigation'
@@ -44,7 +44,7 @@ export function History() {
   const currency = useCurrency()
   // Resumen y analítica sobre lo filtrado (#376), con o sin margen (#403).
   const includeMargin = f.filters.includeMargin
-  const stats = useHistoryStats(f.queryParams, includeMargin)
+  const { stats, fallo: falloStats } = useHistoryStats(f.queryParams, includeMargin)
 
   const { total } = d
   // Panel de detalle (#373): ?tx=<id>, con Anterior/Siguiente en el orden de la lista.
@@ -146,7 +146,13 @@ export function History() {
             <ShortfallBanner count={balance.data.shortfalls.count} asset={balance.asset} walletFiltered={balance.walletFiltered}
               onOpenFirst={balance.data.shortfalls.first_id ? () => openTx(balance.data!.shortfalls.first_id) : null} />
           )}
-          {d.isLoading ? (
+          {/* Fallos (#498): cada parte dice el suyo, con Reintentar; el resto sigue. */}
+          {falloStats && <QueryError what="las estadísticas" error={falloStats.error} onRetry={falloStats.retry} className="rounded-xl border border-border" />}
+          {balance?.fallo && <QueryError what="el saldo corrido" error={balance.fallo.error} onRetry={balance.fallo.retry} className="rounded-xl border border-border" />}
+          {d.falloFiltros && <QueryError what="las opciones de los filtros" error={d.falloFiltros.error} onRetry={d.falloFiltros.retry} className="rounded-xl border border-border" />}
+          {d.fallo ? (
+            <QueryError what="las operaciones" error={d.fallo.error} onRetry={d.fallo.retry} className="rounded-xl border border-border" />
+          ) : d.isLoading ? (
             <SkeletonGroup label="Cargando las transacciones" className="space-y-2">
               {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-10 w-full" />)}
             </SkeletonGroup>

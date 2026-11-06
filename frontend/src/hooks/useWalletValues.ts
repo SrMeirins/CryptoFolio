@@ -7,6 +7,7 @@ import { portfolioInventory, type WalletSummary } from '../utils/portfolioInvent
 // Valor de cada wallet en la moneda de visualización (#448), con las mismas
 // consultas y el mismo cálculo que Portfolio para que las cifras coincidan.
 export function useWalletValues(): { byWallet: ReadonlyMap<string, WalletSummary>; currency: ReturnType<typeof useDisplayMarket>['currency'] } {
+  // consulta de fondo (#498): sin estas cifras, la lista de wallets sigue sin el valor de cada una; Portfolio trata el mismo fallo.
   const { data: lots = [] } = useQuery({ queryKey: ['fifo-lots'], queryFn: portfolioApi.getLots })
   const { data: fiatBalances = [] } = useQuery({ queryKey: ['fiat-balances'], queryFn: portfolioApi.getFiatBalances })
   const { data: lockedAmounts = [] } = useQuery({ queryKey: ['locked-amounts'], queryFn: portfolioApi.getLockedAmounts, staleTime: 60_000 })

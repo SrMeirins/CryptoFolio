@@ -12,7 +12,7 @@ import { localToday } from '../../utils/pnlChart'
 import { filterActivity, groupByDay, localTimeOf, selectRecent, type ActivityFilter } from '../../utils/recentActivity'
 import { activitySubtitle } from '../../utils/panelSubtitles'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import { PanelHeader, SegmentedControl, Skeleton, panelSurface, SkeletonGroup, FilteredEmpty, NotApplicable } from '../../components/ui'
+import { PanelHeader, SegmentedControl, Skeleton, panelSurface, SkeletonGroup, FilteredEmpty, NotApplicable, QueryError } from '../../components/ui'
 
 // Actividad reciente (#237): línea de tiempo de los últimos 7 días (máx. 12
 // operaciones; si no hay, las 8 últimas) agrupada por día en hora de Madrid,
@@ -32,11 +32,12 @@ export function RecentActivity() {
   const currency = useCurrency()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<ActivityFilter>('all')
-  const { data, isLoading } = useQuery({
+  const recentQ = useQuery({
     queryKey: ['recent-transactions', currency],
     queryFn: () => portfolioApi.getTransactions({ limit: '20', offset: '0' }, currency),
     refetchInterval: 60_000,
   })
+  const { data, isLoading } = recentQ
 
   const today = localToday()
   const items = useMemo<Item[]>(() => selectRecent(data?.transactions ?? [], today).map(tx => ({
@@ -59,7 +60,9 @@ export function RecentActivity() {
         }
       />
 
-      {isLoading ? (
+      {recentQ.isError ? (
+        <QueryError what="la actividad reciente" error={recentQ.error} onRetry={() => void recentQ.refetch()} />
+      ) : isLoading ? (
         <SkeletonGroup label="Cargando la actividad" className="p-5 space-y-3">
           {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-10 w-full" />)}
         </SkeletonGroup>

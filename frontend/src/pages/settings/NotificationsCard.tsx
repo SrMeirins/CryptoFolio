@@ -7,6 +7,8 @@ import { useToast } from '../../hooks/useToast'
 import { useBellStore } from '../../store/bellStore'
 import { SettingsCard } from './SettingsCard'
 import { SavedMark } from './SavedMark'
+import { QueryError } from '../../components/ui'
+import { failure } from '../../utils/queryFailure'
 
 // Notificaciones en General (#447): un interruptor por categoría con cuántos
 // avisos activos tiene. La lista completa vive en la campana de la barra
@@ -16,8 +18,10 @@ export function NotificationsCard({ index = 0 }: { index?: number }) {
   const toast = useToast()
   const { saved, confirm } = useSettingFeedback()
   const openBell = useBellStore(s => s.setOpen)
-  const { data: config } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
-  const { data: all = [] } = useQuery({ queryKey: ['notifications-all'], queryFn: portfolioApi.getAllNotifications, refetchInterval: 60_000 })
+  const configQ = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
+  const { data: config } = configQ
+  const allQ = useQuery({ queryKey: ['notifications-all'], queryFn: portfolioApi.getAllNotifications, refetchInterval: 60_000 })
+  const { data: all = [] } = allQ
   const muted = mutedCategories(config?.[NOTIFICATIONS_MUTED_KEY])
   const active = (key: NotificationCategory) => all.filter(n => n.categoryKey === key && !n.dismissed).length
   const visible = all.filter(n => !n.muted && !n.dismissed).length
@@ -40,6 +44,8 @@ export function NotificationsCard({ index = 0 }: { index?: number }) {
     void setMuted(next, on ? `Avisos de ${label} activados` : `Avisos de ${label} silenciados`, now)
   }
 
+  // Fallo de sus consultas (#498): se dice en la tarjeta, con Reintentar.
+  const fallo = failure(configQ, allQ)
   return (
     <SettingsCard index={index} icon={Bell} title="Notificaciones" status={<SavedMark stamp={saved} id="avisos" />}
       description="Elige qué avisos quieres recibir. Un aviso descartado vuelve a salir si cambia."
@@ -49,6 +55,7 @@ export function NotificationsCard({ index = 0 }: { index?: number }) {
           {visible === 0 ? 'Sin avisos activos' : `Ver ${visible} ${visible === 1 ? 'aviso activo' : 'avisos activos'}`}
         </button>
       }>
+      {fallo && <QueryError what="los avisos" error={fallo.error} onRetry={fallo.retry} className="mb-3 rounded-xl border border-border" />}
       <ul className="grid sm:grid-cols-2 gap-x-6">
         {NOTIFICATION_CATEGORIES.map(c => {
           const on = !muted.includes(c.key)
