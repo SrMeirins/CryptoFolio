@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Search, RefreshCw, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Search, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { portfolioApi, type AssetMetadata } from '../../../api/portfolio'
-import { fieldClasses } from '../../../components/ui'
+import { fieldClasses, Button } from '../../../components/ui'
 import { formatNumber } from '../../../utils/format'
 
 export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; onSaved: () => void }) {
@@ -62,16 +62,14 @@ export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; on
           placeholder="ej. bitcoin, ethereum, ethereumpow"
           className={fieldClasses('md', false, 'flex-1 font-mono')}
         />
-        <button type="button" onClick={handleTest} disabled={testing || !geckoId.trim()}
+        <Button variant="ghost" onClick={handleTest} disabled={!geckoId.trim()} loading={testing} icon={<Search size={13} aria-hidden="true" />}
           title="Verificar que este ID devuelve precio en CoinGecko" aria-label="Verificar el id de CoinGecko"
-          className="px-3 py-2 bg-background-tertiary hover:bg-border disabled:opacity-50 rounded-lg text-sm transition-colors">
-          {testing ? <RefreshCw size={13} aria-hidden="true" className="animate-spin" /> : <Search size={13} aria-hidden="true" />}
-        </button>
+          className="px-3 py-2 bg-background-tertiary hover:bg-border text-fg hover:text-fg" />
         {isDirty && (
-          <button type="button" onClick={handleSave} disabled={saving || !geckoId.trim()}
-            className="px-3 py-2 bg-brand/20 hover:bg-brand/30 disabled:opacity-50 rounded-lg text-xs font-medium text-brand transition-colors whitespace-nowrap">
-            {saving ? <RefreshCw size={12} className="animate-spin" /> : 'Guardar'}
-          </button>
+          <Button variant="ghost" onClick={handleSave} disabled={!geckoId.trim()} loading={saving}
+            className="px-3 py-2 bg-brand/20 hover:bg-brand/30 text-xs text-brand-ink hover:text-brand-ink">
+            Guardar
+          </Button>
         )}
       </div>
       {testResult && (

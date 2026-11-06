@@ -28,7 +28,7 @@ import { DeclaracionRenta } from './fiscal/DeclaracionRenta'
 import type { FiscalHito } from '../api/portfolio'
 import { useFiscalShortcuts } from './fiscal/useFiscalShortcuts'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
-import { cardClasses, EmptyState, ErrorState, Skeleton, PageHeader, panelEnterStyle, tabId, tabPanelId, SectionHeader, ViewTabs } from '../components/ui'
+import { cardClasses, EmptyState, ErrorState, Skeleton, PageHeader, panelEnterStyle, tabId, tabPanelId, SectionHeader, ViewTabs, RefreshBar } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 import { PieMetodologia, type TemaMetodo } from '../components/metodologia'
 
@@ -241,7 +241,9 @@ export function Fiscal() {
       <ViewTabs items={TAB_ITEMS} value={vista} onChange={setVista} label="Secciones de Fiscal" idBase={ID_BASE} />
 
       <div id={tabPanelId(ID_BASE)} role="tabpanel" aria-labelledby={tabId(ID_BASE, vista)} aria-busy={switching}
-        className={`space-y-5 transition-opacity duration-200 ${switching ? 'opacity-60' : ''}`}>
+        className="relative space-y-5">
+        {/* Cambio de año (#494): se mantienen las cifras del anterior y una barra indica la recarga. */}
+        <RefreshBar active={switching} />
         {/* Cabecera común de la vista (#491): un h2 con título y contexto en todas las pestañas. */}
         <SectionHeader {...vistaHeader(vista, activeYear)} />
         {/* Planificar trabaja siempre con el año en curso, sea cual sea el seleccionado (#307) */}

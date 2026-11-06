@@ -18,7 +18,7 @@ import { HistoryTable } from './history/HistoryTable'
 import { HistoryPagination, PAGINATION_ID } from './history/HistoryPagination'
 import { StatsBar } from './history/StatsBar'
 import { AnalyticsPanel } from './history/AnalyticsPanel'
-import { Button, EmptyState, LoadingState } from '../components/ui'
+import { Button, EmptyState, RefreshBar, Skeleton, SkeletonGroup } from '../components/ui'
 import { HistoryHeader } from './history/HistoryHeader'
 import { TransactionDetailPanel } from './history/detail/TransactionDetailPanel'
 import { useDetailNavigation } from './history/detail/useDetailNavigation'
@@ -109,6 +109,7 @@ export function History() {
     a.click()
   }
 
+  const refreshing = d.isFetching && !!d.data
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Anuncio de resultados para lectores de pantalla (#351). */}
@@ -121,14 +122,16 @@ export function History() {
           currentBalance={balance?.data ? { amount: balance.data.current, asset: balance.asset, wallet: balance.walletFiltered } : null} />
         <HistoryToolbar ref={searchRef} filters={f.filters} searchInput={f.searchInput} wallets={wallets}
           assets={d.assets} presentTypes={d.presentTypes} imports={d.imports}
-          currencySymbol={currencySymbol} isFetching={d.isFetching}
+          currencySymbol={currencySymbol}
           setSearchInput={f.setSearchInput} setFilter={f.setFilter} patchFilters={f.patchFilters}
           setDateRange={f.setDateRange} onCopyLink={() => { void copyLink() }} onHelp={() => setShowHelp(true)}
           year={{ years: d.years, value: year, onChange: goYear, onStep: stepTo, canPrev: prevYear !== null, canNext: nextYear !== null }} />
         <ActiveFilterChips chips={chips} onRemove={f.patchFilters} onClearAll={f.clearFilters} />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      {/* Recarga (#494): los datos siguen visibles y una barra fina lo indica. */}
+      <div className="relative shrink-0"><RefreshBar active={refreshing} /></div>
+      <div className="flex-1 overflow-y-auto" aria-busy={refreshing || undefined}>
         <div className="px-6 pt-4 pb-4 space-y-4">
           {stats && (
             <>
@@ -144,7 +147,9 @@ export function History() {
               onOpenFirst={balance.data.shortfalls.first_id ? () => openTx(balance.data!.shortfalls.first_id) : null} />
           )}
           {d.isLoading ? (
-            <LoadingState />
+            <SkeletonGroup label="Cargando las transacciones" className="space-y-2">
+              {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </SkeletonGroup>
           ) : d.transactions.length === 0 ? (
             <EmptyState
               icon={<Package size={28} aria-hidden="true" />}

@@ -1,5 +1,5 @@
 import { useState, useId } from 'react'
-import { X, AlertTriangle, CheckCircle, Loader } from 'lucide-react'
+import { X, AlertTriangle, CheckCircle } from 'lucide-react'
 import { OperationWizard, type WizardResult } from './OperationWizard'
 import { portfolioApi, type ManualTxPreview, type Transaction, type FifoRunResult } from '../api/portfolio'
 import { OP_META } from '../constants/operations'
@@ -8,7 +8,7 @@ import { ManualTxPreviewPanel } from './ManualTxPreviewPanel'
 import { ManualTxDoneScreen } from './ManualTxDoneScreen'
 import { ImportEditNotice } from './ImportEditNotice'
 import { amountNetFor, editFormType, savedOperationType } from './manualTxData'
-import { buttonClasses, iconButtonClasses, Modal } from './ui'
+import { Button, iconButtonClasses, Modal, Skeleton, SkeletonGroup } from './ui'
 
 interface ManualTxModalProps {
   onClose: () => void
@@ -164,10 +164,10 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
 
               {previewLoading ? (
-                <div className="flex items-center gap-2 text-fg-muted text-sm py-6 justify-center">
-                  <Loader size={14} className="animate-spin" />
-                  Calculando impacto fiscal...
-                </div>
+                <SkeletonGroup label="Calculando el impacto fiscal" className="space-y-3">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                </SkeletonGroup>
               ) : preview ? (
                 <ManualTxPreviewPanel preview={preview} wizardResult={wizardResult} />
               ) : null}
@@ -188,17 +188,12 @@ export function ManualTxModal({ onClose, onSuccess, transaction }: ManualTxModal
               >
                 ← {isEditMode ? 'Volver a editar' : 'Volver al wizard'}
               </button>
-              <button
-                type="button"
-                onClick={handleConfirm}
-                disabled={step === 'saving' || previewLoading}
-                className={buttonClasses('success', 'lg', 'flex')}
-              >
+              <Button variant="success" size="lg" onClick={handleConfirm} disabled={previewLoading} loading={step === 'saving'}
+                icon={<CheckCircle size={14} aria-hidden="true" />}>
                 {step === 'saving'
-                  ? <><Loader size={14} className="animate-spin" /> {isEditMode ? 'Actualizando y recalculando FIFO...' : 'Guardando y recalculando FIFO...'}</>
-                  : <><CheckCircle size={14} /> {isEditMode ? 'Confirmar y actualizar' : 'Confirmar y guardar'}</>
-                }
-              </button>
+                  ? (isEditMode ? 'Actualizando y recalculando FIFO...' : 'Guardando y recalculando FIFO...')
+                  : (isEditMode ? 'Confirmar y actualizar' : 'Confirmar y guardar')}
+              </Button>
             </div>
           </>
         )}

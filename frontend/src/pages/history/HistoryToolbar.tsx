@@ -1,6 +1,6 @@
 import { forwardRef, useState, type ReactNode } from 'react'
 import { YearSelector } from './keyboard/YearSelector'
-import { RefreshCw, PenLine, Link2, Layers, FilePen, Keyboard, SlidersHorizontal, ChevronDown } from 'lucide-react'
+import { PenLine, Link2, Layers, FilePen, Keyboard, SlidersHorizontal, ChevronDown } from 'lucide-react'
 import { DateRangePicker } from '../../components/DateRangePicker'
 import { Dropdown, MultiDropdown, iconButtonClasses } from '../../components/ui'
 import { fmtShort } from '../../utils/date'
@@ -40,7 +40,6 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
   presentTypes: string[]
   imports: { id: string; filename: string; imported_at: string }[]
   currencySymbol: string
-  isFetching: boolean
   setSearchInput: (v: string) => void
   setFilter: <K extends keyof HistoryFilterState>(key: K, value: HistoryFilterState[K]) => void
   patchFilters: (patch: Partial<HistoryFilterState>) => void
@@ -50,7 +49,7 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
   year: { years: readonly number[]; value: number | null; onChange: (y: number | null) => void; onStep: (s: -1 | 1) => void; canPrev: boolean; canNext: boolean }
   onHelp: () => void
 }>(function HistoryToolbar({
-  filters, searchInput, wallets, assets, presentTypes, imports, currencySymbol, isFetching,
+  filters, searchInput, wallets, assets, presentTypes, imports, currencySymbol,
   setSearchInput, setFilter, patchFilters, setDateRange, onCopyLink, year, onHelp,
 }, searchRef) {
   const [moreOpen, setMoreOpen] = useState(readMoreFiltersOpen)
@@ -86,7 +85,6 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
         </button>
 
         <span className="ml-auto flex items-center gap-1">
-          {isFetching && <RefreshCw size={11} aria-hidden="true" className="text-fg-subtle animate-spin" />}
           <button type="button" onClick={onHelp} title="Atajos de teclado (?)" aria-keyshortcuts="?"
             className={iconButtonClasses('md')} aria-label="Atajos de teclado">
             <Keyboard size={13} aria-hidden="true" />

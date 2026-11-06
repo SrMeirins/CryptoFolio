@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Download } from 'lucide-react'
 import type { TransactionFlows } from '../../api/portfolio'
-import { PageHeader, buttonClasses } from '../../components/ui'
+import { PageHeader, Skeleton, buttonClasses } from '../../components/ui'
 import { navIcon } from '../../constants/navigation'
 import { formatMoney, formatNumber, type Currency } from '../../utils/format'
 import { formatBalance } from './balance/balanceFormat'
@@ -23,7 +23,7 @@ export function HistoryHeader({ loaded, total, filtered, flows, currency, views,
   /** Saldo actual del activo filtrado (#380); de la wallet si se filtra una. */
   currentBalance?: { amount: number; asset: string; wallet: boolean } | null
 }) {
-  const subtitle = !loaded ? 'Cargando…'
+  const subtitle = !loaded ? <Skeleton className="inline-block h-3.5 w-40 align-middle" />
     : total > 0 ? `${formatNumber(total, 0)} transacciones${filtered ? ' filtradas' : ''}`
       : filtered ? 'Sin resultados para estos filtros' : 'Sin transacciones importadas'
   return (

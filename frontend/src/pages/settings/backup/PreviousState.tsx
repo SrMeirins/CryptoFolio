@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { History, RefreshCw } from 'lucide-react'
+import { History } from 'lucide-react'
 import type { BackupSnapshot } from '../../../api/backup'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
-import { buttonClasses } from '../../../components/ui'
+import { Button } from '../../../components/ui'
 import { formatNumber } from '../../../utils/format'
 import { formatBackupDate } from '../../../utils/backupFile'
 import { useRevertSnapshot } from './useRevertSnapshot'
@@ -22,10 +22,9 @@ export function PreviousState({ snapshot }: { snapshot: BackupSnapshot }) {
           Guardado el {formatBackupDate(snapshot.created_at)} antes de restaurar, con {formatNumber(ops, 0)} {ops === 1 ? 'operación' : 'operaciones'}.
         </p>
       </div>
-      <button type="button" onClick={() => setConfirming(true)} disabled={reverting} className={buttonClasses('secondary', 'md', 'flex')}>
-        {reverting && <RefreshCw size={13} aria-hidden="true" className="animate-spin" />}
+      <Button onClick={() => setConfirming(true)} loading={reverting}>
         {reverting ? 'Volviendo...' : 'Volver al estado anterior'}
-      </button>
+      </Button>
       {confirming && (
         <ConfirmDialog danger title="Volver al estado anterior"
           message={`Los datos actuales se sustituirán por los guardados el ${formatBackupDate(snapshot.created_at)}. Si quieres conservarlos, exporta antes una copia.`}

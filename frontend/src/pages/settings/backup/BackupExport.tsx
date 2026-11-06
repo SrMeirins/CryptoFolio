@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { AlertTriangle, Download, Lock, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Download, Lock } from 'lucide-react'
 import { backupApi } from '../../../api/backup'
-import { Field, Switch, buttonClasses, fieldClasses } from '../../../components/ui'
+import { Field, Switch, fieldClasses, Button } from '../../../components/ui'
 import { useToast } from '../../../hooks/useToast'
 import { backupFilename } from '../../../constants/appInfo'
 import { downloadJson, exportPasswordError } from '../../../utils/backupFile'
@@ -64,10 +64,9 @@ export function BackupExport() {
       )}
 
       <div className="flex justify-end">
-        <button type="submit" disabled={exporting} className={buttonClasses('primary', 'md', 'flex')}>
-          {exporting ? <RefreshCw size={13} aria-hidden="true" className="animate-spin" /> : encrypt ? <Lock size={13} aria-hidden="true" /> : <Download size={13} aria-hidden="true" />}
+        <Button type="submit" variant="primary" loading={exporting} icon={encrypt ? <Lock size={13} aria-hidden="true" /> : <Download size={13} aria-hidden="true" />}>
           {exporting ? 'Preparando...' : encrypt ? 'Descargar copia cifrada' : 'Descargar copia'}
-        </button>
+        </Button>
       </div>
     </form>
   )

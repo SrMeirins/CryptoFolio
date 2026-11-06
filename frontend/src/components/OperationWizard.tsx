@@ -9,7 +9,7 @@ import { DynamicField } from './DynamicField'
 import { WalletLabel } from './WalletPicker'
 import { buildInitialFields } from '../utils/operationWizardFields'
 import { T } from '../utils/colors'
-import { buttonClasses, iconButtonClasses } from './ui'
+import { buttonClasses, iconButtonClasses, Skeleton, SkeletonGroup } from './ui'
 import { formatNumber } from '../utils/format'
 
 interface OperationWizardProps {
@@ -70,9 +70,11 @@ export function OperationWizard(props: OperationWizardProps) {
 
   if (!catalog) {
     return (
-      <div className="flex items-center justify-center h-64 text-fg-subtle text-sm">
-        Cargando catálogo...
-      </div>
+      <SkeletonGroup label="Cargando el catálogo de operaciones" className="h-64 space-y-3 p-1">
+        <Skeleton className="h-9 w-full" />
+        <Skeleton className="h-9 w-2/3" />
+        <Skeleton className="h-24 w-full" />
+      </SkeletonGroup>
     )
   }
   return <OperationWizardForm {...props} catalog={catalog} />

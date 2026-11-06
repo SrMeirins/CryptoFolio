@@ -11,7 +11,7 @@ import { SaleSimulatorResults } from './SaleSimulatorResults'
 import { SaleSimulatorChart } from './SaleSimulatorChart'
 import { AnimatedNumber } from './AnimatedNumber'
 import { EurOnlyBadge } from './EurOnlyBadge'
-import { iconButtonClasses, Modal, Dropdown, SegmentedControl } from './ui'
+import { iconButtonClasses, Modal, Dropdown, SegmentedControl, Skeleton, SkeletonGroup } from './ui'
 import { parseFeePct, readFeePct, saveFeePct, walletQuantities } from '../utils/saleSimulator'
 import { QTY_PCTS, curvePrices, pctOfWallet, priceScenarios, qtyForPct, saleBreakEven, walletBreakEven } from '../utils/saleSimulatorView'
 
@@ -170,7 +170,7 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose, ini
                 <Dropdown label="Wallet de venta" value={wallet?.walletId ?? ''} className="w-full"
                   onChange={v => { setWalletChoice(v); setQtyInput(null) }}
                   options={wallets.map(w => ({ value: w.walletId, label: `${w.walletName} · ${formatAmount(w.quantity)}` }))} />
-              ) : <p className="text-xs text-fg-subtle py-2">Cargando wallets…</p>}
+              ) : <SkeletonGroup label="Cargando las wallets"><Skeleton className="h-9 w-full" /></SkeletonGroup>}
               <p className="mt-1.5 text-[11px] text-fg-subtle">Salen primero los lotes más antiguos del activo, estén en la wallet que estén (FIFO global).</p>
             </div>
 
@@ -256,10 +256,10 @@ export function SaleSimulatorModal({ asset, totalQty, currentPrice, onClose, ini
             )}
 
             {loading && !result && (
-              <div className="flex items-center justify-center gap-2 py-10 text-xs text-fg-subtle" role="status">
-                <span className="inline-block w-3 h-3 border border-border border-t-brand rounded-full animate-spin motion-reduce:animate-none" />
-                Calculando…
-              </div>
+              <SkeletonGroup label="Calculando el resultado" className="space-y-3">
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </SkeletonGroup>
             )}
 
             {result && (

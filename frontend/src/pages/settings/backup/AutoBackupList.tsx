@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Download, RotateCcw } from 'lucide-react'
+import { Download, RotateCcw, Loader2 } from 'lucide-react'
 import { backupApi, type AutoBackupFile } from '../../../api/backup'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
 import { iconButtonClasses } from '../../../components/ui'
@@ -56,9 +56,9 @@ export function AutoBackupList({ files }: { files: readonly AutoBackupFile[] }) 
                 aria-label={`Descargar la copia del ${formatBackupDate(f.created_at)}`} className={iconButtonClasses('md')}>
                 <Download size={14} aria-hidden="true" />
               </button>
-              <button type="button" onClick={() => setRestoring(f)} disabled={busy !== null}
+              <button type="button" onClick={() => setRestoring(f)} disabled={busy !== null} aria-busy={busy === f.name || undefined}
                 aria-label={`Restaurar la copia del ${formatBackupDate(f.created_at)}`} className={iconButtonClasses('md', false, '', 'danger')}>
-                <RotateCcw size={14} aria-hidden="true" className={busy === f.name ? 'animate-spin' : ''} />
+                {busy === f.name ? <Loader2 size={14} aria-hidden="true" className="animate-spin" /> : <RotateCcw size={14} aria-hidden="true" />}
               </button>
             </div>
           </li>

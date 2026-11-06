@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi, type AssetMetadata } from '../../api/portfolio'
 import { ApiError } from '../../api/client'
-import { Search, Plus, RefreshCw, CheckCircle, X, Zap } from 'lucide-react'
+import { Search, Plus, CheckCircle, X, Zap } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useToast } from '../../hooks/useToast'
 import { useDisplayMarket } from '../../hooks/useDisplayMarket'
@@ -13,7 +13,7 @@ import { AssetHealth } from './assets/AssetHealth'
 import { AssetEditDrawer } from './assets/AssetEditDrawer'
 import { matchesFilter, priceHealth, sortAssets, type AssetFilter, type SortColumn, type SortDirection } from './assets/assetRows'
 import { T, alpha, ink } from '../../utils/colors'
-import { buttonClasses, fieldClasses, iconButtonClasses, panelSurface, Pagination, SectionHeader } from '../../components/ui'
+import { Button, buttonClasses, fieldClasses, iconButtonClasses, panelSurface, Pagination, SectionHeader, Skeleton, SkeletonGroup } from '../../components/ui'
 import { paginate, type PageSize } from '../../utils/pagination'
 
 // Activos en Ajustes (#450): salud de los precios, filtros rápidos (también
@@ -105,17 +105,12 @@ export function AssetsSection() {
       <div className="shrink-0 pb-4 space-y-3">
         <SectionHeader title="Activos y precios" subtitle="Pares de precio en Binance. Se detectan solos al importar."
           actions={<>
-            {unknown.length > 0 && !detectingAll && (
-              <button type="button" onClick={handleDetectAll}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+            {(unknown.length > 0 || detectingAll) && (
+              <Button onClick={handleDetectAll} loading={detectingAll} icon={<Zap size={12} aria-hidden="true" />}
+                className="gap-1.5 px-3 py-2 text-xs border-0"
                 style={{ backgroundColor: alpha(T.warning, 9), color: ink(T.warning) }}>
-                <Zap size={12} aria-hidden="true" /> Detectar {unknown.length} sin precio
-              </button>
-            )}
-            {detectingAll && (
-              <span role="status" className="flex items-center gap-1.5 text-xs text-fg-muted px-3 py-2">
-                <RefreshCw size={12} aria-hidden="true" className="animate-spin" /> Detectando...
-              </span>
+                {detectingAll ? 'Detectando precios' : `Detectar ${unknown.length} sin precio`}
+              </Button>
             )}
             <button type="button" onClick={() => setShowAdd(s => !s)} className={buttonClasses('primary', 'md', 'flex')}>
               <Plus size={14} aria-hidden="true" /> Añadir activo
@@ -171,7 +166,9 @@ export function AssetsSection() {
       {/* Tabla con su propio desplazamiento */}
       <div className={panelSurface('none', 'flex-1 min-h-0 overflow-y-auto mb-4')}>
         {isLoading
-          ? <p role="status" className="py-8 text-center text-fg-subtle text-sm">Cargando activos...</p>
+          ? <SkeletonGroup label="Cargando los activos" className="p-4 space-y-2">
+              {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-9 w-full" />)}
+            </SkeletonGroup>
           : visible.length === 0
             ? <p className="py-8 text-center text-fg-subtle text-sm">Ningún activo con estos filtros.</p>
             : <AssetsTable assets={pageData.items} priceOf={priceOf} currency={market.currency} sort={sort} onSort={onSort}

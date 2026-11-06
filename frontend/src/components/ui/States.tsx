@@ -3,8 +3,9 @@ import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from './Button'
 import { skeletonClasses, stateClasses } from './classes'
 
-// Estados comunes (#199): vacío, carga y error con la misma composición
-// (icono, título, descripción, acción) en todas las pantallas.
+// Estados comunes (#199): vacío y error con la misma composición (icono,
+// título, descripción, acción) en todas las pantallas. La carga sigue la norma
+// de #494: esqueletos (SkeletonGroup) y barra de recarga (Loading.tsx).
 
 interface StateProps {
   icon?: ReactNode
@@ -23,15 +24,6 @@ export function EmptyState({ icon, title, description, action, compact = false, 
       <p className="text-sm text-fg-muted">{title}</p>
       {description && <p className="text-xs text-fg-subtle max-w-sm">{description}</p>}
       {action && <div className="mt-1">{action}</div>}
-    </div>
-  )
-}
-
-export function LoadingState({ label = 'Cargando…', compact = false, className = '' }: { label?: string; compact?: boolean; className?: string }) {
-  return (
-    <div role="status" aria-live="polite" className={stateClasses(compact, `flex-row text-sm text-fg-subtle ${className}`)}>
-      <RefreshCw size={14} className="animate-spin" aria-hidden="true" />
-      {label}
     </div>
   )
 }

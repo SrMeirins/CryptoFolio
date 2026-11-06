@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Search, RefreshCw, CheckCircle, XCircle, Zap } from 'lucide-react'
+import { Search, CheckCircle, XCircle, Zap } from 'lucide-react'
 import { portfolioApi, type AssetMetadata } from '../../../api/portfolio'
 import { Toggle } from '../../../components/Toggle'
 import { PairInputsGrid } from './PairInputsGrid'
 import { CoinGeckoIdEditor } from './CoinGeckoIdEditor'
 import { AssetLogoEditor } from './AssetLogoEditor'
 import { T, alpha } from '../../../utils/colors'
-import { buttonClasses, fieldClasses } from '../../../components/ui'
+import { buttonClasses, fieldClasses, Button } from '../../../components/ui'
 import { formatNumber } from '../../../utils/format'
 
 export function AssetEditPanel({ asset, onSaved, onCancel, embedded = false }: {
@@ -69,12 +69,10 @@ export function AssetEditPanel({ asset, onSaved, onCancel, embedded = false }: {
 
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium text-fg-muted">Editar pares de <span className="mono">{asset.symbol}</span></p>
-        <button type="button" onClick={handleDetect} disabled={detecting}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-          style={{ backgroundColor: alpha(T.brand, 9), color: T.brand }}>
-          {detecting ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}
+        <Button variant="ghost" size="sm" onClick={handleDetect} loading={detecting} icon={<Zap size={11} aria-hidden="true" />}
+          className="gap-1.5" style={{ backgroundColor: alpha(T.brand, 9), color: T.brand }}>
           Auto-detectar
-        </button>
+        </Button>
       </div>
 
       <PairInputsGrid
@@ -94,10 +92,9 @@ export function AssetEditPanel({ asset, onSaved, onCancel, embedded = false }: {
             onKeyDown={e => e.key === 'Enter' && handleTest()}
             placeholder={`${asset.symbol}EUR, ${asset.symbol}USDT...`}
             className={fieldClasses('md', false, 'flex-1 mono')} />
-          <button type="button" onClick={handleTest} disabled={testLoading || !testPairVal} aria-label="Probar el par en Binance" title="Probar el par en Binance"
-            className="px-3 py-2 bg-background-tertiary hover:bg-border disabled:opacity-50 rounded-lg text-sm transition-colors">
-            {testLoading ? <RefreshCw size={13} aria-hidden="true" className="animate-spin" /> : <Search size={13} aria-hidden="true" />}
-          </button>
+          <Button variant="ghost" onClick={handleTest} disabled={!testPairVal} loading={testLoading} icon={<Search size={13} aria-hidden="true" />}
+            aria-label="Probar el par en Binance" title="Probar el par en Binance"
+            className="px-3 py-2 bg-background-tertiary hover:bg-border text-fg hover:text-fg" />
         </div>
         {testResult && (
           <div className={`flex items-center gap-2 text-xs ${testResult.exists ? 'text-positive' : 'text-negative'}`}>

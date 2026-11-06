@@ -1,5 +1,5 @@
 import { RefreshCw } from 'lucide-react'
-import { buttonClasses } from '../../../components/ui'
+import { Button } from '../../../components/ui'
 import { formatAge, daysSince } from '../../../utils/portfolioLots'
 import type { PriceHealth } from './assetRows'
 
@@ -39,9 +39,9 @@ export function AssetHealth({ health, retrying, onRetry }: { health: PriceHealth
           ? <>Último fallo: <span className="mono text-fg-muted">{lastFailure.symbol}</span> {REASON[lastFailure.reason] ?? 'sin precio'} en {SOURCE[lastFailure.source] ?? lastFailure.source}, {when(lastFailure.at)}.</>
           : 'Sin fallos de precio desde que arrancó la app.'}
       </p>
-      <button type="button" onClick={onRetry} disabled={retrying} className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
-        <RefreshCw size={12} aria-hidden="true" className={retrying ? 'animate-spin' : ''} /> Reintentar precios
-      </button>
+      <Button size="sm" onClick={onRetry} loading={retrying} icon={<RefreshCw size={12} aria-hidden="true" />} className="gap-1.5">
+        Reintentar precios
+      </Button>
     </section>
   )
 }

@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../api/portfolio'
-import { RefreshCw, Trash2, Zap, ArrowLeftRight, Layers, FileUp, Tag, Wallet, Coins, BarChart3, Wrench, AlertTriangle, HardDrive, Upload, Calculator, CalendarClock, type LucideIcon } from 'lucide-react'
+import { Trash2, Zap, ArrowLeftRight, Layers, FileUp, Tag, Wallet, Coins, BarChart3, Wrench, AlertTriangle, HardDrive, Upload, Calculator, CalendarClock, type LucideIcon } from 'lucide-react'
 import { useToast } from '../../hooks/useToast'
 import { useRunFifoStream } from '../../hooks/useRunFifoStream'
 import { T } from '../../utils/colors'
-import { buttonClasses, fieldClasses, StatCard } from '../../components/ui'
+import { buttonClasses, fieldClasses, StatCard, Button } from '../../components/ui'
 import { SettingsCard } from './SettingsCard'
 import { formatNumber } from '../../utils/format'
 import { BackupCard } from './backup/BackupCard'
@@ -114,11 +114,9 @@ export function DatosSection() {
               {cacheResult !== null && (
                 <span className="text-xs text-positive">{cacheResult} entradas eliminadas</span>
               )}
-              <button type="button" onClick={handleClearCache} disabled={clearingCache}
-                className={buttonClasses('secondary', 'md', 'flex')}>
-                {clearingCache ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
+              <Button onClick={handleClearCache} loading={clearingCache} icon={<Trash2 size={13} aria-hidden="true" />}>
                 Limpiar
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -129,11 +127,9 @@ export function DatosSection() {
                 <p className="text-sm font-medium">Re-ejecutar motor FIFO</p>
                 <p className="text-xs text-fg-subtle mt-0.5">Recalcula todos los lotes y plusvalías desde cero y compara con lo anterior.</p>
               </div>
-              <button type="button" onClick={() => void handleRunFifo()} disabled={runningFifo}
-                className={buttonClasses('secondary', 'md', 'flex')}>
-                {runningFifo ? <RefreshCw size={13} aria-hidden="true" className="animate-spin" /> : <Zap size={13} aria-hidden="true" />}
+              <Button onClick={() => void handleRunFifo()} loading={runningFifo} icon={<Zap size={13} aria-hidden="true" />}>
                 {runningFifo ? 'Calculando...' : 'Ejecutar'}
-              </button>
+              </Button>
             </div>
             <FifoRunPanel state={fifoState} />
           </div>

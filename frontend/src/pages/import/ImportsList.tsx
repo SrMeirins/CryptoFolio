@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, RefreshCw, Trash2, Calendar, Hash, ChevronRight } from 'lucide-react'
+import { FileText, Loader2, Trash2, Calendar, Hash, ChevronRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { ImportRecord } from '../../api/portfolio'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -70,10 +70,7 @@ export function ImportsList({ imports, onDelete }: {
             {/* Fila principal */}
             <div className="px-4 py-3 flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-background-tertiary">
-                {isDeleting
-                  ? <RefreshCw size={16} className="text-fg-subtle animate-spin" />
-                  : <FileText size={16} className="text-fg-subtle" />
-                }
+                <FileText size={16} className="text-fg-subtle" aria-hidden="true" />
               </div>
 
               <div className="flex-1 min-w-0">
@@ -102,9 +99,10 @@ export function ImportsList({ imports, onDelete }: {
                 type="button"
                 onClick={() => setConfirmId(imp.id)}
                 className={iconButtonClasses('md', false, '', 'danger')}
-                title="Borrar importación"
+                title="Borrar importación" aria-label={isDeleting ? 'Borrando la importación' : 'Borrar importación'}
+                aria-busy={isDeleting || undefined} disabled={isDeleting}
               >
-                <Trash2 size={14} />
+                {isDeleting ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Trash2 size={14} aria-hidden="true" />}
               </button>
             </div>
 

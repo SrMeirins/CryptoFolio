@@ -5,7 +5,7 @@ import { portfolioApi, type LockedAmount } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { BreakEvenCell } from '../../components/BreakEvenCell'
 import { PnlPill } from '../../components/AssetTableCells'
-import { Button, Drawer, Skeleton, iconButtonClasses } from '../../components/ui'
+import { Button, Drawer, Skeleton, iconButtonClasses, SkeletonGroup } from '../../components/ui'
 import { OP_META } from '../../constants/operations'
 import { formatAmount, formatMoney, formatPercent, formatPrice, pnlColor, type Currency } from '../../utils/format'
 import { usePricesStore } from '../../store/pricesStore'
@@ -198,7 +198,7 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
             Lotes FIFO abiertos{data ? ` (${lots.length})` : ''}
           </h3>
           <p className="text-[11px] text-fg-subtle">Se vende primero el lote más antiguo, esté en la wallet que esté (FIFO global); está marcado como «Siguiente».</p>
-          {isLoading && <div role="status" aria-label="Cargando los lotes" className="space-y-2">{[0, 1, 2].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>}
+          {isLoading && <SkeletonGroup label="Cargando los lotes" className="space-y-2">{[0, 1, 2].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}</SkeletonGroup>}
           {isError && <p className="text-xs text-fg-subtle">No se pudieron cargar los lotes.</p>}
           {data && lots.length === 0 && <p className="text-xs text-fg-subtle">No hay lotes abiertos.</p>}
           <ul className="space-y-2">

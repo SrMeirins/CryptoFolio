@@ -4,7 +4,7 @@ import { ValueChart } from './ValueChart'
 import { EvolutionSummary } from './EvolutionSummary'
 import { CalendarDayDetail } from './calendar/CalendarDayDetail'
 import { DateRangePicker } from '../../components/DateRangePicker'
-import { SegmentedControl, PanelHeader, panelSurface } from '../../components/ui'
+import { SegmentedControl, PanelHeader, panelSurface, RefreshBar } from '../../components/ui'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
 import { usePreparacionHistoricos } from '../../hooks/usePreparacionHistoricos'
 import { PreparandoHistoricos } from '../../components/PreparandoHistoricos'
@@ -82,7 +82,10 @@ export function EvolutionCard() {
   const state = { loading: active.isLoading, error: active.isError, intraday: query.intraday, currency, points, animationKey }
 
   return (
-    <div className={panelSurface('none', 'px-5 py-5')}>
+    <div className={panelSurface('none', 'relative px-5 py-5')} aria-busy={active.isPlaceholderData || undefined}>
+      {/* Cambio de periodo (#494): la curva anterior sigue visible y una barra indica la recarga.
+          Las reconsultas periódicas de fondo no la encienden. */}
+      <RefreshBar active={active.isPlaceholderData} />
       <PanelHeader
         icon={LineChart}
         title="Evolución"

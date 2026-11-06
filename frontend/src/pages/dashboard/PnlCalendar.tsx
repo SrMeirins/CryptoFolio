@@ -8,7 +8,7 @@ import { dailyPnlQuery } from '../../queries/currencyQueries'
 import { localToday } from '../../utils/pnlChart'
 import { addMonths, compareYm, monthGrid, monthLabel, monthRange, monthSummary, ymOf, type YearMonth } from '../../utils/pnlCalendar'
 import { monthStats, weekTotals, yearMonths } from '../../utils/calendarStats'
-import { Button, SegmentedControl, iconButtonClasses, PanelHeader, Skeleton, MonthPicker, panelSurface } from '../../components/ui'
+import { Button, SegmentedControl, iconButtonClasses, PanelHeader, Skeleton, MonthPicker, panelSurface, SkeletonGroup } from '../../components/ui'
 import { CalendarMonthGrid } from './calendar/CalendarMonthGrid'
 import { CalendarStats } from './calendar/CalendarStats'
 import { CalendarLegend } from './calendar/CalendarLegend'
@@ -128,9 +128,9 @@ export function PnlCalendar() {
             lastDay={Number(weeks.flat().filter(Boolean).at(-1)?.slice(8) ?? 31)} />
           {isError && <p className="text-xs text-fg-subtle py-6 text-center">No se pudo cargar el P&L del mes.</p>}
           {isLoading && (
-            <div role="status" aria-label="Cargando el calendario" className="grid grid-cols-7 gap-1.5">
+            <SkeletonGroup label="Cargando el calendario" className="grid grid-cols-7 gap-1.5">
               {Array.from({ length: 35 }, (_, i) => <Skeleton key={i} className="h-16" />)}
-            </div>
+            </SkeletonGroup>
           )}
           {!isError && (
             <div key={`${ym.year}-${ym.month}`} className="animate-page-in">

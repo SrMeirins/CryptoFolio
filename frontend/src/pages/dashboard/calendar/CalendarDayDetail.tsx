@@ -4,7 +4,7 @@ import { useCurrencyQuery } from '../../../hooks/useCurrencyQuery'
 import { dayDetailQuery } from '../../../queries/currencyQueries'
 import { formatMoney, type Currency } from '../../../utils/format'
 import type { CalendarDay } from '../../../utils/pnlCalendar'
-import { iconButtonClasses } from '../../../components/ui'
+import { iconButtonClasses, Skeleton, SkeletonGroup } from '../../../components/ui'
 import { CryptoIcon } from '../../../components/CryptoIcon'
 import { longDate, signedMoney, signedPct, toneOf } from './format'
 
@@ -71,7 +71,11 @@ export function CalendarDayDetail({ date, day, onClose }: { date: string; day: C
         </button>
       </div>
 
-      {isLoading && <p className="text-xs text-fg-subtle">Cargando el detalle…</p>}
+      {isLoading && (
+        <SkeletonGroup label="Cargando el detalle del día" className="grid gap-4 sm:grid-cols-3">
+          {[0, 1, 2].map(i => <div key={i} className="space-y-1.5"><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-4/5" /><Skeleton className="h-3 w-3/5" /></div>)}
+        </SkeletonGroup>
+      )}
       {isError && <p className="text-xs text-fg-subtle">No se pudo cargar el detalle del día.</p>}
       {data && (
         <div className="grid gap-4 sm:grid-cols-3">
