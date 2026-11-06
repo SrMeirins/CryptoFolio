@@ -5,7 +5,7 @@ import { CryptoIcon } from '../../components/CryptoIcon'
 import { TableExpandToggle } from './TableExpandToggle'
 import type { RendimientoEvent } from './types'
 import { fiscalDateDetail, formatFiscalDate, formatFiscalQty } from '../../utils/fiscalTable'
-import { buttonClasses, badgeClasses, tableFootRowClasses, tableHeadRowClasses, tableRowClasses, Dropdown, Pagination, panelSurface, Hint, TextTooltip } from '../../components/ui'
+import { buttonClasses, badgeClasses, tableFootRowClasses, tableHeadRowClasses, tableRowClasses, Dropdown, Pagination, panelSurface, Hint, TextTooltip, FilteredEmpty } from '../../components/ui'
 import { paginate, type PageSize } from '../../utils/pagination'
 import { buildRendimientosCsv } from '../../utils/fiscalRendimientos'
 import { usePrivacyStore } from '../../store/privacyStore'
@@ -106,7 +106,10 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
             <tbody className="divide-y divide-border">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-fg-subtle text-xs">Sin rendimientos con los filtros actuales</td>
+                  <td colSpan={6}>
+                    <FilteredEmpty summary={`Filtros: ${[filterActivo, filterTipo].filter(Boolean).join(', ')}.`}
+                      onClear={() => { setFilterActivo(''); setFilterTipo('') }} />
+                  </td>
                 </tr>
               ) : view.items.map((r, i) => (
                 <tr key={`${r.fecha}-${r.tipo}-${r.activo}-${i}`} className={tableRowClasses()}>

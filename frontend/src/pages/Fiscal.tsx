@@ -30,6 +30,8 @@ import { useFiscalShortcuts } from './fiscal/useFiscalShortcuts'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
 import { cardClasses, EmptyState, ErrorState, Skeleton, PageHeader, panelEnterStyle, tabId, tabPanelId, SectionHeader, ViewTabs, RefreshBar } from '../components/ui'
 import { navIcon } from '../constants/navigation'
+import { FirstUseEmpty } from '../components/FirstUseEmpty'
+import { useHasTransactions } from '../hooks/useHasTransactions'
 import { PieMetodologia, type TemaMetodo } from '../components/metodologia'
 
 const VISTA_LABELS: Record<FiscalVista, string> = { resumen: 'Resumen', operaciones: 'Operaciones', modelo721: 'Modelo 721', planificar: 'Planificar' }
@@ -55,6 +57,7 @@ function vistaHeader(vista: FiscalVista, year: number): { title: string; subtitl
 }
 
 export function Fiscal() {
+  const firstUse = useHasTransactions()
   const [searchParams, setSearchParams] = useSearchParams()
   // ?anio=2025 llega desde el resultado de una importación (#324).
   const [selectedYear, setSelectedYear] = useState<number | null>(() => {
@@ -185,10 +188,15 @@ export function Fiscal() {
     )
   }
 
+  // Sin ejercicios (#496): primer uso si no hay operaciones; si las hay, aún falta el cálculo FIFO.
   if (!activeYear) {
     return (
-      <div className="p-6">
-        <EmptyState icon={<FileText size={32} />} title="No hay datos fiscales disponibles." description="Importa transacciones y ejecuta el motor FIFO primero." />
+      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+        <PageHeader icon={navIcon('/fiscal')} title="Fiscal" />
+        {firstUse.empty
+          ? <FirstUseEmpty what="tus ganancias, pérdidas y obligaciones fiscales" />
+          : <EmptyState icon={<FileText size={32} />} title="Aún no hay ejercicios fiscales"
+              description="Se calculan con el FIFO tras importar. Si acabas de importar, espera a que termine o ejecútalo en Ajustes, sección Datos." />}
       </div>
     )
   }

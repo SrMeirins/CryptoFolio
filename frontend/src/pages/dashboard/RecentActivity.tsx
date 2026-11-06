@@ -12,7 +12,7 @@ import { localToday } from '../../utils/pnlChart'
 import { filterActivity, groupByDay, localTimeOf, selectRecent, type ActivityFilter } from '../../utils/recentActivity'
 import { activitySubtitle } from '../../utils/panelSubtitles'
 import { CryptoIcon } from '../../components/CryptoIcon'
-import { EmptyState, PanelHeader, SegmentedControl, Skeleton, panelSurface, SkeletonGroup } from '../../components/ui'
+import { PanelHeader, SegmentedControl, Skeleton, panelSurface, SkeletonGroup, FilteredEmpty, NotApplicable } from '../../components/ui'
 
 // Actividad reciente (#237): línea de tiempo de los últimos 7 días (máx. 12
 // operaciones; si no hay, las 8 últimas) agrupada por día en hora de Madrid,
@@ -64,7 +64,9 @@ export function RecentActivity() {
           {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-10 w-full" />)}
         </SkeletonGroup>
       ) : groups.length === 0 ? (
-        <EmptyState compact title={items.length === 0 ? 'Sin transacciones aún' : 'Sin operaciones de este tipo en el periodo'} />
+        items.length === 0
+          ? <NotApplicable>Sin operaciones en el periodo.</NotApplicable>
+          : <FilteredEmpty summary={`Filtro: ${FILTERS.find(f => f.value === filter)?.label ?? filter}.`} onClear={() => setFilter('all')} />
       ) : (
         <div className="px-5 py-4 space-y-4">
           {groups.map(g => (

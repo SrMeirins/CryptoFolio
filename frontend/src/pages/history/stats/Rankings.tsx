@@ -2,7 +2,7 @@ import type { HistoryStats } from '../../../api/portfolio'
 import { CryptoIcon } from '../../../components/CryptoIcon'
 import { formatAmount, formatMoney, type Currency } from '../../../utils/format'
 import { T } from '../../../utils/colors'
-import { Hint } from '../../../components/ui'
+import { Hint, NotApplicable } from '../../../components/ui'
 
 // Rankings de la analítica del Historial (#376, #413): top activos y
 // comisiones por activo, con barras en degradado y filas que filtran la lista
@@ -38,7 +38,7 @@ export function Rankings({ stats, currency, period, onAssetClick }: {
         <p className="text-[11px] text-fg-subtle uppercase tracking-widest mb-2">
           Top activos <span className="normal-case">· {period}</span>
         </p>
-        {stats.top_assets.length === 0 && <p className="text-xs text-fg-subtle">Sin compras ni ventas en este periodo.</p>}
+        {stats.top_assets.length === 0 && <NotApplicable>Sin compras ni ventas en este periodo.</NotApplicable>}
         <div className="space-y-0.5">
           {stats.top_assets.slice(0, 6).map(row => (
             <RankRow key={row.asset} asset={row.asset} share={row.ops / topOps} color={T.brand} figure={String(row.ops)}

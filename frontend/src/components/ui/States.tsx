@@ -1,11 +1,19 @@
 import type { ReactNode } from 'react'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, RefreshCw, SearchX } from 'lucide-react'
 import { Button } from './Button'
 import { skeletonClasses, stateClasses } from './classes'
 
 // Estados comunes (#199): vacío y error con la misma composición (icono,
 // título, descripción, acción) en todas las pantallas. La carga sigue la norma
 // de #494: esqueletos (SkeletonGroup) y barra de recarga (Loading.tsx).
+//
+// Norma de vacíos (#496), tres tipos:
+// - Primer uso (no hay ninguna operación): FirstUseEmpty, uno por página, con
+//   «Importar» y «Añadir a mano».
+// - Por filtros (hay datos, pero no con estos filtros): FilteredEmpty, con el
+//   resumen de los filtros y siempre «Quitar filtros».
+// - No aplica (no hay nada que mostrar por naturaleza): NotApplicable, texto
+//   neutro sin acción.
 
 interface StateProps {
   icon?: ReactNode
@@ -37,6 +45,29 @@ export function ErrorState({ title, description, onRetry, compact = false, class
       {onRetry && <Button size="sm" className="mt-2" icon={<RefreshCw size={12} />} onClick={onRetry}>Reintentar</Button>}
     </div>
   )
+}
+
+/** Vacío por filtros (#496): resumen de los filtros activos y siempre «Quitar filtros». */
+export function FilteredEmpty({ summary, onClear, compact = true, className = '' }: {
+  /** Filtros activos en texto: «búsqueda "BTC" y wallet Ledger». */
+  summary?: ReactNode
+  onClear: () => void
+  compact?: boolean
+  className?: string
+}) {
+  return (
+    <div role="status" data-empty="filtros" className={stateClasses(compact, className)}>
+      <SearchX size={22} className="text-fg-subtle mb-1" aria-hidden="true" />
+      <p className="text-sm text-fg-muted">Sin resultados con estos filtros</p>
+      {summary && <p className="text-xs text-fg-subtle max-w-sm">{summary}</p>}
+      <Button variant="ghost" size="sm" className="mt-1" onClick={onClear}>Quitar filtros</Button>
+    </div>
+  )
+}
+
+/** Vacío que «no aplica» (#496): no hay nada que mostrar por naturaleza; texto neutro sin acción. */
+export function NotApplicable({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <p data-empty="no-aplica" className={`py-6 text-center text-xs text-fg-subtle ${className}`}>{children}</p>
 }
 
 /** Marcador de carga con la forma del contenido final. */

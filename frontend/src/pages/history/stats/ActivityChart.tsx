@@ -4,6 +4,7 @@ import { STATS_CATEGORIES, type HistoryStats, type StatsCategory } from '../../.
 import { formatMoney, formatNumber, type Currency } from '../../../utils/format'
 import { useReducedMotion } from '../../../hooks/useReducedMotion'
 import { CATEGORY_LABELS, chartRows, periodBreakdown, type ChartMode, type ChartRow } from './statsChart'
+import { NotApplicable } from '../../../components/ui'
 
 // Gráfico de actividad del Historial (#376, #413): barras apiladas por
 // categoría con degradado, foco en el periodo bajo el ratón (los demás se
@@ -27,7 +28,7 @@ function DetailTooltip({ active, payload, chart, mode, currency, colors }: {
     <div className="glass-tooltip rounded-xl px-3.5 py-3 text-xs min-w-52">
       <p className="font-semibold text-fg capitalize">{row.label}</p>
       <p className="text-fg-subtle mb-2 mono">{formatNumber(d.ops, 0)} {d.ops === 1 ? 'operación' : 'operaciones'} · {formatMoney(d.value, currency)}</p>
-      {d.items.length === 0 && <p className="text-fg-subtle">Sin actividad.</p>}
+      {d.items.length === 0 && <NotApplicable>Sin actividad en el periodo.</NotApplicable>}
       <ul className="space-y-1">
         {d.items.map((it, i) => (
           <li key={it.category} className={`flex items-center gap-2 ${i === 0 ? 'text-fg font-semibold' : 'text-fg-muted'}`}>

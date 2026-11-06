@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { portfolioApi } from '../api/portfolio'
 import { SaleSimulatorModal } from '../components/SaleSimulatorModal'
-import { Wallet, Search, X, Settings, Rows3, Rows4 } from 'lucide-react'
+import { Search, X, Settings, Rows3, Rows4 } from 'lucide-react'
 import { useDisplayLots, useDisplayMarket } from '../hooks/useDisplayMarket'
 import { InventoryStrip } from './portfolio/InventoryStrip'
 import { AssetDetailPanel } from './portfolio/AssetDetailPanel'
@@ -11,10 +11,12 @@ import { usePricesStore } from '../store/pricesStore'
 import { WalletCards } from './portfolio/WalletCards'
 import { WalletSections } from './portfolio/WalletSections'
 import { DustSection } from './portfolio/DustSection'
-import { iconButtonClasses, fieldClasses, Button, EmptyState, Notice, PageHeader, Skeleton, SkeletonGroup, SegmentedControl, Dropdown, panelClasses, panelEnterStyle, panelSurface } from '../components/ui'
+import { iconButtonClasses, fieldClasses, Button, FilteredEmpty, Notice, NotApplicable, PageHeader, Skeleton, SkeletonGroup, SegmentedControl, Dropdown, panelClasses, panelEnterStyle, panelSurface } from '../components/ui'
 import { AssetTable } from '../components/AssetTable'
 import { navIcon } from '../constants/navigation'
 import { PieMetodologia } from '../components/metodologia'
+import { FirstUseEmpty } from '../components/FirstUseEmpty'
+import { useHasTransactions } from '../hooks/useHasTransactions'
 import { portfolioSubtitle } from '../utils/panelSubtitles'
 import { portfolioSections } from '../utils/portfolioSections'
 import { portfolioInventory } from '../utils/portfolioInventory'
@@ -38,6 +40,7 @@ const DENSITY_OPTIONS = [
 ]
 
 export function Portfolio() {
+  const firstUse = useHasTransactions()
   const { data: lots = [], isLoading } = useQuery({
     queryKey: ['fifo-lots'],
     queryFn: portfolioApi.getLots,
@@ -139,6 +142,13 @@ export function Portfolio() {
   const nothingFound = mainCount === 0 && dust.rows.length === 0
   const filtersActive = !!search || !!walletFilter || pnlFilter !== 'all'
   const walletOptions = [{ value: '', label: 'Todas las wallets' }, ...inventory.wallets.map(w => ({ value: w.walletId, label: w.name }))]
+  // Resumen de los filtros activos para el vacío por filtros (#496).
+  const filtersSummary = [
+    search && `búsqueda «${search}»`,
+    walletFilter && `wallet ${walletOptions.find(o => o.value === walletFilter)?.label ?? walletFilter}`,
+    pnlFilter !== 'all' && PNL_OPTIONS.find(o => o.value === pnlFilter)?.label.toLowerCase(),
+  ].filter(Boolean).join(', ')
+  const clearFilters = () => { setSearch(''); setWalletFilter(null); setPnlFilter('all') }
 
   function changeView(next: PortfolioView) {
     setView(next)
@@ -154,6 +164,16 @@ export function Portfolio() {
     const next = !dustOpen
     setDustOpen(next)
     saveDustOpen(next)
+  }
+
+  // Sin ninguna operación (#496): un único vacío de primer uso.
+  if (firstUse.empty) {
+    return (
+      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+        <PageHeader icon={navIcon('/portfolio')} title="Portfolio" />
+        <FirstUseEmpty what="tus posiciones y su P&L" />
+      </div>
+    )
   }
 
   return (
@@ -242,7 +262,7 @@ export function Portfolio() {
             <Dropdown size="sm" label="Filtrar por wallet" value={walletFilter ?? ''} onChange={v => setWalletFilter(v || null)} options={walletOptions} />
           )}
           {filtersActive && (
-            <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setWalletFilter(null); setPnlFilter('all') }}>Quitar filtros</Button>
+            <Button variant="ghost" size="sm" onClick={clearFilters}>Quitar filtros</Button>
           )}
         </div>
       )}
@@ -252,16 +272,10 @@ export function Portfolio() {
           {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-12 w-full" />)}
         </SkeletonGroup>
       ) : lots.length === 0 && fiatBalances.length === 0 ? (
-        <EmptyState icon={<Wallet size={32} />} title="Sin activos en portfolio" description="Importa tu CSV de Binance para empezar" />
+        // Hay operaciones, pero ninguna posición abierta: no aplica (#496).
+        <NotApplicable className="border border-dashed border-border rounded-xl">No tienes posiciones abiertas: todo lo que compraste se ha vendido o retirado.</NotApplicable>
       ) : nothingFound ? (
-        <EmptyState
-          compact
-          icon={<Search size={22} />}
-          title={search
-            ? <>Sin resultados para <span className="mono text-fg">"{search}"</span></>
-            : 'Ninguna posición coincide con los filtros'}
-          action={<Button variant="ghost" size="sm" onClick={() => { setSearch(''); setWalletFilter(null); setPnlFilter('all') }}>Quitar filtros</Button>}
-        />
+        <FilteredEmpty summary={filtersSummary && `Filtros: ${filtersSummary}.`} onClear={clearFilters} />
       ) : (
         <>
           {view === 'asset' ? (

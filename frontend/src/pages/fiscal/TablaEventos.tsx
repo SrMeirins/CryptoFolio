@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { TrendingUp, Filter, Download } from 'lucide-react'
+import { TrendingUp, Download } from 'lucide-react'
 import { formatEur, pnlColor } from '../../utils/format'
 import { SortIcon } from '../../components/SortIcon'
 import { TableExpandToggle } from './TableExpandToggle'
@@ -8,7 +8,7 @@ import { OperacionesFilters } from './OperacionesFilters'
 import { RecompraSummary } from './RecompraSummary'
 import { WarningsLegend } from './EventWarnings'
 import type { FiscalEvent, FiscalSummary } from './types'
-import { buttonClasses, Pagination, tableFootRowClasses, tableHeadRowClasses, panelSurface, Hint, Tooltip } from '../../components/ui'
+import { buttonClasses, Pagination, tableFootRowClasses, tableHeadRowClasses, panelSurface, Hint, Tooltip, FilteredEmpty } from '../../components/ui'
 import { useDebounce } from '../../hooks/useDebounce'
 import { usePrivacyStore } from '../../store/privacyStore'
 import { paginate, type PageSize } from '../../utils/pagination'
@@ -101,10 +101,7 @@ export function TablaEventos({ events, summary, initialFilters }: {
             tones={tones} warnings={warnings} assets={assets} onClear={clear} filtered={isFiltered(filters)} />
 
           {filtered.length === 0 ? (
-            <p className="px-4 py-10 text-center text-fg-subtle text-xs">
-              <Filter size={20} className="mx-auto mb-2 opacity-30" aria-hidden="true" />
-              Sin operaciones con los filtros actuales
-            </p>
+            <FilteredEmpty onClear={clear} />
           ) : (
             <>
               {/* Tarjetas en contenedores estrechos; tabla a partir de 56 rem */}

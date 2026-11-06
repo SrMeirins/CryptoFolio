@@ -4,7 +4,7 @@ import { Calculator, Hourglass, PiggyBank, Repeat, TrendingDown, TrendingUp } fr
 import { portfolioApi } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { SaleSimulatorModal } from '../../components/SaleSimulatorModal'
-import { buttonClasses, cardClasses, fieldClasses, Notice, Skeleton, TextTooltip } from '../../components/ui'
+import { buttonClasses, cardClasses, fieldClasses, Notice, Skeleton, TextTooltip, NotApplicable } from '../../components/ui'
 import { useDebounce } from '../../hooks/useDebounce'
 import { usePricesStore } from '../../store/pricesStore'
 import { ink } from '../../utils/colors'
@@ -154,7 +154,7 @@ export function PlanificadorTab() {
       {/* Pérdidas latentes */}
       <FiscalChartCard icon={TrendingDown} title="Pérdidas latentes que puedes realizar">
         {sug.perdidas.length === 0 ? (
-          <p className="text-xs text-fg-subtle">No tienes posiciones con pérdida latente a los precios actuales.</p>
+          <NotApplicable>No tienes posiciones con pérdida latente a los precios actuales.</NotApplicable>
         ) : (
           <ul className="space-y-2">
             {sug.perdidas.map(s => {
@@ -183,7 +183,7 @@ export function PlanificadorTab() {
       {data.colchon > 0.005 && (
         <FiscalChartCard icon={TrendingUp} title="Ganancias que caben en el colchón">
           {sug.ganancias.length === 0 ? (
-            <p className="text-xs text-fg-subtle">No tienes posiciones con ganancia latente a los precios actuales.</p>
+            <NotApplicable>No tienes posiciones con ganancia latente a los precios actuales.</NotApplicable>
           ) : (
             <ul className="space-y-2">
               {sug.ganancias.map(s => (

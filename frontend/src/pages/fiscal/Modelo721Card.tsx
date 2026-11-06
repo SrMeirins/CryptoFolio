@@ -6,7 +6,7 @@ import { AlertTriangle, ChevronRight, Download, FileCheck2, Landmark, ShieldChec
 import { formatEur, formatPercent, formatPrice } from '../../utils/format'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { InfoTooltip } from '../../components/InfoTooltip'
-import { buttonClasses, fieldClasses, Notice, panelSurface, Hint } from '../../components/ui'
+import { buttonClasses, fieldClasses, Notice, panelSurface, Hint, NotApplicable } from '../../components/ui'
 import { usePrivacyStore } from '../../store/privacyStore'
 import { ink } from '../../utils/colors'
 import { formatFiscalDate, formatFiscalQty } from '../../utils/fiscalTable'
@@ -199,7 +199,7 @@ export function Modelo721Card({ data: snapshot, activeYear }: { data: Modelo721;
             {view.exchanges.map(g => <ExchangeRow key={g.walletId} g={g} total={view.totalExchanges} />)}
           </ul>
         ) : (
-          <p className="text-xs text-fg-subtle">No hay activos en exchanges a esta fecha.</p>
+          <NotApplicable>No hay activos en exchanges a esta fecha.</NotApplicable>
         )}
 
         {/* Autocustodia: no computa */}

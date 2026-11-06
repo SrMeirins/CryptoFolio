@@ -13,7 +13,7 @@ import { AssetHealth } from './assets/AssetHealth'
 import { AssetEditDrawer } from './assets/AssetEditDrawer'
 import { matchesFilter, priceHealth, sortAssets, type AssetFilter, type SortColumn, type SortDirection } from './assets/assetRows'
 import { T, alpha, ink } from '../../utils/colors'
-import { Button, buttonClasses, fieldClasses, iconButtonClasses, panelSurface, Pagination, SectionHeader, Skeleton, SkeletonGroup, Hint } from '../../components/ui'
+import { Button, buttonClasses, fieldClasses, iconButtonClasses, panelSurface, Pagination, SectionHeader, Skeleton, SkeletonGroup, Hint, FilteredEmpty } from '../../components/ui'
 import { paginate, type PageSize } from '../../utils/pagination'
 
 // Activos en Ajustes (#450): salud de los precios, filtros rápidos (también
@@ -172,7 +172,8 @@ export function AssetsSection() {
               {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-9 w-full" />)}
             </SkeletonGroup>
           : visible.length === 0
-            ? <p className="py-8 text-center text-fg-subtle text-sm">Ningún activo con estos filtros.</p>
+            ? <FilteredEmpty summary={[search && `búsqueda «${search}»`, filtro !== 'todos' && FILTERS.find(f => f.value === filtro)?.label].filter(Boolean).join(', ')}
+                onClear={() => { setSearch(''); setFiltro('todos'); setPage(1) }} />
             : <AssetsTable assets={pageData.items} priceOf={priceOf} currency={market.currency} sort={sort} onSort={onSort}
                 onEdit={setEditingSymbol} onDelete={setConfirmDelete} />}
         <Pagination page={pageData.page} pages={pageData.pages} from={pageData.from} to={pageData.to} total={pageData.total}
