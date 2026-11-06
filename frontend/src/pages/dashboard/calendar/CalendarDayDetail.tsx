@@ -4,7 +4,7 @@ import { useCurrencyQuery } from '../../../hooks/useCurrencyQuery'
 import { dayDetailQuery } from '../../../queries/currencyQueries'
 import { formatMoney, type Currency } from '../../../utils/format'
 import type { CalendarDay } from '../../../utils/pnlCalendar'
-import { iconButtonClasses, Skeleton, SkeletonGroup } from '../../../components/ui'
+import { iconButtonClasses, Skeleton, SkeletonGroup, QueryError } from '../../../components/ui'
 import { CryptoIcon } from '../../../components/CryptoIcon'
 import { longDate, signedMoney, signedPct, toneOf } from './format'
 
@@ -42,10 +42,11 @@ function ContributionList({ title, items, currency }: { title: string; items: Ar
 }
 
 export function CalendarDayDetail({ date, day, onClose }: { date: string; day: CalendarDay | undefined; onClose: () => void }) {
-  const { data, isLoading, isError, currency: requested } = useCurrencyQuery(
+  const dayQ = useCurrencyQuery(
     c => dayDetailQuery(c, date),
     { refetchInterval: day?.live ? 60_000 : false },
   )
+  const { data, isLoading, isError, currency: requested } = dayQ
   const currency = data?.currency ?? requested
   // Hoy, la cifra principal es la del calendario (en vivo); el reparto, la del servidor.
   const pnl = day?.pnl ?? data?.pnl ?? 0
@@ -76,7 +77,7 @@ export function CalendarDayDetail({ date, day, onClose }: { date: string; day: C
           {[0, 1, 2].map(i => <div key={i} className="space-y-1.5"><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-4/5" /><Skeleton className="h-3 w-3/5" /></div>)}
         </SkeletonGroup>
       )}
-      {isError && <p className="text-xs text-fg-subtle">No se pudo cargar el detalle del día.</p>}
+      {isError && <QueryError what="el detalle del día" error={dayQ.error} onRetry={() => void dayQ.refetch()} />}
       {data && (
         <div className="grid gap-4 sm:grid-cols-3">
           <dl className="space-y-1 text-xs">

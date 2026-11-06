@@ -79,7 +79,7 @@ export function EvolutionCard() {
     setPeriod('Rango')
   }
 
-  const state = { loading: active.isLoading, error: active.isError, intraday: query.intraday, currency, points, animationKey }
+  const state = { loading: active.isLoading, error: active.isError, onRetry: () => void active.refetch(), intraday: query.intraday, currency, points, animationKey }
 
   return (
     <div className={panelSurface('none', 'relative px-5 py-5')} aria-busy={active.isPlaceholderData || undefined}>

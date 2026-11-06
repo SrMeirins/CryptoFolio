@@ -2,7 +2,7 @@ import { useState, type KeyboardEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, SlidersHorizontal } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
-import { Dropdown } from '../../components/ui'
+import { Dropdown, QueryError } from '../../components/ui'
 import { useToast } from '../../hooks/useToast'
 import { useSettingFeedback } from '../../hooks/useSettingFeedback'
 import { formatNumber } from '../../utils/format'
@@ -13,6 +13,7 @@ import {
 } from '../../utils/preferences'
 import { SettingsCard } from './SettingsCard'
 import { SavedMark } from './SavedMark'
+import { failure } from '../../utils/queryFailure'
 
 // Preferencias de General (#446): umbral de polvo, privacidad al abrir y página
 // de inicio. Se guardan al momento con Deshacer, como el resto de Ajustes (#445).
@@ -33,7 +34,8 @@ function Row({ label, hint, htmlFor, children }: { label: string; hint: string; 
 }
 
 export function PreferencesCard({ index = 0 }: { index?: number }) {
-  const { data: config } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
+  const configQ = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
+  const { data: config } = configQ
   const queryClient = useQueryClient()
   const toast = useToast()
   const { saved, confirm } = useSettingFeedback()
@@ -68,10 +70,13 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
   const page = startPage(config)
   const pageLabel = (p: StartPage) => START_PAGES.find(s => s.value === p)?.label ?? 'Dashboard'
 
+  // Sin la configuración, los valores mostrados serían los predeterminados (#498).
+  const fallo = failure(configQ)
   return (
     <SettingsCard index={index} icon={SlidersHorizontal} title="Preferencias"
       status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /></>}
       description="Cómo se comporta la app al abrirla y qué posiciones cuentan como polvo.">
+      {fallo && <QueryError what="tus preferencias" error={fallo.error} onRetry={fallo.retry} className="mb-3 rounded-xl border border-border" />}
       <div>
         <Row label="Umbral de polvo" htmlFor="pref-polvo"
           hint="Las posiciones que valen menos se agrupan aparte en Portfolio y no cuentan en los mejores y peores.">

@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi } from '../../../api/portfolio'
 import { statsParams } from './statsChart'
+import { failure } from '../../../utils/queryFailure'
 
 // Estadísticas del Historial sobre lo filtrado (#376), en paralelo con la
 // lista; conservan las cifras previas mientras recalculan y traen ambas
@@ -26,5 +27,5 @@ export function useHistoryStats(listParams: Record<string, string>, includeMargi
     void queryClient.prefetchQuery({ queryKey: statsKey(other), queryFn: () => portfolioApi.getHistoryStats(other) })
   }, [loaded, params, includeMargin, queryClient])
 
-  return query.data
+  return { stats: query.data, fallo: failure(query) }
 }

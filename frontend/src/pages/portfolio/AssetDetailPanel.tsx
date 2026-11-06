@@ -5,7 +5,7 @@ import { portfolioApi, type LockedAmount } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { BreakEvenCell } from '../../components/BreakEvenCell'
 import { PnlPill } from '../../components/AssetTableCells'
-import { Button, Drawer, Skeleton, iconButtonClasses, SkeletonGroup, TextTooltip, NotApplicable } from '../../components/ui'
+import { Button, Drawer, Skeleton, iconButtonClasses, SkeletonGroup, TextTooltip, NotApplicable, QueryError } from '../../components/ui'
 import { OP_META } from '../../constants/operations'
 import { formatAmount, formatMoney, formatPercent, formatPrice, pnlColor, type Currency } from '../../utils/format'
 import { usePricesStore } from '../../store/pricesStore'
@@ -44,17 +44,19 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
 }) {
   const titleId = useId()
   const closeRef = useRef<HTMLButtonElement>(null)
-  const { data, isLoading, isError } = useQuery({
+  const lotsQ = useQuery({
     queryKey: ['open-lots', row.asset],
     queryFn: () => portfolioApi.getOpenLots(row.asset),
     staleTime: 60_000,
   })
+  const { data, isLoading, isError } = lotsQ
   const lots = useMemo(() => lotsView(data?.lots ?? [], price, currency, rate), [data, price, currency, rate])
-  const { data: sales } = useQuery({
+  const salesQ = useQuery({
     queryKey: ['asset-sales', row.asset],
     queryFn: () => portfolioApi.getAssetSales(row.asset),
     staleTime: 60_000,
   })
+  const { data: sales } = salesQ
   const livePriceEur = usePricesStore(s => s.prices[row.asset])
   // Inicio de «Todo»: la primera compra del activo, también de lo ya vendido (#523).
   const firstOpenedAt = useMemo(
@@ -192,6 +194,7 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
           </ul>
         </section>
 
+        {salesQ.isError && <QueryError what="las ventas del activo" error={salesQ.error} onRetry={() => void salesQ.refetch()} />}
         {/* Lotes FIFO */}
         <section aria-labelledby={`${titleId}-lotes`} className="space-y-2">
           <h3 id={`${titleId}-lotes`} className="text-[11px] font-semibold uppercase tracking-widest text-fg-subtle">
@@ -199,7 +202,7 @@ export function AssetDetailPanel({ row, price, change24h, currency, rate, locked
           </h3>
           <p className="text-[11px] text-fg-subtle">Se vende primero el lote más antiguo, esté en la wallet que esté (FIFO global); está marcado como «Siguiente».</p>
           {isLoading && <SkeletonGroup label="Cargando los lotes" className="space-y-2">{[0, 1, 2].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}</SkeletonGroup>}
-          {isError && <p className="text-xs text-fg-subtle">No se pudieron cargar los lotes.</p>}
+          {isError && <QueryError what="los lotes" error={lotsQ.error} onRetry={() => void lotsQ.refetch()} />}
           {data && lots.length === 0 && <NotApplicable>No hay lotes abiertos.</NotApplicable>}
           <ul className="space-y-2">
             {lots.map((l, i) => (

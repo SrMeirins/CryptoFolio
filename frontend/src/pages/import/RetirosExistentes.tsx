@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, History, Save } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
-import { buttonClasses, cardClasses } from '../../components/ui'
+import { buttonClasses, cardClasses, QueryError } from '../../components/ui'
 import { WithdrawalAddressGroup } from './WithdrawalAddressGroup'
 import { GuardarDireccionModal } from './GuardarDireccionModal'
 import { agruparPorDireccion, walletsPorDireccion, type GrupoDireccion } from './direcciones'
@@ -11,6 +11,7 @@ import { txKey } from './withdrawalDestinationsHelpers'
 import { idDireccion } from './revisionHelpers'
 import { cambiosDeDestino, comoTransaccion, destinosEfectivos } from './existentes'
 import type { ResultadoExistentes, RetiroExistente } from './types'
+import { failure } from '../../utils/queryFailure'
 
 // Retiros ya importados sin dirección (#330): se completan con el historial de
 // retiradas o el CSV ya importado. Destino actual preseleccionado; una dirección
@@ -19,8 +20,10 @@ export function RetirosExistentes({ existentes, onGuardar }: {
   existentes: RetiroExistente[]
   onGuardar: (reasignaciones: Record<string, string>) => Promise<ResultadoExistentes>
 }) {
-  const { data: wallets = [] } = useQuery({ queryKey: ['wallets'], queryFn: portfolioApi.getWalletsFull })
-  const { data: redes = [] } = useQuery({ queryKey: ['networks'], queryFn: portfolioApi.getNetworks, staleTime: 5 * 60_000 })
+  const walletsQ = useQuery({ queryKey: ['wallets'], queryFn: portfolioApi.getWalletsFull })
+  const { data: wallets = [] } = walletsQ
+  const redesQ = useQuery({ queryKey: ['networks'], queryFn: portfolioApi.getNetworks, staleTime: 5 * 60_000 })
+  const { data: redes = [] } = redesQ
   const coldWallets = useMemo(() => wallets.filter(w => w.type !== 'exchange' && w.name !== 'Wallets externas'), [wallets])
   const reconocidas = useMemo(() => walletsPorDireccion(coldWallets), [coldWallets])
 
@@ -70,8 +73,10 @@ export function RetirosExistentes({ existentes, onGuardar }: {
     )
   }
 
+  const fallo = failure(walletsQ, redesQ)
   return (
     <section aria-labelledby="existentes-titulo" className={cardClasses('md', 'space-y-3')}>
+      {fallo && <QueryError what="tus wallets y redes" error={fallo.error} onRetry={fallo.retry} />}
       <div className="flex items-start gap-3">
         <History size={18} className="text-brand shrink-0 mt-0.5" aria-hidden="true" />
         <div>

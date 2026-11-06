@@ -10,6 +10,7 @@ export const TIMEZONE_QUERY_KEY = ['settings', 'timezone'] as const
  * se usa la de por defecto; si cambia (en Ajustes), las páginas se repintan.
  */
 export function useTimezoneSync(): void {
+  // consulta de fondo (#498): sin interfaz propia; Ajustes, zona horaria, muestra su propio fallo.
   const { data } = useQuery({ queryKey: TIMEZONE_QUERY_KEY, queryFn: portfolioApi.getTimezone, staleTime: 5 * 60_000 })
   const setTz = useTimezoneStore(s => s.setTz)
   useEffect(() => {

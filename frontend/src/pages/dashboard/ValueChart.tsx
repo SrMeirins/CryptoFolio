@@ -23,13 +23,14 @@ function axisMoney(v: number, decimals: number, currency: Currency): string {
   return decimals === 0 ? formatMoneyCompact(v, currency) : formatMoney(v, currency)
 }
 
-export function ValueChart({ points, currency, intraday, animationKey, loading, error }: {
+export function ValueChart({ points, currency, intraday, animationKey, loading, error, onRetry }: {
   points: EvolutionPoint[]
   currency: Currency
   intraday: boolean
   animationKey: string
   loading: boolean
   error: boolean
+  onRetry?: () => void
 }) {
   const c = useChartColors()
   const reduceMotion = useReducedMotion()
@@ -52,7 +53,7 @@ export function ValueChart({ points, currency, intraday, animationKey, loading, 
   const last = points[points.length - 1]
 
   return (
-    <ChartFrame loading={loading} error={error} empty={points.length === 0} errorText="No se pudo cargar el valor de la cartera.">
+    <ChartFrame loading={loading} error={error} onRetry={onRetry} empty={points.length === 0} errorText="No se pudo cargar el valor de la cartera.">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={points} margin={{ top: 8, right: 20, left: 0, bottom: 0 }}>
           <defs>

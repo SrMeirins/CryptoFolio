@@ -4,7 +4,7 @@ import { Calculator, Hourglass, PiggyBank, Repeat, TrendingDown, TrendingUp } fr
 import { portfolioApi } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { SaleSimulatorModal } from '../../components/SaleSimulatorModal'
-import { buttonClasses, cardClasses, fieldClasses, Notice, Skeleton, TextTooltip, NotApplicable } from '../../components/ui'
+import { buttonClasses, cardClasses, fieldClasses, Notice, Skeleton, TextTooltip, NotApplicable, QueryError } from '../../components/ui'
 import { useDebounce } from '../../hooks/useDebounce'
 import { usePricesStore } from '../../store/pricesStore'
 import { ink } from '../../utils/colors'
@@ -53,7 +53,8 @@ function Fila({ s, nota, onSimular }: { s: Sugerencia; nota: React.ReactNode; on
 
 export function PlanificadorTab() {
   const prices = usePricesStore(s => s.prices)
-  const { data, isLoading, isError, dataUpdatedAt } = useQuery({ queryKey: ['fiscal-planner'], queryFn: portfolioApi.getFiscalPlanner, staleTime: 60_000 })
+  const plannerQ = useQuery({ queryKey: ['fiscal-planner'], queryFn: portfolioApi.getFiscalPlanner, staleTime: 60_000 })
+  const { data, isLoading, isError, dataUpdatedAt } = plannerQ
   const [simular, setSimular] = useState<Sugerencia | null>(null)
   const [extraInput, setExtraInput] = useState('')
   const extra = useDebounce(parseFloat(extraInput.replace(',', '.')), 350)
@@ -91,15 +92,16 @@ export function PlanificadorTab() {
     const previas = vigente.version === nuevas.version ? vigente.cuotas : new Map<number, number>()
     setCache({ version: nuevas.version, base: nuevas.base, cuotas: new Map([...previas, ...nuevas.pares]) })
   }
-  const { data: rapida } = useQuery({
+  const rapidaQ = useQuery({
     queryKey: ['fiscal-cuotas', 'rapida', extra],
     queryFn: () => portfolioApi.getFiscalCuotas([extra]),
     enabled: Number.isFinite(extra) && Math.abs(extra) <= 1e9,
     staleTime: 60_000,
   })
+  const { data: rapida } = rapidaQ
 
   if (isLoading) return <div className="space-y-3">{[0, 1, 2].map(i => <Skeleton key={i} className="h-28 rounded-xl" />)}</div>
-  if (isError || !data) return <p className="text-sm text-fg-subtle">No se pudo cargar el planificador.</p>
+  if (isError || !data) return <QueryError what="el planificador" error={plannerQ.error} onRetry={() => void plannerQ.refetch()} compact={false} />
 
   const rapidaCuota = rapida?.cuotas[0]
 
@@ -133,6 +135,7 @@ export function PlanificadorTab() {
 
       {/* Simulador rápido */}
       <FiscalChartCard icon={Calculator} title="¿Cuánto pagaría?">
+        {rapidaQ.isError && <QueryError what="la estimación" error={rapidaQ.error} onRetry={() => void rapidaQ.refetch()} className="py-4" />}
         <div className="flex items-center gap-3 flex-wrap text-sm">
           <label className="flex items-center gap-2">
             <span className="text-fg-muted">Si realizo</span>

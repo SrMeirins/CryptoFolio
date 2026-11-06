@@ -4,6 +4,7 @@ import { portfolioApi } from '../../api/portfolio'
 import { useToast } from '../../hooks/useToast'
 import { invalidateTransactionQueries } from '../../utils/queryInvalidation'
 import { PAGE_SIZE } from './useHistoryFilters'
+import { failure } from '../../utils/queryFailure'
 
 // Datos del Historial (#351): página actual, precarga de la siguiente,
 // facetas para los filtros, nombre de la importación filtrada y borrado.
@@ -22,7 +23,8 @@ export function useHistoryData(queryParams: Record<string, string>, offset: numb
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [restoringId, setRestoringId] = useState<string | null>(null)
 
-  const { data, isLoading, isFetching } = useQuery({ ...pageQuery(queryParams), placeholderData: prev => prev })
+  const pageQ = useQuery({ ...pageQuery(queryParams), placeholderData: prev => prev })
+  const { data, isLoading, isFetching } = pageQ
 
   // Precarga de la página siguiente con los mismos filtros y orden (#349).
   useEffect(() => {
@@ -37,9 +39,11 @@ export function useHistoryData(queryParams: Record<string, string>, offset: numb
   }
 
   // Cuentas presentes en los datos (#346).
-  const { data: facets } = useQuery({ queryKey: ['transactions', 'facets'], queryFn: portfolioApi.getTransactionFacets, staleTime: 60_000 })
+  const facetsQ = useQuery({ queryKey: ['transactions', 'facets'], queryFn: portfolioApi.getTransactionFacets, staleTime: 60_000 })
+  const { data: facets } = facetsQ
   // Archivos importados: opciones del filtro por archivo y nombre del chip (#366).
-  const { data: imports = [] } = useQuery({ queryKey: ['imports'], queryFn: portfolioApi.getImports, staleTime: 60_000 })
+  const importsQ = useQuery({ queryKey: ['imports'], queryFn: portfolioApi.getImports, staleTime: 60_000 })
+  const { data: imports = [] } = importsQ
 
   /** Borra una transacción manual; true si se borró. */
   async function deleteTx(id: string): Promise<boolean> {
@@ -81,6 +85,9 @@ export function useHistoryData(queryParams: Record<string, string>, offset: numb
 
   return {
     data, transactions, total, isLoading, isFetching,
+    // Fallos (#498): de la página de operaciones y de las opciones de los filtros.
+    fallo: failure(pageQ),
+    falloFiltros: failure(facetsQ, importsQ),
     assets: facets?.assets ?? [],
     presentTypes: facets?.types ?? [],
     years: facets?.years ?? [],

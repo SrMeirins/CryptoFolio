@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowDownToLine, Check, Eye, EyeOff, History, MapPin } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
-import { buttonClasses, Notice } from '../../components/ui'
+import { buttonClasses, Notice, QueryError } from '../../components/ui'
 import { DepositSection } from './DepositSection'
 import { AssignBar } from './AssignBar'
 import { WithdrawalAssetGroup } from './WithdrawalAssetGroup'
@@ -12,6 +12,7 @@ import { agruparPorDireccion, walletsPorDireccion, type GrupoDireccion } from '.
 import { idActivo, idDeposito, idDireccion, siguientePendiente, sugerenciasPendientes } from './revisionHelpers'
 import { txKey, loadMemory, saveMemory } from './withdrawalDestinationsHelpers'
 import type { PreviewTransaction, DepositReview } from './types'
+import { failure } from '../../utils/queryFailure'
 
 
 // Revisión obligatoria (#321): un solo scroll con la cabecera fija, asignación
@@ -33,8 +34,11 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
   // La memoria se lee una vez: es la de importaciones anteriores, no la de esta sesión.
   const [memoria] = useState(loadMemory)
 
-  const { data: wallets = [] } = useQuery({ queryKey: ['wallets'], queryFn: portfolioApi.getWalletsFull })
-  const { data: redes = [] } = useQuery({ queryKey: ['networks'], queryFn: portfolioApi.getNetworks, staleTime: 5 * 60_000 })
+  const walletsQ = useQuery({ queryKey: ['wallets'], queryFn: portfolioApi.getWalletsFull })
+  const { data: wallets = [] } = walletsQ
+  const redesQ = useQuery({ queryKey: ['networks'], queryFn: portfolioApi.getNetworks, staleTime: 5 * 60_000 })
+  const { data: redes = [] } = redesQ
+  const falloDestinos = failure(walletsQ, redesQ)
   const coldWallets = useMemo(() => wallets.filter(w => w.type !== 'exchange' && w.name !== 'Wallets externas'), [wallets])
 
   // Retiros con dirección: una decisión por dirección (#320); el resto, por activo.
@@ -175,6 +179,7 @@ export function WithdrawalDestinations({ withdrawals, destinations, onAssign, de
 
       <div className="p-5 space-y-4 bg-background-card rounded-b-[10px]">
         <p className="text-xs text-fg-subtle">Asigna el destino de cada retiro y el coste de cada depósito externo.</p>
+        {falloDestinos && <QueryError what="tus wallets y redes" error={falloDestinos.error} onRetry={falloDestinos.retry} className="rounded-xl border border-border" />}
 
         {coldWallets.length === 0 && withdrawals.length > 0 && (
           <Notice tipo="aviso" compact>

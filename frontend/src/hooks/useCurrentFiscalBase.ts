@@ -7,6 +7,7 @@ import { baseTramosCompensada } from '../utils/tramosIrpf'
 // del ahorro ya compensada y el valor para el Modelo 721, con las mismas
 // consultas (y caché) que la página Fiscal. Sin año, el más reciente con datos.
 export function useCurrentFiscalBase(forYear?: number) {
+  // consulta de fondo (#498): sin la base del ejercicio, el editor de tramos no muestra la vista previa de la cuota; los tramos se editan igual.
   const { data: years = [] } = useQuery({ queryKey: ['fiscal-years'], queryFn: portfolioApi.getFiscalYears })
   const year = forYear ?? years[0] ?? null
   const q = fiscalYearQueries(year ?? 0)

@@ -12,7 +12,7 @@ import { AssetHealth } from './assets/AssetHealth'
 import { AssetEditDrawer } from './assets/AssetEditDrawer'
 import { matchesFilter, priceHealth, sortAssets, type AssetFilter, type SortColumn, type SortDirection } from './assets/assetRows'
 import { T, alpha, ink } from '../../utils/colors'
-import { Button, buttonClasses, fieldClasses, iconButtonClasses, panelSurface, Pagination, SectionHeader, Skeleton, SkeletonGroup, Hint, FilteredEmpty } from '../../components/ui'
+import { Button, buttonClasses, fieldClasses, iconButtonClasses, panelSurface, Pagination, SectionHeader, Skeleton, SkeletonGroup, Hint, FilteredEmpty, QueryError } from '../../components/ui'
 import { paginate, type PageSize } from '../../utils/pagination'
 
 // Activos en Ajustes (#450): salud de los precios, filtros rápidos (también
@@ -42,10 +42,11 @@ export function AssetsSection() {
   // Filtro rápido por estado del precio (#337) o estables (#450).
   const [filtro, setFiltro]               = useState<AssetFilter>('todos')
 
-  const { data: assets = [], isLoading } = useQuery({
+  const assetsQ = useQuery({
     queryKey: ['assets'],
     queryFn: portfolioApi.getAssets,
   })
+  const { data: assets = [], isLoading } = assetsQ
 
   // Precio en la moneda de visualización: el del feed en vivo o, si no llega, el de la API (en EUR).
   const rate = market.currency === 'EUR' ? 1 : market.rate
@@ -166,7 +167,9 @@ export function AssetsSection() {
 
       {/* Tabla con su propio desplazamiento */}
       <div className={panelSurface('none', 'flex-1 min-h-0 overflow-y-auto mb-4')}>
-        {isLoading
+        {assetsQ.isError
+          ? <QueryError what="los activos" error={assetsQ.error} onRetry={() => void assetsQ.refetch()} />
+          : isLoading
           ? <SkeletonGroup label="Cargando los activos" className="p-4 space-y-2">
               {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-9 w-full" />)}
             </SkeletonGroup>

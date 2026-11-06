@@ -5,7 +5,7 @@ import { AlertCircle, RotateCcw, Scale, Landmark, Percent, BellRing } from 'luci
 import { tramosDeEscala } from '../../utils/tramosIrpf'
 import { escalaKey } from '../../hooks/useTramos'
 import type { EscalaAhorro } from '../../api/portfolio'
-import { Dropdown } from '../../components/ui'
+import { Dropdown, QueryError } from '../../components/ui'
 import { SettingsCard } from './SettingsCard'
 import { ComisionRedCard } from './ComisionRedCard'
 import { SavedMark } from './SavedMark'
@@ -17,6 +17,7 @@ import { preview721, previewCuota } from '../../utils/fiscalPreview'
 import { NOTIFICATIONS_MUTED_KEY, mutedCategories } from '../../constants/notifications'
 import { formatEur } from '../../utils/format'
 import { formatNumber } from '../../utils/format'
+import { failure } from '../../utils/queryFailure'
 
 /** Importe entero en euros con el símbolo detrás (#444). */
 const formatEurInteger = (n: number) => `${formatNumber(n, 0)}\u00a0€`
@@ -30,7 +31,8 @@ const blurOnEnter = (e: KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Ent
 // Enter, validado; un valor no válido muestra el motivo y conserva el anterior.
 // Cada guardado ofrece Deshacer.
 export function FiscalSection() {
-  const { data: config = {} } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
+  const configQ = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
+  const { data: config = {} } = configQ
   const queryClient = useQueryClient()
   const toast = useToast()
   const { saved, confirm } = useSettingFeedback()
@@ -75,12 +77,14 @@ export function FiscalSection() {
 
   // ── Tramos IRPF por ejercicio (#452) ─────────────────────────────────────
   // Cada ejercicio parte de su escala oficial; se editan los tipos, no los tramos.
-  const { data: years = [] } = useQuery({ queryKey: ['fiscal-years'], queryFn: portfolioApi.getFiscalYears })
+  const yearsQ = useQuery({ queryKey: ['fiscal-years'], queryFn: portfolioApi.getFiscalYears })
+  const { data: years = [] } = yearsQ
   const thisYear = new Date().getFullYear()
   const yearOptions = [...new Set([thisYear, ...years])].sort((x, y) => y - x)
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const year = selectedYear ?? years[0] ?? thisYear
-  const { data: escala } = useQuery({ queryKey: escalaKey(year), queryFn: () => portfolioApi.getEscala(year), staleTime: 5 * 60_000 })
+  const escalaQ = useQuery({ queryKey: escalaKey(year), queryFn: () => portfolioApi.getEscala(year), staleTime: 5 * 60_000 })
+  const { data: escala } = escalaQ
   const tramos = escala ? tramosDeEscala(escala.tramos) : []
   const storedTipos = escala ? escala.tramos.map(t => t.tipo) : []
   const oficiales = escala ? escala.tramos.map(t => t.tipoOficial) : []
@@ -137,8 +141,11 @@ export function FiscalSection() {
     }
   }
 
+  // Configuración, ejercicios y escala (#498): sin ellos, los valores mostrados serían los predeterminados.
+  const fallo = failure(configQ, yearsQ, escalaQ)
   return (
     <div className="space-y-4 max-w-3xl">
+      {fallo && <QueryError what="la configuración fiscal" error={fallo.error} onRetry={fallo.retry} className="rounded-xl border border-border" />}
       {/* Normativa (#451): lo que aplica la app, sin opciones que no se pueden elegir */}
       <SettingsCard index={0} icon={Scale} title="Normativa"
         description="Lo que aplica la app a tus cálculos. Hoy solo admite la residencia fiscal en España.">

@@ -8,7 +8,7 @@ import { dailyPnlQuery } from '../../queries/currencyQueries'
 import { localToday } from '../../utils/pnlChart'
 import { addMonths, compareYm, monthGrid, monthLabel, monthRange, monthSummary, ymOf, type YearMonth } from '../../utils/pnlCalendar'
 import { monthStats, weekTotals, yearMonths } from '../../utils/calendarStats'
-import { Button, SegmentedControl, iconButtonClasses, PanelHeader, Skeleton, MonthPicker, panelSurface, SkeletonGroup } from '../../components/ui'
+import { Button, SegmentedControl, iconButtonClasses, PanelHeader, Skeleton, MonthPicker, panelSurface, SkeletonGroup, QueryError } from '../../components/ui'
 import { CalendarMonthGrid } from './calendar/CalendarMonthGrid'
 import { CalendarStats } from './calendar/CalendarStats'
 import { CalendarLegend } from './calendar/CalendarLegend'
@@ -17,6 +17,7 @@ import { CalendarYearView } from './calendar/CalendarYearView'
 import { MonthTrend } from './calendar/MonthTrend'
 import { calendarSubtitle } from '../../utils/panelSubtitles'
 import { timezoneLabel } from '../../utils/timezoneLabel'
+import { failure } from '../../utils/queryFailure'
 
 // Calendario de ganancias y pérdidas diarias (#167), sobre GET /api/v1/pnl/daily.
 // El día de hoy se recalcula con cada precio en vivo (#213). Desde #216: vista
@@ -37,23 +38,26 @@ export function PnlCalendar() {
   const range = monthRange(ym, today)
 
   // Primer mes con actividad: se toma de la consulta de "Todo" que ya hace el gráfico (misma caché).
-  const { data: all } = useCurrencyQuery(currency => dailyPnlQuery(currency))
+  const allQ = useCurrencyQuery(currency => dailyPnlQuery(currency))
+  const { data: all } = allQ
   const firstYm = all ? ymOf(all.from) : null
 
   // Mes en la moneda de visualización; la otra se precarga para que el toggle sea instantáneo (#177).
-  const { data: monthData, isLoading, isError, currency: requested } = useCurrencyQuery(
+  const monthQ = useCurrencyQuery(
     currency => dailyPnlQuery(currency, range?.from, range?.to),
     {
       enabled: range !== null && view === 'month',
       refetchInterval: (query) => (query.state.data?.refreshing ? 5_000 : compareYm(ym, current) === 0 ? 60_000 : false),
     },
   )
+  const { data: monthData, isLoading, isError, currency: requested } = monthQ
   // Año completo para la vista anual (hasta hoy).
   const yearTo = `${ym.year}-12-31` < today ? `${ym.year}-12-31` : today
-  const { data: yearData } = useCurrencyQuery(
+  const yearQ = useCurrencyQuery(
     currency => dailyPnlQuery(currency, `${ym.year}-01-01`, yearTo),
     { enabled: view === 'year' && `${ym.year}-01-01` <= today },
   )
+  const { data: yearData } = yearQ
 
   // Un mes futuro (sin rango) compartiría clave con "Todo": se descarta.
   const data = range ? monthData : undefined
@@ -86,6 +90,8 @@ export function PnlCalendar() {
   }
   const step = (delta: number) => go(view === 'month' ? addMonths(ym, delta) : { year: ym.year + delta, month: ym.month })
 
+  // Fallo del mes, del año o de la serie completa (#498).
+  const fallo = failure(monthQ, allQ, yearQ)
   return (
     <div className={panelSurface('none', 'px-5 py-5')}>
       <PanelHeader
@@ -126,7 +132,7 @@ export function PnlCalendar() {
             selected={selected} onOpenDay={d => setSelected(s => (s === d ? null : d))} />}
           <MonthTrend days={days} currency={currency} hovered={hovered} onHover={setHovered}
             lastDay={Number(weeks.flat().filter(Boolean).at(-1)?.slice(8) ?? 31)} />
-          {isError && <p className="text-xs text-fg-subtle py-6 text-center">No se pudo cargar el P&L del mes.</p>}
+          {fallo && <QueryError what="el P&L del mes" error={fallo.error} onRetry={fallo.retry} />}
           {isLoading && (
             <SkeletonGroup label="Cargando el calendario" className="grid grid-cols-7 gap-1.5">
               {Array.from({ length: 35 }, (_, i) => <Skeleton key={i} className="h-16" />)}

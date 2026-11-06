@@ -11,6 +11,7 @@ export const escalaKey = (year: number) => ['irpf-escala', year] as const
  * llega, la escala vigente.
  */
 export function useTramos(year: number = new Date().getFullYear()): Tramo[] {
+  // consulta de fondo (#498): sin la escala guardada se usa la vigente de la base del ahorro (TRAMOS_DEFAULT).
   const { data } = useQuery({ queryKey: escalaKey(year), queryFn: () => portfolioApi.getEscala(year), staleTime: 5 * 60_000 })
   return data ? tramosDeEscala(data.tramos) : TRAMOS_DEFAULT
 }

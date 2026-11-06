@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { AlertTriangle, RefreshCw, SearchX } from 'lucide-react'
 import { Button } from './Button'
-import { skeletonClasses, stateClasses } from './classes'
+import { queryErrorTitle, skeletonClasses, stateClasses } from './classes'
+import { explicarFallo } from '../../utils/explicarFallo'
 
 // Estados comunes (#199): vacío y error con la misma composición (icono,
 // título, descripción, acción) en todas las pantallas. La carga sigue la norma
@@ -45,6 +46,22 @@ export function ErrorState({ title, description, onRetry, compact = false, class
       {onRetry && <Button size="sm" className="mt-2" icon={<RefreshCw size={12} />} onClick={onRetry}>Reintentar</Button>}
     </div>
   )
+}
+
+/**
+ * Error de una consulta dentro de su panel (#498): qué no se pudo cargar, la
+ * ayuda común según el fallo (#497) y «Reintentar». El resto de la página
+ * sigue funcionando.
+ */
+export function QueryError({ what, error, onRetry, compact = true, className = '' }: {
+  /** Lo que muestra el panel: «las posiciones», «el resumen fiscal». */
+  what: string
+  error: unknown
+  onRetry: () => void
+  compact?: boolean
+  className?: string
+}) {
+  return <ErrorState compact={compact} className={className} title={queryErrorTitle(what)} description={explicarFallo(error)} onRetry={onRetry} />
 }
 
 /** Vacío por filtros (#496): resumen de los filtros activos y siempre «Quitar filtros». */

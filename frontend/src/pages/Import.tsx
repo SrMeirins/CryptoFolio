@@ -15,7 +15,7 @@ import { invalidateTransactionQueries } from '../utils/queryInvalidation'
 import { portfolioApi } from '../api/portfolio'
 import { waitForImportCommit, readProgressStream } from './import/importStream'
 import { useWithdrawalDestinations, useDepositCosts, clearImportSessionStorage } from './import/useImportSessionState'
-import { cardClasses, buttonClasses, PageHeader } from '../components/ui'
+import { cardClasses, buttonClasses, PageHeader, QueryError } from '../components/ui'
 import { ImportStepper } from './import/ImportStepper'
 import { pasoDeStage, type Paso } from './import/wizard'
 import { navIcon } from '../constants/navigation'
@@ -23,6 +23,7 @@ import { anadirASeleccion, clasificarArchivo, firmaLote, indicesAConfirmar, type
 import { useAvisoSalida } from './import/useAvisoSalida'
 import { useTituloImportacion } from './import/useTituloImportacion'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { failure } from '../utils/queryFailure'
 
 // Firma de la selección: si se vuelven a subir los mismos archivos, se conserva lo asignado (#318, #326).
 const FIRMA_KEY = 'import_file_signature'
@@ -52,19 +53,21 @@ export function ImportPage() {
   const [showManualTx, setShowManualTx] = useState(false)
   const TX_PAGE_SIZE = 20
 
-  const { data: imports = [] } = useQuery({
+  const importsQ = useQuery({
     queryKey: ['imports'],
     queryFn: portfolioApi.getImports,
   })
+  const { data: imports = [] } = importsQ
 
   // Mientras importa: aviso al salir y progreso en el título de la pestaña (#324).
   const avisoSalida = useAvisoSalida(stage === 'progress')
   useTituloImportacion(progressLog, stage === 'progress' || stage === 'done')
 
-  const { data: pendingDeposits = [] } = useQuery({
+  const pendingQ = useQuery({
     queryKey: ['pending-deposits'],
     queryFn: portfolioApi.getPendingDeposits,
   })
+  const { data: pendingDeposits = [] } = pendingQ
   const hasPendingDeposits = pendingDeposits.length > 0
 
   // Analiza la selección (uno o varios archivos, #326). Sin exchange forzado, el backend lo detecta.
@@ -271,6 +274,7 @@ export function ImportPage() {
     invalidateTransactionQueries(queryClient, { includeImports: true })
   }
 
+  const falloImport = failure(importsQ, pendingQ)
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <PageHeader
@@ -284,6 +288,10 @@ export function ImportPage() {
             className={buttonClasses('secondary', 'md', 'flex')}
           >
             <Plus size={14} />
+
+      {/* Importaciones previas y depósitos pendientes (#498). */}
+      {falloImport && <QueryError what="tus importaciones y depósitos pendientes" error={falloImport.error} onRetry={falloImport.retry}
+        className="rounded-xl border border-border" />}
             Nueva transacción
           </button>
           {stage !== 'upload' && stage !== 'progress' && (

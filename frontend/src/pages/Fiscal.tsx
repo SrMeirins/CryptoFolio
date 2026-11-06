@@ -28,11 +28,12 @@ import { DeclaracionRenta } from './fiscal/DeclaracionRenta'
 import type { FiscalHito } from '../api/portfolio'
 import { useFiscalShortcuts } from './fiscal/useFiscalShortcuts'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
-import { cardClasses, EmptyState, ErrorState, Skeleton, PageHeader, panelEnterStyle, tabId, tabPanelId, SectionHeader, ViewTabs, RefreshBar } from '../components/ui'
+import { cardClasses, EmptyState, QueryError, Skeleton, PageHeader, panelEnterStyle, tabId, tabPanelId, SectionHeader, ViewTabs, RefreshBar } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 import { FirstUseEmpty } from '../components/FirstUseEmpty'
 import { useHasTransactions } from '../hooks/useHasTransactions'
 import { PieMetodologia, type TemaMetodo } from '../components/metodologia'
+import { failure } from '../utils/queryFailure'
 
 const VISTA_LABELS: Record<FiscalVista, string> = { resumen: 'Resumen', operaciones: 'Operaciones', modelo721: 'Modelo 721', planificar: 'Planificar' }
 const TAB_ITEMS = FISCAL_VISTAS.map((v, i) => ({ value: v, label: VISTA_LABELS[v], shortcut: String(i + 1) }))
@@ -67,12 +68,17 @@ export function Fiscal() {
   const vista = parseVista(searchParams.get('vista'))
   const queryClient = useQueryClient()
 
-  const { data: years = [] } = useQuery({ queryKey: ['fiscal-years'], queryFn: portfolioApi.getFiscalYears })
-  const { data: overview = [] } = useQuery({ queryKey: ['fiscal-overview'], queryFn: portfolioApi.getFiscalOverview, staleTime: FISCAL_STALE_TIME })
-  const { data: carryforward } = useQuery({ queryKey: ['fiscal-carryforward'], queryFn: portfolioApi.getFiscalCarryforward, staleTime: FISCAL_STALE_TIME })
-  const { data: calendario } = useQuery({ queryKey: ['fiscal-calendario'], queryFn: portfolioApi.getFiscalCalendar, staleTime: FISCAL_STALE_TIME })
+  const yearsQ = useQuery({ queryKey: ['fiscal-years'], queryFn: portfolioApi.getFiscalYears })
+  const { data: years = [] } = yearsQ
+  const overviewQ = useQuery({ queryKey: ['fiscal-overview'], queryFn: portfolioApi.getFiscalOverview, staleTime: FISCAL_STALE_TIME })
+  const { data: overview = [] } = overviewQ
+  const carryforwardQ = useQuery({ queryKey: ['fiscal-carryforward'], queryFn: portfolioApi.getFiscalCarryforward, staleTime: FISCAL_STALE_TIME })
+  const { data: carryforward } = carryforwardQ
+  const calendarioQ = useQuery({ queryKey: ['fiscal-calendario'], queryFn: portfolioApi.getFiscalCalendar, staleTime: FISCAL_STALE_TIME })
+  const { data: calendario } = calendarioQ
   // Ejercicios declarados (#311): sin caché larga, para ver los cambios tras una importación.
-  const { data: declaraciones = [] } = useQuery({ queryKey: ['fiscal-declaraciones'], queryFn: portfolioApi.getDeclaraciones })
+  const declaracionesQ = useQuery({ queryKey: ['fiscal-declaraciones'], queryFn: portfolioApi.getDeclaraciones })
+  const { data: declaraciones = [] } = declaracionesQ
 
   const activeYear = selectedYear ?? (years.length > 0 ? years[0] : null)
   // Escala del ahorro de cada ejercicio (#452): la del activo y la del anterior, para compararlos.
@@ -84,21 +90,27 @@ export function Fiscal() {
   // deshabilitada: solo sirve para tener claves válidas antes de saber el año.
   const q = fiscalYearQueries(activeYear ?? 0)
   const yearOpts = { enabled: !!activeYear, retry: false, placeholderData: keepPreviousData } as const
-  const { data: summary, isLoading: summaryLoading, isError: summaryError, isPlaceholderData: switching } = useQuery({ ...q.summary, ...yearOpts })
-  const { data: events, isLoading: eventsLoading, isError: eventsError } = useQuery({ ...q.events, ...yearOpts })
-  const { data: modelo721, isLoading: modelo721Loading, isError: modelo721Error } = useQuery({ ...q.modelo721, ...yearOpts })
-  const { data: breakdown = [], isError: breakdownError } = useQuery({ ...q.breakdown, ...yearOpts })
-  const { data: monthly, isError: monthlyError } = useQuery({ ...q.monthly, ...yearOpts })
+  const summaryQ0 = useQuery({ ...q.summary, ...yearOpts })
+  const { data: summary, isLoading: summaryLoading, isError: summaryError, isPlaceholderData: switching } = summaryQ0
+  const eventsQ0 = useQuery({ ...q.events, ...yearOpts })
+  const { data: events, isLoading: eventsLoading, isError: eventsError } = eventsQ0
+  const modelo721Q0 = useQuery({ ...q.modelo721, ...yearOpts })
+  const { data: modelo721, isLoading: modelo721Loading, isError: modelo721Error } = modelo721Q0
+  const breakdownQ0 = useQuery({ ...q.breakdown, ...yearOpts })
+  const { data: breakdown = [], isError: breakdownError } = breakdownQ0
+  const monthlyQ0 = useQuery({ ...q.monthly, ...yearOpts })
+  const { data: monthly, isError: monthlyError } = monthlyQ0
 
   // Año en curso: el anterior «a estas alturas» (mismo día de Madrid) (#297).
   const enCurso = !!summary?.esAnioEnCurso && !switching
   const hasta = localMonthDay()
-  const { data: prevPeriod } = useQuery({
+  const prevPeriodQ = useQuery({
     queryKey: ['fiscal-neto-hasta', (activeYear ?? 0) - 1, hasta],
     queryFn: () => portfolioApi.getFiscalNetoHasta((activeYear ?? 0) - 1, hasta),
     enabled: enCurso && !!activeYear && years.includes(activeYear - 1),
     staleTime: FISCAL_STALE_TIME,
   })
+  const { data: prevPeriod } = prevPeriodQ
 
   // Precarga del resto de años cuando la página queda libre: cambiar de año pasa a ser instantáneo.
   useEffect(() => {
@@ -176,17 +188,26 @@ export function Fiscal() {
 
   const hasError = eventsError || breakdownError || monthlyError || summaryError || modelo721Error
 
-  if (hasError && activeYear) {
+  const retryFiscal = () => { void queryClient.refetchQueries({ predicate: q => String(q.queryKey[0]).startsWith('fiscal-') }) }
+  // Sin la lista de ejercicios no se sabe si hay datos (#498): se dice antes que el vacío.
+  if (yearsQ.isError) {
     return (
-      <div className="p-6">
-        <ErrorState
-          title={`Error al cargar los datos fiscales de ${activeYear}`}
-          description="Inténtalo de nuevo en unos segundos."
-          onRetry={() => queryClient.refetchQueries({ predicate: q => String(q.queryKey[0]).startsWith('fiscal-') })}
-        />
+      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+        <PageHeader icon={navIcon('/fiscal')} title="Fiscal" />
+        <QueryError what="los ejercicios fiscales" error={yearsQ.error} onRetry={() => void yearsQ.refetch()} compact={false} />
       </div>
     )
   }
+  if (hasError && activeYear) {
+    const q0 = [summaryQ0, eventsQ0, modelo721Q0, breakdownQ0, monthlyQ0].find(q => q.isError)
+    return (
+      <div className="p-6">
+        <QueryError what={`los datos fiscales de ${activeYear}`} error={q0?.error} onRetry={retryFiscal} compact={false} />
+      </div>
+    )
+  }
+  // Piezas secundarias (#498): un fallo se dice bajo la cabecera y el resto sigue.
+  const falloSecundario = failure(overviewQ, carryforwardQ, calendarioQ, declaracionesQ, prevPeriodQ)
 
   // Sin ejercicios (#496): primer uso si no hay operaciones; si las hay, aún falta el cálculo FIFO.
   if (!activeYear) {
@@ -254,6 +275,8 @@ export function Fiscal() {
         <RefreshBar active={switching} />
         {/* Cabecera común de la vista (#491): un h2 con título y contexto en todas las pestañas. */}
         <SectionHeader {...vistaHeader(vista, activeYear)} />
+        {falloSecundario && <QueryError what="parte de los datos fiscales" error={falloSecundario.error} onRetry={falloSecundario.retry}
+          className="rounded-xl border border-border" />}
         {/* Planificar trabaja siempre con el año en curso, sea cual sea el seleccionado (#307) */}
         {vista === 'planificar' ? (
           <Block i={0}>

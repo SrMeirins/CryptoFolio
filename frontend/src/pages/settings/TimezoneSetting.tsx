@@ -2,7 +2,7 @@ import { useId, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Clock } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
-import { Dropdown, Modal, ModalHeader, buttonClasses } from '../../components/ui'
+import { Dropdown, Modal, ModalHeader, buttonClasses, QueryError } from '../../components/ui'
 import { SettingsCard } from './SettingsCard'
 import { SavedMark } from './SavedMark'
 import { useSettingFeedback } from '../../hooks/useSettingFeedback'
@@ -10,6 +10,7 @@ import { useToast } from '../../hooks/useToast'
 import { TIMEZONE_QUERY_KEY } from '../../hooks/useTimezoneSync'
 import { allTimezones, systemTimezone, timezoneOptions } from '../../utils/timezoneOptions'
 import { timezoneLabel } from '../../utils/timezoneLabel'
+import { failure } from '../../utils/queryFailure'
 
 // Zona horaria de la aplicación en Ajustes (#390): días, meses, ejercicio
 // fiscal y horas. Con ejercicios ya declarados se pide confirmación: sus
@@ -29,8 +30,10 @@ export function TimezoneSetting({ index = 0 }: { index?: number }) {
   const titleId = useId()
   const [pending, setPending] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const { data: info } = useQuery({ queryKey: TIMEZONE_QUERY_KEY, queryFn: portfolioApi.getTimezone })
-  const { data: declaraciones = [] } = useQuery({ queryKey: ['fiscal-declaraciones'], queryFn: portfolioApi.getDeclaraciones })
+  const infoQ = useQuery({ queryKey: TIMEZONE_QUERY_KEY, queryFn: portfolioApi.getTimezone })
+  const { data: info } = infoQ
+  const declQ = useQuery({ queryKey: ['fiscal-declaraciones'], queryFn: portfolioApi.getDeclaraciones })
+  const { data: declaraciones = [] } = declQ
   const system = systemTimezone()
   const options = useMemo(() => timezoneOptions(allTimezones(), system), [system])
 
@@ -61,7 +64,16 @@ export function TimezoneSetting({ index = 0 }: { index?: number }) {
     else void apply(value)
   }
 
-  if (!info) return null
+  // Fallo (#498): sin la zona actual no se ofrece cambiarla; se dice y se puede reintentar.
+  const fallo = failure(infoQ, declQ)
+  if (!info) {
+    if (!fallo) return null
+    return (
+      <SettingsCard index={index} icon={Clock} title="Zona horaria">
+        <QueryError what="la zona horaria" error={fallo.error} onRetry={fallo.retry} className="rounded-xl border border-border" />
+      </SettingsCard>
+    )
+  }
   const pendingLabel = pending === '' ? 'la zona predeterminada' : pending ? timezoneLabel(pending) : ''
 
   return (
@@ -70,7 +82,8 @@ export function TimezoneSetting({ index = 0 }: { index?: number }) {
         Decide el día de cada operación, el ejercicio fiscal, los cierres diarios del P&amp;L y las horas que ves.
         Ahora: <span className="text-fg font-medium">{timezoneLabel(info.timezone)}</span> ({info.timezone}, {SOURCE_TEXT[info.source]}).
       </>}
-      action={<Dropdown label="Zona horaria" value={info.timezone} onChange={v => request(v)} options={options} searchable disabled={saving} className="w-64" />}>
+      action={<Dropdown label="Zona horaria" value={info.timezone} onChange={v => request(v)} options={options} searchable disabled={saving || !!fallo} className="w-64" />}>
+      {fallo && <QueryError what="los datos de la zona horaria" error={fallo.error} onRetry={fallo.retry} className="mb-3 rounded-xl border border-border" />}
       {info.invalidSetting && (
         <p role="alert" className="flex items-start gap-1.5 text-xs text-warning-ink">
           <AlertTriangle size={13} aria-hidden="true" className="shrink-0 mt-px" />

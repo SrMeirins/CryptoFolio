@@ -21,6 +21,7 @@ const systemPrefersDark = () => window.matchMedia(DARK_QUERY).matches
 
 /** Preferencia guardada y tema que se ve (sigue al sistema en vivo con «system»). */
 export function useEffectiveTheme(): { preference: ThemePreference; theme: EffectiveTheme } {
+  // consulta de fondo (#498): sin el tema guardado se usa el oscuro, el predeterminado; un fallo al guardarlo ya avisa.
   const { data: config } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
   const preference = parseThemePreference(config?.[THEME_CONFIG_KEY])
   const prefersDark = useSyncExternalStore(subscribeSystem, systemPrefersDark, () => true)

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { portfolioApi } from '../api/portfolio'
+import { failure } from '../utils/queryFailure'
 
 /**
  * Lista de wallets, cacheada/deduplicada por React Query bajo la queryKey
@@ -15,6 +16,17 @@ import { portfolioApi } from '../api/portfolio'
  * de este cambio, anotado para su propio turno).
  */
 export function useWalletsQuery() {
-  const { data: wallets = [] } = useQuery({ queryKey: ['wallets'], queryFn: portfolioApi.getWallets })
-  return wallets
+  return useWalletsResult().wallets
 }
+
+/**
+ * Lista de wallets y su fallo (#498), para quien la muestra: sin ella, un
+ * selector vacío diría que no hay wallets. `useWalletsQuery` es la consulta de
+ * fondo para traducir identificadores a nombres.
+ */
+export function useWalletsResult() {
+  const walletsQ = useQuery({ queryKey: ['wallets'], queryFn: portfolioApi.getWallets })
+  return { wallets: walletsQ.data ?? EMPTY, fallo: failure(walletsQ) }
+}
+
+const EMPTY: never[] = []

@@ -17,8 +17,9 @@ import { useSettingFeedback } from '../../hooks/useSettingFeedback'
 import { formatMoney, formatNumber } from '../../utils/format'
 import { daysSince, formatAge } from '../../utils/portfolioLots'
 import { alpha, ink } from '../../utils/colors'
-import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses, SectionHeader, EmptyState, Button } from '../../components/ui'
+import { cardClasses, buttonClasses, iconButtonClasses, fieldClasses, SectionHeader, EmptyState, Button, QueryError } from '../../components/ui'
 import { explorerLink } from '../../utils/externalLink'
+import { failure } from '../../utils/queryFailure'
 
 export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => void }) {
   const queryClient = useQueryClient()
@@ -33,22 +34,27 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
   const [syncingAddressId, setSyncingAddressId]   = useState<string | null>(null)
 
   // Mientras alguna dirección esté pendiente de su verificación automática, se refresca sola (#336).
-  const { data: wallets = [] } = useQuery({
+  const walletsQ = useQuery({
     queryKey: ['wallets'],
     queryFn: portfolioApi.getWalletsFull,
     refetchInterval: q => (hayPendientes(q.state.data ?? []) ? 5_000 : false),
   })
-  const { data: networks = [] } = useQuery({
+  const { data: wallets = [] } = walletsQ
+  const networksQ = useQuery({
     queryKey: ['networks'],
     queryFn: portfolioApi.getNetworks,
   })
+  const { data: networks = [] } = networksQ
 
   const confirmTarget = wallets.find(w => w.id === confirmDeleteId)
   const editTarget = wallets.find(w => w.id === editingWalletId)
 
   // Resumen de cada wallet (#448): valor como en Portfolio, operaciones y última actividad.
   const { byWallet, currency } = useWalletValues()
-  const { data: usage = [] } = useQuery({ queryKey: ['wallet-summary'], queryFn: portfolioApi.getWalletSummary })
+  const usageQ = useQuery({ queryKey: ['wallet-summary'], queryFn: portfolioApi.getWalletSummary })
+  const { data: usage = [] } = usageQ
+  // Fallo (#498): sin la lista no se sabe si hay wallets; se dice antes que el vacío.
+  const fallo = failure(walletsQ, networksQ, usageQ)
   const usageOf = (id: string) => usage.find(u => u.wallet_id === id)
   const { confirm } = useSettingFeedback()
 
@@ -126,7 +132,9 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
       )}
 
       {/* Wallets de usuario */}
-      {userWallets.length === 0 && !showAdd ? (
+      {fallo ? (
+        <QueryError what="tus wallets" error={fallo.error} onRetry={fallo.retry} className="rounded-xl border border-border" />
+      ) : userWallets.length === 0 && !showAdd ? (
         <EmptyState className="rounded-xl border border-dashed border-border" icon={<WalletIcon size={28} />}
           title="No tienes wallets propias configuradas"
           description="Solo hacen falta si retiras a wallets frías: así los traspasos no cuentan como ventas."

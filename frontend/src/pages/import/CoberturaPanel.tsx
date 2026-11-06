@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { BookOpen, CalendarClock, CalendarRange, Check, Copy, Undo2 } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
-import { cardClasses } from '../../components/ui'
+import { cardClasses, QueryError } from '../../components/ui'
 import { formatNumber } from '../../utils/format'
 import { formatFiscalDate } from '../../utils/fiscalTable'
 import { LineaTiempo } from './LineaTiempo'
@@ -76,7 +76,9 @@ function Tramo({ c, h, tipo, onVerGuia }: { c: CoberturaExchange; h: HuecoCobert
 // Panel «Cobertura» del paso Subir (#328): por exchange, qué está importado, los
 // huecos entre exportaciones y lo pendiente hasta hoy, con la intensidad mensual.
 export function CoberturaPanel({ onVerGuia }: { onVerGuia: (ex: 'binance' | 'bitvavo') => void }) {
-  const { data = [] } = useQuery({ queryKey: ['cobertura'], queryFn: portfolioApi.getCobertura })
+  const coberturaQ = useQuery({ queryKey: ['cobertura'], queryFn: portfolioApi.getCobertura })
+  const { data = [] } = coberturaQ
+  if (coberturaQ.isError) return <QueryError what="la cobertura de tus importaciones" error={coberturaQ.error} onRetry={() => void coberturaQ.refetch()} className="rounded-xl border border-border" />
   if (data.length === 0) return null
   return (
     <section aria-labelledby="cobertura-titulo" className={cardClasses('md', 'space-y-5')}>

@@ -5,7 +5,7 @@ import { portfolioApi, type FiscalYear } from '../../api/portfolio'
 import { formatEur, formatPercent } from '../../utils/format'
 import { EurOnlyBadge } from '../../components/EurOnlyBadge'
 import { AnimatedNumber } from '../../components/AnimatedNumber'
-import { PanelHeader, badgeClasses, panelSurface, TextTooltip } from '../../components/ui'
+import { PanelHeader, badgeClasses, panelSurface, TextTooltip, QueryError } from '../../components/ui'
 import { fiscalSubtitle } from '../../utils/panelSubtitles'
 import { baseTramosCompensada } from '../../utils/tramosIrpf'
 import { deadlineFromHito, deadlineUrgency, estimatedTax, gainLossShares } from '../../utils/fiscalPanel'
@@ -13,6 +13,7 @@ import { MODELO721_LABELS, modelo721Status, pendingPricesText } from '../../util
 import { useTramos } from '../../hooks/useTramos'
 import { FISCAL_STALE_TIME } from '../fiscal/constants'
 import { FiscalMonthly } from './FiscalMonthly'
+import { failure, type QueryLike } from '../../utils/queryFailure'
 
 // Panel fiscal del Dashboard (#236): resumen compacto del ejercicio en curso
 // con el G/P neto realizado, la comparación de ganancias y pérdidas, la cuota
@@ -27,7 +28,11 @@ const plural = (n: number) => `${n} ${n === 1 ? 'día' : 'días'}`
 const URGENCY_TEXT = { calm: 'text-brand', soon: 'text-warning', urgent: 'text-negative' } as const
 const URGENCY_BAR = { calm: 'bg-brand', soon: 'bg-warning', urgent: 'bg-negative' } as const
 
-export function FiscalCard({ data }: { data: FiscalYear[] }) {
+export function FiscalCard({ data, dataQuery }: {
+  data: FiscalYear[]
+  /** Consulta de los ejercicios (Dashboard), para mostrar su fallo en la tarjeta (#498). */
+  dataQuery?: QueryLike
+}) {
   const currentYear = new Date().getFullYear()
   const current = data.find((fy) => fy.fiscal_year === currentYear) ?? data[data.length - 1]
   const year = current?.fiscal_year
@@ -35,26 +40,41 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
   const tramos = useTramos(year)
 
   // Mismas consultas (y caché) que la página Fiscal.
-  const { data: summary } = useQuery({
+  const summaryQ = useQuery({
     queryKey: ['fiscal-summary-detail', year],
     queryFn: () => portfolioApi.getFiscalSummaryDetail(year!),
     enabled: !!year, staleTime: FISCAL_STALE_TIME,
   })
-  const { data: carryforward } = useQuery({ queryKey: ['fiscal-carryforward'], queryFn: portfolioApi.getFiscalCarryforward, staleTime: FISCAL_STALE_TIME })
-  const { data: monthly } = useQuery({
+  const summary = summaryQ.data
+  const carryforwardQ = useQuery({ queryKey: ['fiscal-carryforward'], queryFn: portfolioApi.getFiscalCarryforward, staleTime: FISCAL_STALE_TIME })
+  const carryforward = carryforwardQ.data
+  const monthlyQ = useQuery({
     queryKey: ['fiscal-monthly', year],
     queryFn: () => portfolioApi.getFiscalMonthly(year!),
     enabled: !!year, staleTime: FISCAL_STALE_TIME,
   })
-  const { data: modelo721 } = useQuery({
+  const monthly = monthlyQ.data
+  const modelo721Q = useQuery({
     queryKey: ['fiscal-721', year],
     queryFn: () => portfolioApi.getFiscalModelo721(year!),
     enabled: !!year, staleTime: FISCAL_STALE_TIME,
   })
+  const modelo721 = modelo721Q.data
   // Próximo plazo: el mismo hito que Fiscal y la campana, calculado en el backend (#309).
-  const { data: calendario } = useQuery({ queryKey: ['fiscal-calendario'], queryFn: portfolioApi.getFiscalCalendar, staleTime: FISCAL_STALE_TIME })
+  const calendarioQ = useQuery({ queryKey: ['fiscal-calendario'], queryFn: portfolioApi.getFiscalCalendar, staleTime: FISCAL_STALE_TIME })
+  const calendario = calendarioQ.data
+  // Un fallo de cualquiera de sus consultas se dice en la tarjeta, con Reintentar (#498).
+  const fallo = failure(...(dataQuery ? [dataQuery] : []), summaryQ, carryforwardQ, monthlyQ, modelo721Q, calendarioQ)
 
-  if (!current) return null
+  if (!current) {
+    if (!fallo) return null
+    return (
+      <div className={panelSurface('none', 'overflow-hidden h-full flex flex-col')}>
+        <PanelHeader icon={Landmark} title="Fiscal" className="px-5 py-4 border-b border-border" />
+        <QueryError what="el resumen fiscal" error={fallo.error} onRetry={fallo.retry} />
+      </div>
+    )
+  }
 
   const gainLoss = parseFloat(current.total_gain_loss_eur)
   const gains    = parseFloat(current.total_gains_eur)
@@ -77,10 +97,11 @@ export function FiscalCard({ data }: { data: FiscalYear[] }) {
         className="px-5 py-4 border-b border-border"
         extra={<EurOnlyBadge />}
         subtitle={fiscalSubtitle(current.fiscal_year, ops)}
-        actions={<Link to="/fiscal" className="text-xs text-brand hover:underline">Detalle →</Link>}
+        actions={<Link to="/fiscal" className="text-xs text-brand-ink hover:underline">Ver detalle en Fiscal</Link>}
       />
 
       <div className="p-5 flex flex-col gap-4 flex-1">
+        {fallo && <QueryError what="parte del resumen fiscal" error={fallo.error} onRetry={fallo.retry} className="py-4" />}
         {/* G/P neto y cuota estimada */}
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>

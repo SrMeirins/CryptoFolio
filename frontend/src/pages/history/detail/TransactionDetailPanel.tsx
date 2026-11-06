@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, PenLine, Trash2, X } from 'lucide-react'
 import type { Transaction } from '../../../api/portfolio'
 import { Drawer } from '../../../components/ui/Drawer'
-import { Skeleton, SkeletonGroup, iconButtonClasses } from '../../../components/ui'
+import { Skeleton, SkeletonGroup, iconButtonClasses, QueryError } from '../../../components/ui'
 import { opMetaOf } from '../../../constants/operations'
 import type { Currency } from '../../../utils/format'
 import { fmtDate } from '../helpers'
@@ -36,7 +36,8 @@ export function TransactionDetailPanel({ id, currency, onClose, onOpen, prev, ne
   // Confirmación de borrado ligada a la transacción: al navegar a otra se descarta.
   const [confirmFor, setConfirmFor] = useState<string | null>(null)
   const confirmDelete = confirmFor === id
-  const { data, isLoading, error } = useQuery(detailQuery(id))
+  const detailQ = useQuery(detailQuery(id))
+  const { data, isLoading, error } = detailQ
   const tx = data?.transaction
 
   const meta = tx ? opMetaOf(tx) : undefined
@@ -78,7 +79,7 @@ export function TransactionDetailPanel({ id, currency, onClose, onOpen, prev, ne
             {[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
           </SkeletonGroup>
         )}
-        {error && <p role="alert" className="px-5 py-4 text-sm text-negative-ink">No se pudo cargar el detalle: {(error as Error).message}</p>}
+        {error && <QueryError what="el detalle" error={error} onRetry={() => void detailQ.refetch()} />}
         {data && <DetailBody data={data} currency={currency} onOpen={onOpen} walletName={walletName} onRestore={onRestore} restoring={restoring} />}
       </div>
       </div>

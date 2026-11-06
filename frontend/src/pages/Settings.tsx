@@ -33,6 +33,7 @@ export function Settings() {
     setSearchParams({ tab }, { replace: true })
   }
 
+  // consulta de fondo (#498): solo decide si se muestra el aviso de primer uso; si falla, no se muestra.
   const { data: wallets = [], isFetched: walletsFetched } = useQuery({
     queryKey: ['wallets'],
     queryFn: portfolioApi.getWallets,

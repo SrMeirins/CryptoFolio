@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot, ResponsiveContainer } from 'recharts'
 import { pricesApi } from '../../api/prices'
 import type { AssetSale } from '../../api/portfolio'
-import { SegmentedControl, Skeleton } from '../../components/ui'
+import { SegmentedControl, Skeleton, QueryError } from '../../components/ui'
 import { useChartColors } from '../../hooks/useChartColors'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { formatAmount, formatPercent, formatPrice, type Currency } from '../../utils/format'
@@ -72,12 +72,13 @@ export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice,
   // «Todo» por defecto: toda la historia del activo con sus compras y ventas (#523).
   const [range, setRange] = useState<ChartRange>('all')
   const days = rangeDays(range, firstOpenedAt)
-  const { data, isLoading, isError } = useQuery({
+  const priceQ = useQuery({
     queryKey: ['price-closes', days, asset],
     queryFn: () => pricesApi.getCloses([asset], days),
     staleTime: 10 * 60_000,
     placeholderData: prev => prev,
   })
+  const { data, isLoading, isError } = priceQ
 
   const keepDays = useMemo(() => operationDays(buys, sales), [buys, sales])
   const points = useMemo(
@@ -104,12 +105,13 @@ export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice,
   )
 
   if (isLoading) return <div className="space-y-2">{header}<Skeleton className="h-44 rounded-xl" /></div>
-  if (isError || points.length < 2) {
+  if (isError) return <QueryError what="el histórico de precios" error={priceQ.error} onRetry={() => void priceQ.refetch()} />
+  if (points.length < 2) {
     return (
       <div className="space-y-2">
         {header}
         <p className="text-xs text-fg-subtle rounded-xl border border-border px-3 py-2.5">
-          {isError ? 'No se pudo cargar el histórico de precios.' : 'Sin histórico de precios para este activo.'}
+          Sin histórico de precios para este activo.
         </p>
       </div>
     )
