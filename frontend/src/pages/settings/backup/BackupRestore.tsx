@@ -72,8 +72,8 @@ export function BackupRestore() {
       await queryClient.invalidateQueries({ refetchType: 'all' })
       reset()
       toast.addToast({
-        type: 'success', title: 'Copia restaurada', duration: 12000,
-        message: result.fifo ? 'Se han recalculado los lotes FIFO.' : 'Re-ejecuta el motor FIFO desde Mantenimiento.',
+        type: 'success', title: 'Copia restaurada',
+        message: result.fifo ? 'Lotes FIFO recalculados.' : 'Ejecuta el cálculo FIFO en Ajustes, Datos, Mantenimiento.',
         action: { label: 'Deshacer', onClick: () => void revert(result.snapshotId) },
       })
     } catch (err) {
@@ -143,7 +143,7 @@ export function BackupRestore() {
       {confirming && chosen && (
         <ConfirmDialog danger title="Restaurar la copia"
           message={`Se sustituirán todos los datos por los de la copia del ${formatBackupDate(chosen.exportedAt)}. Antes se guarda el estado actual y podrás volver a él.`}
-          confirmLabel="Restaurar" onConfirm={() => void handleRestore()} onCancel={() => setConfirming(false)} />
+          confirmLabel="Restaurar la copia" onConfirm={() => void handleRestore()} onCancel={() => setConfirming(false)} />
       )}
     </div>
   )

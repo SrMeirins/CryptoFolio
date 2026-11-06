@@ -46,6 +46,24 @@ Se usa el componente `Notice` (`frontend/src/components/ui/Notice.tsx`) con uno 
 - **Acción opcional** con verbo y objeto, junto al texto.
 - **Los errores de una acción no son avisos:** siguen la norma de errores y confirmaciones (#497).
 
+## Avisos tras una acción y confirmaciones
+
+Avisos flotantes (`useToast`) y diálogos (`ConfirmDialog`). Los tiempos están en `frontend/src/components/toastTiming.ts`.
+
+| Caso | Qué se muestra |
+| --- | --- |
+| Cambio reversible | Aviso con «Deshacer», 6 s, sin diálogo previo. |
+| Borrado o cambio con efecto fiscal | Diálogo con el efecto concreto y botón con verbo y cantidad («Borrar 3 operaciones»); después, aviso con «Deshacer» si se puede. |
+| Irreversible y masivo | Diálogo con confirmación escrita y copia previa. |
+| Error | Qué pasó y qué hacer, sin códigos internos (`toast.fail`); 6 s. |
+| Éxito sin cambio visible | Aviso breve, 4 s. |
+| Éxito con cambio visible | Sin aviso: basta el cambio y la marca «Guardado». |
+
+- **Ningún aviso se cierra** mientras el ratón o el foco estén encima.
+- **Títulos:** participio con objeto («Operación borrada», «Copia restaurada») o «No se pudo» con la acción («No se pudo guardar»). Sin «Éxito», «Error al…» ni exclamaciones.
+- **Botón de confirmar:** verbo y objeto («Restaurar la copia», «Borrar la wallet Ledger»), nunca «Aceptar» o «Confirmar» solos. El foco empieza en «Cancelar».
+- **Nada nativo:** ni `window.confirm` ni `alert`. El único aviso del navegador permitido es el de cerrar la pestaña con una importación en curso.
+
 ## Explicaciones de cálculo
 
 - **Pie de metodología** (`PieMetodologia`) en las pantallas con cálculos: una línea con el método y el enlace «Cómo calculamos».

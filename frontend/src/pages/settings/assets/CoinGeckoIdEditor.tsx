@@ -23,7 +23,7 @@ export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; on
     try {
       const result = await portfolioApi.testCoinGeckoId(geckoId.trim())
       setTestResult(result)
-    } catch { setError('Error al conectar con CoinGecko') }
+    } catch { setError('No se pudo conectar con CoinGecko. Vuelve a intentarlo en unos segundos.') }
     finally { setTesting(false) }
   }
 
@@ -36,7 +36,7 @@ export function CoinGeckoIdEditor({ asset, onSaved }: { asset: AssetMetadata; on
       queryClient.invalidateQueries({ queryKey: ['assets'] })
       onSaved()
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error al guardar'
+      const msg = e instanceof Error ? e.message : 'No se pudo guardar.'
       setError(msg.includes('422') ? `"${geckoId}" no devuelve precio en CoinGecko` : msg)
     } finally { setSaving(false) }
   }

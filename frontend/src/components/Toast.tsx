@@ -2,6 +2,8 @@ import { useState, useCallback, useRef } from 'react'
 import { CheckCircle, AlertTriangle, XCircle, Info, X } from 'lucide-react'
 import { ToastContext, type ToastItem, type ToastType } from './toastContext'
 import { iconButtonClasses } from './ui'
+import { createToastTimer, toastDuration } from './toastTiming'
+import { explicarFallo } from '../utils/explicarFallo'
 
 const ICONS: Record<ToastType, React.ReactNode> = {
   success: <CheckCircle  size={15} className="text-positive  shrink-0 mt-0.5" />,
@@ -29,62 +31,34 @@ const ROLE: Record<ToastType, 'alert' | 'status'> = {
   info:    'status',
 }
 
-interface TimerState {
-  duration:  number
-  remaining: number
-  startedAt: number
-}
-
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
-  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
-  // Tiempo restante y de inicio por toast — permite pausar el auto-cierre
-  // al pasar el ratón por encima (para poder terminar de leer un mensaje
-  // largo, p. ej. un aviso de fallo de recálculo FIFO) y reanudarlo desde
-  // donde se quedó, no desde el principio, al quitar el ratón.
-  const timerState = useRef<Record<string, TimerState>>({})
+  // Un temporizador por aviso; se pausa con el ratón o el foco encima (toastTiming).
+  const timers = useRef<Record<string, ReturnType<typeof createToastTimer>>>({})
 
   const remove = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id))
-    clearTimeout(timers.current[id])
+    timers.current[id]?.clear()
     delete timers.current[id]
-    delete timerState.current[id]
   }, [])
-
-  const scheduleTimer = useCallback((id: string, ms: number) => {
-    timers.current[id] = setTimeout(() => remove(id), ms)
-  }, [remove])
 
   const addToast = useCallback((toast: Omit<ToastItem, 'id'>) => {
     const id = Math.random().toString(36).slice(2)
     setToasts(prev => [...prev.slice(-4), { ...toast, id }])
-    // Con acción, más tiempo para alcanzarla (#445).
-    const duration = toast.duration ?? (toast.type === 'error' || toast.action ? 6000 : 4000)
-    timerState.current[id] = { duration, remaining: duration, startedAt: Date.now() }
-    scheduleTimer(id, duration)
-  }, [scheduleTimer])
+    timers.current[id] = createToastTimer(toastDuration(toast), () => remove(id))
+  }, [remove])
 
-  const pause = useCallback((id: string) => {
-    const state = timerState.current[id]
-    if (!state) return
-    clearTimeout(timers.current[id])
-    state.remaining = Math.max(0, state.remaining - (Date.now() - state.startedAt))
-  }, [])
-
-  const resume = useCallback((id: string) => {
-    const state = timerState.current[id]
-    if (!state) return
-    state.startedAt = Date.now()
-    scheduleTimer(id, state.remaining)
-  }, [scheduleTimer])
+  const pause = useCallback((id: string) => { timers.current[id]?.pause() }, [])
+  const resume = useCallback((id: string) => { timers.current[id]?.resume() }, [])
 
   const success = useCallback((title: string, message?: string) => addToast({ type: 'success', title, message }), [addToast])
   const error   = useCallback((title: string, message?: string) => addToast({ type: 'error',   title, message }), [addToast])
   const warning = useCallback((title: string, message?: string) => addToast({ type: 'warning', title, message }), [addToast])
   const info    = useCallback((title: string, message?: string) => addToast({ type: 'info',    title, message }), [addToast])
+  const fail    = useCallback((title: string, err: unknown) => addToast({ type: 'error', title, message: explicarFallo(err) }), [addToast])
 
   return (
-    <ToastContext.Provider value={{ addToast, success, error, warning, info }}>
+    <ToastContext.Provider value={{ addToast, success, error, warning, info, fail }}>
       {children}
       <div className="fixed bottom-5 right-5 z-200 flex flex-col gap-2 w-80 pointer-events-none">
         {toasts.map(t => (

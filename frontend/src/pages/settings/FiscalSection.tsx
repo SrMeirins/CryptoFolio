@@ -45,7 +45,7 @@ export function FiscalSection() {
       await queryClient.invalidateQueries({ queryKey: ['config'] })
       return true
     } catch (e) {
-      toast.error('No se pudo guardar', (e as Error).message)
+      toast.fail('No se pudo guardar', e)
       return false
     }
   }
@@ -100,7 +100,7 @@ export function FiscalSection() {
       const before = previous.tramos.map(t => t.tipo)
       confirm('tramos', `${y}: ${message}`, undoable ? () => void applyTipos(y, before, 'tramos como antes', false) : undefined)
     } catch (e) {
-      toast.error('No se pudo guardar', (e as Error).message)
+      toast.fail('No se pudo guardar', e)
     }
   }
   function commitRate(i: number) {

@@ -21,6 +21,8 @@ export interface ToastContextValue {
   error:   (title: string, message?: string) => void
   warning: (title: string, message?: string) => void
   info:    (title: string, message?: string) => void
+  /** Error de una acción (#497): «No se pudo …» y, como texto, qué pasó y qué hacer. */
+  fail:    (title: string, error: unknown) => void
 }
 
 export const ToastContext = createContext<ToastContextValue | null>(null)

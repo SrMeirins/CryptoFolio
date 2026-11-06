@@ -16,7 +16,7 @@ function RestoreConfirm({ onConfirm, onCancel, restoring }: { onConfirm: () => v
       onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onCancel() } }}>
       <span className="text-xs text-fg-muted">Se perderán tus cambios (salvo las notas) y se recalculará el FIFO.</span>
       <Button variant="danger" size="sm" onClick={onConfirm} loading={restoring} className="px-2 py-0.5 text-xs">
-        {restoring ? 'Restaurando…' : 'Restaurar'}
+        {restoring ? 'Restaurando…' : 'Restaurar los valores'}
       </Button>
       <button type="button" ref={cancelRef} onClick={onCancel} disabled={restoring} className={buttonClasses('ghost', 'sm', 'px-2 py-0.5 text-xs')}>
         Cancelar

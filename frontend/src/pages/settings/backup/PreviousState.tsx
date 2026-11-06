@@ -28,7 +28,7 @@ export function PreviousState({ snapshot }: { snapshot: BackupSnapshot }) {
       {confirming && (
         <ConfirmDialog danger title="Volver al estado anterior"
           message={`Los datos actuales se sustituirán por los guardados el ${formatBackupDate(snapshot.created_at)}. Si quieres conservarlos, exporta antes una copia.`}
-          confirmLabel="Volver" onConfirm={() => { setConfirming(false); void revert(snapshot.id) }} onCancel={() => setConfirming(false)} />
+          confirmLabel="Volver al estado anterior" onConfirm={() => { setConfirming(false); void revert(snapshot.id) }} onCancel={() => setConfirming(false)} />
       )}
     </div>
   )

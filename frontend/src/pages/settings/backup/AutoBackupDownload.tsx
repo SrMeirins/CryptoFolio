@@ -28,7 +28,7 @@ export function AutoBackupDownload({ name, createdAt, onClose }: { name: string;
       toast.success('Copia descargada', 'Cifrada con tu contraseña: guárdala, sin ella no se puede restaurar.')
       onClose()
     } catch (err) {
-      toast.error('No se pudo descargar', (err as Error).message)
+      toast.fail('No se pudo descargar', err)
     } finally {
       setBusy(false)
     }

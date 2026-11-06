@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { portfolioApi, type AssetMetadata } from '../../api/portfolio'
-import { ApiError } from '../../api/client'
 import { Search, Plus, CheckCircle, X, Zap } from 'lucide-react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useToast } from '../../hooks/useToast'
@@ -85,7 +84,7 @@ export function AssetsSection() {
       await queryClient.invalidateQueries({ queryKey: ['assets'] })
       toast.success('Precios reintentados', 'Los que sigan sin precio aparecen como «Sin precio».')
     } catch (e) {
-      toast.error('No se pudo reintentar', e instanceof ApiError && e.status === 429 ? 'Espera un minuto antes de volver a intentarlo.' : (e as Error).message)
+      toast.fail('No se pudieron reintentar los precios', e)
     } finally { setRetrying(false) }
   }
 
@@ -94,7 +93,7 @@ export function AssetsSection() {
       await portfolioApi.deleteAsset(symbol)
       queryClient.invalidateQueries({ queryKey: ['assets'] })
     } catch (e) {
-      toast.error('Error al borrar el activo', (e as Error).message)
+      toast.fail('No se pudo borrar el activo', e)
     }
     setConfirmDelete(null)
   }
@@ -188,8 +187,8 @@ export function AssetsSection() {
       {confirmDelete && (
         <ConfirmDialog
           title="Borrar activo"
-          message={`¿Borrar «${confirmDelete}»? Solo es posible si no tiene transacciones asociadas.`}
-          confirmLabel="Borrar" danger
+          message={`¿Borrar «${confirmDelete}»? Solo es posible si no tiene operaciones asociadas.`}
+          confirmLabel={`Borrar ${confirmDelete}`} danger
           onConfirm={() => handleDelete(confirmDelete)}
           onCancel={() => setConfirmDelete(null)}
         />

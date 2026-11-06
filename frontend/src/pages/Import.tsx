@@ -22,6 +22,7 @@ import { navIcon } from '../constants/navigation'
 import { anadirASeleccion, clasificarArchivo, firmaLote, indicesAConfirmar, type ArchivoSel } from './import/lote'
 import { useAvisoSalida } from './import/useAvisoSalida'
 import { useTituloImportacion } from './import/useTituloImportacion'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 // Firma de la selección: si se vuelven a subir los mismos archivos, se conserva lo asignado (#318, #326).
 const FIRMA_KEY = 'import_file_signature'
@@ -57,7 +58,7 @@ export function ImportPage() {
   })
 
   // Mientras importa: aviso al salir y progreso en el título de la pestaña (#324).
-  useAvisoSalida(stage === 'progress')
+  const avisoSalida = useAvisoSalida(stage === 'progress')
   useTituloImportacion(progressLog, stage === 'progress' || stage === 'done')
 
   const { data: pendingDeposits = [] } = useQuery({
@@ -95,7 +96,7 @@ export function ImportPage() {
       const body: unknown = await res.json()
 
       if (!res.ok) {
-        setError((body as { error?: string }).error || 'Error en preview')
+        setError((body as { error?: string }).error || 'No se pudo analizar el archivo. Vuelve a intentarlo.')
         return
       }
 
@@ -104,7 +105,7 @@ export function ImportPage() {
       setExchange(data.exchange ?? 'binance')
       setStage('preview')
     } catch {
-      setError('Error al procesar los archivos')
+      setError('No se pudieron leer los archivos. Comprueba que la aplicación sigue en marcha y vuelve a intentarlo.')
     } finally {
       setLoading(false)
     }
@@ -210,7 +211,7 @@ export function ImportPage() {
 
       if (!res.ok) {
         const err = await res.json()
-        setProgressLog([{ phase: 'error', message: err.error || 'Error al importar' }])
+        setProgressLog([{ phase: 'error', message: err.error || 'No se pudo completar la importación. Vuelve a intentarlo.' }])
         return
       }
 
@@ -396,6 +397,13 @@ export function ImportPage() {
             invalidateTransactionQueries(queryClient)
           }}
         />
+      )}
+      {/* Salir a medias (#497): diálogo común en lugar de window.confirm. */}
+      {avisoSalida.destino && (
+        <ConfirmDialog title="¿Salir de la importación?"
+          message="La importación sigue en curso. Si sales ahora no verás el resultado, aunque el servidor la terminará igualmente."
+          confirmLabel="Salir sin ver el resultado" cancelLabel="Seguir aquí"
+          onConfirm={avisoSalida.salir} onCancel={avisoSalida.quedarse} />
       )}
     </div>
   )

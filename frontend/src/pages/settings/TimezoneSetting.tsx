@@ -2,7 +2,6 @@ import { useId, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Clock } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
-import { ApiError } from '../../api/client'
 import { Dropdown, Modal, ModalHeader, buttonClasses } from '../../components/ui'
 import { SettingsCard } from './SettingsCard'
 import { SavedMark } from './SavedMark'
@@ -49,7 +48,7 @@ export function TimezoneSetting({ index = 0 }: { index?: number }) {
       confirm('zona', value ? `Días y horas en ${timezoneLabel(value)}` : 'Se usa la zona predeterminada',
         undoable ? () => void apply(previous, false) : undefined)
     } catch (e) {
-      toast.error('No se pudo cambiar la zona horaria', e instanceof ApiError ? e.message : (e as Error).message)
+      toast.fail('No se pudo cambiar la zona horaria', e)
     } finally {
       setSaving(false)
     }

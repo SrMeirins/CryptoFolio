@@ -30,7 +30,7 @@ export function NotificationsCard({ index = 0 }: { index?: number }) {
       await queryClient.invalidateQueries({ queryKey: ['notifications-all'] })
       confirm('avisos', message, undoable ? () => void setMuted(previous, 'Avisos como antes', next, false) : undefined)
     } catch (e) {
-      toast.error('No se pudo guardar', (e as Error).message)
+      toast.fail('No se pudo guardar', e)
     }
   }
   function toggle(key: NotificationCategory, label: string, on: boolean) {

@@ -26,12 +26,12 @@ export function AutoBackupList({ files }: { files: readonly AutoBackupFile[] }) 
       const result = await backupApi.autoRestore(file.name)
       await queryClient.invalidateQueries({ refetchType: 'all' })
       toast.addToast({
-        type: 'success', title: 'Copia restaurada', duration: 12000,
-        message: result.fifo ? 'Se han recalculado los lotes FIFO.' : 'Re-ejecuta el motor FIFO desde Mantenimiento.',
+        type: 'success', title: 'Copia restaurada',
+        message: result.fifo ? 'Lotes FIFO recalculados.' : 'Ejecuta el cálculo FIFO en Ajustes, Datos, Mantenimiento.',
         action: { label: 'Deshacer', onClick: () => void revert(result.snapshotId) },
       })
     } catch (err) {
-      toast.error('No se pudo restaurar', (err as Error).message)
+      toast.fail('No se pudo restaurar', err)
     } finally {
       setBusy(null)
     }
@@ -68,7 +68,7 @@ export function AutoBackupList({ files }: { files: readonly AutoBackupFile[] }) 
       {restoring && (
         <ConfirmDialog danger title="Restaurar la copia automática"
           message={`Se sustituirán todos los datos por los de la copia del ${formatBackupDate(restoring.created_at)}. Antes se guarda el estado actual y podrás volver a él.`}
-          confirmLabel="Restaurar" onConfirm={() => void restore(restoring)} onCancel={() => setRestoring(null)} />
+          confirmLabel="Restaurar la copia" onConfirm={() => void restore(restoring)} onCancel={() => setRestoring(null)} />
       )}
     </>
   )

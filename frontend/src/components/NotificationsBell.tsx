@@ -53,7 +53,7 @@ export function NotificationsBell() {
       // El botón descartado ya no existe: el foco vuelve al panel, no se pierde.
       panelRef.current?.querySelector<HTMLElement>('#panel-avisos li button, #panel-avisos button')?.focus()
     } catch (e) {
-      toast.error('No se pudo descartar', (e as Error).message)
+      toast.fail('No se pudo descartar', e)
     }
   }
   async function fixStaleWithdrawals() {

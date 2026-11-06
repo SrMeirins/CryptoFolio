@@ -42,7 +42,7 @@ export function ComisionRedCard({ index = 0 }: { index?: number }) {
       confirm(COMISION_RED_KEY, next === 'coste' ? 'Comisión de red sumada al coste; FIFO recalculado' : 'Comisión de red como transmisión; FIFO recalculado',
         undoable ? () => void aplicar(previo, next, false) : undefined)
     } catch (e) {
-      toast.error('No se pudo cambiar el criterio', (e as Error).message)
+      toast.fail('No se pudo cambiar el criterio', e)
     } finally {
       setAplicando(false)
     }
@@ -60,7 +60,7 @@ export function ComisionRedCard({ index = 0 }: { index?: number }) {
         onChange={v => { if (v !== actual) setPendiente(v) }} />}>
       {aplicando && <p role="status" className="text-xs text-fg-subtle">Recalculando el FIFO…</p>}
       {pendiente !== null && (
-        <ConfirmDialog title="Cambiar el criterio de la comisión de red" confirmLabel="Cambiar y recalcular"
+        <ConfirmDialog title="Cambiar el criterio de la comisión de red" confirmLabel="Cambiar el criterio y recalcular"
           message={mensajeCambioComisionRed(pendiente, ejercicios)}
           onConfirm={() => void aplicar(pendiente, actual)} onCancel={() => setPendiente(null)} />
       )}

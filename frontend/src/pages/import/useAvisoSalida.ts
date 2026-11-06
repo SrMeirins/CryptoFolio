@@ -1,11 +1,15 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-const MENSAJE = 'La importación sigue en curso. Si sales ahora no verás el resultado (el servidor la terminará igualmente). ¿Salir?'
+// Aviso al salir mientras se importa (#324, #497). Cerrar o recargar la pestaña
+// usa el aviso del navegador (beforeunload), el único posible ahí. Navegar a
+// otra sección de la app abre el diálogo común: sin router de datos no hay
+// useBlocker, así que se interceptan en captura los clics en enlaces internos
+// y se guarda el destino hasta que el usuario decida.
+export function useAvisoSalida(activo: boolean): { destino: string | null; salir: () => void; quedarse: () => void } {
+  const navigate = useNavigate()
+  const [destino, setDestino] = useState<string | null>(null)
 
-// Aviso al salir mientras se importa (#324): cerrar o recargar la pestaña
-// (beforeunload) y navegar a otra sección de la app. Sin router de datos no hay
-// useBlocker: se interceptan en captura los clics en enlaces internos.
-export function useAvisoSalida(activo: boolean): void {
   useEffect(() => {
     if (!activo) return
     const antesDeSalir = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
@@ -13,7 +17,8 @@ export function useAvisoSalida(activo: boolean): void {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
       const a = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null
       if (!a || a.target === '_blank' || a.origin !== window.location.origin || a.pathname === window.location.pathname) return
-      if (!window.confirm(MENSAJE)) { e.preventDefault(); e.stopPropagation() }
+      e.preventDefault(); e.stopPropagation()
+      setDestino(a.pathname + a.search + a.hash)
     }
     window.addEventListener('beforeunload', antesDeSalir)
     document.addEventListener('click', alClicar, true)
@@ -22,4 +27,13 @@ export function useAvisoSalida(activo: boolean): void {
       document.removeEventListener('click', alClicar, true)
     }
   }, [activo])
+
+  const salir = useCallback(() => {
+    const d = destino
+    setDestino(null)
+    if (d) navigate(d)
+  }, [destino, navigate])
+  const quedarse = useCallback(() => setDestino(null), [])
+
+  return { destino: activo ? destino : null, salir, quedarse }
 }

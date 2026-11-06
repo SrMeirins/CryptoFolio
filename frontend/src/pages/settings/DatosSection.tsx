@@ -39,7 +39,7 @@ export function DatosSection() {
       setCacheResult(result.deleted)
       queryClient.invalidateQueries({ queryKey: ['settings-stats'] })
     } catch (e) {
-      toast.error('Error al limpiar la caché', (e as Error).message)
+      toast.fail('No se pudo limpiar la caché', e)
     } finally {
       setClearingCache(false)
     }
@@ -53,9 +53,9 @@ export function DatosSection() {
       queryClient.invalidateQueries({ refetchType: 'all' })
       setShowResetConfirm(false)
       setResetInput('')
-      toast.success('Datos borrados', 'Todas las transacciones y lotes FIFO han sido eliminados.')
+      toast.success('Datos borrados', 'Operaciones y lotes FIFO borrados.')
     } catch (e) {
-      toast.error('Error al eliminar los datos', (e as Error).message)
+      toast.fail('No se pudieron borrar los datos', e)
     } finally {
       setResetting(false)
     }
@@ -150,16 +150,16 @@ export function DatosSection() {
             </div>
             <button type="button" onClick={() => setShowResetConfirm(true)}
               className="px-4 py-2 border border-negative/50 text-negative-ink hover:bg-negative/10 rounded-lg text-sm font-medium transition-colors">
-              Eliminar todo
+              Borrar todos los datos
             </button>
           </div>
         ) : (
           <div className="space-y-3">
             <div className="px-4 py-3 rounded-xl border border-negative/40 bg-negative/8 space-y-1">
-              <p className="text-sm font-medium text-negative">¿Estás seguro?</p>
+              <p className="text-sm font-medium text-negative">Se borrarán todos los datos</p>
               <p className="text-xs text-fg-muted">
-                Esta acción borrará TODAS las transacciones, importaciones, lotes FIFO y caché de precios.
-                La configuración de wallets y activos se mantiene. Esta acción es <strong>irreversible</strong>.
+                Todas las operaciones, importaciones, lotes FIFO y la caché de precios. Se mantienen las wallets y los activos.
+                No se puede deshacer: exporta antes una copia de seguridad si quieres conservarlos.
               </p>
             </div>
             <div className="space-y-1.5">
@@ -177,7 +177,7 @@ export function DatosSection() {
               </button>
               <button type="button" onClick={handleReset} disabled={resetInput !== CONFIRM_WORD || resetting}
                 className={buttonClasses('danger', 'md')}>
-                {resetting ? 'Eliminando...' : 'Sí, eliminar todo'}
+                {resetting ? 'Borrando...' : 'Borrar todos los datos'}
               </button>
             </div>
           </div>

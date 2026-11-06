@@ -46,7 +46,7 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
       await queryClient.invalidateQueries({ queryKey: ['config'] })
       confirm(key, message, undoable ? () => void save(key, previous, 'Valor anterior restaurado', value, false) : undefined)
     } catch (e) {
-      toast.error('No se pudo guardar', (e as Error).message)
+      toast.fail('No se pudo guardar', e)
     }
   }
 
