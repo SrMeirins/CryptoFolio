@@ -13,7 +13,8 @@ test('Ganancias y Pérdidas abren Operaciones con su filtro', async ({ page }) =
     await card.waitFor({ timeout: 15_000 }).catch(() => {})
     test.skip(await card.count() === 0, 'Sin ejercicio fiscal en estos datos')
     await card.click()
-    await expect(page).toHaveURL(new RegExp(`vista=operaciones&resultado=${value}$`))
+    // El ejercicio va en la URL (#536): Operaciones se abre en el mismo año.
+    await expect(page).toHaveURL(new RegExp(`vista=operaciones&anio=\\d{4}&resultado=${value}$`))
     await expect(page.getByRole('button', { name: chip, pressed: true })).toBeVisible()
   }
 })
@@ -25,7 +26,7 @@ test('Rendimientos baja a su tabla y le pasa el foco', async ({ page }) => {
   await card.waitFor({ timeout: 15_000 }).catch(() => {})
   test.skip(await card.count() === 0, 'Sin ejercicio fiscal en estos datos')
   await card.click()
-  await expect(page).toHaveURL(/vista=operaciones&seccion=rendimientos$/)
+  await expect(page).toHaveURL(/vista=operaciones&anio=\d{4}&seccion=rendimientos$/)
   const table = page.locator('#fiscal-rendimientos')
   await table.waitFor({ timeout: 15_000 }).catch(() => {})
   test.skip(await table.count() === 0, 'Ejercicio sin rendimientos')
@@ -38,7 +39,7 @@ test('Operaciones abre la pestaña sin filtros', async ({ page }) => {
   await card.waitFor({ timeout: 15_000 }).catch(() => {})
   test.skip(await card.count() === 0, 'Sin ejercicio fiscal en estos datos')
   await card.click()
-  await expect(page).toHaveURL(/vista=operaciones$/)
+  await expect(page).toHaveURL(/vista=operaciones&anio=\d{4}$/)
 })
 
 for (const theme of ['dark', 'light'] as const) {
