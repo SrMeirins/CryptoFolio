@@ -56,11 +56,13 @@ export function Tooltip({ label, children, direction = 'down', trigger, triggerL
           {trigger}
         </button>
       ) : (
+        // Zona pulsable de 24 px (WCAG 2.5.8) con el círculo visible de 14 px; los
+        // márgenes negativos mantienen la maquetación de alrededor.
         <button {...triggerProps}
-          className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[11px] font-semibold cursor-default select-none transition-all duration-150 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
-            open ? 'bg-brand/20 text-brand-ink border border-brand/50' : 'bg-overlay/5 text-fg-subtle border border-overlay/10 hover:border-overlay/20 hover:text-fg-muted'
-          }`}>
-          ?
+          className="group/q -m-[5px] w-6 h-6 grid place-items-center rounded-full cursor-default select-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60">
+          <span aria-hidden="true" className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[11px] font-semibold transition-all duration-150 ${
+            open ? 'bg-brand/20 text-brand-ink border border-brand/50' : 'bg-overlay/5 text-fg-subtle border border-overlay/10 group-hover/q:border-overlay/20 group-hover/q:text-fg-muted'
+          }`}>?</span>
         </button>
       )}
 

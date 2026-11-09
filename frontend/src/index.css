@@ -309,6 +309,19 @@
   animation: shimmer 1.6s ease-in-out infinite;
 }
 
+/* ── Cabecera de vista (#535) ─────────────────────────────────────────────
+   Tarjeta con un brillo suave del color de marca en la esquina y el icono en
+   un degradado de marca a azul, con su sombra. */
+.view-header {
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--cf-brand) 14%, transparent) 0%, transparent 55%),
+    var(--cf-bg-card);
+}
+.view-header-tile {
+  background: linear-gradient(135deg, var(--cf-brand-solid), color-mix(in srgb, var(--cf-brand-solid) 55%, var(--cf-info)));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--cf-brand-solid) 35%, transparent);
+}
+
 /* ── Barra de recarga (#494) ──────────────────────────────────────────────
    Indeterminada sobre el panel que se actualiza; con «reducir movimiento»
    queda fija a todo el ancho, sin desplazarse. */

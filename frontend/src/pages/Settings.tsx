@@ -67,9 +67,7 @@ export function Settings() {
 
       {/* Menú lateral y contenido (#445); en pantallas estrechas, menú arriba. */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-8 px-6 pt-5">
-        <div className="shrink-0 lg:w-60">
-          <SettingsNav active={activeTab} onChange={handleTabChange} />
-        </div>
+        <SettingsNav active={activeTab} onChange={handleTabChange} />
         <div className="flex-1 min-w-0 min-h-0 overflow-hidden" id={tabPanelId('settings')} role="tabpanel" aria-labelledby={tabId('settings', activeTab)}>
           {/* La clave remonta el contenido para la entrada suave al cambiar de sección. */}
           <div key={activeTab} className="settings-section-in h-full">

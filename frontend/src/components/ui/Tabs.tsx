@@ -1,7 +1,6 @@
 import { type KeyboardEvent, type ReactNode } from 'react'
 import { optionForKey } from '../../utils/segmented'
 import { tabClasses, tabId, tabPanelId, type TabsVariant } from './classes'
-import { Hint } from './Tooltip'
 
 // Pestañas (#199): cambian el panel visible. Patrón tablist del WAI-ARIA:
 // flechas, Inicio y Fin mueven entre pestañas; cada pestaña controla el panel
@@ -10,7 +9,7 @@ import { Hint } from './Tooltip'
 export interface TabItem<T extends string> {
   value: T
   label: ReactNode
-  /** Atajo de teclado de la pestaña: se anuncia (aria-keyshortcuts) y se muestra en un Hint. */
+  /** Atajo de teclado de la pestaña: se anuncia (aria-keyshortcuts); se explica en el panel de atajos. */
   shortcut?: string
 }
 
@@ -40,14 +39,13 @@ export function Tabs<T extends string>({ items, value, onChange, label, idBase, 
       className={`flex items-center ${variant === 'underline' ? 'border-b border-border' : 'gap-1'} ${className}`}>
       {items.map(item => {
         const active = item.value === value
-        const tab = (
+        return (
           <button key={item.value} id={tabId(idBase, item.value)} type="button" role="tab"
             aria-selected={active} aria-controls={tabPanelId(idBase)} tabIndex={active ? 0 : -1}
             aria-keyshortcuts={item.shortcut} onClick={() => onChange(item.value)} className={tabClasses(active, variant)}>
             {item.label}
           </button>
         )
-        return item.shortcut ? <Hint key={item.value} label={`Atajo: ${item.shortcut}`} className="shrink-0">{tab}</Hint> : tab
       })}
     </div>
   )

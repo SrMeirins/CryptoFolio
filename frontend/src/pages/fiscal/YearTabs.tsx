@@ -1,17 +1,26 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react'
-import { formatEur } from '../../utils/format'
 import { optionForKey } from '../../utils/segmented'
-import type { YearOverview } from './types'
-import { badgeClasses } from '../../components/ui'
+import { ESTADO_EJERCICIO_LABEL, estadoEjercicio, type EstadoEjercicio } from '../../utils/fiscalNav'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
+import type { YearOverview } from './types'
 
-// Selector de ejercicio (#297): fila desplazable en pantallas estrechas que
-// centra el año activo; flechas, Inicio y Fin cambian de año (patrón tablist).
-// El año en curso lo decide el backend en hora de Madrid (esAnioEnCurso).
-export function YearTabs({ years, activeYear, overview, onSelect }: {
+// Selector de ejercicio de la cabecera (#297, #535): chips compactos con el año
+// y su estado en texto (en curso, por declarar, declarado), nunca solo color.
+// Fila desplazable que centra el año activo; flechas, Inicio y Fin cambian de
+// año (patrón tablist). El año en curso lo decide el backend (esAnioEnCurso).
+
+const TONO: Record<EstadoEjercicio, string> = {
+  'en-curso': 'text-brand-ink',
+  'por-declarar': 'text-warning-ink',
+  declarado: 'text-positive-ink',
+}
+
+export function YearTabs({ years, activeYear, overview, declarados, onSelect }: {
   years: number[]
   activeYear: number
   overview: YearOverview[]
+  /** Ejercicios con la renta marcada como declarada. */
+  declarados: ReadonlySet<number>
   onSelect: (year: number) => void
 }) {
   const refs = useRef<Record<number, HTMLButtonElement | null>>({})
@@ -30,36 +39,18 @@ export function YearTabs({ years, activeYear, overview, onSelect }: {
   }
 
   return (
-    <div className="flex gap-2 overflow-x-auto sm:flex-wrap pb-1 -mb-1 [scrollbar-width:thin]" role="tablist"
-      aria-label="Ejercicio fiscal (← → para cambiar)" onKeyDown={onKeyDown}>
+    <div className="flex gap-1 overflow-x-auto max-w-full p-0.5 rounded-lg border border-border bg-background-tertiary [scrollbar-width:thin]"
+      role="tablist" aria-label="Ejercicio fiscal" onKeyDown={onKeyDown}>
       {years.map(year => {
-        const ov   = overview.find(o => o.year === year)
-        const neto = ov?.netoPatrimonial ?? 0
+        const estado = estadoEjercicio(overview.find(o => o.year === year)?.esAnioEnCurso ?? false, declarados.has(year))
         const active = activeYear === year
         return (
-          <button
-            key={year}
-            ref={el => { refs.current[year] = el }}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            tabIndex={active ? 0 : -1}
-            onClick={() => onSelect(year)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all shrink-0 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
-              active
-                ? 'bg-brand/20 border border-brand/40 text-fg'
-                : 'bg-background-tertiary border border-border text-fg-muted hover:text-fg hover:border-fg-subtle'
-            }`}
-          >
-            <span>{year}</span>
-            {ov?.esAnioEnCurso && (
-              <span className={badgeClasses('brand', 'sm')}>EN CURSO</span>
-            )}
-            {ov && (
-              <span className={`text-xs mono font-bold ${neto >= 0 ? 'text-positive-ink' : 'text-negative-ink'}`}>
-                {neto >= 0 ? '+' : ''}{formatEur(neto)}
-              </span>
-            )}
+          <button key={year} ref={el => { refs.current[year] = el }} type="button" role="tab"
+            aria-selected={active} tabIndex={active ? 0 : -1} onClick={() => onSelect(year)}
+            className={`shrink-0 flex flex-col items-start px-2.5 py-1 rounded-md text-left transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
+              active ? 'bg-background-card shadow-xs ring-1 ring-brand/40' : 'hover:bg-overlay/5'}`}>
+            <span className={`text-sm font-semibold mono leading-tight ${active ? 'text-fg' : 'text-fg-muted'}`}>{year}</span>
+            <span className={`text-[10px] font-medium leading-tight ${TONO[estado]}`}>{ESTADO_EJERCICIO_LABEL[estado]}</span>
           </button>
         )
       })}

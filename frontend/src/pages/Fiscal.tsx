@@ -28,15 +28,22 @@ import { DeclaracionRenta } from './fiscal/DeclaracionRenta'
 import type { FiscalHito } from '../api/portfolio'
 import { useFiscalShortcuts } from './fiscal/useFiscalShortcuts'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
-import { cardClasses, EmptyState, QueryError, Skeleton, PageHeader, panelEnterStyle, tabId, tabPanelId, SectionHeader, ViewTabs, RefreshBar } from '../components/ui'
+import { badgeClasses, cardClasses, EmptyState, QueryError, Skeleton, PageHeader, panelEnterStyle, tabId, tabPanelId, SectionNav, RefreshBar, ViewHeader, type StatStripCell } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 import { FirstUseEmpty } from '../components/FirstUseEmpty'
 import { useHasTransactions } from '../hooks/useHasTransactions'
 import { PieMetodologia, type TemaMetodo } from '../components/metodologia'
 import { failure } from '../utils/queryFailure'
+import { AlertTriangle, Landmark, LayoutDashboard, ListOrdered, PiggyBank, type LucideIcon } from 'lucide-react'
+import { avisosVistas, ESTADO_EJERCICIO_LABEL, estadoEjercicio } from '../utils/fiscalNav'
+import { MODELO721_LABELS, modelo721Status } from '../utils/modelo721Status'
+import { formatEur, formatNumber } from '../utils/format'
+import { liveModelo721, margenUmbral } from '../utils/modelo721View'
+import { usePricesStore } from '../store/pricesStore'
 
 const VISTA_LABELS: Record<FiscalVista, string> = { resumen: 'Resumen', operaciones: 'Operaciones', modelo721: 'Modelo 721', planificar: 'Planificar' }
-const TAB_ITEMS = FISCAL_VISTAS.map((v, i) => ({ value: v, label: VISTA_LABELS[v], shortcut: String(i + 1) }))
+/** Icono de cada vista en el menú lateral (#535). */
+const VISTA_ICON: Record<FiscalVista, LucideIcon> = { resumen: LayoutDashboard, operaciones: ListOrdered, modelo721: Landmark, planificar: PiggyBank }
 const ID_BASE = 'fiscal-vista'
 
 /** Tema de «Cómo calculamos» que abre el pie en cada vista (#493). */
@@ -59,6 +66,7 @@ function vistaHeader(vista: FiscalVista, year: number): { title: string; subtitl
 
 export function Fiscal() {
   const firstUse = useHasTransactions()
+  const livePrices = usePricesStore(st => st.prices)
   const [searchParams, setSearchParams] = useSearchParams()
   // ?anio=2025 llega desde el resultado de una importación (#324).
   const [selectedYear, setSelectedYear] = useState<number | null>(() => {
@@ -66,6 +74,8 @@ export function Fiscal() {
     return a >= 2009 && a <= 2100 ? a : null
   })
   const vista = parseVista(searchParams.get('vista'))
+  // Colchón de Planificar para su cabecera (#535): misma consulta y caché que la vista; su fallo lo trata la vista.
+  const { data: planner } = useQuery({ queryKey: ['fiscal-planner'], queryFn: portfolioApi.getFiscalPlanner, staleTime: 60_000, enabled: vista === 'planificar' })
   const queryClient = useQueryClient()
 
   const yearsQ = useQuery({ queryKey: ['fiscal-years'], queryFn: portfolioApi.getFiscalYears })
@@ -165,7 +175,7 @@ export function Fiscal() {
   // En pantallas estrechas la fila de pestañas se desplaza: la activa siempre a la vista.
   useEffect(() => {
     const el = document.getElementById(tabId(ID_BASE, vista))
-    const row = el?.parentElement
+    const row = el?.closest<HTMLElement>('[role="tablist"]')
     if (!el || !row || row.scrollWidth <= row.clientWidth) return
     const a = el.getBoundingClientRect(), r = row.getBoundingClientRect()
     row.scrollLeft += (a.left - r.left) - (r.width - a.width) / 2
@@ -247,34 +257,86 @@ export function Fiscal() {
     ? caducanEsteAnio(carryforward.origenes, activeYear)
     : null
 
+  // Menú lateral (#535): dato vivo, aviso y atajo de cada vista.
+  const anioEnCurso = overview.find(o => o.esAnioEnCurso)?.year ?? null
+  const estado721 = modelo721 ? modelo721Status(modelo721) : null
+  const avisos = avisosVistas({
+    rentaCambiada: (rentaDeclarada?.cambios?.length ?? 0) > 0,
+    obligado721SinPresentar: estado721 === 'obligatorio' && !modelo721?.presentado,
+  })
+  const datoVivo: Record<FiscalVista, string | undefined> = {
+    resumen: summary ? `Neto ${formatEur(summary.netoPatrimonial)}` : undefined,
+    operaciones: events ? `${formatNumber(events.fiscalEvents.length, 0)} ${events.fiscalEvents.length === 1 ? 'operación' : 'operaciones'}` : undefined,
+    modelo721: estado721 ? MODELO721_LABELS[estado721] : undefined,
+    planificar: carryforward ? `${formatEur(carryforward.pendienteTotal)} de pérdidas pendientes` : undefined,
+  }
+  const navItems = FISCAL_VISTAS.map((v, i) => ({
+    value: v, label: VISTA_LABELS[v], icon: VISTA_ICON[v], hint: datoVivo[v], shortcut: String(i + 1),
+    badge: avisos[v] && (
+      <span className="inline-flex text-warning-ink"><AlertTriangle size={12} aria-hidden="true" /><span className="sr-only">: requiere atención, {avisos[v]}</span></span>
+    ),
+  }))
+  const ov = overview.find(o => o.year === activeYear)
+  const m721 = modelo721 ? liveModelo721(modelo721, livePrices) : null
+  const caducaEnCurso = anioEnCurso && carryforward?.origenes ? caducanEsteAnio(carryforward.origenes, anioEnCurso)?.importe ?? 0 : null
+  const tono = (v: number) => (v > 0.005 ? 'positive' as const : v < -0.005 ? 'negative' as const : undefined)
+  const cifras: Record<FiscalVista, StatStripCell[]> = {
+    resumen: summary ? [
+      { key: 'neto', label: 'Neto a declarar', value: summary.netoPatrimonial, format: formatEur, tone: tono(summary.netoPatrimonial) },
+      { key: 'cuota', label: 'Cuota estimada', value: cuota, format: formatEur },
+      { key: 'ops', label: 'Operaciones', value: ov?.numOperaciones ?? 0, format: v => formatNumber(v, 0) },
+    ] : [],
+    operaciones: ov ? [
+      { key: 'ganancias', label: 'Ganancias', value: ov.totalGanancias, format: formatEur, tone: tono(ov.totalGanancias) },
+      { key: 'perdidas', label: 'Pérdidas', value: ov.totalPerdidas, format: formatEur, tone: tono(ov.totalPerdidas) },
+      { key: 'ops', label: 'Operaciones', value: ov.numOperaciones, format: v => formatNumber(v, 0) },
+    ] : [],
+    modelo721: m721 ? [
+      { key: 'custodia', label: 'En custodia de terceros', value: m721.totalValorCustodia, format: formatEur },
+      { key: 'umbral', label: 'Umbral', value: m721.umbral, format: formatEur },
+      { key: 'margen', label: margenUmbral(m721) >= 0 ? 'Margen hasta el umbral' : 'Por encima del umbral', value: Math.abs(margenUmbral(m721)), format: formatEur,
+        tone: margenUmbral(m721) < 0 ? 'warning' as const : undefined },
+    ] : [],
+    planificar: carryforward ? [
+      { key: 'pendientes', label: 'Pérdidas pendientes', value: carryforward.pendienteTotal, format: formatEur },
+      ...(planner ? [{ key: 'colchon', label: 'Colchón', value: planner.colchon, format: formatEur }] : []),
+      ...(caducaEnCurso !== null ? [{ key: 'caducan', label: 'Caducan este año', value: caducaEnCurso, format: formatEur, tone: caducaEnCurso > 0.005 ? 'warning' as const : undefined }] : []),
+    ] : [],
+  }
+  const declarados = new Set(declaraciones.filter(d => d.tipo === 'renta').map(d => d.ejercicio))
+  const estadoActivo = estadoEjercicio(!!summary?.esAnioEnCurso, declarados.has(activeYear))
+
   return (
-    <div className="p-6 space-y-5 max-w-5xl mx-auto">
+    <div className="p-6 space-y-5">
       <PageHeader
         icon={navIcon('/fiscal')}
         title="Fiscal"
         badges={<EurOnlyBadge />}
         subtitle="Método FIFO · normativa española · importes en EUR"
-        actions={<ExportPanel year={activeYear} />}
       />
 
-      <YearTabs years={years} activeYear={activeYear} overview={overview} onSelect={setSelectedYear} />
-      {activeYear && (
-        <p className="text-xs text-right -mt-2">
-          <Link to={historyYearLink(activeYear)} className="text-brand-ink hover:underline rounded focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
-            Ver las operaciones de {activeYear} en Historial
-          </Link>
-        </p>
-      )}
-
-      {/* Nivel 2 de la norma de selección (#492): vistas con URL. */}
-      <ViewTabs items={TAB_ITEMS} value={vista} onChange={setVista} label="Secciones de Fiscal" idBase={ID_BASE} />
+      {/* Nivel 1 de la norma de selección (#492, #535): menú lateral con URL (?vista=). */}
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-8">
+      <SectionNav items={navItems} value={vista} onChange={setVista} label="Secciones de Fiscal" idBase={ID_BASE} />
 
       <div id={tabPanelId(ID_BASE)} role="tabpanel" aria-labelledby={tabId(ID_BASE, vista)} aria-busy={switching}
-        className="relative space-y-5">
+        className="relative flex-1 min-w-0 space-y-5">
         {/* Cambio de año (#494): se mantienen las cifras del anterior y una barra indica la recarga. */}
         <RefreshBar active={switching} />
-        {/* Cabecera común de la vista (#491): un h2 con título y contexto en todas las pestañas. */}
-        <SectionHeader {...vistaHeader(vista, activeYear)} />
+        {/* Cabecera de la vista (#491, #535, variante A): ejercicio, estado, años, exportar, cifras y enlace a Historial. */}
+        <ViewHeader id="fiscal-vista-titulo" icon={VISTA_ICON[vista]} {...vistaHeader(vista, activeYear)}
+          eyebrow={`Ejercicio ${vista === 'planificar' && anioEnCurso ? anioEnCurso : activeYear}`}
+          badge={vista !== 'planificar' && <span className={badgeClasses(estadoActivo === 'por-declarar' ? 'warning' : estadoActivo === 'declarado' ? 'positive' : 'brand')}>{ESTADO_EJERCICIO_LABEL[estadoActivo]}</span>}
+          actions={<>
+            <YearTabs years={years} activeYear={activeYear} overview={overview} declarados={declarados} onSelect={setSelectedYear} />
+            <ExportPanel year={activeYear} />
+          </>}
+          stats={cifras[vista]}
+          footer={
+            <Link to={historyYearLink(activeYear)} className="text-brand-ink hover:underline rounded focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
+              Ver las operaciones de {activeYear} en Historial
+            </Link>
+          } />
         {falloSecundario && <QueryError what="parte de los datos fiscales" error={falloSecundario.error} onRetry={falloSecundario.retry}
           className="rounded-xl border border-border" />}
         {/* Planificar trabaja siempre con el año en curso, sea cual sea el seleccionado (#307) */}
@@ -324,11 +386,12 @@ export function Fiscal() {
             <div className={cardClasses('md')}><Skeleton className="h-4 w-48" /></div>
           ) : modelo721 && <Block i={0}><Modelo721Card data={modelo721} activeYear={activeYear} /></Block>
         ) : null}
-      </div>
 
-      <PieMetodologia tema={TEMA_VISTA[vista]}>
-        Método FIFO global por activo según la normativa española. Información orientativa: consulta con un asesor fiscal antes de presentar tu declaración.
-      </PieMetodologia>
+        <PieMetodologia tema={TEMA_VISTA[vista]}>
+          Método FIFO global por activo según la normativa española. Información orientativa: consulta con un asesor fiscal antes de presentar tu declaración.
+        </PieMetodologia>
+      </div>
+      </div>
     </div>
   )
 }
