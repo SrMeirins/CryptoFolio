@@ -200,6 +200,8 @@ jobs:
           BACKEND_PORT: '3001'
           BACKEND_HOST: 127.0.0.1
           PRICE_SOURCES_OFFLINE: 'true'
+          # La suite e2e completa supera las 5000 peticiones por ventana del valor por defecto.
+          RATE_LIMIT_MAX: '50000'
         run: |
           nohup npx tsx src/index.ts > backend.log 2>&1 &
           for i in $(seq 1 60); do curl -sf http://127.0.0.1:3001/health && exit 0; sleep 2; done
