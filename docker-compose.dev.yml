@@ -111,6 +111,8 @@ services:
       BLOCKFROST_API_KEY: ${BLOCKFROST_API_KEY:-}
       SUBSCAN_API_KEY: ${SUBSCAN_API_KEY:-}
       PRICE_REFRESH_INTERVAL_MS: ${PRICE_REFRESH_INTERVAL_MS:-60000}
+      # La suite e2e completa supera las 5000 peticiones por ventana del valor por defecto.
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-50000}
       # Zona horaria de la aplicación (#388): vacía, Europe/Madrid; la de Ajustes prevalece.
       APP_TIMEZONE: ${APP_TIMEZONE:-}
       # Copias automáticas cifradas con la clave del equipo (#454), en la
