@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { buildRendimientosCsv, tramosCompactos } from './fiscalRendimientos'
+import { buildRendimientosCsv } from './fiscalRendimientos'
 import type { RendimientoEvent } from '../pages/fiscal/types'
 
-// CSV de rendimientos y tramos compactos (#313). Datos sintéticos.
+// CSV de rendimientos (#313). Datos sintéticos.
 const r = (p: Partial<RendimientoEvent>): RendimientoEvent =>
-  ({ fecha: '2026-06-26', tipo: 'Cashback / Bonus', activo: 'EUR', cantidad: 0.76, valorEur: 0.76, wallet: 'Bitvavo', ...p })
+  ({ fecha: '2026-06-26', tipo: 'Cashback / Bonus', activo: 'EUR', cantidad: 0.76, valorEur: 0.76, wallet: 'Bitvavo', base: 'general', ...p })
 
 describe('buildRendimientosCsv', () => {
   it('cabecera y filas con «;»', () => {
@@ -17,13 +17,5 @@ describe('buildRendimientosCsv', () => {
     const line = buildRendimientosCsv([r({ wallet: '=HYPERLINK("x")', activo: 'A;B' })]).split('\n')[1]
     expect(line).toContain(`"'=HYPERLINK(""x"")"`)
     expect(line).toContain('"A;B"')
-  })
-})
-
-describe('tramosCompactos', () => {
-  it('compactos por debajo de 1.000 €', () => {
-    expect(tramosCompactos(0.9)).toBe(true)
-    expect(tramosCompactos(999.99)).toBe(true)
-    expect(tramosCompactos(1_000)).toBe(false)
   })
 })
