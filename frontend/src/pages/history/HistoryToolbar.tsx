@@ -1,6 +1,6 @@
 import { forwardRef, useState, type ReactNode } from 'react'
 import { YearSelector } from './keyboard/YearSelector'
-import { PenLine, Link2, Layers, FilePen, Keyboard, SlidersHorizontal, ChevronDown } from 'lucide-react'
+import { PenLine, Link2, Layers, FilePen, SlidersHorizontal, ChevronDown } from 'lucide-react'
 import { DateRangePicker } from '../../components/DateRangePicker'
 import { Dropdown, MultiDropdown, iconButtonClasses, Hint } from '../../components/ui'
 import { fmtShort } from '../../utils/date'
@@ -48,10 +48,9 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
   onCopyLink: () => void
   /** Selector «Año» (#382). */
   year: { years: readonly number[]; value: number | null; onChange: (y: number | null) => void; onStep: (s: -1 | 1) => void; canPrev: boolean; canNext: boolean }
-  onHelp: () => void
 }>(function HistoryToolbar({
   filters, searchInput, wallets, assets, presentTypes, imports, currencySymbol,
-  setSearchInput, setFilter, patchFilters, setDateRange, onCopyLink, year, onHelp,
+  setSearchInput, setFilter, patchFilters, setDateRange, onCopyLink, year,
 }, searchRef) {
   const [moreOpen, setMoreOpen] = useState(readMoreFiltersOpen)
   const moreCount = secondaryFilterCount(filters)
@@ -86,12 +85,7 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
         </button>
 
         <span className="ml-auto flex items-center gap-1">
-          <Hint label="Atajos de teclado (?)">
-            <button type="button" onClick={onHelp} aria-keyshortcuts="?"
-              className={iconButtonClasses('md')} aria-label="Atajos de teclado">
-              <Keyboard size={13} aria-hidden="true" />
-            </button>
-          </Hint>
+          {/* Los atajos se abren desde la barra superior o con «?» (#535), en todas las pantallas. */}
           <Hint label="Copiar el enlace de esta vista">
             <button type="button" onClick={onCopyLink}
               className={iconButtonClasses('md')} aria-label="Copiar el enlace de esta vista">

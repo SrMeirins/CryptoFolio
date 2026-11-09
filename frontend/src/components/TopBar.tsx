@@ -1,13 +1,16 @@
 import { useRef, useState } from 'react'
-import { Menu, SlidersHorizontal } from 'lucide-react'
+import { Menu, SlidersHorizontal, Keyboard } from 'lucide-react'
 import { StatusIndicator } from './StatusIndicator'
 import { CurrencyToggle } from './CurrencyToggle'
 import { ThemeToggle } from './ThemeToggle'
 import { PrivacyToggle } from './PrivacyToggle'
 import { NotificationsBell } from './NotificationsBell'
-import { Popover, iconButtonClasses } from './ui'
+import { Popover, iconButtonClasses, IconButton } from './ui'
 import { NARROW_QUERY, useMediaQuery } from '../hooks/useMediaQuery'
 import { useNavStore } from '../store/navStore'
+import { ShortcutsPanel } from './ShortcutsPanel'
+import { useShortcutsKey } from '../hooks/useShortcutsKey'
+import { useShortcutsStore } from '../store/shortcutsStore'
 
 // Barra superior (#200): 64 px, igual que la cabecera de la barra lateral, para
 // que sus bordes inferiores coincidan. Solo estado, moneda, tema y avisos.
@@ -18,6 +21,8 @@ export function TopBar() {
   const mobileOpen = useNavStore(s => s.mobileOpen)
   const setMobileOpen = useNavStore(s => s.setMobileOpen)
   const [vistaOpen, setVistaOpen] = useState(false)
+  const setShortcutsOpen = useShortcutsStore(s => s.setOpen)
+  useShortcutsKey()
   const vistaRef = useRef<HTMLButtonElement>(null)
 
   return (
@@ -48,7 +53,10 @@ export function TopBar() {
         </>
       )}
       <PrivacyToggle />
+      {/* Atajos de teclado (#535): también con «?» en cualquier pantalla. */}
+      <IconButton label="Atajos de teclado" icon={<Keyboard size={16} aria-hidden="true" />} aria-keyshortcuts="?" onClick={() => setShortcutsOpen(true)} />
       <NotificationsBell />
+      <ShortcutsPanel />
     </div>
   )
 }

@@ -25,8 +25,8 @@ import { useRunningBalance } from './history/balance/useRunningBalance'
 import { ShortfallBanner } from './history/balance/ShortfallBanner'
 import { selectedYear, stepYear, yearRange } from './history/keyboard/yearNav'
 import { useHistoryShortcuts } from './history/keyboard/useHistoryShortcuts'
-import { ShortcutsHelp } from './history/keyboard/ShortcutsHelp'
 import { FirstUseEmpty } from '../components/FirstUseEmpty'
+import { useShortcutsStore } from '../store/shortcutsStore'
 
 // Pestaña Historial: orquesta el estado de filtros (useHistoryFilters), los
 // datos (useHistoryData) y los bloques de UI de pages/history/ (#351).
@@ -35,7 +35,7 @@ export function History() {
   const paginationRef = useRef<HTMLElement>(null)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [showNewTx, setShowNewTx] = useState(false)
-  const [showHelp, setShowHelp] = useState(false)
+  const openShortcuts = useShortcutsStore(s => s.setOpen)
 
   const f = useHistoryFilters()
   const d = useHistoryData(f.queryParams, f.offset, f.filters.import_id)
@@ -78,7 +78,7 @@ export function History() {
   const stepTo = (step: -1 | 1) => { const y = step === -1 ? prevYear : nextYear; if (y !== null) goYear(y) }
   useHistoryShortcuts({
     search: () => searchRef.current?.focus(),
-    help: () => setShowHelp(true),
+    help: () => openShortcuts(true),
     yearPrev: () => stepTo(-1),
     yearNext: () => stepTo(1),
   })
@@ -124,7 +124,7 @@ export function History() {
           assets={d.assets} presentTypes={d.presentTypes} imports={d.imports}
           currencySymbol={currencySymbol}
           setSearchInput={f.setSearchInput} setFilter={f.setFilter} patchFilters={f.patchFilters}
-          setDateRange={f.setDateRange} onCopyLink={() => { void copyLink() }} onHelp={() => setShowHelp(true)}
+          setDateRange={f.setDateRange} onCopyLink={() => { void copyLink() }}
           year={{ years: d.years, value: year, onChange: goYear, onStep: stepTo, canPrev: prevYear !== null, canNext: nextYear !== null }} />
         <ActiveFilterChips chips={chips} onRemove={f.patchFilters} onClearAll={f.clearFilters} />
       </div>
@@ -181,7 +181,6 @@ export function History() {
           walletName={walletName} onRestore={id => { void d.restoreTx(id) }} restoring={d.restoringId === f.focusTx} />
       )}
 
-      {showHelp && <ShortcutsHelp onClose={() => setShowHelp(false)} />}
 
       {(showNewTx || editingTx) && (
         <ManualTxModal
