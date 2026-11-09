@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
+import { pulsarInterruptor } from './interruptor'
 
 // Avisos (#447): campana accesible con Descartar y silenciado por categoría en
 // Ajustes. Solo lectura: los avisos, el descarte y la config se interceptan
@@ -17,6 +18,7 @@ const CAT: Record<string, string> = { Precios: 'precios', Fiscal: 'fiscal' }
 async function fakeNotifications(page: Page) {
   const dismissed = new Set<string>()
   let muted: string[] = []
+  let ultima: Record<string, string> | null = null
   await page.route('**/api/settings/notifications**', async route => {
     const url = new URL(route.request().url())
     if (url.pathname.endsWith('/dismiss')) {
@@ -35,11 +37,16 @@ async function fakeNotifications(page: Page) {
       await route.fulfill({ json: { success: true } })
       return
     }
-    // Si la página navega a mitad de la petición, la respuesta ya no existe: se ignora.
+    // Si la petición real falla (navegación, servidor lento), se responde con la
+    // última configuración conocida en lugar de dejar la consulta colgada.
     try {
       const real = await route.fetch()
-      await route.fulfill({ response: real, json: { ...(await real.json()), notifications_muted: JSON.stringify(muted) } })
-    } catch { /* navegación en curso */ }
+      ultima = await real.json() as Record<string, string>
+      await route.fulfill({ response: real, json: { ...ultima, notifications_muted: JSON.stringify(muted) } })
+    } catch {
+      if (ultima) await route.fulfill({ json: { ...ultima, notifications_muted: JSON.stringify(muted) } }).catch(() => {})
+      else await route.abort().catch(() => {})
+    }
   })
 }
 
@@ -72,7 +79,7 @@ test('silenciar una categoría en Ajustes la quita de la campana, con Deshacer',
   const card = page.getByRole('region', { name: 'Notificaciones' })
   const fiscal = card.getByRole('switch', { name: /^Fiscal/ })
   await expect(fiscal).toBeChecked()
-  await fiscal.click({ force: true })
+  await pulsarInterruptor(fiscal)
   await expect(fiscal).not.toBeChecked()
   await expect(page.getByRole('button', { name: 'Avisos del sistema: 1' })).toBeVisible()
   await page.getByRole('status').filter({ hasText: 'Guardado' }).getByRole('button', { name: 'Deshacer' }).click()
