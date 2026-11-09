@@ -247,7 +247,7 @@ Se abre un lote nuevo con `cost_basis_eur` = valor de mercado en el momento de r
 
 ### Fiscalmente (España — IRPF)
 
-Las recompensas de staking se consideran **rendimientos del capital mobiliario** (art. 25.4 LIRPF), integrándose en la **base del ahorro**. Se valoran al precio de mercado en el momento de recepción. La DGT tiene consultas vinculantes que apuntan a esta clasificación para el staking delegado (no minería directa).
+Las recompensas de staking se consideran **rendimientos del capital mobiliario** obtenidos por la cesión a terceros de capitales propios (art. 25.2 LIRPF, consulta vinculante DGT V1766-22), integrándose en la **base del ahorro**. Se valoran al precio de mercado en el momento de recepción. Entran en la cuota estimada y en la compensación de pérdidas (hasta el 25 %, art. 49 LIRPF).
 
 > **Nota:** El tratamiento del staking de validador propio (ETH 2.0) está en debate doctrinal. Puede considerarse actividad económica o ganancia patrimonial según el volumen y la frecuencia. Consulta con tu asesor fiscal.
 
@@ -332,7 +332,7 @@ Se abre un lote nuevo con `cost_basis_eur` = valor de mercado en el momento de r
 
 ### Fiscalmente (España — IRPF)
 
-Los airdrops recibidos sin contraprestación son una **ganancia patrimonial no derivada de transmisión** (art. 33.1 LIRPF), integrable en la **base del ahorro**. El valor se fija al precio de mercado en el momento de recepción.
+Los airdrops recibidos sin contraprestación son una **ganancia patrimonial no derivada de transmisión** (art. 33.1 LIRPF), que se integra en la **base general** (arts. 45 y 46 LIRPF; consulta vinculante DGT V1948-21). El valor se fija al precio de mercado en el momento de recepción. La aplicación los muestra aparte, como información, porque su cuota depende del resto de ingresos: no entran en la cuota estimada del ahorro ni se compensan con sus pérdidas.
 
 > **Nota:** Existe debate sobre si los airdrops de Launchpool (obtenidos bloqueando capital, no por azar) podrían clasificarse como rendimientos del capital mobiliario. La posición conservadora (y la más habitual en la práctica) es tratarlos como ganancia patrimonial.
 
@@ -378,7 +378,7 @@ Se abre un lote nuevo al precio de mercado del momento de recepción.
 
 ### Fiscalmente (España — IRPF)
 
-Los cashbacks y bonos recibidos de un exchange son **ganancias patrimoniales no derivadas de transmisión** (art. 33.1 LIRPF), base del ahorro, valoradas al precio de mercado en el momento de recepción. Algunos asesores los asimilan a rendimientos del capital mobiliario por analogía con los bonos bancarios; la posición más habitual es la ganancia patrimonial.
+Los cashbacks y bonos recibidos de un exchange se tratan como **ganancias patrimoniales no derivadas de transmisión** (art. 33.1 LIRPF), valoradas al precio de mercado en el momento de recepción, que se integran en la **base general** (arts. 45 y 46 LIRPF). No hay consulta vinculante específica: es un criterio prudente de la aplicación, por analogía con los airdrops. Si se trata de una devolución de comisión, podría tratarse como menor coste de la operación; conviene consultarlo con un asesor. Igual que los airdrops, se muestran aparte y no entran en la cuota estimada del ahorro.
 
 ---
 

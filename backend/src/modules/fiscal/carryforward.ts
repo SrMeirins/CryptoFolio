@@ -1,6 +1,7 @@
 import { db } from '../../db/client';
 import { getAppTimezone } from '../time/appTimezone';
 import { ANIOS_COMPENSACION, type AnioFiscal } from './compensacion';
+import { OPS_RCM_AHORRO } from './clasificacionRentas';
 
 // Carga de los ejercicios para la compensación de pérdidas (#305). La lógica
 // pura vive en compensacion.ts (sin base de datos); se reexporta aquí para no
@@ -8,7 +9,8 @@ import { ANIOS_COMPENSACION, type AnioFiscal } from './compensacion';
 export { baseAhorro, compensarPerdidas, ANIOS_COMPENSACION, type AnioFiscal, type DetalleCompensacion, type OrigenPerdida } from './compensacion';
 
 /**
- * Neto G/P y rendimientos de cada ejercicio, desde el primero con datos hasta
+ * Neto G/P y rendimientos del capital mobiliario (solo los de la base del
+ * ahorro, #537) de cada ejercicio, desde el primero con datos hasta
  * el actual (#305). Antes se cargaban solo los 4 últimos y el actual: una
  * pérdida anterior a esa ventana, aún vigente, no se tenía en cuenta.
  */
@@ -26,9 +28,9 @@ export async function cargarAniosFiscales(currentYear: number): Promise<AnioFisc
     SELECT EXTRACT(YEAR FROM t.timestamp AT TIME ZONE $1)::int AS year,
            COALESCE(SUM(t.amount_net * COALESCE(t.price_per_unit, 0)), 0) AS total
     FROM transactions t
-    WHERE t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
+    WHERE t.operation_type = ANY($2)
     GROUP BY 1
-  `, [tz]);
+  `, [tz, OPS_RCM_AHORRO]);
   const netoPorAnio = new Map<number, number>(gp.rows.map((r: { year: number; neto: string }) => [r.year, parseFloat(r.neto)]));
   const rendPorAnio = new Map<number, number>(rend.rows.map((r: { year: number; total: string }) => [r.year, parseFloat(r.total)]));
   const conDatos = [...netoPorAnio.keys(), ...rendPorAnio.keys()].filter(y => y <= currentYear);

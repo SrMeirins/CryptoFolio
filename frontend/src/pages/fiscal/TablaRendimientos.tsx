@@ -10,7 +10,19 @@ import { paginate, type PageSize } from '../../utils/pagination'
 import { buildRendimientosCsv } from '../../utils/fiscalRendimientos'
 import { usePrivacyStore } from '../../store/privacyStore'
 
-export function TablaRendimientos({ rendimientos, year }: { rendimientos: RendimientoEvent[]; year: number }) {
+// Una tabla por base del IRPF (#537): los rendimientos del capital mobiliario
+// (ahorro) y, aparte, las rentas de la base general, que solo se informan.
+export function TablaRendimientos({ rendimientos, year, id = 'fiscal-rendimientos', title = 'Rendimientos del capital mobiliario',
+  archivo = 'rendimientos_fiscal', nota }: {
+  rendimientos: RendimientoEvent[]
+  year: number
+  id?: string
+  title?: string
+  /** Prefijo del CSV descargado. */
+  archivo?: string
+  /** Explicación bajo la cabecera (p. ej., por qué no entra en la cuota). */
+  nota?: React.ReactNode
+}) {
   const [expanded, setExpanded]         = useState(true)
   const [filterActivo, setFilterActivo] = useState('')
   const [filterTipo, setFilterTipo]     = useState('')
@@ -40,7 +52,7 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
     const blob = new Blob(['\uFEFF' + buildRendimientosCsv(filtered)], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = `rendimientos_fiscal_${year}.csv`
+    a.href = url; a.download = `${archivo}_${year}.csv`
     a.click(); URL.revokeObjectURL(url)
   }
 
@@ -51,11 +63,11 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
 
   return (
     // Destino de la tarjeta Rendimientos del ejercicio (#418): recibe el foco al llegar.
-    <div id="fiscal-rendimientos" tabIndex={-1} className={panelSurface('none', 'overflow-hidden scroll-mt-4 focus:outline-hidden')}>
+    <div id={id} tabIndex={-1} className={panelSurface('none', 'overflow-hidden scroll-mt-4 focus:outline-hidden')}>
       <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-wrap gap-2">
         <TableExpandToggle
           icon={TrendingDown}
-          title="Rendimientos del Capital Mobiliario"
+          title={title}
           count={rendimientos.length}
           expanded={expanded}
           onToggle={() => setExpanded(!expanded)}
@@ -82,13 +94,15 @@ export function TablaRendimientos({ rendimientos, year }: { rendimientos: Rendim
                 <button type="button" onClick={exportCsv} disabled={privacy || filtered.length === 0}
                   className={buttonClasses('secondary', 'sm', 'flex gap-1.5')}>
                   <Download size={11} aria-hidden="true" />
-                  {filtered.length < rendimientos.length ? 'CSV de lo filtrado' : 'CSV de rendimientos'}
+                  {filtered.length < rendimientos.length ? 'CSV de lo filtrado' : 'CSV de la tabla'}
                 </button>
               </Hint>
             </>
           )}
         </div>
       </div>
+
+      {nota && <div className="px-5 pt-4">{nota}</div>}
 
       {expanded && (
         <div className="overflow-x-auto">

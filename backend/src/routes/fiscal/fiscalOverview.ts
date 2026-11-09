@@ -3,6 +3,7 @@ import { cargarAniosFiscales, compensarPerdidas } from '../../modules/fiscal/car
 import { db } from '../../db/client';
 import { localYearMonth } from '../../modules/time/localTime';
 import { getAppTimezone } from '../../modules/time/appTimezone';
+import { OPS_RCM_AHORRO, OPS_RENTA_ESPECIE } from '../../modules/fiscal/clasificacionRentas';
 
 
 const router = Router();
@@ -16,9 +17,9 @@ router.get('/years', async (_req: Request, res: Response) => {
     UNION
     SELECT DISTINCT EXTRACT(YEAR FROM timestamp AT TIME ZONE $1)::int AS year
     FROM transactions
-    WHERE operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
+    WHERE operation_type = ANY($2)
     ORDER BY year DESC
-  `, [tz]);
+  `, [tz, OPS_RENTA_ESPECIE]);
   res.json(result.rows.map((r: { year: number }) => r.year));
 });
 
@@ -33,9 +34,9 @@ router.get('/overview', async (_req: Request, res: Response) => {
     UNION
     SELECT DISTINCT EXTRACT(YEAR FROM timestamp AT TIME ZONE $1)::int AS year
     FROM transactions
-    WHERE operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
+    WHERE operation_type = ANY($2)
     ORDER BY year ASC
-  `, [tz]);
+  `, [tz, OPS_RENTA_ESPECIE]);
 
   const years: number[] = yearsRes.rows.map((r: { year: number }) => r.year);
 
@@ -55,8 +56,8 @@ router.get('/overview', async (_req: Request, res: Response) => {
       SELECT COALESCE(SUM(t.amount_net * COALESCE(t.price_per_unit, 0)), 0) AS total_rendimientos
       FROM transactions t
       WHERE EXTRACT(YEAR FROM t.timestamp AT TIME ZONE $2) = $1
-        AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
-    `, [year, tz]);
+        AND t.operation_type = ANY($3)
+    `, [year, tz, OPS_RCM_AHORRO]);
 
     return {
       year,
@@ -76,7 +77,8 @@ router.get('/overview', async (_req: Request, res: Response) => {
 // Análisis de compensación de pérdidas (últimos 4 años + año actual).
 // Normativa española: pérdidas patrimoniales compensan contra ganancias
 // patrimoniales sin límite, y contra rendimientos del capital mobiliario
-// con límite del 25% de los rendimientos positivos del año.
+// con límite del 25% de los rendimientos positivos del año, conjunto con la
+// pérdida del propio año (art. 49 LIRPF, #537).
 router.get('/carryforward', async (_req: Request, res: Response) => {
   const tz = await getAppTimezone(db);
   const rows = await cargarAniosFiscales(localYearMonth(tz).year);

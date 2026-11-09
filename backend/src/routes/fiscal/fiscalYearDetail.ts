@@ -7,6 +7,7 @@ import { obligacion721 } from '../../modules/fiscal/declaraciones';
 import { listarDeclaraciones, ultimaPresentacion721 } from '../../modules/fiscal/declaracionesRepo';
 import { endOfLocalYear, localDate, localYearMonth } from '../../modules/time/localTime';
 import { getAppTimezone } from '../../modules/time/appTimezone';
+import { OPS_BASE_GENERAL, OPS_RCM_AHORRO } from '../../modules/fiscal/clasificacionRentas';
 
 const router = Router();
 
@@ -103,14 +104,17 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
       AND flc.fiscal_event_type != 'NONE'
   `, [year, tz]);
 
+  // Rentas en especie por base (#537): las del ahorro entran en la cuota; las
+  // de la base general solo se informan.
   const rendRes = await db.query(`
     SELECT
-      COALESCE(SUM(t.amount_net * COALESCE(t.price_per_unit, 0)), 0) AS total_rendimientos,
-      COUNT(*) AS num_rendimientos
+      COALESCE(SUM(t.amount_net * COALESCE(t.price_per_unit, 0)) FILTER (WHERE t.operation_type = ANY($3)), 0) AS total_rendimientos,
+      COUNT(*) FILTER (WHERE t.operation_type = ANY($3)) AS num_rendimientos,
+      COALESCE(SUM(t.amount_net * COALESCE(t.price_per_unit, 0)) FILTER (WHERE t.operation_type = ANY($4)), 0) AS total_base_general,
+      COUNT(*) FILTER (WHERE t.operation_type = ANY($4)) AS num_base_general
     FROM transactions t
     WHERE EXTRACT(YEAR FROM t.timestamp AT TIME ZONE $2) = $1
-      AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
-  `, [year, tz]);
+  `, [year, tz, OPS_RCM_AHORRO, OPS_BASE_GENERAL]);
 
   const dec31 = esAnioEnCurso ? new Date() : endOfLocalYear(tz, year);
   const { activos, preciosPendientes } = await valorizarLotesEnFecha(dec31);
@@ -129,6 +133,8 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
     numOperacionesPatrimoniales: parseInt(gpRes.rows[0].num_operaciones),
     totalRendimientos:           parseFloat(rendRes.rows[0].total_rendimientos),
     numRendimientos:             parseInt(rendRes.rows[0].num_rendimientos),
+    totalBaseGeneral:            parseFloat(rendRes.rows[0].total_base_general),
+    numBaseGeneral:              parseInt(rendRes.rows[0].num_base_general),
     // Con precios pendientes el valor es un mínimo: si ya supera el umbral la
     // obligación es segura; si no, el resultado es incompleto (#267).
     valorTotal31Dic:             valorTotal721,

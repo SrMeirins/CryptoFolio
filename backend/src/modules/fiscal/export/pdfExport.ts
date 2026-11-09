@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import PDFDocument from 'pdfkit';
 import { EventoFiscal, Rendimiento } from '../eventosAnio';
+import { separarPorBase, TITULO_BASE_GENERAL } from '../clasificacionRentas';
 
 const PW = 595.28, PH = 841.89, ML = 40, MR = 40;
 const W = PW - ML - MR;
@@ -32,7 +33,9 @@ export function writePdfExport(
   const totalGP        = fiscalEvents.reduce((s, e) => s + e.gananciaPerdidaEur, 0);
   const totalGanancias = fiscalEvents.filter(e => e.gananciaPerdidaEur > 0).reduce((s, e) => s + e.gananciaPerdidaEur, 0);
   const totalPerdidas  = fiscalEvents.filter(e => e.gananciaPerdidaEur < 0).reduce((s, e) => s + e.gananciaPerdidaEur, 0);
-  const totalRend      = rendimientos.reduce((s, r) => s + r.valorEur, 0);
+  // Por base del IRPF (#537): el resumen solo suma los rendimientos del ahorro.
+  const { ahorro, general } = separarPorBase(rendimientos);
+  const totalRend      = ahorro.reduce((s, r) => s + r.valorEur, 0);
 
   // Per-asset breakdown
   const byAsset = new Map<string, { ops: number; ganancias: number; perdidas: number; neto: number }>();
@@ -219,11 +222,16 @@ export function writePdfExport(
     W
   );
 
-  // ── RENDIMIENTOS ──────────────────────────────────────────────────────
-  if (rendimientos.length > 0) {
+  // ── RENDIMIENTOS (ahorro) Y BASE GENERAL (informativo, #537) ───────────
+  const secciones: Array<[string, string, Rendimiento[]]> = [
+    ['Rendimientos del Capital Mobiliario (base del ahorro)', 'Total rendimientos', ahorro],
+    [TITULO_BASE_GENERAL, 'Total base general', general],
+  ];
+  for (const [titulo, etiquetaTotal, lista] of secciones) {
+    if (lista.length === 0) continue;
     needsPage(60);
     doc.y += 10;
-    sectionHeader(`Rendimientos del Capital Mobiliario — ${rendimientos.length} operaciones`);
+    sectionHeader(`${titulo} — ${lista.length} operaciones`);
 
     const rc = [
       { text: 'Fecha',    w: 60 },
@@ -235,7 +243,7 @@ export function writePdfExport(
     rc[4].w = W - rc.slice(0, 4).reduce((s, c) => s + c.w, 0);
     tHead(rc);
 
-    rendimientos.forEach((r, i) => {
+    lista.forEach((r, i) => {
       tRow([
         { text: r.fecha,              w: rc[0].w, color: C_GRAY5 },
         { text: r.tipo,               w: rc[1].w },
@@ -244,7 +252,7 @@ export function writePdfExport(
         { text: fmtEurPdf(r.valorEur), w: rc[4].w, align: 'right', bold: true, color: C_VIOLET },
       ], i);
     });
-    totalRow('Total rendimientos', fmtEurPdf(totalRend), C_VIOLET, W);
+    totalRow(etiquetaTotal, fmtEurPdf(lista.reduce((s, r) => s + r.valorEur, 0)), C_VIOLET, W);
   }
 
   // ── AVISO LEGAL ───────────────────────────────────────────────────────

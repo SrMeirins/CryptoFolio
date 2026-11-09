@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { sanitizeCsvField } from '../../csv/csvSafety';
 import { EventoFiscal, Rendimiento } from '../eventosAnio';
+import { separarPorBase, TITULO_BASE_GENERAL } from '../clasificacionRentas';
 
 // Formato Modelo 100 (declaración IRPF española) — CSV con ; como separador.
 export function writeModelo100Csv(
@@ -32,11 +33,16 @@ export function writeModelo100Csv(
     ].join(';'));
   }
 
-  lines.push('');
-  lines.push('RENDIMIENTOS DEL CAPITAL MOBILIARIO');
-  lines.push('Fecha;Tipo;Activo;Cantidad;Valor EUR');
-  for (const r of rendimientos) {
-    lines.push([r.fecha, r.tipo, sanitizeCsvField(r.activo), r.cantidad.toFixed(8), r.valorEur.toFixed(2)].join(';'));
+  // Por base del IRPF (#537): el ahorro entra en la cuota; la general solo se informa.
+  const { ahorro, general } = separarPorBase(rendimientos);
+  for (const [titulo, lista] of [['RENDIMIENTOS DEL CAPITAL MOBILIARIO (base del ahorro)', ahorro], [TITULO_BASE_GENERAL.toUpperCase(), general]] as const) {
+    if (lista === general && lista.length === 0) continue;
+    lines.push('');
+    lines.push(titulo);
+    lines.push('Fecha;Tipo;Activo;Cantidad;Valor EUR');
+    for (const r of lista) {
+      lines.push([r.fecha, r.tipo, sanitizeCsvField(r.activo), r.cantidad.toFixed(8), r.valorEur.toFixed(2)].join(';'));
+    }
   }
 
   res.send('﻿' + lines.join('\n'));

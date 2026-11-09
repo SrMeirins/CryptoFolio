@@ -10,6 +10,7 @@ function cfYear(overrides: Partial<CarryforwardDetalle>): CarryforwardDetalle {
     perdida: 0,
     compensadoPatrim: 0,
     compensadoRend: 0,
+    compensadoRendAnio: 0,
     compensado: 0,
     limiteRend25: 0,
     netoDespues: 0,
