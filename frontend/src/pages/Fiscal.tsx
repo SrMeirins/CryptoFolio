@@ -20,6 +20,7 @@ import { TablaEventos } from './fiscal/TablaEventos'
 import { TablaRendimientos } from './fiscal/TablaRendimientos'
 import { ExportPanel } from './fiscal/ExportPanel'
 import { YearTabs } from './fiscal/YearTabs'
+import { YearCards } from './fiscal/YearCards'
 import { historyYearLink } from './history/keyboard/yearNav'
 import { FiscalHero, FiscalHeroSkeleton } from './fiscal/FiscalHero'
 import { PlanificadorTab } from './fiscal/PlanificadorTab'
@@ -155,10 +156,19 @@ export function Fiscal() {
       return next
     })
   }, [setSearchParams])
+  // Ejercicio elegido (#536): se refleja en ?anio= sin apilar historial, con el resto de la URL intacta.
+  const elegirAnio = useCallback((y: number) => {
+    setSelectedYear(y)
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('anio', String(y))
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
   // Desde un gráfico: abre Operaciones ya filtrada (#301).
   const openOperaciones = useCallback((filters: Record<string, string>) => {
-    setSearchParams({ vista: 'operaciones', ...filters })
-  }, [setSearchParams])
+    setSearchParams({ vista: 'operaciones', ...(activeYear ? { anio: String(activeYear) } : {}), ...filters })
+  }, [setSearchParams, activeYear])
   const urlFilters = filtersFromUrl(searchParams)
 
   // Tarjeta Rendimientos (#418): en Operaciones, baja a su tabla y le pasa el
@@ -184,15 +194,15 @@ export function Fiscal() {
   // Desde el calendario: cada hito lleva a donde se trabaja (#309).
   const goHito = useCallback((h: FiscalHito) => {
     if (h.id === 'cierre') { setVista('planificar'); return }
-    if (years.includes(h.ejercicio)) setSelectedYear(h.ejercicio)
+    if (years.includes(h.ejercicio)) elegirAnio(h.ejercicio)
     setVista(h.id === 'modelo721' ? 'modelo721' : 'resumen')
-  }, [setVista, years])
+  }, [setVista, years, elegirAnio])
 
   const onYearStep = useCallback((step: -1 | 1) => {
     if (!activeYear) return
     const next = adjacentYear(years, activeYear, step)
-    if (next !== null) setSelectedYear(next)
-  }, [years, activeYear])
+    if (next !== null) elegirAnio(next)
+  }, [years, activeYear, elegirAnio])
   const onTab = useCallback((i: number) => { const v = FISCAL_VISTAS[i]; if (v) setVista(v) }, [setVista])
   useFiscalShortcuts({ onYearStep, onTab })
 
@@ -328,7 +338,8 @@ export function Fiscal() {
           eyebrow={`Ejercicio ${vista === 'planificar' && anioEnCurso ? anioEnCurso : activeYear}`}
           badge={vista !== 'planificar' && <span className={badgeClasses(estadoActivo === 'por-declarar' ? 'warning' : estadoActivo === 'declarado' ? 'positive' : 'brand')}>{ESTADO_EJERCICIO_LABEL[estadoActivo]}</span>}
           actions={<>
-            <YearTabs years={years} activeYear={activeYear} overview={overview} declarados={declarados} onSelect={setSelectedYear} />
+            {/* En Resumen el selector son las tarjetas de ejercicio (#536), justo debajo. */}
+            {vista !== 'resumen' && <YearTabs years={years} activeYear={activeYear} overview={overview} declarados={declarados} onSelect={elegirAnio} />}
             <ExportPanel year={activeYear} />
           </>}
           stats={cifras[vista]}
@@ -351,6 +362,7 @@ export function Fiscal() {
           <FiscalHeroSkeleton />
         ) : summary && vista === 'resumen' ? (
           <>
+            <YearCards years={years} activeYear={activeYear} overview={overview} declarados={declarados} onSelect={elegirAnio} />
             <FiscalHero summary={summary} cuota={cuota} tipoMedio={tipoMedio} comparison={comparison} aviso={caducan && <AvisoCaducidad {...caducan} compact />}
               declarada={!!rentaDeclarada} onOpen={openOperaciones} />
             {!summary.esAnioEnCurso && <Block i={1}><DeclaracionRenta year={activeYear} declaracion={rentaDeclarada} /></Block>}
@@ -359,7 +371,7 @@ export function Fiscal() {
                 <CalendarioFiscal data={calendario} netoPorAnio={new Map(overview.map(o => [o.year, o.netoPatrimonial]))} onGo={goHito} />
               </Block>
             )}
-            {overview.length >= 2 && <Block i={1}><ComparativaAnual data={overview} activeYear={activeYear} onSelectYear={setSelectedYear} /></Block>}
+            {overview.length >= 2 && <Block i={1}><ComparativaAnual data={overview} activeYear={activeYear} onSelectYear={elegirAnio} /></Block>}
             {monthly && monthly.meses.length > 0 && (
               <Block i={2}><EvolucionMensual data={monthly} onSelectMonth={m => openOperaciones(monthRange(activeYear, m))} /></Block>
             )}
