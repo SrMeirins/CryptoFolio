@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
+import { pulsarInterruptor } from './interruptor'
 
 // Fiscal en Ajustes (#451): bloque Normativa, vista previa antes de aplicar y
 // recordatorios. Solo lectura: /api/settings/config se intercepta.
@@ -9,6 +10,9 @@ const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 async function fakeConfig(page: Page) {
   const overrides: Record<string, string> = {}
   const writes: Array<{ key: string; value: string }> = []
+  // Última configuración real: si una petición falla (navegación, servidor
+  // lento), se responde con ella en lugar de dejar la consulta colgada.
+  let ultima: Record<string, string> | null = null
   await page.route('**/api/settings/config', async route => {
     if (route.request().method() === 'PUT') {
       const body = route.request().postDataJSON() as { key: string; value: string }
@@ -19,8 +23,12 @@ async function fakeConfig(page: Page) {
     }
     try {
       const real = await route.fetch()
-      await route.fulfill({ response: real, json: { ...(await real.json()), ...overrides } })
-    } catch { /* navegación en curso */ }
+      ultima = await real.json() as Record<string, string>
+      await route.fulfill({ response: real, json: { ...ultima, ...overrides } })
+    } catch {
+      if (ultima) await route.fulfill({ json: { ...ultima, ...overrides } }).catch(() => {})
+      else await route.abort().catch(() => {})
+    }
   })
   return writes
 }
@@ -63,7 +71,7 @@ test('los recordatorios se silencian con Deshacer y es la misma opción que en G
   await page.goto('/settings?tab=fiscal')
   const sw = page.getByRole('switch', { name: 'Recordatorios de plazos fiscales' })
   await expect(sw).toBeChecked()
-  await sw.click({ force: true })
+  await pulsarInterruptor(sw)
   await expect(sw).not.toBeChecked()
   expect(JSON.parse(writes[0].value)).toContain('fiscal')
   await page.getByRole('status').filter({ hasText: 'Guardado' }).getByRole('button', { name: 'Deshacer' }).click()
