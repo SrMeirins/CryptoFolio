@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { desgloseSeries, dominiosAlineados, filtersFromUrl, pasoRedondo, mensualSeries, monthRange, resumenMensual, tramosScale } from './fiscalCharts'
+import { dominiosAlineados, filtersFromUrl, pasoRedondo, mensualSeries, monthRange, resumenMensual, tramosScale } from './fiscalCharts'
 import { TRAMOS_DEFAULT } from './tramosIrpf'
 
 // Gráficos de Fiscal (#301). Datos sintéticos.
@@ -30,23 +30,6 @@ describe('resumenMensual', () => {
   })
   it('sin operaciones: sin mejor ni peor', () => {
     expect(resumenMensual(mensualSeries([mes(1, 0, 0, 0, 0)]))).toMatchObject({ mejor: null, peor: null, conOperaciones: 0 })
-  })
-})
-
-describe('desgloseSeries', () => {
-  const item = (asset: string, g: number, p: number) => ({ asset, ganancias: g, perdidas: p, neto: g + p, operaciones: 1 })
-  it('8 principales por movimiento y el resto en «Otros»', () => {
-    const items = Array.from({ length: 11 }, (_, i) => item(`A${i}`, i, -i))
-    const s = desgloseSeries(items)
-    expect(s).toHaveLength(9)
-    expect(s[0].asset).toBe('A10')
-    const otros = s[8]
-    expect(otros).toMatchObject({ asset: 'Otros', otros: 3, ganancias: 0 + 1 + 2, perdidas: -(0 + 1 + 2), operaciones: 3 })
-    // Los totales se conservan.
-    expect(s.reduce((a, r) => a + r.neto, 0)).toBeCloseTo(items.reduce((a, r) => a + r.neto, 0), 9)
-  })
-  it('sin «Otros» si caben todos', () => {
-    expect(desgloseSeries([item('X', 1, 0)]).map(r => r.asset)).toEqual(['X'])
   })
 })
 

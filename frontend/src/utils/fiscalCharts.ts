@@ -1,10 +1,11 @@
-import type { BreakdownItem, MesData } from '../pages/fiscal/types'
+import type { MesData } from '../pages/fiscal/types'
 import type { Tramo } from './tramosIrpf'
 import type { EventFilters } from './fiscalOperations'
 
-// Gráficos de Fiscal (#301): series de la evolución mensual y el desglose,
+// Gráficos de Fiscal (#301): series de la evolución mensual,
 // escala de tramos y filtros de operaciones desde la URL. Puras. La
-// comparativa interanual vive en comparativaFiscal.ts (#539).
+// comparativa interanual vive en comparativaFiscal.ts (#539) y el desglose
+// por activo, en desgloseActivo.ts (#540).
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic']
 
@@ -45,23 +46,6 @@ export function resumenMensual(series: readonly MonthBar[]): { mejor: MonthBar |
   const mejor = conOps.reduce<MonthBar | null>((a, s) => (a === null || (s.neto ?? 0) > (a.neto ?? 0) ? s : a), null)
   const peor = conOps.reduce<MonthBar | null>((a, s) => (a === null || (s.neto ?? 0) < (a.neto ?? 0) ? s : a), null)
   return { mejor, peor, conOperaciones: conOps.length, transcurridos: pasados.length }
-}
-
-export interface AssetRow { asset: string; ganancias: number; perdidas: number; neto: number; operaciones: number; otros?: number }
-
-/** Los `top` activos con más movimiento (ganancias + pérdidas) y el resto sumado en «Otros». */
-export function desgloseSeries(items: readonly BreakdownItem[], top = 8): AssetRow[] {
-  const sorted = [...items].sort((a, b) => (b.ganancias + Math.abs(b.perdidas)) - (a.ganancias + Math.abs(a.perdidas)) || a.asset.localeCompare(b.asset))
-  const head: AssetRow[] = sorted.slice(0, top).map(i => ({ ...i, perdidas: -Math.abs(i.perdidas) }))
-  const rest = sorted.slice(top)
-  if (rest.length === 0) return head
-  return [...head, rest.reduce<AssetRow>((acc, i) => ({
-    ...acc,
-    ganancias: acc.ganancias + i.ganancias,
-    perdidas: acc.perdidas - Math.abs(i.perdidas),
-    neto: acc.neto + i.neto,
-    operaciones: acc.operaciones + i.operaciones,
-  }), { asset: 'Otros', ganancias: 0, perdidas: 0, neto: 0, operaciones: 0, otros: rest.length })]
 }
 
 /** Primer y último día de un mes (AAAA-MM-DD), para filtrar las operaciones. */
