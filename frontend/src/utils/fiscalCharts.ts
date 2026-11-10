@@ -99,6 +99,8 @@ export function filtersFromUrl(params: URLSearchParams): Partial<EventFilters> {
   const resultado = params.get('resultado')
   if (resultado === 'ganancia') out.result = 'gain'
   else if (resultado === 'perdida') out.result = 'loss'
+  // Desde el paso «Datos completos» (#542): solo las de clave por revisar.
+  if (params.get('revisar') === '1') out.onlyRevisar = true
   return out
 }
 

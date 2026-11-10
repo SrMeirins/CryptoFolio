@@ -14,6 +14,7 @@ import { useTramos } from '../../hooks/useTramos'
 import { FISCAL_STALE_TIME } from '../fiscal/constants'
 import { FiscalMonthly } from './FiscalMonthly'
 import { failure, type QueryLike } from '../../utils/queryFailure'
+import { resumenEstado } from '../../utils/pasosDeclaracion'
 
 // Panel fiscal del Dashboard (#236): resumen compacto del ejercicio en curso
 // con el G/P neto realizado, la comparación de ganancias y pérdidas, la cuota
@@ -63,6 +64,11 @@ export function FiscalCard({ data, dataQuery }: {
   // Próximo plazo: el mismo hito que Fiscal y la campana, calculado en el backend (#309).
   const calendarioQ = useQuery({ queryKey: ['fiscal-calendario'], queryFn: portfolioApi.getFiscalCalendar, staleTime: FISCAL_STALE_TIME })
   const calendario = calendarioQ.data
+  // Estado de la declaración del último ejercicio cerrado (#542): el mismo origen que Fiscal.
+  // consulta de fondo (#498): sin las marcas, la tarjeta no muestra la línea del estado.
+  const declaracionesQ = useQuery({ queryKey: ['fiscal-declaraciones'], queryFn: portfolioApi.getDeclaraciones, staleTime: FISCAL_STALE_TIME })
+  const ultimoCerrado = Math.max(0, ...data.map(fy => fy.fiscal_year).filter(y => y < currentYear))
+  const estadoCerrado = declaracionesQ.data && ultimoCerrado > 0 ? resumenEstado(ultimoCerrado, declaracionesQ.data) : null
   // Un fallo de cualquiera de sus consultas se dice en la tarjeta, con Reintentar (#498).
   const fallo = failure(...(dataQuery ? [dataQuery] : []), summaryQ, carryforwardQ, monthlyQ, modelo721Q, calendarioQ)
 
@@ -131,6 +137,14 @@ export function FiscalCard({ data, dataQuery }: {
         </div>
 
         {monthly && <FiscalMonthly meses={monthly.meses} />}
+
+        {estadoCerrado && (
+          <Link to={`/fiscal?anio=${ultimoCerrado}`}
+            className="flex items-center justify-between gap-3 rounded-xl border border-border bg-overlay/2 px-3 py-2 text-xs hover:bg-overlay/4 transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60">
+            <span className="text-fg-subtle">Declaración de {ultimoCerrado}</span>
+            <span className={badgeClasses(estadoCerrado.tono)}>{estadoCerrado.texto}</span>
+          </Link>
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           {/* Modelo 721 */}

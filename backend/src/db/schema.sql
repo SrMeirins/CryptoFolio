@@ -517,10 +517,11 @@ INSERT INTO asset_metadata (symbol, name, coingecko_id, is_stablecoin, binance_e
 
 -- ============================================================
 -- TABLA: fiscal_declaraciones — Renta y Modelo 721 presentados (#311, migración 008)
+-- y ejercicio revisado (#542, migración 021)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS fiscal_declaraciones (
   ejercicio     INTEGER     NOT NULL CHECK (ejercicio BETWEEN 2009 AND 2100),
-  tipo          TEXT        NOT NULL CHECK (tipo IN ('renta', 'modelo721')),
+  tipo          TEXT        NOT NULL CONSTRAINT fiscal_declaraciones_tipo_check CHECK (tipo IN ('renta', 'modelo721', 'revision')),
   declarado_en  TIMESTAMPTZ NOT NULL DEFAULT now(),
   cifras        JSONB       NOT NULL CHECK (jsonb_typeof(cifras) = 'object'),
   PRIMARY KEY (ejercicio, tipo)

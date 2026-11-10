@@ -1,6 +1,8 @@
 import { db } from '../../db/client';
 import { avisoCalendario } from '../fiscal/calendarioFiscal';
 import { obligaciones721 } from '../fiscal/obligacion721';
+import { cifrasRenta, listarDeclaraciones, presentadas } from '../fiscal/declaracionesRepo';
+import { compararCifras, type CifrasRenta } from '../fiscal/declaraciones';
 import { getAppTimezone } from '../time/appTimezone';
 import { coberturaActual } from '../csv/coberturaDb';
 import { avisosCobertura } from '../csv/coberturaAvisos';
@@ -104,9 +106,23 @@ export async function collectNotifications(): Promise<SystemNotification[]> {
   // Recordatorio del calendario fiscal (#309): a 30 días del próximo hito, información; a 7, aviso.
   // Sin la obligación del 721 (p. ej. si falla la valoración) el aviso no se pierde: se asume desconocida.
   const obligado = await obligaciones721().catch(() => () => null);
-  const avisoFiscal = avisoCalendario(new Date(), obligado, await getAppTimezone(db));
+  // Lo ya presentado no se recuerda (#542).
+  const yaPresentada = await presentadas().catch(() => () => false);
+  const avisoFiscal = avisoCalendario(new Date(), obligado, await getAppTimezone(db), yaPresentada);
   if (avisoFiscal) {
     notifications.push({ id: 'fiscal-calendar', type: avisoFiscal.type, category: 'Fiscal', message: avisoFiscal.message });
+  }
+
+  // Renta presentada cuyas cifras han cambiado después (#542): puede hacer falta una complementaria.
+  const rentas = (await listarDeclaraciones().catch(() => [])).filter(d => d.tipo === 'renta');
+  for (const d of rentas) {
+    const cambios = compararCifras(d.cifras as Partial<CifrasRenta>, await cifrasRenta(d.ejercicio));
+    if (cambios.length > 0) {
+      notifications.push({
+        id: `renta-cambios-${d.ejercicio}`, type: 'warning', category: 'Fiscal',
+        message: `Las cifras de la Renta de ${d.ejercicio} han cambiado desde que la presentaste (${cambios.length} ${cambios.length === 1 ? 'concepto' : 'conceptos'}). Revisa si hace falta una complementaria.`,
+      });
+    }
   }
 
   // Verificación on-chain de las direcciones (#336): última comprobación de cada activo.
