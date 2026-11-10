@@ -15,7 +15,8 @@ export function FiscalChartCard({ icon: Icon, title, right, children }: {
 }) {
   return (
     <div className={panelSurface('md')}>
-      <div className="flex items-center justify-between mb-4">
+      {/* Altura mínima común (#539): con o sin control a la derecha, los títulos de paneles vecinos quedan alineados. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 min-h-8">
         <div className="flex items-center gap-2">
           <Icon size={15} className="text-fg-subtle" />
           <h3 className="text-[11px] text-fg-subtle font-medium uppercase tracking-widest">{title}</h3>

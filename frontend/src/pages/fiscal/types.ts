@@ -104,6 +104,9 @@ export interface YearOverview {
   netoPatrimonial: number
   numOperaciones: number
   totalRendimientos: number
+  /** Base del ahorro tras compensar y cuota estimada con la escala del año (#539). */
+  base: number
+  cuota: number
 }
 
 export interface CarryforwardDetalle {
@@ -155,6 +158,10 @@ export interface MesData {
   mes: number
   label: string
   netoMes: number
+  /** Ganancias (positivas) y pérdidas (negativas) del mes por separado (#539). */
+  gananciasMes: number
+  perdidasMes: number
+  operacionesMes: number
   acumulado: number
 }
 

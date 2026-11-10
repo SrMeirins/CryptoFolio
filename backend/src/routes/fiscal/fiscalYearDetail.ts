@@ -43,7 +43,8 @@ router.get('/:year/breakdown', async (req: Request, res: Response) => {
 });
 
 // ── GET /api/fiscal/:year/monthly ──────────────────────────────────────────
-// G/P acumulado mes a mes para el año dado (para gráfico de evolución).
+// Resultado mes a mes del año dado (gráfico de evolución): ganancias y
+// pérdidas por separado (#539), neto, operaciones y acumulado.
 router.get('/:year/monthly', async (req: Request, res: Response) => {
   const tz = await getAppTimezone(db);
   const year = parseYear(req.params.year);
@@ -52,7 +53,10 @@ router.get('/:year/monthly', async (req: Request, res: Response) => {
   const result = await db.query(`
     SELECT
       EXTRACT(MONTH FROM flc.consumed_at AT TIME ZONE $2)::int AS mes,
-      COALESCE(SUM(flc.gain_loss_eur), 0)      AS neto_mes
+      COALESCE(SUM(flc.gain_loss_eur), 0)      AS neto_mes,
+      COALESCE(SUM(flc.gain_loss_eur) FILTER (WHERE flc.gain_loss_eur > 0), 0) AS ganancias_mes,
+      COALESCE(SUM(flc.gain_loss_eur) FILTER (WHERE flc.gain_loss_eur < 0), 0) AS perdidas_mes,
+      COUNT(*) AS operaciones_mes
     FROM fifo_lot_consumptions flc
     WHERE EXTRACT(YEAR FROM flc.consumed_at AT TIME ZONE $2) = $1
       AND flc.fiscal_event_type != 'NONE'
@@ -62,7 +66,12 @@ router.get('/:year/monthly', async (req: Request, res: Response) => {
 
   const byMonth = new Map(result.rows.map((r: Record<string, unknown>) => [
     parseInt(r.mes as string),
-    parseFloat(r.neto_mes as string),
+    {
+      neto: parseFloat(r.neto_mes as string),
+      ganancias: parseFloat(r.ganancias_mes as string),
+      perdidas: parseFloat(r.perdidas_mes as string),
+      operaciones: parseInt(r.operaciones_mes as string),
+    },
   ]));
 
   const { year: currentYear, month: currentMonth } = localYearMonth(tz);
@@ -71,11 +80,15 @@ router.get('/:year/monthly', async (req: Request, res: Response) => {
   let acumulado = 0;
   const meses = [];
   for (let m = 1; m <= maxMonth; m++) {
-    acumulado += byMonth.get(m) ?? 0;
+    const d = byMonth.get(m);
+    acumulado += d?.neto ?? 0;
     meses.push({
       mes: m,
       label: new Date(year, m - 1, 1).toLocaleDateString('es-ES', { month: 'short' }),
-      netoMes:    byMonth.get(m) ?? 0,
+      netoMes:       d?.neto ?? 0,
+      gananciasMes:  d?.ganancias ?? 0,
+      perdidasMes:   d?.perdidas ?? 0,
+      operacionesMes: d?.operaciones ?? 0,
       acumulado,
     });
   }
