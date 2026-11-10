@@ -62,13 +62,15 @@ function CellBody({ cell }: { cell: StatStripCell }) {
   )
 }
 
-export function StatStrip({ cells, label, className = '' }: {
+export function StatStrip({ cells, label, columnas, className = '' }: {
   cells: readonly StatStripCell[]
   /** Nombre del grupo para el lector de pantalla. */
   label: string
+  /** Columnas fijas en lugar de una por celda, p. ej. 2 en un panel estrecho (#539). */
+  columnas?: 2 | 3 | 4 | 5 | 6
   className?: string
 }) {
-  const n = Math.min(6, Math.max(2, cells.length))
+  const n = columnas ?? Math.min(6, Math.max(2, cells.length))
   return (
     // gap-px sobre el color del borde: los separadores salen en cualquier disposición de la rejilla.
     <ul aria-label={label}

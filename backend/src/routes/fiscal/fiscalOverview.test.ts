@@ -62,6 +62,9 @@ describe('routes/fiscal — overview', () => {
     expect(y2023).toBeTruthy();
     expect(y2023.netoPatrimonial).toBeCloseTo(50, 2);
     expect(y2023.numOperaciones).toBe(1);
+    // Cuota estimada del año (#539): base 50 € al 19 % de la escala de 2023.
+    expect(y2023.base).toBeCloseTo(50, 2);
+    expect(y2023.cuota).toBeCloseTo(9.5, 2);
   });
 
   it('GET /carryforward devuelve detalle por año con la estructura esperada', async () => {

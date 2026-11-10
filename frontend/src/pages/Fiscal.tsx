@@ -50,8 +50,8 @@ const ID_BASE = 'fiscal-vista'
 const TEMA_VISTA: Record<FiscalVista, TemaMetodo> = { resumen: 'fifo', operaciones: 'fifo', planificar: 'compensacion', modelo721: 'modelo721' }
 
 /** Bloque con la entrada escalonada de paneles (#297). */
-function Block({ i, children }: { i: number; children: ReactNode }) {
-  return <div className="panel-in" style={panelEnterStyle(i)}>{children}</div>
+function Block({ i, children, className = '' }: { i: number; children: ReactNode; className?: string }) {
+  return <div className={`panel-in ${className}`} style={panelEnterStyle(i)}>{children}</div>
 }
 
 /** Título y contexto de cada vista (#491). */
@@ -121,6 +121,12 @@ export function Fiscal() {
     staleTime: FISCAL_STALE_TIME,
   })
   const { data: prevPeriod } = prevPeriodQ
+  // consulta de fondo (#498): sin el año anterior, la evolución mensual se muestra sin el interruptor de comparar.
+  const prevMonthlyQ = useQuery({
+    ...fiscalYearQueries((activeYear ?? 0) - 1).monthly,
+    enabled: !!activeYear && years.includes(activeYear - 1),
+  })
+  const { data: prevMonthly } = prevMonthlyQ
 
   // Precarga del resto de años cuando la página queda libre: cambiar de año pasa a ser instantáneo.
   useEffect(() => {
@@ -168,6 +174,11 @@ export function Fiscal() {
   const openOperaciones = useCallback((filters: Record<string, string>) => {
     setSearchParams({ vista: 'operaciones', ...(activeYear ? { anio: String(activeYear) } : {}), ...filters })
   }, [setSearchParams, activeYear])
+  // Desde la comparativa (#539): Operaciones de otro ejercicio.
+  const openOperacionesDe = useCallback((y: number) => {
+    setSelectedYear(y)
+    setSearchParams({ vista: 'operaciones', anio: String(y) })
+  }, [setSearchParams])
   const urlFilters = filtersFromUrl(searchParams)
 
   // Tarjeta Rendimientos (#418): en Operaciones, baja a su tabla y le pasa el
@@ -376,9 +387,18 @@ export function Fiscal() {
                 <CalendarioFiscal data={calendario} netoPorAnio={new Map(overview.map(o => [o.year, o.netoPatrimonial]))} onGo={goHito} />
               </Block>
             )}
-            {overview.length >= 2 && <Block i={1}><ComparativaAnual data={overview} activeYear={activeYear} onSelectYear={elegirAnio} /></Block>}
-            {monthly && monthly.meses.length > 0 && (
-              <Block i={2}><EvolucionMensual data={monthly} onSelectMonth={m => openOperaciones(monthRange(activeYear, m))} /></Block>
+            {/* Comparativa y evolución mensual en una fila en ancho grande (#539). */}
+            {(overview.length >= 2 || (monthly && monthly.meses.length > 0)) && (
+              <div className="grid gap-5 xl:grid-cols-2">
+                {overview.length >= 2 && <Block i={1} className="[&>*]:h-full"><ComparativaAnual data={overview} activeYear={activeYear} onOpenYear={openOperacionesDe} /></Block>}
+                {monthly && monthly.meses.length > 0 && (
+                  <Block i={2} className="[&>*]:h-full">
+                    <EvolucionMensual data={monthly} year={activeYear} previo={prevMonthly}
+                      frenteAnterior={comparison ? { delta: comparison.netoDelta, label: comparison.label } : null}
+                      onSelectMonth={m => openOperaciones(monthRange(activeYear, m))} />
+                  </Block>
+                )}
+              </div>
             )}
             {breakdown.length > 0 && <Block i={3}><DesglosePorActivo data={breakdown} onSelectAsset={a => openOperaciones({ activo: a })} /></Block>}
             {carryforward && <Block i={4}><PerdidasPendientes data={carryforward} /></Block>}

@@ -44,7 +44,8 @@ test('interacciones principales sin errores ni avisos', async ({ page }) => {
 
   await page.goto('/fiscal')
   await settle(page)
-  for (const year of await page.getByRole('button', { name: /^20\d\d/ }).all()) {
+  // Las tarjetas de ejercicio (#536); las filas de la comparativa abren Operaciones (#539).
+  for (const year of await page.getByRole('tablist', { name: 'Ejercicios fiscales' }).getByRole('tab').all()) {
     await year.click()
     await settle(page)
   }

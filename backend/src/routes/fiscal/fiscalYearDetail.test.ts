@@ -48,6 +48,7 @@ describe('routes/fiscal — breakdown y monthly', () => {
 
     await seedConsumption('BTC', 1, 50);
     await seedConsumption('ETH', 3, -20);
+    await seedConsumption('SOL', 3, 30);
 
     app = (await import('../../app')).default;
   });
@@ -78,9 +79,29 @@ describe('routes/fiscal — breakdown y monthly', () => {
     const marzo = res.body.meses.find((m: { mes: number }) => m.mes === 3);
     expect(enero.netoMes).toBeCloseTo(50, 2);
     expect(enero.acumulado).toBeCloseTo(50, 2);
-    expect(marzo.netoMes).toBeCloseTo(-20, 2);
-    expect(marzo.acumulado).toBeCloseTo(30, 2);
+    expect(marzo.netoMes).toBeCloseTo(10, 2);
+    expect(marzo.acumulado).toBeCloseTo(60, 2);
     // Año pasado (no en curso): no hay proyección
     expect(res.body).not.toHaveProperty('proyeccionFinAnio'); // retirada en #301
+  });
+
+  it('GET /:year/monthly separa ganancias y pérdidas de cada mes y cuenta sus operaciones (#539)', async () => {
+    const res = await request(app).get('/api/fiscal/2023/monthly');
+    const marzo = res.body.meses.find((m: { mes: number }) => m.mes === 3);
+    expect(marzo).toMatchObject({ operacionesMes: 2 });
+    expect(marzo.gananciasMes).toBeCloseTo(30, 2);
+    expect(marzo.perdidasMes).toBeCloseTo(-20, 2);
+    expect(marzo.gananciasMes + marzo.perdidasMes).toBeCloseTo(marzo.netoMes, 9);
+    const febrero = res.body.meses.find((m: { mes: number }) => m.mes === 2);
+    expect(febrero).toMatchObject({ netoMes: 0, gananciasMes: 0, perdidasMes: 0, operacionesMes: 0 });
+  });
+
+  it('la suma de los meses coincide con el neto del ejercicio (#539)', async () => {
+    const [mensual, resumen] = await Promise.all([request(app).get('/api/fiscal/2023/monthly'), request(app).get('/api/fiscal/2023/summary')]);
+    const suma = mensual.body.meses.reduce((t: number, m: { netoMes: number }) => t + m.netoMes, 0);
+    expect(suma).toBeCloseTo(resumen.body.netoPatrimonial, 9);
+    const ganancias = mensual.body.meses.reduce((t: number, m: { gananciasMes: number }) => t + m.gananciasMes, 0);
+    expect(ganancias).toBeCloseTo(resumen.body.totalGanancias, 9);
+    expect(mensual.body.meses.at(-1).acumulado).toBeCloseTo(resumen.body.netoPatrimonial, 9);
   });
 });

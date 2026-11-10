@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { cargarAniosFiscales, compensarPerdidas } from '../../modules/fiscal/carryforward';
+import { baseAhorro, cargarAniosFiscales, compensarPerdidas } from '../../modules/fiscal/carryforward';
+import { calcularIrpfAhorro } from '../../modules/fiscal/irpf';
+import { escalaDe } from '../../modules/fiscal/escalasAhorro';
 import { db } from '../../db/client';
 import { localYearMonth } from '../../modules/time/localTime';
 import { getAppTimezone } from '../../modules/time/appTimezone';
@@ -70,7 +72,16 @@ router.get('/overview', async (_req: Request, res: Response) => {
     };
   }));
 
-  res.json(data);
+  // Cuota estimada de cada año (#539): base del ahorro tras compensar, con la
+  // escala de ese ejercicio; la misma regla que Fiscal y la Renta declarada.
+  const { detalle } = compensarPerdidas(await cargarAniosFiscales(localYearMonth(tz).year));
+  const conCuota = await Promise.all(data.map(async (o) => {
+    const d = detalle.find(x => x.year === o.year);
+    const base = Math.max(0, d ? baseAhorro(d) : o.netoPatrimonial + o.totalRendimientos);
+    return { ...o, base, cuota: calcularIrpfAhorro(base, await escalaDe(db, o.year)) };
+  }));
+
+  res.json(conCuota);
 });
 
 // ── GET /api/fiscal/carryforward ───────────────────────────────────────────
