@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import { Calculator, CheckCircle2, ChevronDown } from 'lucide-react'
 import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { Notice, panelClasses, panelEnterStyle, panelSurface, Skeleton } from '../../components/ui'
-import { formatEur, formatPercent, pnlColor } from '../../utils/format'
+import { formatEur, formatPercent, pnlColor, formatEurSigned } from '../../utils/format'
 import type { YearComparison } from '../../utils/fiscalHeader'
 import { avanceAnio, cascadaCuota, type PasoCascada } from '../../utils/cascadaCuota'
 import { textoPlazoRenta } from '../../utils/plazoRenta'
@@ -21,7 +21,7 @@ import type { CarryforwardDetalle, FiscalSummary } from './types'
 // Un total negativo (neto en pérdidas) va en rojo; el resto, neutro.
 const pnlColorTotal = (v: number) => (v < -0.005 ? 'text-negative' : 'text-fg')
 
-const signed = (v: number) => `${v >= 0 ? '+' : ''}${formatEur(v)}`
+const signed = formatEurSigned
 
 function Delta({ value, label, invert = false }: { value: number; label: string; invert?: boolean }) {
   // En la cuota, pagar más es peor: el color se invierte.

@@ -1,13 +1,13 @@
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis } from 'recharts'
 import type { MesData } from '../fiscal/types'
-import { formatEur } from '../../utils/format'
+import { formatEurSigned } from '../../utils/format'
 import { useChartColors } from '../../hooks/useChartColors'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 
 // G/P realizado de cada mes del ejercicio (#236): barras verdes o rojas según
 // el signo, con el acumulado en el tooltip. Ocupa el alto disponible del panel.
 
-const signed = (n: number) => `${n > 0 ? '+' : ''}${formatEur(n)}`
+const signed = formatEurSigned
 
 export function FiscalMonthly({ meses }: { meses: MesData[] }) {
   const c = useChartColors()

@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import { TrendingUp } from 'lucide-react'
 import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid } from 'recharts'
-import { formatEur, formatMoneyCompact } from '../../../utils/format'
+import { formatEur, formatMoneyCompact, formatEurSigned } from '../../../utils/format'
 import { dominiosAlineados, mensualSeries, resumenMensual, type MonthBar } from '../../../utils/fiscalCharts'
 import { useChartColors } from '../../../hooks/useChartColors'
 import { useReducedMotion } from '../../../hooks/useReducedMotion'
@@ -17,7 +17,7 @@ import type { MonthlyData } from '../types'
 // abre sus operaciones. Debajo, la tira con el mejor y el peor mes.
 
 const LONG = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-const signed = (v: number) => `${v >= 0 ? '+' : ''}${formatEur(v)}`
+const signed = formatEurSigned
 // Marcas del eje: sin decimales salvo que el paso sea menor que 1 €.
 const eje = (ticks: readonly number[]) => (v: number) => (Math.abs(ticks[1] - ticks[0]) < 1 ? formatEur(v) : formatMoneyCompact(v, 'EUR'))
 const tono = (v: number) => (v > 0.005 ? 'text-positive' : v < -0.005 ? 'text-negative' : 'text-fg')

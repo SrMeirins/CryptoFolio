@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { TrendingUp } from 'lucide-react'
-import { formatEur, formatNumber } from '../../../utils/format'
+import { formatEur, formatNumber, formatEurSigned } from '../../../utils/format'
 import { ETIQUETAS_TIRA, filasComparativa, maxEscala, pctEscala, resumenComparativa, type FilaAnual, type MetricaAnual } from '../../../utils/comparativaFiscal'
 import { SegmentedControl, StatStrip, type StatStripCell } from '../../../components/ui'
 import { FiscalChartCard } from '../FiscalChartCard'
@@ -12,7 +12,7 @@ import type { YearOverview } from '../types'
 // provisional. Cada fila abre las operaciones de ese año. Debajo, la tira con
 // el mejor y el peor año según la métrica.
 
-const signed = (v: number) => `${v >= 0 ? '+' : ''}${formatEur(v)}`
+const signed = formatEurSigned
 const METRICAS = [
   { value: 'resultado' as const, label: 'Resultado' },
   { value: 'cuota' as const, label: 'Cuota' },

@@ -1,5 +1,5 @@
 import { CryptoIcon } from '../../../../components/CryptoIcon'
-import { formatEur, formatMoneyCompact, pnlColor } from '../../../../utils/format'
+import { formatMoneyCompact, pnlColor, formatEurSigned } from '../../../../utils/format'
 import { cascadaContribucion, escalaCascada, tramoBarra, type PasoContribucion } from '../../../../utils/desgloseActivo'
 import type { BreakdownItem } from '../../types'
 
@@ -9,7 +9,7 @@ import type { BreakdownItem } from '../../types'
 // una línea punteada une el final de cada barra con el inicio de la
 // siguiente. La última fila, en su banda, es el neto: la suma de todos.
 
-const signed = (v: number) => `${v >= 0 ? '+' : ''}${formatEur(v)}`
+const signed = formatEurSigned
 
 // Barra con degradado hacia su extremo y borde del mismo tono; el color va
 // siempre con el signo del importe en texto.

@@ -4,14 +4,14 @@ import { Link } from 'react-router-dom'
 import type { ProgressEvent, ResumenImportacion } from './types'
 import { ImportLogPanel } from './ImportLogPanel'
 import { buttonClasses, cardClasses, Notice } from '../../components/ui'
-import { formatEur, pnlColor } from '../../utils/format'
+import { pnlColor, formatEurSigned } from '../../utils/format'
 import { formatFiscalDate } from '../../utils/fiscalTable'
 import { formatoDuracion } from './progreso'
 import { ExchangeBadge } from './ExchangeBadge'
 import { usePreparacionHistoricos } from '../../hooks/usePreparacionHistoricos'
 import { porcentajePreparacion } from '../../utils/preparacion'
 
-const signed = (v: number) => `${v >= 0 ? '+' : ''}${formatEur(v)}`
+const signed = formatEurSigned
 const fmt = new Intl.NumberFormat('es-ES')
 
 // Resultado de la importación (#324): cifras, impacto fiscal por ejercicio,
