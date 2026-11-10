@@ -87,4 +87,20 @@ describe('compensarPerdidas — orígenes y caducidad', () => {
     expect(r.detalle[1]).toMatchObject({ compensadoRendAnio: 0, compensadoPatrim: 150, compensadoRend: 10, netoDespues: 0 });
     expect(r.origenes[0]).toMatchObject({ pendiente: 40 });
   });
+
+  it('guarda en qué ejercicio se compensó cada pérdida y con qué (#541)', () => {
+    // 2022 pierde 100; 2023 gana 30; 2024 tiene 40 de rendimientos (25 % = 10) y gana 20.
+    const r = compensarPerdidas(anios(2022, [[-100, 0], [30, 0], [20, 40]]));
+    expect(r.origenes[0].aplicaciones).toEqual([
+      { year: 2023, patrim: 30, rend: 0 },
+      { year: 2024, patrim: 20, rend: 10 },
+    ]);
+    const suma = r.origenes[0].aplicaciones.reduce((t, a) => t + a.patrim + a.rend, 0);
+    expect(suma).toBeCloseTo(r.origenes[0].compensadoPatrim + r.origenes[0].compensadoRend, 9);
+  });
+
+  it('la fase 1 queda anotada en el propio año de la pérdida', () => {
+    const r = compensarPerdidas(anios(2025, [[-100, 40]]));
+    expect(r.origenes[0].aplicaciones).toEqual([{ year: 2025, patrim: 0, rend: 10 }]);
+  });
 });

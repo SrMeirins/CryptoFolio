@@ -132,6 +132,16 @@ export function formatEur(value: number): string {
 }
 
 /**
+ * Importe en euros con signo explícito («+12,00 €», «-3,40 €»). Por debajo de
+ * medio céntimo es «0,00 €», sin signo: antes salía «-< 0,01 €» o «+< 0,01 €»
+ * en resultados que se compensan casi del todo (#541).
+ */
+export function formatEurSigned(value: number): string {
+  if (Math.abs(value) < 0.005) return formatEur(0)
+  return `${value > 0 ? '+' : ''}${formatEur(value)}`
+}
+
+/**
  * Precio unitario con decimales adaptativos según magnitud.
  * Muestra suficientes decimales para que el movimiento de precio sea visible.
  *   ≥ 10.000 → 2 dec   (BTC: 65.432,12 €)
@@ -182,9 +192,10 @@ export function formatAmount(value: number | string | null | undefined, decimals
   return formatNumber(v, decimals)
 }
 
+/** Color de un resultado; por debajo de medio céntimo, neutro: se muestra como 0,00 (#541). */
 export function pnlColor(value: number): string {
-  if (value > 0) return 'text-positive'
-  if (value < 0) return 'text-negative'
+  if (value >= 0.005) return 'text-positive'
+  if (value <= -0.005) return 'text-negative'
   return 'text-fg-muted'
 }
 

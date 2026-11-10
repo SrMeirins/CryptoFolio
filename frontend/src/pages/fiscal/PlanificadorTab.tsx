@@ -8,7 +8,7 @@ import { buttonClasses, cardClasses, fieldClasses, Notice, Skeleton, TextTooltip
 import { useDebounce } from '../../hooks/useDebounce'
 import { usePricesStore } from '../../store/pricesStore'
 import { ink } from '../../utils/colors'
-import { formatEur } from '../../utils/format'
+import { formatEur, formatEurSigned } from '../../utils/format'
 import { formatFiscalQty } from '../../utils/fiscalTable'
 import { ahorroDe, importesPendientes, trocear } from '../../utils/ahorroIrpf'
 import { sugerencias, type Sugerencia } from '../../utils/planificador'
@@ -18,7 +18,7 @@ import { FiscalChartCard } from './FiscalChartCard'
 // aprovechables y ganancias que caben, con precios en vivo y el mismo motor
 // fiscal que el simulador de venta (las cuotas las calcula el backend).
 
-const signed = (v: number) => `${v >= 0 ? '+' : ''}${formatEur(v)}`
+const signed = formatEurSigned
 
 function Fila({ s, nota, onSimular }: { s: Sugerencia; nota: React.ReactNode; onSimular: () => void }) {
   return (

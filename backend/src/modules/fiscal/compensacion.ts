@@ -31,6 +31,9 @@ export interface DetalleCompensacion {
   netoDespues: number;
 }
 
+/** Compensación de una pérdida en un ejercicio (#541): con ganancias y con rendimientos. */
+export interface Aplicacion { year: number; patrim: number; rend: number }
+
 /** Una pérdida por su año de origen (#305): original = compensado + pendiente + caducado. */
 export interface OrigenPerdida {
   year: number;
@@ -41,6 +44,8 @@ export interface OrigenPerdida {
   caducado: number;
   /** Último ejercicio en que se puede compensar (31 de diciembre de ese año). */
   caducaEn: number;
+  /** Compensaciones año a año (#541): ejercicio en que se aplicó y con qué. */
+  aplicaciones: Aplicacion[];
   /**
    * Pérdida del último ejercicio del cálculo, el año en curso (#534): es
    * provisional, porque aún puede compensarse con ganancias del mismo año, y
@@ -67,14 +72,21 @@ export function compensarPerdidas(rows: readonly AnioFiscal[]): ResultadoCompens
   const origenes: OrigenPerdida[] = [];
   const vivos = () => origenes.filter(o => o.pendiente > EPS);
 
+  // Anota en la pérdida lo compensado en un ejercicio (#541), sumando si ya había algo de ese año.
+  const anotar = (o: OrigenPerdida, year: number, campo: 'patrim' | 'rend', c: number) => {
+    const a = o.aplicaciones.find(x => x.year === year) ?? o.aplicaciones[o.aplicaciones.push({ year, patrim: 0, rend: 0 }) - 1];
+    a[campo] += c;
+  };
+
   // Consume `importe` de las pérdidas vivas, de la más antigua a la más nueva.
-  const consumir = (importe: number, campo: 'compensadoPatrim' | 'compensadoRend') => {
+  const consumir = (importe: number, campo: 'compensadoPatrim' | 'compensadoRend', year: number) => {
     let resto = importe;
     for (const o of vivos()) {
       if (resto <= 0) break;
       const c = Math.min(o.pendiente, resto);
       o.pendiente -= c;
       o[campo] += c;
+      if (c > 0) anotar(o, year, campo === 'compensadoPatrim' ? 'patrim' : 'rend', c);
       resto -= c;
     }
   };
@@ -95,12 +107,12 @@ export function compensarPerdidas(rows: readonly AnioFiscal[]): ResultadoCompens
     // Fase 2a: pérdidas anteriores contra las ganancias del año, sin límite.
     const pendienteTotalPatrim = vivos().reduce((s, o) => s + o.pendiente, 0);
     const compensadoPatrim = Math.min(pendienteTotalPatrim, gananciasPatrim);
-    consumir(compensadoPatrim, 'compensadoPatrim');
+    consumir(compensadoPatrim, 'compensadoPatrim', year);
 
     // Fase 2b: lo que queda, contra rendimientos con lo que deje libre la fase 1 del 25 %.
     const pendienteTotalRend = vivos().reduce((s, o) => s + o.pendiente, 0);
     const compensadoRendPrevio = Math.min(pendienteTotalRend, limiteRendimientos - compensadoRendAnio);
-    consumir(compensadoRendPrevio, 'compensadoRend');
+    consumir(compensadoRendPrevio, 'compensadoRend', year);
     const compensadoRend = compensadoRendAnio + compensadoRendPrevio;
 
     // Lo que no se compensa de la pérdida de este año queda para los siguientes.
@@ -108,6 +120,7 @@ export function compensarPerdidas(rows: readonly AnioFiscal[]): ResultadoCompens
       origenes.push({
         year, original: perdidaEsteAnio, compensadoPatrim: 0, compensadoRend: compensadoRendAnio,
         pendiente: perdidaEsteAnio - compensadoRendAnio, caducado: 0, caducaEn: year + ANIOS_COMPENSACION, provisional: false,
+        aplicaciones: compensadoRendAnio > 0 ? [{ year, patrim: 0, rend: compensadoRendAnio }] : [],
       });
     }
 

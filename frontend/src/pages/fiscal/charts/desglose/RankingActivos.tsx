@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Search, Wallet } from 'lucide-react'
 import { CryptoIcon } from '../../../../components/CryptoIcon'
 import { fieldClasses, Hint, SegmentedControl, StatStrip, tableHeadRowClasses } from '../../../../components/ui'
-import { formatEur, formatNumber, formatPercent, pnlColor } from '../../../../utils/format'
+import { formatEur, formatNumber, formatPercent, pnlColor, formatEurSigned } from '../../../../utils/format'
 import { filasRanking, filtrarRanking, ordenarRanking, separarOtros, totalesRanking, type ClaveOrden, type Direccion, type FilaActivo, type FiltroSigno } from '../../../../utils/desgloseActivo'
 import type { BreakdownItem } from '../../types'
 
@@ -12,7 +12,7 @@ import type { BreakdownItem } from '../../types'
 // signo, y los que pasan de los 8 primeros en «Otros» desplegable. La fila
 // abre las operaciones del activo; el icono, su detalle en Portfolio.
 
-const signed = (v: number) => `${v >= 0 ? '+' : ''}${formatEur(v)}`
+const signed = formatEurSigned
 const COLUMNAS: ReadonlyArray<{ id: ClaveOrden; label: string; align: 'left' | 'right' }> = [
   { id: 'asset', label: 'Activo', align: 'left' },
   { id: 'neto', label: 'Resultado', align: 'right' },

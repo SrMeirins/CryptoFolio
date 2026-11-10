@@ -136,6 +136,8 @@ export interface OrigenPerdida {
   caducaEn: number
   /** Pérdida del año en curso: provisional, no suma al pendiente (#534). */
   provisional?: boolean
+  /** Compensaciones año a año (#541): ejercicio en que se aplicó, con ganancias y con rendimientos. */
+  aplicaciones?: Array<{ year: number; patrim: number; rend: number }>
 }
 
 export interface Carryforward {
