@@ -33,7 +33,7 @@ export function fiscalTypeLabel(tipo: string, activoRecibido?: string | null): {
   return TYPE_LABELS[tipo] ?? { label: tipo, tone: 'other' }
 }
 
-const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic']
+export const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic']
 
 /** «2026-01-01» (día de Madrid) → «1 ene 2026». */
 export function formatFiscalDate(fecha: string): string {

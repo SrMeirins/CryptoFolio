@@ -60,14 +60,40 @@ function hito(id: HitoId, ejercicio: number, hoy: string, obligado: Obligacion72
  * Ciclo alrededor de hoy: los tres hitos que vienen. El próximo hito (el de
  * la campana y el Dashboard) salta el 721 si consta que no hay obligación.
  */
-export function calendarioFiscal(now: Date = new Date(), obligado: Obligacion721 = () => null, tz: string = DEFAULT_TIMEZONE): { hoy: string; hitos: Hito[]; proximo: Hito } {
+/** Meses de la línea del ciclo fiscal (#538): el actual y los 17 siguientes. */
+export const MESES_CICLO = 18;
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** Primer día del mes actual y último del mes 17 meses después (AAAA-MM-DD). */
+export function ventanaCiclo(hoy: string): { desde: string; hasta: string } {
+  const [y, m] = hoy.split('-').map(Number);
+  const fin = new Date(Date.UTC(y, m - 1 + MESES_CICLO, 0));
+  return { desde: `${y}-${pad(m)}-01`, hasta: fin.toISOString().slice(0, 10) };
+}
+
+export interface CalendarioFiscal {
+  hoy: string;
+  /** Los tres hitos que vienen (la línea de tiempo del Dashboard). */
+  hitos: Hito[];
+  proximo: Hito;
+  /** Ventana de 18 meses de la línea del ciclo (#538). */
+  ventana: { desde: string; hasta: string };
+  /** Todos los plazos que tocan la ventana, en orden de fin. */
+  ciclo: Hito[];
+}
+
+export function calendarioFiscal(now: Date = new Date(), obligado: Obligacion721 = () => null, tz: string = DEFAULT_TIMEZONE): CalendarioFiscal {
   // Hoy en la zona de la aplicación (#388).
   const hoy = localDate(tz, now);
   const y = Number(hoy.slice(0, 4));
-  const todos = [hito('modelo721', y - 1, hoy, obligado), hito('renta', y - 1, hoy, obligado), hito('cierre', y, hoy, obligado), hito('modelo721', y, hoy, obligado), hito('renta', y, hoy, obligado)];
-  const vigentes = todos.filter(h => h.estado !== 'pasado').sort((a, b) => a.hasta.localeCompare(b.hasta));
+  const todos = [y - 1, y, y + 1].flatMap(e => (['cierre', 'modelo721', 'renta'] as const).map(id => hito(id, e, hoy, obligado)))
+    .sort((a, b) => a.hasta.localeCompare(b.hasta));
+  const vigentes = todos.filter(h => h.estado !== 'pasado');
   const proximo = vigentes.find(h => !(h.id === 'modelo721' && h.obligado === false)) ?? vigentes[0];
-  return { hoy, hitos: vigentes.slice(0, 3), proximo };
+  const ventana = ventanaCiclo(hoy);
+  const ciclo = todos.filter(h => h.hasta >= ventana.desde && h.desde <= ventana.hasta);
+  return { hoy, hitos: vigentes.slice(0, 3), proximo, ventana, ciclo };
 }
 
 /** Aviso para la campana: a 30 días del próximo hito (información) y a 7 (aviso). */

@@ -175,7 +175,15 @@ export interface FiscalHito {
   obligado?: boolean | null
 }
 
-export interface FiscalCalendar { hoy: string; hitos: FiscalHito[]; proximo: FiscalHito }
+export interface FiscalCalendar {
+  hoy: string
+  hitos: FiscalHito[]
+  proximo: FiscalHito
+  /** Ventana de 18 meses de la línea del ciclo (#538), del 1 del mes actual al último día del mes 17 después. */
+  ventana: { desde: string; hasta: string }
+  /** Plazos que tocan la ventana, en orden de fin. */
+  ciclo: FiscalHito[]
+}
 
 /** Planificador de fin de año (#307). */
 export interface FiscalPlanner {
