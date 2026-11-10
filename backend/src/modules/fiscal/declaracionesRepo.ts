@@ -10,7 +10,8 @@ import { OPS_RCM_AHORRO } from './clasificacionRentas';
 // Acceso a los ejercicios declarados (#311) y cifras actuales de la Renta de
 // un ejercicio, calculadas con las mismas consultas y reglas que Fiscal.
 
-export type TipoDeclaracion = 'renta' | 'modelo721';
+/** Renta y 721 presentados (#311) y ejercicio revisado (#542). */
+export type TipoDeclaracion = 'renta' | 'modelo721' | 'revision';
 
 export interface Declaracion { ejercicio: number; tipo: TipoDeclaracion; declaradoEn: string; cifras: Record<string, number> }
 
@@ -59,8 +60,32 @@ export async function guardarDeclaracion(ejercicio: number, tipo: TipoDeclaracio
   return { ejercicio: x.ejercicio, tipo: x.tipo, declaradoEn: new Date(x.declarado_en).toISOString(), cifras: x.cifras };
 }
 
-export async function borrarDeclaracion(ejercicio: number, tipo: TipoDeclaracion): Promise<boolean> {
-  return ((await db.query(`DELETE FROM fiscal_declaraciones WHERE ejercicio = $1 AND tipo = $2`, [ejercicio, tipo])).rowCount ?? 0) > 0;
+/** Quita la marca y devuelve lo que había (para Deshacer, #542); null si no estaba. */
+export async function borrarDeclaracion(ejercicio: number, tipo: TipoDeclaracion): Promise<Declaracion | null> {
+  const r = await db.query(
+    `DELETE FROM fiscal_declaraciones WHERE ejercicio = $1 AND tipo = $2 RETURNING ejercicio, tipo, declarado_en, cifras`, [ejercicio, tipo]);
+  const x = r.rows[0];
+  return x ? { ejercicio: x.ejercicio, tipo: x.tipo, declaradoEn: new Date(x.declarado_en).toISOString(), cifras: x.cifras } : null;
+}
+
+/**
+ * Deshacer (#542): vuelve a dejar una marca tal como estaba, con su fecha y
+ * sus cifras originales, no las de ahora.
+ */
+export async function restaurarDeclaracion(d: Declaracion): Promise<Declaracion> {
+  const r = await db.query(
+    `INSERT INTO fiscal_declaraciones (ejercicio, tipo, declarado_en, cifras) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (ejercicio, tipo) DO UPDATE SET cifras = EXCLUDED.cifras, declarado_en = EXCLUDED.declarado_en
+     RETURNING ejercicio, tipo, declarado_en, cifras`, [d.ejercicio, d.tipo, d.declaradoEn, JSON.stringify(d.cifras)]);
+  const x = r.rows[0];
+  return { ejercicio: x.ejercicio, tipo: x.tipo, declaradoEn: new Date(x.declarado_en).toISOString(), cifras: x.cifras };
+}
+
+/** Si la Renta o el 721 de un ejercicio ya están presentados (#542): lo usan el calendario y la campana. */
+export async function presentadas(): Promise<(id: string, ejercicio: number) => boolean> {
+  const r = await db.query(`SELECT ejercicio, tipo FROM fiscal_declaraciones WHERE tipo IN ('renta', 'modelo721')`);
+  const set = new Set(r.rows.map((x: { ejercicio: number; tipo: string }) => `${x.tipo}:${x.ejercicio}`));
+  return (id, ejercicio) => set.has(`${id}:${ejercicio}`);
 }
 
 /** Último Modelo 721 presentado antes de `ejercicio`; null si no hay. */

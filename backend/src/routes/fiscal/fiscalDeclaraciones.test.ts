@@ -74,4 +74,40 @@ describe('/api/fiscal — ejercicios declarados (#311)', () => {
     expect((await request(app).put(`/api/fiscal/${Y - 1}/declaracion/modelo721`).send({ valor: -1 })).status).toBe(400);
     expect((await request(app).delete(`/api/fiscal/${Y - 1}/declaracion/otro`)).status).toBe(400);
   });
+
+  it('marca el ejercicio como revisado con las cifras del momento y detecta cambios después (#542)', async () => {
+    const put = await request(app).put(`/api/fiscal/${Y - 1}/declaracion/revision`).send({});
+    expect(put.status).toBe(200);
+    expect(put.body).toMatchObject({ ejercicio: Y - 1, tipo: 'revision', cifras: { operaciones: 2 } });
+    let rev = (await request(app).get('/api/fiscal/declaraciones')).body.find((d: { tipo: string }) => d.tipo === 'revision');
+    expect(rev.cambios).toEqual([]);
+    await seedSale(Y - 1, 100);
+    rev = (await request(app).get('/api/fiscal/declaraciones')).body.find((d: { tipo: string }) => d.tipo === 'revision');
+    expect(rev.cambios.map((c: { campo: string }) => c.campo)).toContain('neto');
+  });
+
+  it('deshacer: quitar devuelve lo que había y restaurarlo deja la fecha y las cifras originales (#542)', async () => {
+    const marcada = (await request(app).put(`/api/fiscal/${Y - 1}/declaracion/renta`).send({})).body;
+    const del = await request(app).delete(`/api/fiscal/${Y - 1}/declaracion/renta`);
+    expect(del.body.previa).toEqual(marcada);
+    await seedSale(Y - 1, 50);   // las cifras actuales ya no son las declaradas
+    const res = await request(app).put(`/api/fiscal/${Y - 1}/declaracion/renta/restaurar`)
+      .send({ declaradoEn: marcada.declaradoEn, cifras: marcada.cifras });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(marcada);
+    const renta = (await request(app).get('/api/fiscal/declaraciones')).body.find((d: { tipo: string }) => d.tipo === 'renta');
+    expect(renta.declaradoEn).toBe(marcada.declaradoEn);
+    expect(renta.cambios.length).toBeGreaterThan(0);
+  });
+
+  it('restaurar valida la entrada', async () => {
+    const ok = { declaradoEn: '2025-05-01T10:00:00.000Z', cifras: { neto: 1 } };
+    const put = (tipo: string, body: object) => request(app).put(`/api/fiscal/${Y - 1}/declaracion/${tipo}/restaurar`).send(body);
+    expect((await put('otro', ok)).status).toBe(400);
+    expect((await put('renta', { ...ok, declaradoEn: 'ayer' })).status).toBe(400);
+    expect((await put('renta', { ...ok, cifras: { 'a b': 1 } })).status).toBe(400);
+    expect((await put('renta', { ...ok, cifras: { neto: 'x' } })).status).toBe(400);
+    expect((await put('renta', { ...ok, extra: 1 })).status).toBe(400);
+    expect((await request(app).put(`/api/fiscal/${Y}/declaracion/renta/restaurar`).send(ok)).status).toBe(400);
+  });
 });

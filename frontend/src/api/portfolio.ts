@@ -150,13 +150,13 @@ export interface AssetSales {
   sales: AssetSale[]
 }
 
-/** Ejercicio declarado (#311). */
+/** Marca del estado de la declaración de un ejercicio (#311, #542): revisado, Renta o 721 presentados. */
 export interface Declaracion {
   ejercicio: number
-  tipo: 'renta' | 'modelo721'
+  tipo: 'renta' | 'modelo721' | 'revision'
   declaradoEn: string
   cifras: Record<string, number>
-  /** Solo la Renta: cifras que han cambiado desde que se declaró. */
+  /** Renta y revisión: cifras que han cambiado desde que se marcaron. */
   cambios?: { campo: string; declarado: number; actual: number }[]
 }
 
@@ -173,6 +173,8 @@ export interface FiscalHito {
   diasParaAbrir: number
   progreso: number
   obligado?: boolean | null
+  /** Renta y 721: ya presentado (#542). */
+  presentado?: boolean
 }
 
 export interface FiscalCalendar {
@@ -915,7 +917,12 @@ export const portfolioApi = {
   getDeclaraciones: () => api.get<Declaracion[]>('/fiscal/declaraciones'),
   marcarRenta: (year: number) => api.put<Declaracion>(`/fiscal/${year}/declaracion/renta`, {}),
   marcar721: (year: number, valor?: number) => api.put<Declaracion>(`/fiscal/${year}/declaracion/modelo721`, valor === undefined ? {} : { valor }),
-  quitarDeclaracion: (year: number, tipo: Declaracion['tipo']) => api.delete<{ ok: true }>(`/fiscal/${year}/declaracion/${tipo}`),
+  marcarRevision: (year: number) => api.put<Declaracion>(`/fiscal/${year}/declaracion/revision`, {}),
+  /** Quita la marca y devuelve la que había, para Deshacer (#542). */
+  quitarDeclaracion: (year: number, tipo: Declaracion['tipo']) => api.delete<{ ok: true; previa: Declaracion }>(`/fiscal/${year}/declaracion/${tipo}`),
+  /** Deshacer (#542): vuelve a dejar la marca tal como estaba, con su fecha y sus cifras. */
+  restaurarDeclaracion: (d: Pick<Declaracion, 'ejercicio' | 'tipo' | 'declaradoEn' | 'cifras'>) =>
+    api.put<Declaracion>(`/fiscal/${d.ejercicio}/declaracion/${d.tipo}/restaurar`, { declaradoEn: d.declaradoEn, cifras: d.cifras }),
   /** Calendario fiscal (#309): hitos del ciclo y el próximo, en hora de Madrid. */
   getFiscalCalendar: () => api.get<FiscalCalendar>('/fiscal/calendario'),
   /** Planificador de fin de año (#307): contexto del ejercicio en curso y lotes abiertos en orden FIFO. */

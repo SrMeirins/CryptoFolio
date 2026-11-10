@@ -158,12 +158,15 @@ export function CalendarioFiscal({ data, netoPorAnio, onGo }: {
               <li key={`${h.id}-${h.ejercicio}`} className={`rounded-xl border p-3.5 space-y-1.5 text-xs ${mismo(h, p) ? 'border-brand/40 bg-brand/5' : 'border-border'}`}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-fg">{h.titulo}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${h.estado === 'en-curso' ? 'bg-positive/12 text-positive-ink' : 'bg-overlay/10 text-fg-muted'}`}>{ESTADO[h.estado]}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${h.presentado ? 'bg-positive/12 text-positive-ink' : h.estado === 'en-curso' ? 'bg-positive/12 text-positive-ink' : 'bg-overlay/10 text-fg-muted'}`}>
+                    {h.presentado ? 'Presentado' : ESTADO[h.estado]}
+                  </span>
                 </div>
                 <p className="text-fg-muted">
                   {h.inicioAproximado ? `Hacia el ${formatFiscalDate(h.desde)}` : `Del ${formatFiscalDate(h.desde)}`} al {formatFiscalDate(h.hasta)}
                 </p>
-                <p className="text-sm"><Urgencia h={h} /></p>
+                {/* Lo ya presentado no tiene cuenta atrás (#542). */}
+                <p className="text-sm">{h.presentado ? <span className="font-medium text-positive-ink">Ya presentado</span> : <Urgencia h={h} />}</p>
                 <p className="text-fg-muted"><Detalle h={h} neto={netoPorAnio.get(h.ejercicio)} enCurso={h.ejercicio === anioHoy} /></p>
                 <button type="button" onClick={() => onGo(h)}
                   className="text-brand-ink font-medium hover:underline rounded focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">{ACCION[h.id]}</button>

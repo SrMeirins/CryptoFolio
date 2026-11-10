@@ -79,3 +79,14 @@ describe('línea del ciclo fiscal (#538)', () => {
     expect(c.proximo).toMatchObject({ id: 'cierre', ejercicio: 2026 });
   });
 });
+
+describe('lo ya presentado (#542)', () => {
+  it('la Renta presentada no es el próximo plazo ni la recuerda la campana', () => {
+    const presentada = (id: string, e: number) => id === 'renta' && e === 2026;
+    const c = calendarioFiscal(at('2027-05-10T10:00:00Z'), () => false, undefined, presentada);
+    expect(c.hitos.find(h => h.id === 'renta' && h.ejercicio === 2026)).toMatchObject({ presentado: true });
+    expect(c.proximo).toMatchObject({ id: 'cierre', ejercicio: 2027 });
+    expect(avisoCalendario(at('2027-06-20T10:00:00Z'), () => false, undefined, presentada)).toBeNull();
+    expect(avisoCalendario(at('2027-06-20T10:00:00Z'), () => false)).toMatchObject({ type: 'info' });
+  });
+});

@@ -28,7 +28,12 @@ export interface Hito {
   progreso: number;
   /** Solo el 721: si hay obligación (null si no se sabe, p. ej. faltan precios). */
   obligado?: boolean | null;
+  /** Renta y 721: ya presentado (#542); no cuenta como próximo plazo ni lo recuerda la campana. */
+  presentado?: boolean;
 }
+
+/** Si la Renta o el 721 de un ejercicio ya están presentados (#542). */
+export type Presentada = (id: HitoId, ejercicio: number) => boolean;
 
 /** Obligación del 721 de un ejercicio; null si no se puede afirmar. */
 export type Obligacion721 = (ejercicio: number) => boolean | null;
@@ -40,7 +45,7 @@ const RENTA_ABRE_MD = '04-08';
 const DAY_MS = 86_400_000;
 const dayNumber = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / DAY_MS;
 
-function hito(id: HitoId, ejercicio: number, hoy: string, obligado: Obligacion721): Hito {
+function hito(id: HitoId, ejercicio: number, hoy: string, obligado: Obligacion721, presentada: Presentada): Hito {
   const [titulo, desde, hasta, inicioAproximado] =
     id === 'cierre' ? [`Cierre del ejercicio ${ejercicio}`, `${ejercicio}-01-01`, `${ejercicio}-12-31`, false]
     : id === 'modelo721' ? [`Modelo 721 de ${ejercicio}`, `${ejercicio + 1}-01-01`, `${ejercicio + 1}-03-31`, false]
@@ -53,6 +58,7 @@ function hito(id: HitoId, ejercicio: number, hoy: string, obligado: Obligacion72
     diasParaAbrir: Math.max(0, dayNumber(desde) - dayNumber(hoy)),
     progreso: estado === 'en-curso' && largo > 0 ? Math.min(100, ((dayNumber(hoy) - dayNumber(desde)) / largo) * 100) : 0,
     ...(id === 'modelo721' ? { obligado: obligado(ejercicio) } : {}),
+    ...(id !== 'cierre' ? { presentado: presentada(id, ejercicio) } : {}),
   };
 }
 
@@ -83,23 +89,25 @@ export interface CalendarioFiscal {
   ciclo: Hito[];
 }
 
-export function calendarioFiscal(now: Date = new Date(), obligado: Obligacion721 = () => null, tz: string = DEFAULT_TIMEZONE): CalendarioFiscal {
+export function calendarioFiscal(now: Date = new Date(), obligado: Obligacion721 = () => null, tz: string = DEFAULT_TIMEZONE, presentada: Presentada = () => false): CalendarioFiscal {
   // Hoy en la zona de la aplicación (#388).
   const hoy = localDate(tz, now);
   const y = Number(hoy.slice(0, 4));
-  const todos = [y - 1, y, y + 1].flatMap(e => (['cierre', 'modelo721', 'renta'] as const).map(id => hito(id, e, hoy, obligado)))
+  const todos = [y - 1, y, y + 1].flatMap(e => (['cierre', 'modelo721', 'renta'] as const).map(id => hito(id, e, hoy, obligado, presentada)))
     .sort((a, b) => a.hasta.localeCompare(b.hasta));
   const vigentes = todos.filter(h => h.estado !== 'pasado');
-  const proximo = vigentes.find(h => !(h.id === 'modelo721' && h.obligado === false)) ?? vigentes[0];
+  // El próximo hito salta el 721 sin obligación y lo que ya está presentado (#542).
+  const proximo = vigentes.find(h => !(h.id === 'modelo721' && h.obligado === false) && !h.presentado) ?? vigentes[0];
   const ventana = ventanaCiclo(hoy);
   const ciclo = todos.filter(h => h.hasta >= ventana.desde && h.desde <= ventana.hasta);
   return { hoy, hitos: vigentes.slice(0, 3), proximo, ventana, ciclo };
 }
 
 /** Aviso para la campana: a 30 días del próximo hito (información) y a 7 (aviso). */
-export function avisoCalendario(now: Date = new Date(), obligado: Obligacion721 = () => null, tz: string = DEFAULT_TIMEZONE): { type: 'info' | 'warning'; message: string } | null {
-  const { proximo } = calendarioFiscal(now, obligado, tz);
-  if (proximo.diasRestantes > 30) return null;
+export function avisoCalendario(now: Date = new Date(), obligado: Obligacion721 = () => null, tz: string = DEFAULT_TIMEZONE, presentada: Presentada = () => false): { type: 'info' | 'warning'; message: string } | null {
+  const { proximo } = calendarioFiscal(now, obligado, tz, presentada);
+  // Nada que recordar de un plazo ya presentado (#542).
+  if (proximo.diasRestantes > 30 || proximo.presentado) return null;
   const cuando = proximo.diasRestantes === 0 ? 'hoy es el último día' : `${proximo.diasRestantes === 1 ? 'queda 1 día' : `quedan ${proximo.diasRestantes} días`}`;
   const accion = proximo.id === 'cierre' ? 'Revisa el planificador antes del 31 de diciembre.'
     : proximo.id === 'modelo721' ? 'Comprueba si estás obligado a presentarlo.'

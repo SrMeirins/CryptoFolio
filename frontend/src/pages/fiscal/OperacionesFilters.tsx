@@ -16,7 +16,7 @@ const chip = (on: boolean) =>
   `inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60 ${
     on ? 'border-brand/40 bg-brand/15 text-fg' : 'border-border text-fg-muted hover:text-fg'}`
 
-export function OperacionesFilters({ filters, search, onSearch, onChange, tones, warnings, assets, onClear, filtered }: {
+export function OperacionesFilters({ filters, search, onSearch, onChange, tones, warnings, porRevisar = 0, assets, onClear, filtered }: {
   filters: EventFilters
   /** Texto de búsqueda sin el retardo, para que el campo responda al instante. */
   search: string
@@ -24,6 +24,8 @@ export function OperacionesFilters({ filters, search, onSearch, onChange, tones,
   onChange: (patch: Partial<EventFilters>) => void
   tones: { tone: FiscalTone; label: string; count: number }[]
   warnings: number
+  /** Operaciones con la clave de contrapartida por revisar (#542). */
+  porRevisar?: number
   assets: string[]
   onClear: () => void
   filtered: boolean
@@ -42,6 +44,11 @@ export function OperacionesFilters({ filters, search, onSearch, onChange, tones,
         {warnings > 0 && (
           <button type="button" aria-pressed={filters.onlyWarnings} onClick={() => onChange({ onlyWarnings: !filters.onlyWarnings })} className={chip(filters.onlyWarnings)}>
             <AlertTriangle size={11} className="text-warning" aria-hidden="true" /> Con aviso <span className="mono text-fg-subtle">{warnings}</span>
+          </button>
+        )}
+        {porRevisar > 0 && (
+          <button type="button" aria-pressed={filters.onlyRevisar} onClick={() => onChange({ onlyRevisar: !filters.onlyRevisar })} className={chip(filters.onlyRevisar)}>
+            <AlertTriangle size={11} className="text-warning" aria-hidden="true" /> Clave por revisar <span className="mono text-fg-subtle">{porRevisar}</span>
           </button>
         )}
       </div>

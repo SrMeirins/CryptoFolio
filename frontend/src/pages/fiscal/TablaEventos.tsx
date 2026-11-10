@@ -12,10 +12,7 @@ import { buttonClasses, Pagination, tableFootRowClasses, tableHeadRowClasses, pa
 import { useDebounce } from '../../hooks/useDebounce'
 import { usePrivacyStore } from '../../store/privacyStore'
 import { paginate, type PageSize } from '../../utils/pagination'
-import {
-  buildEventsCsv, EMPTY_FILTERS, filterEvents, hasWarning, isFiltered, recompraSummary, sortEvents, toneCounts,
-  type EventFilters, type SortDir, type SortKey,
-} from '../../utils/fiscalOperations'
+import { buildEventsCsv, EMPTY_FILTERS, filterEvents, hasWarning, isFiltered, recompraSummary, sortEvents, toneCounts, type EventFilters, type SortDir, type SortKey, necesitaRevision } from '../../utils/fiscalOperations'
 
 // Tabla de ganancias y pérdidas patrimoniales (#299): filtros, paginación,
 // resumen de recompras, avisos como iconos, tarjetas en móvil y CSV de lo filtrado.
@@ -47,6 +44,7 @@ export function TablaEventos({ events, summary, initialFilters }: {
   }, [events])
   const tones = useMemo(() => toneCounts(events), [events])
   const warnings = useMemo(() => events.filter(hasWarning).length, [events])
+  const porRevisar = useMemo(() => events.filter(necesitaRevision).length, [events])
   const recompras = useMemo(() => recompraSummary(events), [events])
 
   const filtered = useMemo(() => sortEvents(filterEvents(events, filters), sortKey, sortDir), [events, filters, sortKey, sortDir])
@@ -98,7 +96,7 @@ export function TablaEventos({ events, summary, initialFilters }: {
         <>
           <RecompraSummary data={recompras} active={filtersState.onlyRecompra} onToggle={() => patch({ onlyRecompra: !filtersState.onlyRecompra })} />
           <OperacionesFilters filters={filtersState} search={searchInput} onSearch={setSearchInput} onChange={patch}
-            tones={tones} warnings={warnings} assets={assets} onClear={clear} filtered={isFiltered(filters)} />
+            tones={tones} warnings={warnings} porRevisar={porRevisar} assets={assets} onClear={clear} filtered={isFiltered(filters)} />
 
           {filtered.length === 0 ? (
             <FilteredEmpty onClear={clear} />

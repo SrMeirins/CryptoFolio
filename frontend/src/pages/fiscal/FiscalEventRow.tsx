@@ -4,11 +4,12 @@ import { CryptoIcon } from '../../components/CryptoIcon'
 import { PNL_THRESHOLD } from './constants'
 import { EventWarnings } from './EventWarnings'
 import type { FiscalEvent } from './types'
+import { necesitaRevision } from '../../utils/fiscalOperations'
 import { Tooltip, tableRowClasses, TextTooltip } from '../../components/ui'
 
 /** Clave de la casilla 1800 (#531): la letra, o «Revisar» si no hay una segura; el significado, en el tooltip. */
 export function ClaveCell({ e }: { e: FiscalEvent }) {
-  const revisar = e.contrapartidaRevisar || !e.contrapartidaClave
+  const revisar = necesitaRevision(e)
   return (
     <Tooltip label={revisar ? 'Clave por revisar' : `Clave ${e.contrapartidaClave}`}
       triggerLabel={revisar ? `Clave por revisar: ${e.contrapartidaDescripcion}` : `Clave ${e.contrapartidaClave}: ${e.contrapartidaDescripcion}`}

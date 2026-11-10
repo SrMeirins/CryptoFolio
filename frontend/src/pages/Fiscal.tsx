@@ -24,7 +24,7 @@ import { historyYearLink } from './history/keyboard/yearNav'
 import { FiscalHero, FiscalHeroSkeleton } from './fiscal/FiscalHero'
 import { PlanificadorTab } from './fiscal/PlanificadorTab'
 import { CalendarioFiscal } from './fiscal/CalendarioFiscal'
-import { DeclaracionRenta } from './fiscal/DeclaracionRenta'
+import { EstadoDeclaracion } from './fiscal/declaracion/EstadoDeclaracion'
 import type { FiscalHito } from '../api/portfolio'
 import { useFiscalShortcuts } from './fiscal/useFiscalShortcuts'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
@@ -40,6 +40,7 @@ import { MODELO721_LABELS, modelo721Status } from '../utils/modelo721Status'
 import { formatEur, formatNumber } from '../utils/format'
 import { liveModelo721, margenUmbral } from '../utils/modelo721View'
 import { usePricesStore } from '../store/pricesStore'
+import { necesitaRevision } from '../utils/fiscalOperations'
 
 const VISTA_LABELS: Record<FiscalVista, string> = { resumen: 'Resumen', operaciones: 'Operaciones', modelo721: 'Modelo 721', planificar: 'Planificar' }
 /** Icono de cada vista en el menú lateral (#535). */
@@ -381,7 +382,15 @@ export function Fiscal() {
             <FiscalHero summary={summary} cuota={cuota} tipoMedio={tipoMedio} comparison={comparison} aviso={caducan && <AvisoCaducidad {...caducan} compact />}
               declarada={!!rentaDeclarada} cf={cfYear} tramos={tramos}
               plazoRenta={calendario?.hitos.find(h => h.id === 'renta' && h.ejercicio === activeYear)} />
-            {!summary.esAnioEnCurso && <Block i={1}><DeclaracionRenta year={activeYear} declaracion={rentaDeclarada} /></Block>}
+            {/* Estado de la declaración por pasos (#542), en los ejercicios cerrados. */}
+            {!summary.esAnioEnCurso && (
+              <Block i={1}>
+                <EstadoDeclaracion year={activeYear} declaraciones={declaraciones}
+                  datos={{ porRevisar: events?.fiscalEvents.filter(necesitaRevision).length ?? 0, preciosPendientes: summary.preciosPendientes }}
+                  obligado721={modelo721?.obligado ?? null}
+                  onVerRevisar={() => openOperaciones({ revisar: '1' })} onModelo721={() => setVista('modelo721')} />
+              </Block>
+            )}
             {calendario && (
               <Block i={1}>
                 <CalendarioFiscal data={calendario} netoPorAnio={new Map(overview.map(o => [o.year, o.netoPatrimonial]))} onGo={goHito} />

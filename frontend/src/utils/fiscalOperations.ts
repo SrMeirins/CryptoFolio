@@ -22,17 +22,24 @@ export interface EventFilters {
   onlyWarnings: boolean
   /** Solo pérdidas posiblemente diferidas (botón «Ver solo estas»). */
   onlyRecompra: boolean
+  /** Solo las que tienen la clave de contrapartida por revisar (#542). */
+  onlyRevisar: boolean
   search: string
 }
 
-export const EMPTY_FILTERS: EventFilters = { asset: '', result: 'all', from: '', to: '', tones: [], onlyWarnings: false, onlyRecompra: false, search: '' }
+export const EMPTY_FILTERS: EventFilters = { asset: '', result: 'all', from: '', to: '', tones: [], onlyWarnings: false, onlyRecompra: false, onlyRevisar: false, search: '' }
 
 export function hasWarning(e: FiscalEvent): boolean {
   return !!(e.posiblePerdidaDiferida || e.permutaWrapStaking || e.lostSinMotivo)
 }
 
+/** Clave de contrapartida por revisar (#531): sin clave segura o marcada para revisar. */
+export function necesitaRevision(e: Pick<FiscalEvent, 'contrapartidaRevisar' | 'contrapartidaClave'>): boolean {
+  return !!e.contrapartidaRevisar || !e.contrapartidaClave
+}
+
 export function isFiltered(f: EventFilters): boolean {
-  return f.asset !== '' || f.result !== 'all' || f.from !== '' || f.to !== '' || f.tones.length > 0 || f.onlyWarnings || f.onlyRecompra || f.search.trim() !== ''
+  return f.asset !== '' || f.result !== 'all' || f.from !== '' || f.to !== '' || f.tones.length > 0 || f.onlyWarnings || f.onlyRecompra || f.onlyRevisar || f.search.trim() !== ''
 }
 
 export function filterEvents(events: readonly FiscalEvent[], f: EventFilters): FiscalEvent[] {
@@ -47,6 +54,7 @@ export function filterEvents(events: readonly FiscalEvent[], f: EventFilters): F
     if (f.tones.length > 0 && !f.tones.includes(fiscalTypeLabel(e.tipo, e.activoRecibido).tone)) return false
     if (f.onlyWarnings && !hasWarning(e)) return false
     if (f.onlyRecompra && !e.posiblePerdidaDiferida) return false
+    if (f.onlyRevisar && !necesitaRevision(e)) return false
     if (q) {
       const haystack = [e.activoTransmitido, e.activoRecibido ?? '', e.wallet, e.contrapartidaClave, e.contrapartidaDescripcion].join(' ').toLowerCase()
       if (!haystack.includes(q)) return false
