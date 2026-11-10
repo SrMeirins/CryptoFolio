@@ -401,7 +401,7 @@ export function Fiscal() {
               </div>
             )}
             {breakdown.length > 0 && <Block i={3}><DesglosePorActivo data={breakdown} onSelectAsset={a => openOperaciones({ activo: a })} /></Block>}
-            {carryforward && <Block i={4}><PerdidasPendientes data={carryforward} /></Block>}
+            {carryforward && <Block i={4}><PerdidasPendientes data={carryforward} onPlanificar={() => setVista('planificar')} /></Block>}
           </>
         ) : summary && vista === 'operaciones' ? (
           eventsLoading ? (

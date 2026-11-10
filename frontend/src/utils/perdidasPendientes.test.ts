@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { caducanEsteAnio, origenesView, totalCaducado } from './perdidasPendientes'
+import { anchoEscalaComun, caducanEsteAnio, cuentaAtras, detalleCompensacion, origenesView, totalCaducado } from './perdidasPendientes'
 import type { OrigenPerdida } from '../pages/fiscal/types'
 
 // Pérdidas pendientes por año de origen (#305). Datos sintéticos.
@@ -33,5 +33,43 @@ describe('caducanEsteAnio', () => {
   })
   it('total caducado sin usar', () => {
     expect(totalCaducado(origenes)).toBe(30)
+  })
+})
+
+describe('anchoEscalaComun (#541)', () => {
+  it('todas las barras en la misma escala: la mayor pérdida ocupa el 100 %', () => {
+    const ancho = anchoEscalaComun(origenes)
+    expect(ancho(100)).toBe(100)
+    expect(ancho(20)).toBe(20)
+    expect(ancho(5)).toBe(5)
+    expect(anchoEscalaComun([])(10)).toBe(0)
+  })
+})
+
+describe('cuentaAtras (#541)', () => {
+  it('días si queda menos de un trimestre, y entonces es «pronto»', () => {
+    expect(cuentaAtras(2026, '2026-11-10')).toEqual({ dias: 51, texto: 'Caduca en 51 días', corto: '51 días', pronto: true })
+    expect(cuentaAtras(2026, '2026-12-30').texto).toBe('Caduca en 1 día')
+    expect(cuentaAtras(2026, '2026-12-31')).toMatchObject({ dias: 0, texto: 'Caduca hoy', pronto: true })
+  })
+  it('meses si queda menos de un año; años y meses si más', () => {
+    expect(cuentaAtras(2026, '2026-03-15')).toMatchObject({ texto: 'Caduca en 9 meses', pronto: false })
+    expect(cuentaAtras(2027, '2026-11-10')).toMatchObject({ texto: 'Caduca en 1 año y 1 mes', corto: '1 año y 1 mes' })
+    expect(cuentaAtras(2029, '2026-11-10').texto).toBe('Caduca en 3 años y 1 mes')
+    expect(cuentaAtras(2028, '2026-12-15').texto).toBe('Caduca en 2 años')
+  })
+  it('pasada la fecha: caducada', () => {
+    expect(cuentaAtras(2025, '2026-01-01')).toMatchObject({ texto: 'Caducada', pronto: false })
+  })
+})
+
+describe('detalleCompensacion (#541)', () => {
+  it('ejercicio a ejercicio, con lo que quedaba después', () => {
+    const d = detalleCompensacion({ original: 100, aplicaciones: [{ year: 2024, patrim: 20, rend: 10 }, { year: 2023, patrim: 30, rend: 0 }] })
+    expect(d).toEqual([
+      { year: 2023, patrim: 30, rend: 0, queda: 70 },
+      { year: 2024, patrim: 20, rend: 10, queda: 40 },
+    ])
+    expect(detalleCompensacion({ original: 10 })).toEqual([])
   })
 })
