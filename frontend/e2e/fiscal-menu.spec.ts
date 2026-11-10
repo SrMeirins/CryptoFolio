@@ -57,6 +57,8 @@ test('las URL antiguas siguen funcionando', async ({ page }) => {
 
 for (const theme of ['dark', 'light'] as const) {
   test(`las cuatro vistas sin violaciones de axe (tema ${theme})`, async ({ page }) => {
+    // Analiza cuatro pantallas completas: con la suite en paralelo superaba los 60 s (#542).
+    test.slow()
     await soloLectura(page)
     await page.emulateMedia({ colorScheme: theme })
     for (const v of ['resumen', 'operaciones', 'modelo721', 'planificar']) {
