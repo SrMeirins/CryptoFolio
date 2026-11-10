@@ -89,7 +89,8 @@ export function RankingActivos({ data, onSelectAsset }: { data: readonly Breakdo
         </div>
         <SegmentedControl options={SIGNOS} value={signo} onChange={setSigno} label="Filtrar por resultado" size="sm" />
       </div>
-      <div className="overflow-x-auto">
+      {/* relative: el texto oculto de las cabeceras (sr-only, absoluto) queda dentro del recorte y no ensancha la página. */}
+      <div className="relative overflow-x-auto">
         <table className="w-full text-sm">
           <caption className="sr-only">Resultado por activo del ejercicio</caption>
           <thead>

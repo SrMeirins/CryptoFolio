@@ -65,3 +65,25 @@ for (const theme of ['dark', 'light'] as const) {
     }
   })
 }
+
+// Regresión (#540): el texto oculto de la cabecera de la tabla ensanchaba la
+// página a 390 px. Se comprueban todos los ejercicios, no solo el de por defecto.
+test.describe('a 390 px', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+  test('ningún ejercicio tiene scroll horizontal en Resumen', async ({ page }) => {
+    await page.goto('/fiscal')
+    const tarjetas = page.getByRole('tablist', { name: 'Ejercicios fiscales' }).getByRole('tab')
+    await tarjetas.first().waitFor({ timeout: 15_000 }).catch(() => {})
+    test.skip(await tarjetas.count() === 0, 'Sin ejercicios en estos datos')
+    const anios = await Promise.all((await tarjetas.all()).map(async t => (await t.innerText()).match(/\d{4}/)![0]))
+    for (const anio of anios) {
+      await page.goto(`/fiscal?anio=${anio}`)
+      await page.waitForLoadState('networkidle')
+      const desborde = await page.evaluate(() => {
+        const m = document.querySelector('main')!
+        return Math.max(document.documentElement.scrollWidth - document.documentElement.clientWidth, m.scrollWidth - m.clientWidth)
+      })
+      expect(desborde, `ejercicio ${anio}`).toBe(0)
+    }
+  })
+})
