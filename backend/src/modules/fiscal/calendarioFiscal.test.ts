@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { avisoCalendario, calendarioFiscal } from './calendarioFiscal';
+import { avisoCalendario, calendarioFiscal, ventanaCiclo } from './calendarioFiscal';
 
 // Calendario fiscal (#309). Instantes en UTC; Madrid es UTC+1 en invierno y UTC+2 en verano.
 const at = (iso: string) => new Date(iso);
@@ -52,5 +52,30 @@ describe('avisoCalendario', () => {
     expect(avisoCalendario(at('2026-12-01T10:00:00Z'))).toMatchObject({ type: 'info' });
     expect(avisoCalendario(at('2026-12-24T10:00:00Z'))?.type).toBe('warning');
     expect(avisoCalendario(at('2027-03-30T10:00:00Z'))?.message).toBe('Modelo 721 de 2026: queda 1 día. Comprueba si estás obligado a presentarlo.');
+  });
+});
+
+describe('línea del ciclo fiscal (#538)', () => {
+  it('ventana de 18 meses: del 1 del mes actual al último día del mes 17 después', () => {
+    expect(ventanaCiclo('2026-11-10')).toEqual({ desde: '2026-11-01', hasta: '2028-04-30' });
+    expect(ventanaCiclo('2027-01-31')).toEqual({ desde: '2027-01-01', hasta: '2028-06-30' });
+    expect(ventanaCiclo('2027-12-15')).toEqual({ desde: '2027-12-01', hasta: '2029-05-31' });
+  });
+  it('el ciclo son todos los plazos que tocan la ventana, en orden de fin', () => {
+    const c = calendarioFiscal(at('2026-11-10T10:00:00Z'));
+    expect(c.ventana).toEqual({ desde: '2026-11-01', hasta: '2028-04-30' });
+    expect(c.ciclo.map(h => `${h.id}:${h.ejercicio}`)).toEqual([
+      'cierre:2026', 'modelo721:2026', 'renta:2026', 'cierre:2027', 'modelo721:2027', 'renta:2027',
+    ]);
+  });
+  it('un plazo que acabó antes del mes actual no entra; el último día de un plazo sí', () => {
+    expect(calendarioFiscal(at('2027-07-05T10:00:00Z')).ciclo.some(h => h.id === 'renta' && h.ejercicio === 2026)).toBe(false);
+    expect(calendarioFiscal(at('2027-04-01T10:00:00Z')).ciclo.some(h => h.id === 'modelo721' && h.ejercicio === 2026)).toBe(false);
+    expect(calendarioFiscal(at('2027-03-31T10:00:00Z')).ciclo[0]).toMatchObject({ id: 'modelo721', ejercicio: 2026, estado: 'en-curso', diasRestantes: 0 });
+  });
+  it('la línea del Dashboard y el próximo hito no cambian', () => {
+    const c = calendarioFiscal(at('2026-10-19T10:00:00Z'));
+    expect(c.hitos.map(h => `${h.id}:${h.ejercicio}`)).toEqual(['cierre:2026', 'modelo721:2026', 'renta:2026']);
+    expect(c.proximo).toMatchObject({ id: 'cierre', ejercicio: 2026 });
   });
 });
