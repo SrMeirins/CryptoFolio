@@ -5,8 +5,12 @@ export interface FiscalSummary {
   totalPerdidas: number
   netoPatrimonial: number
   numOperacionesPatrimoniales: number
+  /** Rendimientos del capital mobiliario de la base del ahorro (staking, lending). */
   totalRendimientos: number
   numRendimientos: number
+  /** Rentas de la base general, solo informativas (#537): airdrops, minería y cashback. */
+  totalBaseGeneral: number
+  numBaseGeneral: number
   valorTotal31Dic: number
   superaUmbral721: boolean
   umbral721: number
@@ -53,6 +57,8 @@ export interface RendimientoEvent {
   cantidad: number
   valorEur: number
   wallet: string
+  /** Base del IRPF (#537): el ahorro entra en la cuota; la general solo se informa. */
+  base: 'ahorro' | 'general'
 }
 
 export interface Modelo721Activo {
@@ -106,7 +112,10 @@ export interface CarryforwardDetalle {
   rendimientos: number
   perdida: number
   compensadoPatrim: number
+  /** Total compensado con rendimientos, dentro del 25 % (art. 49 LIRPF). */
   compensadoRend: number
+  /** Parte de `compensadoRend` que es la pérdida del propio año (#537). */
+  compensadoRendAnio: number
   compensado: number
   limiteRend25: number
   netoDespues: number

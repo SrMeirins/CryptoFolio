@@ -12,8 +12,3 @@ export function buildRendimientosCsv(rows: readonly RendimientoEvent[]): string 
   ].join(';'))
   return [header, ...lines].join('\n')
 }
-
-/** Por debajo de esta base, los tramos IRPF se muestran en una línea (#313). */
-export const BASE_TRAMOS_COMPACTOS = 1_000
-
-export const tramosCompactos = (base: number) => base < BASE_TRAMOS_COMPACTOS

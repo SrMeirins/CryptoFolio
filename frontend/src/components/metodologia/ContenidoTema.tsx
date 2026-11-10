@@ -47,8 +47,9 @@ export function ContenidoTema({ tema }: { tema: TemaMetodo }) {
     case 'compensacion':
       return (
         <>
-          <p>Las pérdidas patrimoniales compensan las ganancias patrimoniales sin límite y, con lo que sobre, hasta el 25 % de los rendimientos positivos (staking, intereses, airdrops).</p>
-          <p>Lo que quede pendiente se compensa en los cuatro ejercicios siguientes, empezando por la pérdida más antigua. Lo que no se use caduca el 31 de diciembre del cuarto año.</p>
+          <p>Si las ganancias y pérdidas del año dan saldo negativo, esa pérdida compensa primero hasta el 25 % de los rendimientos del capital mobiliario del mismo año (staking e intereses).</p>
+          <p>Lo que quede pendiente se compensa en los cuatro ejercicios siguientes, empezando por la pérdida más antigua: contra las ganancias sin límite y, con lo que sobre, contra los rendimientos con el mismo 25 %, que es un límite conjunto con la pérdida de ese año. Lo que no se use caduca el 31 de diciembre del cuarto año.</p>
+          <p>Airdrops, minería y cashback son ganancias no derivadas de transmisión: van a la base general, no se compensan con estas pérdidas y la app solo los informa.</p>
           <p>La pérdida del año en curso es provisional: hasta el 31 de diciembre aún puede compensar ganancias de ese mismo año.</p>
           <Ejemplo>Pierdes 1.000 € en 2024 y ganas 600 € en 2025. En 2025 compensas 600 € y quedan 400 € para 2026, 2027 y 2028.</Ejemplo>
           <Fuente>arts. 48 y 49 de la Ley del IRPF (integración y compensación en la base del ahorro).</Fuente>

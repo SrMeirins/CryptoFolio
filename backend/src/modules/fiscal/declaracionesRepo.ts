@@ -5,6 +5,7 @@ import { escalaDe } from './escalasAhorro';
 import { localYearMonth } from '../time/localTime';
 import { getAppTimezone } from '../time/appTimezone';
 import type { CifrasRenta, Presentacion721 } from './declaraciones';
+import { OPS_RCM_AHORRO } from './clasificacionRentas';
 
 // Acceso a los ejercicios declarados (#311) y cifras actuales de la Renta de
 // un ejercicio, calculadas con las mismas consultas y reglas que Fiscal.
@@ -12,8 +13,6 @@ import type { CifrasRenta, Presentacion721 } from './declaraciones';
 export type TipoDeclaracion = 'renta' | 'modelo721';
 
 export interface Declaracion { ejercicio: number; tipo: TipoDeclaracion; declaradoEn: string; cifras: Record<string, number> }
-
-const RENDIMIENTOS = `('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')`;
 
 export async function cifrasRenta(year: number): Promise<CifrasRenta> {
   const tz = await getAppTimezone(db);
@@ -26,7 +25,7 @@ export async function cifrasRenta(year: number): Promise<CifrasRenta> {
   const rend = (await db.query(`
     SELECT COALESCE(SUM(amount_net * COALESCE(price_per_unit, 0)), 0) AS total, COUNT(*) AS n
     FROM transactions
-    WHERE EXTRACT(YEAR FROM timestamp AT TIME ZONE $2) = $1 AND operation_type IN ${RENDIMIENTOS}`, [year, tz])).rows[0];
+    WHERE EXTRACT(YEAR FROM timestamp AT TIME ZONE $2) = $1 AND operation_type = ANY($3)`, [year, tz, OPS_RCM_AHORRO])).rows[0];
   // Escala del ejercicio declarado (#452).
   const tipos = await escalaDe(db, year);
   const detalle = compensarPerdidas(await cargarAniosFiscales(localYearMonth(tz).year)).detalle.find(d => d.year === year);

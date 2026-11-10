@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import ExcelJS from 'exceljs';
 import { EventoFiscal, Rendimiento } from '../eventosAnio';
+import { separarPorBase } from '../clasificacionRentas';
 
 const EUR_FMT = '#,##0.00 €';
 const EUR_COLS = ['valorTx', 'gastosTx', 'valorAdq', 'gastosAdq', 'gp'];
@@ -63,27 +64,28 @@ export async function writeExcelExport(
   EUR_COLS.forEach(col => { t1.getCell(col).numFmt = EUR_FMT; });
   t1.font = { bold: true };
 
-  const sheet2 = workbook.addWorksheet('Rendimientos Capital Mob.');
-  sheet2.columns = [
-    { header: 'Fecha',     key: 'fecha',    width: 12 },
-    { header: 'Tipo',      key: 'tipo',     width: 20 },
-    { header: 'Activo',    key: 'activo',   width: 10 },
-    { header: 'Cantidad',  key: 'cantidad', width: 15 },
-    { header: 'Valor EUR', key: 'valor',    width: 15 },
-  ];
-  styleHeaderRow(sheet2.getRow(1));
-
-  for (const r of rendimientos) {
-    const row2 = sheet2.addRow({ fecha: r.fecha, tipo: r.tipo, activo: r.activo, cantidad: r.cantidad, valor: r.valorEur });
-    row2.getCell('valor').numFmt = EUR_FMT;
+  // Una hoja por base del IRPF (#537): la general solo si hay rentas de ese tipo.
+  const { ahorro, general } = separarPorBase(rendimientos);
+  const hojas: Array<[string, Rendimiento[]]> = [['Rendimientos Capital Mob.', ahorro]];
+  if (general.length > 0) hojas.push(['Base general (informativo)', general]);
+  for (const [nombre, lista] of hojas) {
+    const sheet = workbook.addWorksheet(nombre);
+    sheet.columns = [
+      { header: 'Fecha',     key: 'fecha',    width: 12 },
+      { header: 'Tipo',      key: 'tipo',     width: 20 },
+      { header: 'Activo',    key: 'activo',   width: 10 },
+      { header: 'Cantidad',  key: 'cantidad', width: 15 },
+      { header: 'Valor EUR', key: 'valor',    width: 15 },
+    ];
+    styleHeaderRow(sheet.getRow(1));
+    for (const r of lista) {
+      const row = sheet.addRow({ fecha: r.fecha, tipo: r.tipo, activo: r.activo, cantidad: r.cantidad, valor: r.valorEur });
+      row.getCell('valor').numFmt = EUR_FMT;
+    }
+    const total = sheet.addRow({ fecha: 'TOTAL', valor: lista.reduce((s, r) => s + r.valorEur, 0) });
+    total.getCell('valor').numFmt = EUR_FMT;
+    total.font = { bold: true };
   }
-
-  const t2 = sheet2.addRow({
-    fecha: 'TOTAL',
-    valor: rendimientos.reduce((s, r) => s + r.valorEur, 0),
-  });
-  t2.getCell('valor').numFmt = EUR_FMT;
-  t2.font = { bold: true };
 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="fiscal_${year}.xlsx"`);

@@ -1,8 +1,17 @@
-// Compensación de pérdidas patrimoniales entre ejercicios (normativa española):
-// las pérdidas compensan ganancias patrimoniales sin límite y rendimientos del
-// capital mobiliario hasta el 25 % de los rendimientos positivos del año; las
-// pendientes caducan tras los 4 ejercicios siguientes. Se consumen de más
-// antigua a más nueva. Lógica pura, sin acceso a la base de datos (#305).
+// Compensación de la base del ahorro (art. 49 LIRPF; manual práctico IRPF de
+// la AEAT, «Integración y compensación de rentas en la base imponible del
+// ahorro»). Lógica pura, sin acceso a la base de datos (#305, #537).
+//
+// Fase 1, el propio ejercicio: si el saldo de ganancias y pérdidas sale
+// negativo, se compensa con el saldo positivo de rendimientos del capital
+// mobiliario del mismo año, hasta el 25 % de ese saldo. El resto queda
+// pendiente para los 4 ejercicios siguientes.
+// Fase 2, ejercicios anteriores, de la pérdida más antigua a la más nueva:
+// primero contra el saldo positivo de ganancias del año, sin límite; después
+// contra los rendimientos, con el mismo 25 % de forma conjunta con la fase 1
+// (calculado sobre los rendimientos antes de compensaciones).
+// Los rendimientos del capital mobiliario son siempre positivos aquí (rentas
+// recibidas a valor de mercado), así que no hay saldo negativo de rendimientos.
 
 export interface AnioFiscal { year: number; netoGP: number; rendimientos: number }
 
@@ -11,8 +20,12 @@ export interface DetalleCompensacion {
   netoAntes: number;
   rendimientos: number;
   perdida: number;
+  /** Pérdidas de años anteriores compensadas con ganancias del año. */
   compensadoPatrim: number;
+  /** Total compensado con rendimientos (fase 1 más fase 2), dentro del 25 %. */
   compensadoRend: number;
+  /** Parte de `compensadoRend` que es la pérdida del propio año (fase 1). */
+  compensadoRendAnio: number;
   compensado: number;
   limiteRend25: number;
   netoDespues: number;
@@ -74,21 +87,28 @@ export function compensarPerdidas(rows: readonly AnioFiscal[]): ResultadoCompens
 
     const perdidaEsteAnio = netoGP < 0 ? Math.abs(netoGP) : 0;
     const gananciasPatrim = netoGP > 0 ? netoGP : 0;
+    const limiteRendimientos = rendimientos > 0 ? rendimientos * 0.25 : 0;
 
-    // 1. Contra las ganancias patrimoniales del año, sin límite.
+    // Fase 1: la pérdida del propio año contra sus rendimientos, hasta el 25 %.
+    const compensadoRendAnio = Math.min(perdidaEsteAnio, limiteRendimientos);
+
+    // Fase 2a: pérdidas anteriores contra las ganancias del año, sin límite.
     const pendienteTotalPatrim = vivos().reduce((s, o) => s + o.pendiente, 0);
     const compensadoPatrim = Math.min(pendienteTotalPatrim, gananciasPatrim);
     consumir(compensadoPatrim, 'compensadoPatrim');
 
-    // 2. Lo que queda, contra rendimientos con el límite del 25 %.
-    const limiteRendimientos = rendimientos > 0 ? rendimientos * 0.25 : 0;
+    // Fase 2b: lo que queda, contra rendimientos con lo que deje libre la fase 1 del 25 %.
     const pendienteTotalRend = vivos().reduce((s, o) => s + o.pendiente, 0);
-    const compensadoRend = Math.min(pendienteTotalRend, limiteRendimientos);
-    consumir(compensadoRend, 'compensadoRend');
+    const compensadoRendPrevio = Math.min(pendienteTotalRend, limiteRendimientos - compensadoRendAnio);
+    consumir(compensadoRendPrevio, 'compensadoRend');
+    const compensadoRend = compensadoRendAnio + compensadoRendPrevio;
 
-    // La pérdida de este año queda pendiente para los siguientes.
+    // Lo que no se compensa de la pérdida de este año queda para los siguientes.
     if (perdidaEsteAnio > EPS) {
-      origenes.push({ year, original: perdidaEsteAnio, compensadoPatrim: 0, compensadoRend: 0, pendiente: perdidaEsteAnio, caducado: 0, caducaEn: year + ANIOS_COMPENSACION, provisional: false });
+      origenes.push({
+        year, original: perdidaEsteAnio, compensadoPatrim: 0, compensadoRend: compensadoRendAnio,
+        pendiente: perdidaEsteAnio - compensadoRendAnio, caducado: 0, caducaEn: year + ANIOS_COMPENSACION, provisional: false,
+      });
     }
 
     return {
@@ -98,6 +118,7 @@ export function compensarPerdidas(rows: readonly AnioFiscal[]): ResultadoCompens
       perdida:          perdidaEsteAnio,
       compensadoPatrim,
       compensadoRend,
+      compensadoRendAnio,
       compensado:       compensadoPatrim + compensadoRend,
       limiteRend25:     limiteRendimientos,
       netoDespues:      gananciasPatrim - compensadoPatrim,

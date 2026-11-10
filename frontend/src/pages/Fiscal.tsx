@@ -12,7 +12,6 @@ import { ComparativaAnual } from './fiscal/charts/ComparativaAnual'
 import { EvolucionMensual } from './fiscal/charts/EvolucionMensual'
 import { DesglosePorActivo } from './fiscal/charts/DesglosePorActivo'
 import { filtersFromUrl, monthRange } from '../utils/fiscalCharts'
-import { TramosIRPF } from './fiscal/TaxCards'
 import { AvisoCaducidad, PerdidasPendientes } from './fiscal/PerdidasPendientes'
 import { caducanEsteAnio } from '../utils/perdidasPendientes'
 import { Modelo721Card } from './fiscal/Modelo721Card'
@@ -29,7 +28,7 @@ import { DeclaracionRenta } from './fiscal/DeclaracionRenta'
 import type { FiscalHito } from '../api/portfolio'
 import { useFiscalShortcuts } from './fiscal/useFiscalShortcuts'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
-import { badgeClasses, cardClasses, EmptyState, QueryError, Skeleton, PageHeader, panelEnterStyle, tabId, tabPanelId, SectionNav, RefreshBar, ViewHeader, type StatStripCell } from '../components/ui'
+import { badgeClasses, cardClasses, EmptyState, Notice, QueryError, Skeleton, PageHeader, panelEnterStyle, tabId, tabPanelId, SectionNav, RefreshBar, ViewHeader, type StatStripCell } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 import { FirstUseEmpty } from '../components/FirstUseEmpty'
 import { useHasTransactions } from '../hooks/useHasTransactions'
@@ -244,7 +243,6 @@ export function Fiscal() {
 
   const cfYear = carryforward?.detalle.find(d => d.year === activeYear)
   const baseCompensada = summary ? baseTramosCompensada(cfYear, summary.netoPatrimonial, summary.totalRendimientos) : 0
-  const huboCompensacion = !!cfYear && cfYear.compensado > 0.01
   const { cuota, tipoMedio } = cuotaAhorro(baseCompensada, tramos)
 
   // Comparación con el año anterior: mismo periodo en el año en curso; año completo si está cerrado.
@@ -292,9 +290,15 @@ export function Fiscal() {
   const tono = (v: number) => (v > 0.005 ? 'positive' as const : v < -0.005 ? 'negative' as const : undefined)
   const cifras: Record<FiscalVista, StatStripCell[]> = {
     resumen: summary ? [
-      { key: 'neto', label: 'Neto a declarar', value: summary.netoPatrimonial, format: formatEur, tone: tono(summary.netoPatrimonial) },
-      { key: 'cuota', label: 'Cuota estimada', value: cuota, format: formatEur },
-      { key: 'ops', label: 'Operaciones', value: ov?.numOperaciones ?? 0, format: v => formatNumber(v, 0) },
+      // Tira pulsable (#537): cada cifra abre Operaciones con su filtro; el neto y la cuota van en el bloque.
+      { key: 'ganancias', label: 'Ganancias', value: summary.totalGanancias, format: v => `+${formatEur(v)}`, tone: tono(summary.totalGanancias),
+        onSelect: () => openOperaciones({ resultado: 'ganancia' }), destination: 'Operaciones' },
+      { key: 'perdidas', label: 'Pérdidas', value: summary.totalPerdidas, format: formatEur, tone: tono(summary.totalPerdidas),
+        onSelect: () => openOperaciones({ resultado: 'perdida' }), destination: 'Operaciones' },
+      { key: 'rendimientos', label: 'Rendimientos', value: summary.totalRendimientos, format: formatEur,
+        onSelect: () => openOperaciones({ seccion: 'rendimientos' }), destination: 'Operaciones' },
+      { key: 'ops', label: 'Operaciones', value: summary.numOperacionesPatrimoniales + summary.numRendimientos, format: v => formatNumber(v, 0),
+        onSelect: () => openOperaciones({}), destination: 'Operaciones' },
     ] : [],
     operaciones: ov ? [
       { key: 'ganancias', label: 'Ganancias', value: ov.totalGanancias, format: formatEur, tone: tono(ov.totalGanancias) },
@@ -364,7 +368,8 @@ export function Fiscal() {
           <>
             <YearCards years={years} activeYear={activeYear} overview={overview} declarados={declarados} onSelect={elegirAnio} />
             <FiscalHero summary={summary} cuota={cuota} tipoMedio={tipoMedio} comparison={comparison} aviso={caducan && <AvisoCaducidad {...caducan} compact />}
-              declarada={!!rentaDeclarada} onOpen={openOperaciones} />
+              declarada={!!rentaDeclarada} cf={cfYear} tramos={tramos}
+              plazoRenta={calendario?.hitos.find(h => h.id === 'renta' && h.ejercicio === activeYear)} />
             {!summary.esAnioEnCurso && <Block i={1}><DeclaracionRenta year={activeYear} declaracion={rentaDeclarada} /></Block>}
             {calendario && (
               <Block i={1}>
@@ -376,12 +381,7 @@ export function Fiscal() {
               <Block i={2}><EvolucionMensual data={monthly} onSelectMonth={m => openOperaciones(monthRange(activeYear, m))} /></Block>
             )}
             {breakdown.length > 0 && <Block i={3}><DesglosePorActivo data={breakdown} onSelectAsset={a => openOperaciones({ activo: a })} /></Block>}
-            {baseCompensada > 0 && (
-              <Block i={4}>
-                <TramosIRPF base={baseCompensada} year={activeYear} label={`Tramos IRPF — estimación ${activeYear}${huboCompensacion ? ' (tras compensar pérdidas)' : ''}`} />
-              </Block>
-            )}
-            {carryforward && <Block i={5}><PerdidasPendientes data={carryforward} /></Block>}
+            {carryforward && <Block i={4}><PerdidasPendientes data={carryforward} /></Block>}
           </>
         ) : summary && vista === 'operaciones' ? (
           eventsLoading ? (
@@ -390,7 +390,18 @@ export function Fiscal() {
             <>
               {/* La clave remonta la tabla cuando un gráfico trae filtros nuevos */}
               <Block i={0}><TablaEventos key={JSON.stringify(urlFilters)} events={events.fiscalEvents} summary={summary} initialFilters={urlFilters} /></Block>
-              <Block i={1}><TablaRendimientos rendimientos={events.rendimientos} year={activeYear} /></Block>
+              <Block i={1}><TablaRendimientos rendimientos={events.rendimientos.filter(r => r.base === 'ahorro')} year={activeYear} /></Block>
+              {/* Base general (#537): airdrops, minería y cashback, fuera de la cuota del ahorro. */}
+              {events.rendimientos.some(r => r.base === 'general') && (
+                <Block i={2}>
+                  <TablaRendimientos rendimientos={events.rendimientos.filter(r => r.base === 'general')} year={activeYear}
+                    id="fiscal-base-general" title="Base general (informativo)" archivo="base_general_fiscal"
+                    nota={<Notice tipo="informacion" compact>
+                      Ganancias no derivadas de transmisión (airdrops, minería y cashback). Tributan en la base general a tu tipo marginal,
+                      que depende del resto de tus ingresos: no entran en la cuota estimada ni se compensan con las pérdidas del ahorro.
+                    </Notice>} />
+                </Block>
+              )}
             </>
           )
         ) : summary && vista === 'modelo721' ? (

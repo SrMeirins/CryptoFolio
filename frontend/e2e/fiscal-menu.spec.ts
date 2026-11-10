@@ -42,7 +42,8 @@ test('plegar el menú lo reduce a iconos y se recuerda', async ({ page }) => {
   await page.goto('/fiscal')
   await page.getByRole('button', { name: 'Plegar secciones de fiscal' }).click()
   await expect(page.getByRole('button', { name: 'Expandir secciones de fiscal' })).toHaveAttribute('aria-expanded', 'false')
-  expect((await menu(page).boundingBox())!.width).toBeLessThan(80)
+  // El ancho se anima al plegar: se espera a que termine la transición.
+  await expect.poll(async () => (await menu(page).boundingBox())!.width).toBeLessThan(80)
   await page.reload()
   await expect(page.getByRole('button', { name: 'Expandir secciones de fiscal' })).toBeVisible()
   await page.getByRole('button', { name: 'Expandir secciones de fiscal' }).click()

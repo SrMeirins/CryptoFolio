@@ -4,6 +4,7 @@ import { getAppTimezone } from '../time/appTimezone';
 import { activoRecibido as recibidoDe, getContraprestacion } from './contrapartida';
 import { hayRecompra, type Adquisicion } from './antiRecompra';
 import { getHistoricalPriceEur } from '../prices/binance';
+import { OPS_RENTA_ESPECIE, baseDeRenta, type BaseIrpf } from './clasificacionRentas';
 
 function getTipoRendimiento(operationType: string): string {
   const map: Record<string, string> = {
@@ -55,6 +56,8 @@ export interface Rendimiento {
   cantidad: number;
   valorEur: number;
   wallet: string;
+  /** Base del IRPF en la que se integra (#537): el ahorro entra en la cuota; la general solo se informa. */
+  base: BaseIrpf;
 }
 
 // Carga y formatea los eventos fiscales y rendimientos de un año dado.
@@ -170,14 +173,15 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
     FROM transactions t
     JOIN wallets w ON w.id = t.wallet_id
     WHERE EXTRACT(YEAR FROM t.timestamp AT TIME ZONE $2) = $1
-      AND t.operation_type IN ('STAKING_REWARD','MINING_REWARD','LENDING_INTEREST','LENDING_INTEREST_LOCKED','CASHBACK','AIRDROP')
+      AND t.operation_type = ANY($3)
     ORDER BY t.timestamp ASC
-  `, [year, tz]);
+  `, [year, tz, OPS_RENTA_ESPECIE]);
 
   const rendimientos: Rendimiento[] = rendRows.rows.map((row: Record<string, unknown>) => ({
     fecha:    localDate(tz, new Date(row.fecha as string)),
     fechaHora: new Date(row.fecha as string).toISOString(),
     tipo:     getTipoRendimiento(row.operation_type as string),
+    base:     baseDeRenta(row.operation_type as string),
     activo:   row.activo as string,
     cantidad: parseFloat(row.cantidad as string),
     valorEur: parseFloat(row.valor_eur as string),

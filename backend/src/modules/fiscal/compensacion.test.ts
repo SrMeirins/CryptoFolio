@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compensarPerdidas, type AnioFiscal } from './compensacion';
+import { baseAhorro, compensarPerdidas, type AnioFiscal } from './compensacion';
 
 // Compensación de pérdidas por año de origen (#305). Datos sintéticos.
 const anios = (desde: number, valores: Array<[number, number]>): AnioFiscal[] =>
@@ -55,5 +55,36 @@ describe('compensarPerdidas — orígenes y caducidad', () => {
     const r = compensarPerdidas(anios(2024, [[100, 0], [50, 8]]));
     expect(r.origenes).toEqual([]);
     expect(r.detalle[1]).toMatchObject({ netoDespues: 50, compensado: 0 });
+  });
+
+  it('fase 1 (art. 49): la pérdida del año compensa el 25 % de sus propios rendimientos', () => {
+    const r = compensarPerdidas(anios(2025, [[-100, 40]]));
+    expect(r.detalle[0]).toMatchObject({ perdida: 100, compensadoRendAnio: 10, compensadoRend: 10, netoDespues: 0 });
+    expect(r.origenes[0]).toMatchObject({ original: 100, compensadoRend: 10, pendiente: 90 });
+    cuadra(r.origenes[0]);
+    // Base del ahorro: 0 de ganancias + 40 de rendimientos - 10 compensados.
+    expect(baseAhorro(r.detalle[0])).toBeCloseTo(30, 9);
+  });
+
+  it('el 25 % es conjunto: la fase 1 va primero y las pérdidas anteriores usan lo que queda', () => {
+    // 2024 deja 100 pendientes; 2025 pierde 4 y tiene 40 de rendimientos: límite 10.
+    const r = compensarPerdidas(anios(2024, [[-100, 0], [-4, 40]]));
+    expect(r.detalle[1]).toMatchObject({ compensadoRendAnio: 4, compensadoRend: 10 });
+    expect(r.origenes[0]).toMatchObject({ year: 2024, compensadoRend: 6, pendiente: 94 });
+    expect(r.origenes[1]).toMatchObject({ year: 2025, compensadoRend: 4, pendiente: 0 });
+    r.origenes.forEach(cuadra);
+  });
+
+  it('una pérdida del año mayor que el 25 % agota el límite: las anteriores no compensan con rendimientos', () => {
+    const r = compensarPerdidas(anios(2024, [[-100, 0], [-50, 40]]));
+    expect(r.detalle[1]).toMatchObject({ compensadoRendAnio: 10, compensadoRend: 10, compensadoPatrim: 0 });
+    expect(r.origenes[0]).toMatchObject({ compensadoRend: 0, pendiente: 100 });
+    expect(r.origenes[1]).toMatchObject({ compensadoRend: 10, pendiente: 40 });
+  });
+
+  it('con saldo positivo de ganancias no hay fase 1: las anteriores compensan ganancias y luego el 25 %', () => {
+    const r = compensarPerdidas(anios(2024, [[-200, 0], [150, 40]]));
+    expect(r.detalle[1]).toMatchObject({ compensadoRendAnio: 0, compensadoPatrim: 150, compensadoRend: 10, netoDespues: 0 });
+    expect(r.origenes[0]).toMatchObject({ pendiente: 40 });
   });
 });
