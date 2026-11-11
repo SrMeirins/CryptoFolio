@@ -19,6 +19,8 @@ export interface FiscalSummary {
   valorIncompleto: boolean
 }
 
+export type CanalOperacion = 'orden' | 'convert' | 'saldos' | 'liquidacion'
+
 export interface FiscalEvent {
   /** Día en Madrid (AAAA-MM-DD, #295). */
   fecha: string
@@ -41,6 +43,17 @@ export interface FiscalEvent {
   txId: string
   /** Único por evento: una operación que consume varios lotes genera varios eventos con el mismo txId (#201). */
   eventId: string
+  /** Día de compra del lote consumido (#543). */
+  fechaAdquisicion?: string
+  /**
+   * Comisión de una compra que fue al coste de lo recibido (#543). Informativa:
+   * no es gasto de esta fila; se deduce como gasto de adquisición al venderlo.
+   */
+  comisionCompraEur?: number
+  /** Binance Convert: comisión incluida en el tipo de cambio, sin desglose (#543). */
+  esConvert?: boolean
+  /** Canal de la operación (#543): orden de mercado, Convert, saldos pequeños a BNB o liquidación. */
+  canal?: CanalOperacion | null
   /** Recompra en ±2 meses de la venta con pérdida — art. 33.5 LIRPF, aplicación a cripto no pacífica. */
   posiblePerdidaDiferida?: boolean
   /** Pérdida 100% deducible computada sin motivo anotado (estafa, exchange insolvente...) — deducibilidad real por validar. */

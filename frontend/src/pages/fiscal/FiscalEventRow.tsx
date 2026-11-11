@@ -1,11 +1,15 @@
 import { formatEur, pnlColor } from '../../utils/format'
-import { fiscalDateDetail, fiscalTypeLabel, formatFiscalDate, formatFiscalQty, type FiscalTone } from '../../utils/fiscalTable'
+import { fiscalDateDetail, fiscalTypeLabel, formatFiscalDate, type FiscalTone } from '../../utils/fiscalTable'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { PNL_THRESHOLD } from './constants'
-import { EventWarnings } from './EventWarnings'
 import type { FiscalEvent } from './types'
 import { necesitaRevision } from '../../utils/fiscalOperations'
-import { Tooltip, tableRowClasses, TextTooltip } from '../../components/ui'
+import { parTexto } from '../../utils/operacionesTabla'
+import { Tooltip, TextTooltip } from '../../components/ui'
+
+// Celdas comunes de la tabla de Operaciones (#299, #543): clave de la casilla
+// 1800, tipo, fecha, par y resultado. Las usan la fila de operación, la de
+// microoperaciones y las tarjetas en pantallas estrechas.
 
 /** Clave de la casilla 1800 (#531): la letra, o «Revisar» si no hay una segura; el significado, en el tooltip. */
 export function ClaveCell({ e }: { e: FiscalEvent }) {
@@ -30,96 +34,27 @@ const TONE_CLASS: Record<FiscalTone, string> = {
   other:  'bg-background-tertiary text-fg-muted',
 }
 
-function TypeBadge({ tipo, recibido }: { tipo: string; recibido: string | null }) {
+export function TypeBadge({ tipo, recibido }: { tipo: string; recibido: string | null }) {
   const type = fiscalTypeLabel(tipo, recibido)
-  return <span className={`text-xs px-1.5 py-0.5 rounded-lg whitespace-nowrap ${TONE_CLASS[type.tone]}`}>{type.label}</span>
+  return <span className={`text-[11px] px-1.5 py-0.5 rounded-lg whitespace-nowrap ${TONE_CLASS[type.tone]}`}>{type.label}</span>
 }
 
-function FechaCell({ e }: { e: FiscalEvent }) {
+export function FechaCell({ e }: { e: Pick<FiscalEvent, 'fecha' | 'fechaHora'> }) {
   return <time dateTime={e.fechaHora ?? e.fecha}><TextTooltip label="Fecha y hora" tip={fiscalDateDetail(e.fechaHora)}>{formatFiscalDate(e.fecha)}</TextTooltip></time>
 }
 
-function Operacion({ e }: { e: FiscalEvent }) {
-  const isFee = fiscalTypeLabel(e.tipo, e.activoRecibido).tone === 'fee'
+/** Par «BTC por EUR» con el icono del activo transmitido (#543). */
+export function ParCell({ e }: { e: Pick<FiscalEvent, 'activoTransmitido' | 'activoRecibido' | 'tipo'> }) {
   return (
-    <div className="flex items-center gap-1 whitespace-nowrap min-w-0">
-      <CryptoIcon symbol={e.activoTransmitido} size={15} />
-      <span className="font-bold mono text-xs">{e.activoTransmitido}</span>
-      {e.activoRecibido ? (
-        <>
-          <span className="text-fg-subtle text-xs mx-0.5">→</span>
-          <CryptoIcon symbol={e.activoRecibido} size={15} />
-          <span className="font-bold mono text-xs">{e.activoRecibido}</span>
-        </>
-      ) : isFee ? (
-        <span className="text-fg-subtle text-xs">→ comisión</span>
-      ) : null}
-    </div>
+    <span className="flex items-center gap-1.5 whitespace-nowrap min-w-0">
+      <CryptoIcon symbol={e.activoTransmitido} size={16} />
+      <span className="font-medium text-fg">{parTexto(e)}</span>
+    </span>
   )
 }
 
-function GananciaPerdida({ gp }: { gp: number }) {
+export function Resultado({ gp }: { gp: number }) {
   return Math.abs(gp) < PNL_THRESHOLD
     ? <span className="text-fg-subtle font-normal">0,00 €</span>
-    : <>{gp > 0 ? '+' : ''}{formatEur(gp)}</>
-}
-
-export function FiscalEventRow({ e }: { e: FiscalEvent }) {
-  const gp = e.gananciaPerdidaEur ?? 0
-  return (
-    <tr className={tableRowClasses()}>
-      <td className="px-4 py-2.5 text-fg-muted text-xs whitespace-nowrap"><FechaCell e={e} /></td>
-      <td className="px-4 py-2.5"><TypeBadge tipo={e.tipo} recibido={e.activoRecibido} /></td>
-      <td className="px-4 py-2.5 min-w-[140px]">
-        <Operacion e={e} />
-        <div className="text-xs text-fg-subtle mt-0.5">{e.wallet}</div>
-      </td>
-      <td className="px-4 py-2.5 text-right mono text-xs text-fg-subtle">{formatFiscalQty(e.cantidadTransmitida)}</td>
-      {/* Clave de la casilla 1800 compacta: el significado va en el tooltip (#299, #531) */}
-      <td className="px-3 py-2.5 text-center">
-        <ClaveCell e={e} />
-      </td>
-      {/* Valor con sus gastos debajo: 8 columnas en lugar de 10, el G/P siempre a la vista */}
-      <td className="px-4 py-2.5 text-right mono whitespace-nowrap">
-        {formatEur(e.valorTransmisionEur)}
-        <div className="text-[11px] text-fg-subtle">− {formatEur(e.gastosTransmisionEur)} gastos</div>
-      </td>
-      <td className="px-4 py-2.5 text-right mono whitespace-nowrap">
-        {formatEur(e.valorAdquisicionEur)}
-        <div className="text-[11px] text-fg-subtle">+ {formatEur(e.gastosAdquisicionEur)} gastos</div>
-      </td>
-      <td className={`px-4 py-2.5 text-right mono font-bold whitespace-nowrap ${pnlColor(gp)}`}>
-        {/* Avisos como iconos junto al resultado (#299) */}
-        <span className="inline-flex items-center justify-end gap-1">
-          <EventWarnings e={e} />
-          <GananciaPerdida gp={gp} />
-        </span>
-      </td>
-    </tr>
-  )
-}
-
-/** Tarjeta de una operación para pantallas estrechas (#299). */
-export function FiscalEventCard({ e }: { e: FiscalEvent }) {
-  const gp = e.gananciaPerdidaEur ?? 0
-  return (
-    <li className="px-4 py-3 space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-xs text-fg-muted"><FechaCell e={e} /><TypeBadge tipo={e.tipo} recibido={e.activoRecibido} /></span>
-        <span className={`inline-flex items-center gap-1 mono text-sm font-bold ${pnlColor(gp)}`}>
-          <EventWarnings e={e} />
-          <GananciaPerdida gp={gp} />
-        </span>
-      </div>
-      <div className="flex items-center justify-between gap-2">
-        <Operacion e={e} />
-        <span className="mono text-xs text-fg-subtle">{formatFiscalQty(e.cantidadTransmitida)}</span>
-      </div>
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-        <div><dt className="text-fg-subtle">Transmisión</dt><dd className="mono text-fg">{formatEur(e.valorTransmisionEur)} <span className="text-fg-subtle">− {formatEur(e.gastosTransmisionEur)}</span></dd></div>
-        <div><dt className="text-fg-subtle">Adquisición</dt><dd className="mono text-fg">{formatEur(e.valorAdquisicionEur)} <span className="text-fg-subtle">+ {formatEur(e.gastosAdquisicionEur)}</span></dd></div>
-        <div className="col-span-2 text-fg-subtle truncate">{e.wallet} · {e.contrapartidaClave ? <span className="mono">{e.contrapartidaClave}</span> : <span className="text-warning-ink">Revisar</span>} {e.contrapartidaDescripcion}</div>
-      </dl>
-    </li>
-  )
+    : <span className={pnlColor(gp)}>{gp > 0 ? '+' : ''}{formatEur(gp)}</span>
 }

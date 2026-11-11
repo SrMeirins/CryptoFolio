@@ -41,6 +41,7 @@ import { formatEur, formatNumber } from '../utils/format'
 import { liveModelo721, margenUmbral } from '../utils/modelo721View'
 import { usePricesStore } from '../store/pricesStore'
 import { necesitaRevision } from '../utils/fiscalOperations'
+import { sinEfecto } from '../utils/operacionesTabla'
 
 const VISTA_LABELS: Record<FiscalVista, string> = { resumen: 'Resumen', operaciones: 'Operaciones', modelo721: 'Modelo 721', planificar: 'Planificar' }
 /** Icono de cada vista en el menú lateral (#535). */
@@ -386,7 +387,7 @@ export function Fiscal() {
             {!summary.esAnioEnCurso && (
               <Block i={1}>
                 <EstadoDeclaracion year={activeYear} declaraciones={declaraciones}
-                  datos={{ porRevisar: events?.fiscalEvents.filter(necesitaRevision).length ?? 0, preciosPendientes: summary.preciosPendientes }}
+                  datos={{ porRevisar: events?.fiscalEvents.filter(e => necesitaRevision(e) && !sinEfecto(e)).length ?? 0, preciosPendientes: summary.preciosPendientes }}
                   obligado721={modelo721?.obligado ?? null}
                   onVerRevisar={() => openOperaciones({ revisar: '1' })} onModelo721={() => setVista('modelo721')} />
               </Block>
