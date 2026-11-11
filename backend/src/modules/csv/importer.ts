@@ -241,6 +241,14 @@ export async function importCsvFile(
       onProgress?.(processed, totalTx, tx.asset, effectiveOpType);
     }
 
+    // Comisiones en una segunda moneda (#543): se enlazan a su compra o venta,
+    // tanto si esta entra en esta importación como si ya estaba en la base.
+    const idPorHash = new Map(normalRows.map(r => [r.tx.rawRowHashes[0], r.id]));
+    for (const row of normalRows) {
+      const de = row.tx.comisionDe;
+      if (de) row.linkedTxId = idPorHash.get(de) ?? existingHashMeta.get(de)?.transaction_id ?? null;
+    }
+
     // ── Paso A: batch INSERT de todas las transacciones normales ──────────────
     // Una sola query por chunk de 500 en lugar de una por tx → ~100x más rápido
     if (normalRows.length > 0) {
@@ -251,7 +259,7 @@ export async function importCsvFile(
         const params: unknown[] = [];
         const valueClauses: string[] = [];
         for (const row of chunk) {
-          const { id, tx, walletId, destinationWalletId, effectiveOpType, depositPriceOverride } = row;
+          const { id, tx, walletId, destinationWalletId, effectiveOpType, depositPriceOverride, linkedTxId } = row;
           // Solo una retirada sin destino queda pendiente de asignarlo; LOST y
           // GIFT_SENT no tienen destino por definición (#257).
           const destPending = effectiveOpType === 'WITHDRAW' && !destinationWalletId;
@@ -269,10 +277,10 @@ export async function importCsvFile(
             walletId, tx.account, tx.notes ?? null,
             destinationWalletId, destPending,
             destino?.address ?? null, destino?.networkId ?? null, destino?.txHash ?? null,
-            tx.includedFeeAsset ?? null, tx.includedFeeAmount ?? null,
+            tx.includedFeeAsset ?? null, tx.includedFeeAmount ?? null, linkedTxId,
           );
           valueClauses.push(
-            `($${b+1},$${b+2},$${b+3}::operation_type,$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},$${b+15},false,$${b+16},$${b+17},NULL,$${b+18},$${b+19},$${b+20},$${b+21},$${b+22})`
+            `($${b+1},$${b+2},$${b+3}::operation_type,$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},$${b+15},false,$${b+16},$${b+17},$${b+23}::uuid,$${b+18},$${b+19},$${b+20},$${b+21},$${b+22})`
           );
         }
         await client.query(

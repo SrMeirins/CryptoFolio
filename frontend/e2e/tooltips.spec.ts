@@ -26,7 +26,7 @@ test('ayuda de una cabecera de tabla en Fiscal: con teclado y al tocar', async (
   await page.goto('/fiscal?vista=operaciones')
   const ayuda = page.getByRole('button', { name: 'Qué incluye Transmisión' })
   await ayuda.focus()
-  await expect(page.getByRole('tooltip')).toContainText('Valor de transmisión y gastos de la venta')
+  await expect(page.getByRole('tooltip')).toContainText('Valor de transmisión: lo que recibiste')
   await page.keyboard.press('Escape')
   await expect(page.getByRole('tooltip')).toHaveCount(0)
   // Al tocar se fija abierto; al tocar fuera se cierra.

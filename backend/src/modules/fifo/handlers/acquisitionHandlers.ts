@@ -2,6 +2,7 @@ import { PoolClient } from 'pg';
 import { getHistoricalPriceEur } from '../../prices/binance';
 import { Transaction, FifoRunResult } from '../constants';
 import { openLot, consumeLots, getOpenLots } from '../lotPrimitives';
+import { valorComisionesEnlazadas } from '../comisionesEnlazadas';
 
 // ── BUY ───────────────────────────────────────────────────────────────────
 export async function processBuy(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
@@ -24,9 +25,17 @@ export async function processBuy(tx: Transaction, result: FifoRunResult, client:
     }
   }
 
+  // Valor de lo entregado, sin comisiones: es lo que se transmite del activo
+  // pagado (#543). Antes se usaba el coste con la comisión sumada, que inflaba
+  // la ganancia de lo entregado justo en el importe de la comisión.
+  const valorEntregadoEur = costBasisEur;
+
   if (tx.fee_asset && tx.fee_amount) {
     if (tx.fee_asset === tx.asset) {
-      const unitPriceEur = tx.amount_net > 0 ? costBasisEur / tx.amount_net : 0;
+      // Comisión en especie (#543): llega menos cantidad (amount_net) por el mismo
+      // pago, así que el coste total no cambia. Se guarda la parte del pago que
+      // corresponde a la comisión, para mostrarla aparte como gasto de adquisición.
+      const unitPriceEur = tx.asset === 'EUR' ? 1 : tx.amount > 0 ? costBasisEur / tx.amount : 0;
       feeEur = tx.fee_amount * unitPriceEur;
     } else {
       // Fee en activo distinto al comprado (ej: BNB). El valor EUR se añade al
@@ -35,9 +44,21 @@ export async function processBuy(tx: Transaction, result: FifoRunResult, client:
       const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
       feeEur = tx.fee_amount * feePrice;
       await consumeLots(tx.id, tx.fee_asset, tx.wallet_id, tx.fee_amount, feeEur, tx.timestamp, result, client);
+      costBasisEur += feeEur;
     }
-    costBasisEur += feeEur;
   }
+
+  // Comisión ya incluida en lo pagado (#415, Bitvavo): el coste no cambia porque
+  // ya la contiene; se guarda aparte para mostrarla como gasto de adquisición (#543).
+  if (tx.included_fee_asset && tx.included_fee_amount && tx.included_fee_asset === tx.cost_asset) {
+    const precio = tx.included_fee_asset === 'EUR' ? 1 : await getHistoricalPriceEur(tx.included_fee_asset, tx.timestamp);
+    feeEur += Math.min(tx.included_fee_amount * precio, valorEntregadoEur);
+  }
+
+  // Comisiones de la orden en otra moneda (#543): también son coste de la compra.
+  const enlazadasEur = await valorComisionesEnlazadas(tx);
+  feeEur += enlazadasEur;
+  costBasisEur += enlazadasEur;
 
   const quantity = tx.amount_net;
 
@@ -46,7 +67,8 @@ export async function processBuy(tx: Transaction, result: FifoRunResult, client:
   if (quantity <= 0 || tx.asset === 'EUR') {
     // Permuta cripto→EUR: consumir lotes del activo pagado aunque no abramos lote de EUR
     if (tx.asset === 'EUR' && tx.cost_asset && tx.cost_asset !== 'EUR' && tx.cost_amount) {
-      await consumeLots(tx.id, tx.cost_asset, tx.wallet_id, tx.cost_amount, costBasisEur, tx.timestamp, result, client);
+      // Venta a EUR: la comisión es gasto de transmisión, se resta de lo obtenido.
+      await consumeLots(tx.id, tx.cost_asset, tx.wallet_id, tx.cost_amount, valorEntregadoEur - feeEur, tx.timestamp, result, client);
     }
     return;
   }
@@ -79,7 +101,7 @@ export async function processBuy(tx: Transaction, result: FifoRunResult, client:
         );
       }
     }
-    await consumeLots(tx.id, tx.cost_asset, tx.wallet_id, tx.cost_amount, costBasisEur, tx.timestamp, result, client);
+    await consumeLots(tx.id, tx.cost_asset, tx.wallet_id, tx.cost_amount, valorEntregadoEur, tx.timestamp, result, client);
   }
 }
 

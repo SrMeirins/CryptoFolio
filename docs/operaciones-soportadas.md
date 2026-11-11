@@ -102,7 +102,10 @@ Aparece como **"Compra"** con el activo recibido en verde. La columna de valor m
 
 - Se **abre un lote nuevo** para el activo recibido, con `cost_basis_eur` = lo que se pagó en EUR (o su equivalente si se pagó en cripto, valorado al precio de mercado del momento).
 - Si se pagó con otra cripto, se **consumen los lotes FIFO** de esa cripto (disposición patrimonial: puede generar ganancia o pérdida).
+- Lo entregado se transmite a su valor de mercado, **sin** sumarle la comisión.
+- Si la fee es en el propio activo comprado (en especie), llega menos cantidad por el mismo pago: el coste del lote es lo entregado y la parte de la comisión se guarda aparte para mostrarla como gasto de adquisición.
 - Si la fee es en un activo distinto al comprado (ej. BNB), su valor EUR se suma al cost basis del lote abierto y además se consumen los lotes de BNB correspondientes.
+- Si la orden pagó comisión en dos monedas (unos fills en el activo y otros en BNB), la segunda queda como comisión enlazada a la compra y también se suma a su coste. Ver el [Apéndice B](#apéndice-b-comisiones-según-el-canal-de-la-permuta).
 
 ### Fiscalmente (España — IRPF)
 
@@ -142,7 +145,8 @@ El parser agrupa las filas del mismo timestamp. Identifica:
 
 - La fila negativa de cripto → el activo vendido
 - La fila positiva de EUR → el ingreso recibido
-- La fila de fee → se añade al coste para reducir el beneficio neto
+- Las filas de fee del mismo instante exacto y la misma cuenta → comisión de la venta (`fee_asset`, `fee_amount`). Si en ese instante hay también una compra, la comisión no se puede atribuir sin ambigüedad y se queda con la compra.
+- Si la orden pagó comisión en dos monedas, la del par va en la venta y la otra (normalmente BNB) como comisión enlazada a la venta.
 
 ### En el historial
 
@@ -152,7 +156,9 @@ Aparece como **"Venta"** con el activo vendido en rojo. La columna de valor mues
 
 Se **consumen lotes FIFO** del activo vendido en orden cronológico (primero el más antiguo). Para cada lote consumido se calcula:
 
-- `ganancia = valor_venta_eur - cost_basis_eur`
+- `ganancia = valor_venta_eur - comisiones - cost_basis_eur`
+
+Las comisiones de la venta, en cualquier activo (del par, BNB en la propia fila o enlazada), son gasto de transmisión: se restan de lo obtenido. El BNB entregado como comisión es además su propia transmisión, con su ganancia o pérdida.
 
 La ganancia neta acumulada está visible en el panel de FIFO del portfolio.
 
@@ -179,7 +185,7 @@ Comisiones que el exchange cobra en un activo que ya posees (normalmente BNB, qu
 
 | Etiqueta CSV | Cuenta | Descripción |
 | --- | --- | --- |
-| `Transaction Fee` | Spot / Cross Margin / Isolated Margin | Fee de la operación de compra o venta. Cuando va en BNB, es un FEE_EXCHANGE; cuando va en el mismo activo de la operación, se integra en el BUY/SELL. |
+| `Transaction Fee` | Spot / Cross Margin / Isolated Margin | Fee de cada fill de una compra o venta, con la misma hora exacta que el fill: se integra en el BUY/SELL. Solo queda como FEE_EXCHANGE la de una segunda moneda (enlazada a su orden) o la que no tiene compraventa en ese instante. |
 | `BNB Fee Deduction` | Spot / Isolated Margin | Deducción de fee en BNB como operación independiente. |
 | `Margin Fee` | Cross Margin | Interés de margen periódico pagado en cripto. |
 | `Isolated Margin Repayment` | Isolated Margin | Devolución de préstamo en margin que consume lotes. |
@@ -706,7 +712,26 @@ Cada venta ejecutada por el bot dentro de Strategy es una **transmisión patrimo
 
 ---
 
-## Apéndice — Resumen rápido de tipos internos
+## Apéndice B: Comisiones según el canal de la permuta
+
+Dos permutas del mismo par (por ejemplo, USDT por FTT) pueden mostrar comisiones distintas porque se hicieron por canales distintos. La tabla de Operaciones de Fiscal indica el canal en cada permuta:
+
+| Canal | Etiqueta del CSV | Comisión | Qué se muestra |
+| --- | --- | --- | --- |
+| Orden | `Transaction Buy` / `Spend` / `Sold` / `Revenue` (Bitvavo: `buy` / `sell`) | Explícita: una línea `Transaction Fee` por cada fill, en el activo de la orden o en BNB | Su importe exacto |
+| Convert | `Binance Convert` | Incluida en el tipo de cambio; Binance no la desglosa | Nota sin importe |
+| Saldos a BNB | `Small Assets Exchange BNB` | Incluida en el cambio; Binance no la desglosa | Nota sin importe |
+| Liquidación | `Cross Margin Liquidation - ...` | La de liquidación figura como comisión aparte | Nota |
+
+Dónde se declara cada comisión (art. 35 LIRPF), una sola vez:
+
+- **Venta** (se entrega el activo y se recibe otro): la comisión es **gasto de transmisión** de esa venta y se resta de lo obtenido.
+- **Compra** (se recibe el activo pagando con otro): la comisión es **gasto de adquisición** de lo recibido. Se suma a su coste y se deduce cuando se vende. En la fila de la compra se muestra como información («Comisión X €»), sin restarla de esa fila.
+- **Convert y saldos a BNB**: no hay importe aparte. La comisión ya está en el precio: se recibió menos cantidad por lo entregado, y el coste de lo recibido es todo lo entregado.
+
+---
+
+## Apéndice: Resumen rápido de tipos internos
 
 | Tipo interno | Descripción corta | Abre lote | Consume lotes | Hecho imponible |
 | --- | --- | --- | --- | --- |
@@ -731,4 +756,4 @@ Cada venta ejecutada por el bot dentro de Strategy es una **transmisión patrimo
 
 ---
 
-*Última actualización: 2026-06-14. Basado en la legislación española vigente (LIRPF, consultas DGT). Esta documentación no constituye asesoramiento fiscal — consulta con un profesional para tu situación concreta.*
+*Última actualización: 2026-11-11. Basado en la legislación española vigente (LIRPF, consultas DGT). Esta documentación no constituye asesoramiento fiscal — consulta con un profesional para tu situación concreta.*

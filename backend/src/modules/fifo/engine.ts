@@ -47,7 +47,7 @@ export async function runFifoEngine(onProgress?: (done: number, total: number) =
     const txRes = await client.query(
       `SELECT id, operation_type, timestamp, asset, amount, amount_net,
             cost_asset, cost_amount, price_per_unit,
-            fee_asset, fee_amount,
+            fee_asset, fee_amount, included_fee_asset, included_fee_amount,
             wallet_id, destination_wallet_id, destination_pending
      FROM transactions
      ORDER BY ${fifoOrderBy()}`
@@ -65,10 +65,27 @@ export async function runFifoEngine(onProgress?: (done: number, total: number) =
       price_per_unit: r.price_per_unit != null ? parseFloat(r.price_per_unit as string) : null,
       fee_asset: r.fee_asset as string | null,
       fee_amount: r.fee_amount != null ? parseFloat(r.fee_amount as string) : null,
+      included_fee_asset: (r.included_fee_asset as string | null) ?? null,
+      included_fee_amount: r.included_fee_amount != null ? parseFloat(r.included_fee_amount as string) : null,
       wallet_id: r.wallet_id as string,
       destination_wallet_id: r.destination_wallet_id as string | null,
       destination_pending: r.destination_pending as boolean,
     }));
+
+    // Comisiones enlazadas a su orden (#543): gasto de la compra o venta.
+    const enlazadas = await client.query(
+      `SELECT linked_tx_id, COALESCE(fee_asset, asset) AS asset, COALESCE(fee_amount, amount) AS amount
+       FROM transactions
+       WHERE operation_type = 'FEE_EXCHANGE' AND linked_tx_id IS NOT NULL`
+    );
+    const porOrden = new Map<string, { asset: string; amount: number }[]>();
+    for (const r of enlazadas.rows as { linked_tx_id: string; asset: string; amount: string }[]) {
+      porOrden.set(r.linked_tx_id, [...(porOrden.get(r.linked_tx_id) ?? []), { asset: r.asset, amount: parseFloat(r.amount) }]);
+    }
+    for (const tx of transactions) {
+      const c = porOrden.get(tx.id);
+      if (c) tx.comisiones_enlazadas = c;
+    }
 
     // Corrige el quirk de timestamp de MARGIN_BORROW de Binance y reordena
     // (ver ordering.ts) con los timestamps ya corregidos.

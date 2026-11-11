@@ -42,7 +42,7 @@ export function isFiltered(f: EventFilters): boolean {
   return f.asset !== '' || f.result !== 'all' || f.from !== '' || f.to !== '' || f.tones.length > 0 || f.onlyWarnings || f.onlyRecompra || f.onlyRevisar || f.search.trim() !== ''
 }
 
-export function filterEvents(events: readonly FiscalEvent[], f: EventFilters): FiscalEvent[] {
+export function filterEvents<T extends FiscalEvent>(events: readonly T[], f: EventFilters): T[] {
   const q = f.search.trim().toLowerCase()
   return events.filter(e => {
     if (f.asset && e.activoTransmitido !== f.asset && e.activoRecibido !== f.asset) return false
@@ -63,7 +63,7 @@ export function filterEvents(events: readonly FiscalEvent[], f: EventFilters): F
   })
 }
 
-export function sortEvents(events: readonly FiscalEvent[], key: SortKey, dir: SortDir): FiscalEvent[] {
+export function sortEvents<T extends FiscalEvent>(events: readonly T[], key: SortKey, dir: SortDir): T[] {
   const sign = dir === 'asc' ? 1 : -1
   return [...events].sort((a, b) => {
     // La fecha se ordena por el instante exacto cuando existe; si empatan, por eventId (orden estable).

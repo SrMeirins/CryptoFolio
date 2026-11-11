@@ -23,9 +23,22 @@ export interface Transaction {
   price_per_unit: number | null;
   fee_asset: string | null;
   fee_amount: number | null;
+  /**
+   * Comisión que el exchange ya incluye en cost_amount (#415, Bitvavo): no
+   * cambia el coste; solo se guarda aparte en el lote para mostrarla como
+   * gasto de adquisición (#543).
+   */
+  included_fee_asset?: string | null;
+  included_fee_amount?: number | null;
   wallet_id: string;
   destination_wallet_id: string | null;
   destination_pending: boolean;
+  /**
+   * Comisiones de la orden en otra moneda (#543): filas FEE_EXCHANGE enlazadas
+   * con linked_tx_id. Son gasto de esta compra o venta; el activo de la
+   * comisión se consume en su propia fila.
+   */
+  comisiones_enlazadas?: readonly { asset: string; amount: number }[];
 }
 
 /**

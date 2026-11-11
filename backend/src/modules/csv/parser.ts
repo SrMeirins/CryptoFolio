@@ -80,8 +80,8 @@ export function rowHash(row: Record<string, string>, occurrenceIndex: number): s
 }
 
 function mainOpType(operation: string): string {
-  // Compras: Buy + Spend + Fee (fee puede acompañar a cualquiera, pero en la práctica
-  // solo aparece junto a Transaction Buy o Transaction Sold al mismo timestamp)
+  // Compras: Buy + Spend + Fee. Una Fee en un instante de venta se reasigna a la
+  // familia de ventas en groupByTimestamp (#543).
   if (['Transaction Buy', 'Transaction Spend', 'Transaction Fee'].includes(operation)) return 'TransactionBuy';
   // Ventas
   if (['Transaction Sold', 'Transaction Revenue', 'Transaction Sell'].includes(operation)) return 'TransactionSell';
@@ -101,13 +101,38 @@ function mainOpType(operation: string): string {
 // nueva — O(n²). Confirmado empíricamente antes de este fix: 20.000 filas
 // (un historial de varios años con varias cuentas, nada exagerado) tardaban
 // 34s; 50.000 filas, 211s. Con este índice, ambos casos bajan a <1s.
+/**
+ * Instantes (ms|cuenta) con filas de venta y sin filas de compra (#543).
+ * Binance escribe la comisión de cada fill con la misma hora exacta que el
+ * fill; en esos instantes la comisión es de la venta. Si un instante tuviera
+ * compra y venta a la vez, la comisión no se puede atribuir sin ambigüedad y
+ * se queda con la compra, como antes.
+ */
+export function instantesSoloVenta(rows: readonly RawCsvRow[]): Set<string> {
+  const ventas = new Set<string>();
+  const compras = new Set<string>();
+  for (const row of rows) {
+    const k = `${row.time.getTime()}|${row.account}`;
+    if (row.operation === 'Transaction Fee') continue;
+    const op = mainOpType(row.operation);
+    if (op === 'TransactionSell') ventas.add(k);
+    else if (op === 'TransactionBuy') compras.add(k);
+  }
+  return new Set([...ventas].filter(k => !compras.has(k)));
+}
+
 function groupByTimestamp(rows: RawCsvRow[]): Map<string, RawCsvRow[]> {
   const groups = new Map<string, RawCsvRow[]>();
   const recentConvertCandidates = new Map<string, { ts: number; key: string }[]>(); // key: account
+  const soloVenta = instantesSoloVenta(rows);
 
   for (const row of rows) {
     const ts = row.time.getTime();
-    const op = mainOpType(row.operation);
+    // La comisión de una venta va en su grupo (#543); antes quedaba suelta como
+    // FEE_EXCHANGE y su importe no se restaba de la venta.
+    const op = row.operation === 'Transaction Fee' && soloVenta.has(`${ts}|${row.account}`)
+      ? 'TransactionSell'
+      : mainOpType(row.operation);
 
     if (op !== 'BinanceConvert') {
       const key = `${ts}|${op}|${row.account}`;

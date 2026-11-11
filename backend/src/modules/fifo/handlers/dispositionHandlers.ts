@@ -2,6 +2,7 @@ import { PoolClient } from 'pg';
 import { getHistoricalPriceEur } from '../../prices/binance';
 import { Transaction, FifoRunResult, FIAT_NO_LOT, FIFO_SHORTFALL_EPSILON, type OpcionesMotor } from '../constants';
 import { openLot, consumeLots, consumeWithoutEffect, getOpenLots, moveLots, updateLot } from '../lotPrimitives';
+import { valorComisionesEnlazadas } from '../comisionesEnlazadas';
 
 // ── SELL ──────────────────────────────────────────────────────────────────
 export async function processSell(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
@@ -10,25 +11,37 @@ export async function processSell(tx: Transaction, result: FifoRunResult, client
     if (tx.cost_asset && !FIAT_NO_LOT.has(tx.cost_asset) && tx.cost_amount && tx.cost_amount > 0) {
       let costBasisEur = tx.amount;
       let netReceived = tx.cost_amount;
+      // Comisión en EUR del lote abierto, para mostrarla aparte como gasto de adquisición (#543).
+      let feeEur = 0;
 
       if (tx.fee_asset && tx.fee_amount) {
         if (tx.fee_asset === tx.cost_asset) {
           // Fee en el activo recibido: llega menos cantidad neta de la que figura en cost_amount.
           netReceived = tx.cost_amount - tx.fee_amount;
+          feeEur = tx.cost_amount > 0 ? tx.amount * tx.fee_amount / tx.cost_amount : 0;
         } else if (tx.fee_asset === tx.asset) {
           // Fee en el propio fiat: coste total mayor (mismo criterio que processBuy).
           costBasisEur += tx.fee_amount;
+          feeEur = tx.fee_amount;
         } else {
-          // Fee en un tercer activo: disposición patrimonial propia, se consume aparte.
+          // Fee en un tercer activo: disposición patrimonial propia, se consume aparte,
+          // y su valor es coste de la compra (#543), como en processBuy.
           const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
           const feeProceedsEur = tx.fee_amount * feePrice;
           await consumeLots(tx.id, tx.fee_asset, tx.wallet_id, tx.fee_amount, feeProceedsEur, tx.timestamp, result, client);
+          costBasisEur += feeProceedsEur;
+          feeEur = feeProceedsEur;
         }
       }
 
+      // Comisiones de la orden en otra moneda (#543): coste de la compra.
+      const enlazadasEur = await valorComisionesEnlazadas(tx);
+      costBasisEur += enlazadasEur;
+      feeEur += enlazadasEur;
+
       if (netReceived > 0) {
         const pricePerUnit = costBasisEur / netReceived;
-        await openLot(tx.cost_asset, netReceived, costBasisEur, pricePerUnit, 0, tx.id, tx.timestamp, tx.wallet_id, client);
+        await openLot(tx.cost_asset, netReceived, costBasisEur, pricePerUnit, feeEur, tx.id, tx.timestamp, tx.wallet_id, client);
         result.lotsCreated++;
       }
     }
@@ -47,6 +60,9 @@ export async function processSell(tx: Transaction, result: FifoRunResult, client
     proceedsEur = tx.amount * price;
   }
 
+  // Comisiones pagadas en un activo que no es del par (#543).
+  let gastosAparteEur = 0;
+
   if (tx.fee_asset && tx.fee_amount) {
     if (tx.fee_asset === tx.asset || tx.fee_asset === tx.cost_asset) {
       // Fee en el activo vendido o en el recibido: reduce los proceeds de ESTA
@@ -55,16 +71,22 @@ export async function processSell(tx: Transaction, result: FifoRunResult, client
       const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
       proceedsEur -= tx.fee_amount * feePrice;
     } else {
-      // Fee en un tercer activo (ej. BNB): no tiene relación con los proceeds de
-      // esta venta. Es una disposición patrimonial propia — se consumen sus lotes
-      // por separado, igual que ya hace processBuy con el fee de activo distinto.
+      // Fee en un tercer activo (ej. BNB): entregar ese BNB es una disposición
+      // propia (se consumen sus lotes aparte) y, además, su valor es gasto de
+      // transmisión de esta venta (#543, art. 35 LIRPF): se resta de lo obtenido.
       const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
       const feeProceedsEur = tx.fee_amount * feePrice;
       await consumeLots(tx.id, tx.fee_asset, tx.wallet_id, tx.fee_amount, feeProceedsEur, tx.timestamp, result, client);
+      gastosAparteEur += feeProceedsEur;
     }
   }
 
-  await consumeLots(tx.id, tx.asset, tx.wallet_id, tx.amount, proceedsEur, tx.timestamp, result, client);
+  // Comisiones de la orden en otra moneda (#543): también gasto de transmisión.
+  gastosAparteEur += await valorComisionesEnlazadas(tx);
+
+  // El lote recibido conserva el valor de lo recibido: estas comisiones se
+  // pagaron con otro activo y no reducen lo que llega.
+  await consumeLots(tx.id, tx.asset, tx.wallet_id, tx.amount, proceedsEur - gastosAparteEur, tx.timestamp, result, client);
 
   // Abrir lote para el activo recibido si no es fiat (SELL_CRYPTO y SELL cripto→cripto/stablecoin).
   // USDT es cripto en la legislación española, igual que cualquier otro token.

@@ -56,9 +56,9 @@ export function ComisionRedCard({ index = 0 }: { index?: number }) {
   return (
     <SettingsCard index={index} icon={Network} title="Comisión de red en traspasos propios" status={<SavedMark stamp={saved} id={COMISION_RED_KEY} />}
       description={<>
-        Cómo se trata la comisión que cobra la red al mover cripto a otra wallet tuya registrada.
-        <strong className="font-medium text-fg"> Transmisión</strong> (por defecto): esas unidades se consideran transmitidas y dan ganancia o pérdida.
-        <strong className="font-medium text-fg"> Sumar al coste</strong>: no hay ganancia ni pérdida y su coste pasa a las unidades que llegan.
+        Cómo se trata la comisión que cobra la red al mover cripto a otra wallet tuya registrada. El traspaso no tributa; la duda es solo esa parte que la red se queda.
+        <strong className="font-medium text-fg"> Transmisión</strong> (por defecto): esas unidades se entregan para pagar un servicio, así que se tratan como transmitidas a su valor de mercado, con su ganancia o pérdida, y se declaran en el ejercicio. Es el criterio prudente: no aplaza nada.
+        <strong className="font-medium text-fg"> Sumar al coste</strong>: la comisión se ve como gasto del traspaso; no hay ganancia ni pérdida y su coste pasa a las unidades que llegan, que lo deducen cuando las vendas. Menos líneas en la Renta, pero difiere el efecto.
         No hay un criterio expreso de Hacienda para este caso; consulta con un asesor. Los retiros a «Wallets externas» siempre se tratan como transmisión.
       </>}
       action={<SegmentedControl label="Criterio de la comisión de red" options={OPCIONES} value={actual} disabled={aplicando || !!fallo}
