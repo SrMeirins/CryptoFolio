@@ -54,6 +54,11 @@ export interface FiscalEvent {
   esConvert?: boolean
   /** Canal de la operación (#543): orden de mercado, Convert, saldos pequeños a BNB o liquidación. */
   canal?: CanalOperacion | null
+  /** Cómo se valoró (#599): precio del momento, «el mayor» de los dos lados o precio del día. */
+  valoracion?: 'momento' | 'mayor' | 'diario' | null
+  /** Valores de los dos lados de la permuta en el momento, solo con «el mayor» (#599). */
+  valorEntregadoEur?: number | null
+  valorRecibidoEur?: number | null
   /** Recompra en ±2 meses de la venta con pérdida — art. 33.5 LIRPF, aplicación a cripto no pacífica. */
   posiblePerdidaDiferida?: boolean
   /** Pérdida 100% deducible computada sin motivo anotado (estafa, exchange insolvente...) — deducibilidad real por validar. */

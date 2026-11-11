@@ -3,17 +3,25 @@ import { getHistoricalPriceEur } from '../../prices/binance';
 import { Transaction, FifoRunResult } from '../constants';
 import { openLot, consumeLots, getOpenLots } from '../lotPrimitives';
 import { valorComisionesEnlazadas } from '../comisionesEnlazadas';
+import { marcarValoracion, precioTransmision, valorarPermutaEnMomento, type Valoracion } from '../valoracion';
 
 // ── BUY ───────────────────────────────────────────────────────────────────
 export async function processBuy(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
   let costBasisEur: number;
   let feeEur = 0;
+  // Cómo se valoró la permuta (#599), para marcar el consumo de lo entregado.
+  let valoracion: Valoracion | null = null;
 
   if (tx.cost_asset === 'EUR') {
     costBasisEur = tx.cost_amount ?? 0;
+  } else if (tx.cost_asset != null && tx.asset === 'EUR') {
+    // Venta a EUR registrada como compra de EUR: vale lo que se cobró.
+    costBasisEur = tx.amount;
   } else if (tx.cost_asset != null) {
-    const price = await getHistoricalPriceEur(tx.cost_asset, tx.timestamp);
-    costBasisEur = (tx.cost_amount ?? 0) * price;
+    // Permuta: valor de mercado en el momento, por el lado más líquido (#599).
+    valoracion = await valorarPermutaEnMomento(
+      { asset: tx.cost_asset, cantidad: tx.cost_amount ?? 0 }, { asset: tx.asset, cantidad: tx.amount }, tx.timestamp);
+    costBasisEur = valoracion.valor;
   } else {
     if (tx.price_per_unit != null && tx.price_per_unit > 0) {
       costBasisEur = tx.amount_net * tx.price_per_unit;
@@ -41,9 +49,10 @@ export async function processBuy(tx: Transaction, result: FifoRunResult, client:
       // Fee en activo distinto al comprado (ej: BNB). El valor EUR se añade al
       // cost basis de la compra, y además se consumen los lotes del activo de la fee
       // (es una disposición patrimonial imponible, igual que vender BNB).
-      const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
-      feeEur = tx.fee_amount * feePrice;
+      const fee = await precioTransmision(tx.fee_asset, tx.timestamp);
+      feeEur = tx.fee_amount * fee.precio;
       await consumeLots(tx.id, tx.fee_asset, tx.wallet_id, tx.fee_amount, feeEur, tx.timestamp, result, client);
+      await marcarValoracion(client, tx.id, tx.fee_asset, fee.diario ? 'diario' : 'momento');
       costBasisEur += feeEur;
     }
   }
@@ -69,6 +78,7 @@ export async function processBuy(tx: Transaction, result: FifoRunResult, client:
     if (tx.asset === 'EUR' && tx.cost_asset && tx.cost_asset !== 'EUR' && tx.cost_amount) {
       // Venta a EUR: la comisión es gasto de transmisión, se resta de lo obtenido.
       await consumeLots(tx.id, tx.cost_asset, tx.wallet_id, tx.cost_amount, valorEntregadoEur - feeEur, tx.timestamp, result, client);
+      await marcarValoracion(client, tx.id, tx.cost_asset, 'momento');
     }
     return;
   }
@@ -102,6 +112,7 @@ export async function processBuy(tx: Transaction, result: FifoRunResult, client:
       }
     }
     await consumeLots(tx.id, tx.cost_asset, tx.wallet_id, tx.cost_amount, valorEntregadoEur, tx.timestamp, result, client);
+    if (valoracion) await marcarValoracion(client, tx.id, tx.cost_asset, valoracion.criterio, valoracion);
   }
 }
 

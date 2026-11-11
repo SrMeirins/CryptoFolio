@@ -34,6 +34,7 @@ router.get('/', async (_req: Request, res: Response) => {
        ci.row_count,
        ci.skipped_count,
        ci.exchange,
+       ci.desfase_horas,
        COUNT(t.id) AS transaction_count,
        MIN(t.timestamp) AS date_from,
        MAX(t.timestamp) AS date_to,

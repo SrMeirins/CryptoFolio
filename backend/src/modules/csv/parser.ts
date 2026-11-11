@@ -160,8 +160,17 @@ function groupByTimestamp(rows: RawCsvRow[]): Map<string, RawCsvRow[]> {
 }
 
 // ── Parser principal ───────────────────────────────────────────────────────
-export async function parseBinanceCsv(fileContent: Buffer | string): Promise<CsvParseResult> {
+/**
+ * Opciones del parser de Binance (#599). `desfaseHoras`: zona horaria en que
+ * se exportó el CSV, en horas respecto de UTC (UTC+2 da 2). La columna «Time»
+ * no la indica; por defecto, UTC.
+ */
+export interface OpcionesParserBinance { desfaseHoras?: number }
+
+export async function parseBinanceCsv(fileContent: Buffer | string, opciones: OpcionesParserBinance = {}): Promise<CsvParseResult> {
   const errors: ParseError[] = [];
+  // Hora del CSV en UTC+d: el instante real es d horas antes.
+  const desfaseMs = (opciones.desfaseHoras ?? 0) * 3_600_000;
   const ignoredRows: RawCsvRow[] = [];
 
   // 1. Parsear CSV raw con cabeceras originales
@@ -212,7 +221,7 @@ export async function parseBinanceCsv(fileContent: Buffer | string): Promise<Csv
 
       rows.push({
         userId:    record['User ID'] ?? '',
-        time:      parseDate(record['Time']),
+        time:      new Date(parseDate(record['Time']).getTime() - desfaseMs),
         account:   record['Account'] ?? '',
         operation: record['Operation'] ?? '',
         coin:      record['Coin'] ?? '',

@@ -3,8 +3,9 @@ import { localDate } from '../time/localTime';
 import { getAppTimezone } from '../time/appTimezone';
 import { activoRecibido as recibidoDe, getContraprestacion } from './contrapartida';
 import { hayRecompra, type Adquisicion } from './antiRecompra';
-import { getHistoricalPriceEur } from '../prices/binance';
+import { getPrecioMomentoEur } from '../prices/momento';
 import { OPS_RENTA_ESPECIE, baseDeRenta, type BaseIrpf } from './clasificacionRentas';
+import type { CriterioValor } from '../fifo/valoracion';
 
 function getTipoRendimiento(operationType: string): string {
   const map: Record<string, string> = {
@@ -66,6 +67,15 @@ export interface EventoFiscal {
   comisionCompraEur: number;
   /** Binance Convert: comisión incluida en el tipo de cambio, sin desglose. */
   esConvert: boolean;
+  /**
+   * Cómo se valoró la transmisión (#599): precio del momento, «el mayor» de
+   * los dos lados de una permuta o precio del día como respaldo. null en
+   * consumos anteriores al recálculo con este criterio.
+   */
+  valoracion: CriterioValor | null;
+  /** Valores de los dos lados de la permuta en el momento, solo con «el mayor». */
+  valorEntregadoEur: number | null;
+  valorRecibidoEur: number | null;
   /** Canal de la operación (#543): orden de mercado, Convert, saldos pequeños a BNB o liquidación. */
   canal: CanalOperacion | null;
   permutaWrapStaking: boolean;
@@ -105,6 +115,9 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
       fl.quantity_original        AS cantidad_lote,
       flc.cost_basis_consumed_eur AS valor_adquisicion,
       flc.gain_loss_eur,
+      flc.valoracion,
+      flc.valor_entregado_eur,
+      flc.valor_recibido_eur,
       fl.opened_at                AS adquirido_en,
       -- Cantidad total que consumió la operación en todos sus lotes: la comisión
       -- se reparte entre ellos en proporción (#543); antes cada lote la llevaba entera.
@@ -188,7 +201,8 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
       if (esVenta && consumoPrincipal) {
         try {
           const fecha = new Date(row.fecha as string);
-          const precio = (a: string) => a === 'EUR' ? Promise.resolve(1) : getHistoricalPriceEur(a, fecha);
+          // El mismo precio del momento que usó el FIFO al restarlas (#599).
+          const precio = async (a: string) => (await getPrecioMomentoEur(a, fecha)).precio;
           let comisiones = 0;
           if (row.fee_asset && row.fee_amount) {
             comisiones += parseFloat(row.fee_amount as string) * await precio(row.fee_asset as string);
@@ -245,6 +259,10 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
         fechaAdquisicion:         localDate(tz, new Date(row.adquirido_en as string)),
         eventId:                  row.consumption_id as string,
         comisionCompraEur:        comisionCompra,
+        // Cómo se valoró la transmisión (#599); los dos lados, solo si fue por «el mayor».
+        valoracion:               (row.valoracion as CriterioValor | null) ?? null,
+        valorEntregadoEur:        row.valoracion === 'mayor' ? parseFloat(row.valor_entregado_eur as string) : null,
+        valorRecibidoEur:         row.valoracion === 'mayor' ? parseFloat(row.valor_recibido_eur as string) : null,
         canal:                    canalDe(row.canal as string | null, row.tx_notes as string | null),
         // Binance Convert: la comisión va dentro del tipo de cambio y no se desglosa.
         esConvert:                canalDe(row.canal as string | null, row.tx_notes as string | null) === 'convert',

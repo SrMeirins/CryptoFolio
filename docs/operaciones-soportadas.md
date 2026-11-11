@@ -731,6 +731,44 @@ Dónde se declara cada comisión (art. 35 LIRPF), una sola vez:
 
 ---
 
+## Apéndice C: Valor de mercado de las transmisiones
+
+El valor de mercado de una transmisión es el del **momento** en que se hace (manual práctico de Renta de la AEAT, «Compra y venta de monedas virtuales»). La aplicación lo obtiene así:
+
+| Orden | Fuente | Precio |
+| --- | --- | --- |
+| 1 | Vela de 1 minuto de Binance del minuto de la operación; si no tuvo operaciones, la más cercana en 15 minutos | Medio negociado en la vela (volumen en cotización entre volumen) |
+| 2 | Vela de 1 hora más cercana | Medio negociado |
+| 3 | Precio del día (respaldo) | Cierre del día; la operación queda indicada como «valorada con el precio del día» |
+
+Se usan los pares en USDT, EUR, BTC y ETH, por ese orden. USDT se convierte a EUR con el par EURUSDT del mismo minuto.
+
+Qué se valora así: las permutas, las comisiones pagadas en cripto (en especie, en BNB o enlazadas) y las comisiones de red. Los rendimientos (staking, airdrops, intereses) siguen con el precio del día en que se reciben.
+
+**Permutas** (art. 37.1.h LIRPF: el mayor entre el valor de mercado de lo entregado y el de lo recibido):
+
+- Se valoran por el lado más líquido: EUR y USD; estables (USDT, USDC, FDUSD, BUSD, DAI); BTC, ETH, BNB; el resto. En un exchange los dos lados valen prácticamente lo mismo en el momento de la orden, así que el resultado no depende del lado.
+- Si en el momento los dos lados difieren **más de un 3 %** (operación fuera de mercado), se toma el mayor y el detalle de la operación lo indica con los dos valores.
+- Con el precio del día no se aplica «el mayor»: la diferencia entre dos precios diarios es la volatilidad del día, no una operación fuera de mercado.
+
+---
+
+## Apéndice D: Zona horaria del CSV de Binance
+
+La columna `Time` del CSV de Binance da la hora **sin indicar su zona horaria**: depende de la que se eligió al exportarlo. Si se lee en una zona equivocada, cada operación queda desplazada varias horas, y con ella su precio de mercado (apéndice C) y, cerca de la medianoche, su día o incluso su ejercicio.
+
+**Al importar**, la aplicación la detecta:
+
+1. Toma hasta 20 órdenes del archivo repartidas en el tiempo (no Convert ni saldos a BNB, que llevan su comisión en el cambio) y saca su precio: lo pagado entre lo recibido.
+2. Para cada desfase posible, de UTC-12 a UTC+14, comprueba si ese precio cae dentro de la vela horaria de Binance de esa hora.
+3. Entre los tres desfases con más coincidencias, elige el de menor error frente al precio medio negociado por minuto.
+
+Con una coincidencia clara (al menos 5 órdenes comparables, el 70 % coincidiendo y un error medio por debajo del 0,5 %) la revisión de la importación ya muestra las horas en esa zona. En cualquier caso se puede cambiar a mano. Sin conexión, la zona queda en UTC y se elige a mano. La zona elegida se guarda con la importación.
+
+**Importaciones ya hechas**: en Importar, cada importación de Binance tiene la acción «Corregir zona horaria». Muestra la zona detectada y qué cambia (cuántas transacciones se desplazan y cuántas cambian de día o de año), guarda una copia previa, desplaza sus transacciones y filas originales y recalcula el FIFO. Las transacciones con la hora editada a mano se respetan.
+
+---
+
 ## Apéndice: Resumen rápido de tipos internos
 
 | Tipo interno | Descripción corta | Abre lote | Consume lotes | Hecho imponible |

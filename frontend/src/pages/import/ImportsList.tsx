@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { FileText, Loader2, Trash2, Calendar, Hash, ChevronRight } from 'lucide-react'
+import { FileText, Loader2, Trash2, Calendar, Hash, ChevronRight, Clock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { ImportRecord } from '../../api/portfolio'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { iconButtonClasses, Hint } from '../../components/ui'
+import { CorregirZonaDialog } from './CorregirZonaDialog'
+import { etiquetaDesfase } from './zonaHoraria'
 
 export function ImportsList({ imports, onDelete }: {
   imports: ImportRecord[]
@@ -11,6 +13,9 @@ export function ImportsList({ imports, onDelete }: {
 }) {
   const [confirmId, setConfirmId]   = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  // Corrección de la zona horaria de un CSV de Binance (#599).
+  const [zonaId, setZonaId] = useState<string | null>(null)
+  const zonaImport = imports.find(i => i.id === zonaId)
   const totalTx = imports.reduce((s, i) => s + parseInt(i.transaction_count), 0)
   const confirmImport = imports.find(i => i.id === confirmId)
 
@@ -77,6 +82,7 @@ export function ImportsList({ imports, onDelete }: {
                 <p className="text-sm font-medium truncate">{imp.filename}</p>
                 <p className="text-xs text-fg-subtle mt-0.5">
                   Importado {fmtImported}
+                  {imp.exchange === 'binance' && <> · hora en {etiquetaDesfase(imp.desfase_horas ?? 0)}</>}
                 </p>
               </div>
 
@@ -94,6 +100,15 @@ export function ImportsList({ imports, onDelete }: {
               <Link to={`/history?import=${encodeURIComponent(imp.id)}`} className="text-xs text-brand hover:underline shrink-0">
                 Ver transacciones
               </Link>
+
+              {imp.exchange === 'binance' && (
+                <Hint label="Corregir zona horaria">
+                  <button type="button" onClick={() => setZonaId(imp.id)} className={iconButtonClasses('md')}
+                    aria-label={`Corregir la zona horaria de ${imp.filename}`}>
+                    <Clock size={14} aria-hidden="true" />
+                  </button>
+                </Hint>
+              )}
 
               <Hint label="Borrar importación">
                 <button
@@ -124,6 +139,8 @@ export function ImportsList({ imports, onDelete }: {
           </div>
         )
       })}
+
+      {zonaImport && <CorregirZonaDialog imp={zonaImport} onClose={() => setZonaId(null)} />}
 
       {confirmImport && (
         <ConfirmDialog

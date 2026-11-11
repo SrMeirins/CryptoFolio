@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasBinaryMagic, parseWithdrawalDestinations, parseDepositCosts } from './importsValidation';
+import { desfasesElegidos, hasBinaryMagic, parseWithdrawalDestinations, parseDepositCosts } from './importsValidation';
 
 // importsValidation.ts no tenía ningún test propio (vivía disperso dentro de
 // imports.ts sin test en absoluto).
@@ -78,5 +78,20 @@ describe('exchangesForzados (#326)', () => {
     expect(() => exchangesForzados({ exchanges: '["kraken"]' }, 1)).toThrow();
     expect(() => exchangesForzados({ exchanges: '{' }, 1)).toThrow();
     expect(() => exchangesForzados({ exchanges: '["binance","binance"]' }, 1)).toThrow();
+  });
+});
+
+describe('desfasesElegidos (#599)', () => {
+  it('sin el campo, ninguno elegido', () => {
+    expect(desfasesElegidos({}, 2)).toEqual([null, null]);
+  });
+  it('JSON con horas enteras entre -12 y 14 o null, rellenado hasta el número de archivos', () => {
+    expect(desfasesElegidos({ desfases: '[2, null]' }, 3)).toEqual([2, null, null]);
+  });
+  it('rechaza lo inválido: fuera de rango, decimales, más valores que archivos o JSON roto', () => {
+    expect(() => desfasesElegidos({ desfases: '[15]' }, 1)).toThrow();
+    expect(() => desfasesElegidos({ desfases: '[1.5]' }, 1)).toThrow();
+    expect(() => desfasesElegidos({ desfases: '[1, 2]' }, 1)).toThrow();
+    expect(() => desfasesElegidos({ desfases: '[' }, 1)).toThrow();
   });
 });

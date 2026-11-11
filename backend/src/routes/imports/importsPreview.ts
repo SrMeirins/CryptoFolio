@@ -5,7 +5,7 @@ import { combinarVistasPrevias, type VistaArchivo } from '../../modules/csv/lote
 import { compararCobertura } from '../../modules/csv/cobertura';
 import { coberturaActual } from '../../modules/csv/coberturaDb';
 import { retirosExistentes } from '../../modules/csv/retiradas/existentes';
-import { archivosDe, exchangesForzados, retiradasDe, uploadCsv } from './importsValidation';
+import { archivosDe, desfasesElegidos, exchangesForzados, retiradasDe, uploadCsv } from './importsValidation';
 
 const router = Router();
 
@@ -20,7 +20,11 @@ router.post('/preview', uploadCsv, async (req: Request, res: Response) => {
   // Solo historiales de retiradas también vale (#330): completan los retiros ya importados.
   if (archivos.length === 0 && retiradasDe(req).length === 0) { res.status(400).json({ error: 'No se recibió ningún archivo' }); return; }
   let forzados: (Exchange | null)[];
-  try { forzados = exchangesForzados(req.body, archivos.length); } catch (e) { res.status(400).json({ error: (e as Error).message }); return; }
+  let desfases: (number | null)[];
+  try {
+    forzados = exchangesForzados(req.body, archivos.length);
+    desfases = desfasesElegidos(req.body, archivos.length);
+  } catch (e) { res.status(400).json({ error: (e as Error).message }); return; }
 
   try {
     const retiradas = retiradasDe(req);
@@ -31,7 +35,8 @@ router.post('/preview', uploadCsv, async (req: Request, res: Response) => {
       vistas.push({
         nombre: f.originalname, exchange,
         deteccion: { ...deteccion, reconocido: deteccion.exchange !== null },
-        resultado: await previewCsvFile(f.buffer, exchange, retiradas),
+        // Zona horaria elegida para un CSV de Binance (#599); sin elegir, UTC.
+        resultado: await previewCsvFile(f.buffer, exchange, retiradas, { desfaseHoras: desfases[i] ?? 0 }),
       });
     }
     const lote = combinarVistasPrevias(vistas);

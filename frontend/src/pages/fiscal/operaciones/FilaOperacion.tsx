@@ -8,7 +8,7 @@ import { EventWarnings } from '../EventWarnings'
 import { ClaveCell, FechaCell, ParCell, Resultado, TypeBadge } from '../FiscalEventRow'
 import { columnasExtra, PADDING, type ColumnaOpcional, type Densidad } from './preferencias'
 import { ChipCanal, ChipComision, IconoNota } from './NotaComision'
-import { textoNota } from './textoComision'
+import { textoNota, textoValoracion } from './textoComision'
 
 // Una operación de la tabla (#543): una fila con sus totales y, desplegable,
 // los lotes FIFO que consumió, con su fecha de compra, coste y resultado.
@@ -107,6 +107,7 @@ export function FilaOperacion({ op, columnas, densidad }: {
             </table>
             <p className="mt-1.5 text-[11px] text-fg-subtle">{op.wallet} · clave {op.contrapartidaClave || 'por revisar'}: {op.contrapartidaDescripcion}</p>
             {textoNota(op) && <p className="mt-1 text-[11px] text-fg-muted">{textoNota(op)}</p>}
+            {textoValoracion(op) && <p className="mt-1 text-[11px] text-fg-muted">{textoValoracion(op)}</p>}
           </td>
         </tr>
       )}

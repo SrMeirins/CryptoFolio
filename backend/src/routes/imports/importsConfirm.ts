@@ -5,7 +5,7 @@ import {
   applyExistingDepositCostUpdates, importTransactionsPhase,
   fetchMissingHistoricalPrices, runFifoPhase, ProgressEmitter,
 } from '../../modules/csv/confirmImport';
-import { archivosDe, exchangesForzados, uploadCsv, parseWithdrawalDestinations, parseDepositCosts, retiradasDe } from './importsValidation';
+import { archivosDe, desfasesElegidos, exchangesForzados, uploadCsv, parseWithdrawalDestinations, parseDepositCosts, retiradasDe } from './importsValidation';
 import { cargarAniosFiscales } from '../../modules/fiscal/carryforward';
 import { estadoPreparacion } from '../../modules/pnl/pnlService';
 import { enSegundoPlano } from '../../utils/enSegundoPlano';
@@ -31,7 +31,13 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
   const archivos = archivosDe(req);
   if (archivos.length === 0) { res.status(400).json({ error: 'No se recibió ningún archivo' }); return; }
   let forzados: (Exchange | null)[];
-  try { forzados = exchangesForzados(req.body, archivos.length); } catch (e) { res.status(400).json({ error: (e as Error).message }); return; }
+  let desfases: (number | null)[];
+  try {
+    forzados = exchangesForzados(req.body, archivos.length);
+    desfases = desfasesElegidos(req.body, archivos.length);
+  } catch (e) { res.status(400).json({ error: (e as Error).message }); return; }
+  // Zona horaria de cada CSV de Binance (#599), la elegida en la vista previa; sin elegir, UTC.
+  const lecturaDe = (i: number) => ({ desfaseHoras: desfases[i] ?? 0 });
   // En la confirmación el exchange llega siempre fijado desde la vista previa; sin él, Binance como antes.
   const exchangeDe = (i: number): Exchange => forzados[i] ?? 'binance';
   const lote = archivos.length > 1;
@@ -69,7 +75,7 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
     // Todos los archivos pasan el gate de depósitos antes de importar ninguno.
     let totalParsed = 0;
     for (const [i, f] of archivos.entries()) {
-      const gate0 = await checkPreImportDepositGate(exchangeDe(i), f.buffer, depositCostsRaw);
+      const gate0 = await checkPreImportDepositGate(exchangeDe(i), f.buffer, depositCostsRaw, lecturaDe(i));
       if (gate0.blocked) {
         send('error',
           `⛔ Revisión requerida${lote ? ` en «${f.originalname}»` : ''}: hay ${gate0.missingCount} depósito${gate0.missingCount > 1 ? 's' : ''} ` +
@@ -93,7 +99,7 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
     for (const [i, f] of archivos.entries()) {
       if (lote) send('importing', `Archivo ${i + 1} de ${archivos.length}: ${f.originalname}`);
       try {
-        const r = await importTransactionsPhase(f.buffer, f.originalname, withdrawalDestinations, newDepositCosts, exchangeDe(i), send, retiradas);
+        const r = await importTransactionsPhase(f.buffer, f.originalname, withdrawalDestinations, newDepositCosts, exchangeDe(i), send, retiradas, lecturaDe(i));
         importados.push({ importId: r.importId, archivo: f.originalname, exchange: exchangeDe(i), nuevas: r.newTransactions, duplicadas: r.duplicateRows, editadas_respetadas: r.editedKept, originales_completadas: r.originalRowsCompleted });
       } catch (e) {
         // En un lote, un archivo idéntico a uno ya importado se salta sin abortar el resto.

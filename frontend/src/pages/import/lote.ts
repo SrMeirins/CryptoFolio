@@ -1,6 +1,7 @@
 import { esCabeceraRetiradas } from './direcciones'
 import { firmaArchivo } from './wizard'
 import type { ArchivoLote } from './types'
+import type { DeteccionZona } from './zonaHoraria'
 
 // Lote de varios archivos (#326): selección en el paso Subir. Lógica pura salvo la lectura de la cabecera.
 
@@ -15,6 +16,12 @@ export interface ArchivoSel {
   exchange: ExchangeId | null
   /** Exchange elegido con «Leer como…»; null = detectar. */
   forzado: ExchangeId | null
+  /** Zona horaria del CSV de Binance en horas respecto de UTC (#599); sin valor, UTC. */
+  desfase?: number | null
+  /** Detección de la zona con el precio de mercado (#599). */
+  zona?: DeteccionZona
+  /** Zona elegida a mano: la detección ya no la cambia. */
+  desfaseManual?: boolean
 }
 
 /** Exchange de un historial de transacciones por su primera línea; null si no se reconoce. */

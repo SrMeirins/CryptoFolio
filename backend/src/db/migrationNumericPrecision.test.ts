@@ -5,18 +5,18 @@ import { createTestDatabase, TestDatabase } from '../test/setup-test-db';
 let testDb: TestDatabase;
 
 describe('esquema — precisión NUMERIC(38,18) para cantidad/precio', () => {
-  it('las 21 columnas de cantidad/precio tienen escala 18, no 10 (incluidas usd_per_eur, #174, e included_fee_amount, #415)', async () => {
+  it('las 24 columnas de cantidad/precio tienen escala 18, no 10 (incluidas usd_per_eur, #174, included_fee_amount, #415, y las del precio del momento, #599)', async () => {
     testDb = await createTestDatabase();
     const pool = new Pool({ connectionString: testDb.connectionString });
     try {
       const res = await pool.query(`
         SELECT table_name, column_name, numeric_precision, numeric_scale
         FROM information_schema.columns
-        WHERE table_name IN ('wallet_addresses','raw_transactions','transactions','fifo_lots','fifo_lot_consumptions','price_cache')
+        WHERE table_name IN ('wallet_addresses','raw_transactions','transactions','fifo_lots','fifo_lot_consumptions','price_cache','price_momento')
           AND data_type = 'numeric'
         ORDER BY table_name, column_name
       `);
-      expect(res.rows.length).toBe(21);
+      expect(res.rows.length).toBe(24);
       for (const row of res.rows) {
         expect(row.numeric_precision).toBe(38);
         expect(row.numeric_scale).toBe(18);

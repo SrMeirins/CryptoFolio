@@ -192,7 +192,7 @@ Bitvavo puede introducir en el futuro un `Type` que este parser no conozca todav
 
 ## 6. Zona horaria y conversión a UTC
 
-A diferencia de Binance (que exporta directamente en UTC), el CSV de Bitvavo da la fecha/hora en **hora local** junto con el nombre de zona horaria IANA (columna `Timezone`, p. ej. `Europe/Madrid`). CryptoFolio convierte esto a UTC real respetando el cambio de horario (CET/CEST) de la fecha concreta, usando `Intl.DateTimeFormat` (sin tablas de offset hardcodeadas).
+A diferencia de Binance (cuyo CSV no indica la zona horaria y la aplicación la detecta; ver el apéndice D de [operaciones-soportadas.md](operaciones-soportadas.md)), el CSV de Bitvavo da la fecha/hora en **hora local** junto con el nombre de zona horaria IANA (columna `Timezone`, p. ej. `Europe/Madrid`). CryptoFolio convierte esto a UTC real respetando el cambio de horario (CET/CEST) de la fecha concreta, usando `Intl.DateTimeFormat` (sin tablas de offset hardcodeadas).
 
 **Caso límite conocido y documentado:** en la madrugada del último domingo de octubre, la franja horaria local 02:00–02:59 ocurre dos veces (primero en CEST, luego en CET tras el cambio de hora). El CSV de Bitvavo no distingue cuál de las dos ocurrencias es una operación concreta. CryptoFolio resuelve siempre a la segunda ocurrencia (CET) — una operación real en la primera ocurrencia (CEST) quedaría registrada hasta 1 hora más tarde de lo real. Es un caso extremo (una hora al año, solo afecta a operaciones en esa franja exacta).
 

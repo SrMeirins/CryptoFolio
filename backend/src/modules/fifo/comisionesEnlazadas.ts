@@ -1,4 +1,4 @@
-import { getHistoricalPriceEur } from '../prices/binance';
+import { getPrecioMomentoEur } from '../prices/momento';
 import type { Transaction } from './constants';
 
 /**
@@ -11,7 +11,7 @@ export async function valorComisionesEnlazadas(tx: Pick<Transaction, 'comisiones
   let total = 0;
   for (const c of tx.comisiones_enlazadas ?? []) {
     if (!(c.amount > 0)) continue;
-    total += c.amount * await getHistoricalPriceEur(c.asset, tx.timestamp);
+    total += c.amount * (await getPrecioMomentoEur(c.asset, tx.timestamp)).precio;
   }
   return total;
 }

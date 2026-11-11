@@ -1,4 +1,4 @@
-import { formatEur } from '../../../utils/format'
+import { formatEur, formatNumber } from '../../../utils/format'
 import { fiscalTypeLabel } from '../../../utils/fiscalTable'
 import type { CanalOperacion, FiscalEvent } from '../types'
 
@@ -55,4 +55,20 @@ export function textoNota(op: ConComision): string | null {
   const canal = canalDePermuta(op)
   const partes = [canal ? CANALES[canal].texto : null, textoComision(op)].filter((t): t is string => !!t)
   return partes.length > 0 ? partes.join(' ') : null
+}
+
+/**
+ * Cómo se valoró la transmisión (#599), para el detalle: solo cuando no es el
+ * precio del momento sin más (por «el mayor» o con el precio del día).
+ */
+export function textoValoracion(op: Pick<FiscalEvent, 'valoracion' | 'valorEntregadoEur' | 'valorRecibidoEur'>): string | null {
+  if (op.valoracion === 'mayor' && op.valorEntregadoEur && op.valorRecibidoEur) {
+    const menor = Math.min(op.valorEntregadoEur, op.valorRecibidoEur)
+    const diferencia = Math.abs(op.valorEntregadoEur - op.valorRecibidoEur) / menor * 100
+    return `Valorada por el mayor (art. 37.1.h LIRPF): en el momento de la operación lo entregado valía ${formatEur(op.valorEntregadoEur)} y lo recibido ${formatEur(op.valorRecibidoEur)}, un ${formatNumber(diferencia, 1, 1)} % de diferencia (más del 3 %); se toma el mayor.`
+  }
+  if (op.valoracion === 'diario') {
+    return 'Valorada con el precio del día: no hay precio del minuto ni de la hora de la operación para este activo.'
+  }
+  return null
 }

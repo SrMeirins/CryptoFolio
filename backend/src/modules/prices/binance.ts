@@ -57,6 +57,37 @@ async function fetchKlinePrice(pair: string, date: Date, retries = 3): Promise<n
   throw new Error(`fetchKlinePrice agotó reintentos para ${pair}`);
 }
 
+/** Vela de Binance: inicio (ms), máximo y mínimo opcionales, cierre, volumen y volumen en la moneda de cotización. */
+export interface Vela { inicio: number; alto?: number; bajo?: number; cierre: number; volumen: number; volumenCotizacion: number }
+
+/**
+ * Velas de un par entre dos instantes (#599), para el precio del momento de
+ * una operación. Reintenta ante el límite de peticiones (429). Un par sin
+ * datos en ese tramo devuelve una lista vacía.
+ */
+export async function fetchVelas(pair: string, intervalo: '1m' | '1h', desde: number, hasta: number, retries = 3): Promise<Vela[]> {
+  const url = `${REST_BASE}/klines?symbol=${pair}&interval=${intervalo}&startTime=${desde}&endTime=${hasta}&limit=100`;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const res = await fetchWithTimeout(url);
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get('retry-after') ?? '0', 10);
+      await sleep(retryAfter > 0 ? retryAfter * 1000 : attempt * 10000);
+      continue;
+    }
+    if (!res.ok) throw new Error(`Binance klines HTTP ${res.status} para ${pair}`);
+    const data = await res.json() as unknown[][];
+    return (data ?? []).map(k => ({
+      inicio: Number(k[0]),
+      alto: parseFloat(k[2] as string),
+      bajo: parseFloat(k[3] as string),
+      cierre: parseFloat(k[4] as string),
+      volumen: parseFloat(k[5] as string),
+      volumenCotizacion: parseFloat(k[7] as string),
+    }));
+  }
+  throw new Error(`fetchVelas agotó reintentos para ${pair}`);
+}
+
 // In-flight dedup: evita N queries concurrentes para el mismo (symbol, date).
 const inFlightPrices = new Map<string, Promise<number>>();
 
