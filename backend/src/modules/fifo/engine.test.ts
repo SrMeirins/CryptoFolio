@@ -180,7 +180,7 @@ describe('consumeLots — shortfall', () => {
 });
 
 describe('processSell — fee en tercer activo', () => {
-  it('dispone de los lotes del activo de la fee (ej. BNB) en vez de solo restarlo de los proceeds de la venta', async () => {
+  it('dispone de los lotes del activo de la fee (ej. BNB) y además resta su valor de la venta como gasto (#543)', async () => {
     await clearTransactions();
     // BNB con coste 400€/unidad (precio de compra), luego usado para pagar una fee.
     await insertTx({ operation_type: 'BUY', asset: 'BNB', amount: 1, amount_net: 1, cost_asset: 'EUR', cost_amount: 400, timestamp: '2024-01-01T00:00:00Z' });
@@ -197,12 +197,12 @@ describe('processSell — fee en tercer activo', () => {
 
     expect(result.errors).toEqual([]);
 
-    // La venta de BTC no debe verse reducida por una fee de un activo ajeno:
-    // proceeds 150€ - coste 100€ = 50€ de ganancia en el BTC.
+    // La comisión en BNB es gasto de transmisión de la venta (#543, art. 35 LIRPF):
+    // (150€ - 5€ de comisión) - 100€ de coste = 45€ de ganancia en el BTC.
     const btcConsumption = await db.query(
       `SELECT gain_loss_eur FROM fifo_lot_consumptions c JOIN fifo_lots l ON l.id = c.lot_id WHERE l.asset = 'BTC'`
     );
-    expect(Number(btcConsumption.rows[0].gain_loss_eur)).toBeCloseTo(50, 6);
+    expect(Number(btcConsumption.rows[0].gain_loss_eur)).toBeCloseTo(45, 6);
 
     // El BNB gastado en la fee debe consumirse de sus propios lotes (disposición
     // patrimonial separada): coste 4€ (0.01 × 400€/u) vs proceeds 5€ (0.01 × 500€ mock) = 1€ ganancia.
@@ -298,7 +298,7 @@ describe('processSell — rama fiat→cripto (comprar cripto pagando con EUR) co
     expect(Number(lot.rows[0].cost_basis_eur)).toBeCloseTo(101, 6); // 100 + 1 de fee
   });
 
-  it('fee en un tercer activo (BNB): se dispone por separado, no afecta al lote recibido', async () => {
+  it('fee en un tercer activo (BNB): se dispone por separado y es coste del lote recibido (#543)', async () => {
     await clearTransactions();
     // BNB previo con coste 400€/unidad (mock: precio actual 500€/u).
     await insertTx({ operation_type: 'BUY', asset: 'BNB', amount: 1, amount_net: 1, cost_asset: 'EUR', cost_amount: 400, timestamp: '2024-06-30T00:00:00Z' });
@@ -312,10 +312,12 @@ describe('processSell — rama fiat→cripto (comprar cripto pagando con EUR) co
     const result = await runFifoEngine();
     expect(result.errors).toEqual([]);
 
-    // El lote de USDC no se ve afectado por la fee de BNB.
-    const usdcLot = await db.query(`SELECT quantity_original, cost_basis_eur FROM fifo_lots WHERE asset = 'USDC'`);
+    // La cantidad de USDC no cambia; la comisión (5€) se suma a su coste y queda
+    // registrada como gasto de adquisición del lote, como en processBuy.
+    const usdcLot = await db.query(`SELECT quantity_original, cost_basis_eur, fee_eur FROM fifo_lots WHERE asset = 'USDC'`);
     expect(Number(usdcLot.rows[0].quantity_original)).toBeCloseTo(50, 6);
-    expect(Number(usdcLot.rows[0].cost_basis_eur)).toBeCloseTo(100, 6);
+    expect(Number(usdcLot.rows[0].cost_basis_eur)).toBeCloseTo(105, 6);
+    expect(Number(usdcLot.rows[0].fee_eur)).toBeCloseTo(5, 6);
 
     // El BNB se dispone por separado: coste 4€ (0.01×400) vs proceeds 5€ (0.01×500 mock) = 1€ ganancia.
     const bnbConsumption = await db.query(

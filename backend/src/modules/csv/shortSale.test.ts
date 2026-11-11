@@ -37,13 +37,12 @@ describe('parseBinanceCsv — venta en corto de margin (Margin Loan + Transactio
     expect(sell!.asset).toBe('USTC');
     expect(sell!.amount).toBe(100);
     expect(sell!.costAsset).toBe('USDT');
-    // "Transaction Fee" siempre agrupa bajo el mainOpType de compra (mainOpType()),
-    // así que para una venta sale como FEE_EXCHANGE aparte, no embebido en el SELL
-    // — comportamiento real verificado contra el CSV de producción.
+    // La "Transaction Fee" del mismo instante es la comisión de la venta (#543):
+    // va dentro del SELL, no como FEE_EXCHANGE suelta.
     expect(sell!.costAmount).toBeCloseTo(5.00, 6);
-    const fee = result.transactions.find(t => t.operationType === 'FEE_EXCHANGE');
-    expect(fee).toBeDefined();
-    expect(fee!.amount).toBeCloseTo(0.01, 6);
+    expect(sell!.feeAsset).toBe('USDT');
+    expect(sell!.feeAmount).toBeCloseTo(0.01, 6);
+    expect(result.transactions.some(t => t.operationType === 'FEE_EXCHANGE')).toBe(false);
 
     // Nada se clasifica como IGNORED/descartado para este grupo.
     expect(result.transactions.some(t => t.operationType === 'IGNORED')).toBe(false);

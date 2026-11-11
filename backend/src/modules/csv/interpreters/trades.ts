@@ -2,6 +2,66 @@ import { RawCsvRow, ParsedTransaction } from '../types';
 import { abs, FIAT_ASSETS } from '../csvUtils';
 import { getHistoricalPriceEur } from '../../prices/binance';
 
+// ── Comisiones de una orden (#543) ─────────────────────────────────────────
+// Binance escribe una línea «Transaction Fee» por fill, con la misma hora que
+// el fill. Con «pagar comisiones con BNB» activo, unos fills cobran en BNB y
+// otros (cuando no queda BNB) en el activo de la orden. La transacción solo
+// guarda una comisión: va la de un activo del par si la hay; cada moneda
+// restante sale como FEE_EXCHANGE enlazada a la orden, que el FIFO cuenta como
+// gasto de esa compra o venta.
+export interface RepartoComisiones {
+  feeAsset?: string;
+  feeAmount?: number;
+  /** Comisiones en otras monedas, una entrada por moneda. */
+  otras: { coin: string; amount: number; rows: RawCsvRow[] }[];
+}
+
+export function repartirComisiones(feeRows: readonly RawCsvRow[], par: readonly string[]): RepartoComisiones {
+  const porMoneda = new Map<string, RawCsvRow[]>();
+  for (const r of feeRows) porMoneda.set(r.coin, [...(porMoneda.get(r.coin) ?? []), r]);
+  if (porMoneda.size === 0) return { otras: [] };
+  const monedas = [...porMoneda.keys()];
+  const principal = par.find(c => porMoneda.has(c)) ?? monedas[0];
+  const suma = (rows: RawCsvRow[]) => rows.reduce((s, r) => s + abs(r.change), 0);
+  return {
+    feeAsset: principal,
+    feeAmount: suma(porMoneda.get(principal)!),
+    otras: monedas.filter(c => c !== principal).map(coin => ({ coin, amount: suma(porMoneda.get(coin)!), rows: porMoneda.get(coin)! })),
+  };
+}
+
+/** Hashes de la orden sin los de sus comisiones en otras monedas, que van en su propia transacción. */
+function hashesSinOtras(hashes: readonly string[], reparto: RepartoComisiones): string[] {
+  const fuera = new Set(reparto.otras.flatMap(o => o.rows.map(r => r.rowHash)));
+  return hashes.filter(h => !fuera.has(h));
+}
+
+/** FEE_EXCHANGE de una comisión en otra moneda, enlazada a su orden. */
+function comisionEnlazada(
+  otra: RepartoComisiones['otras'][number], orden: ParsedTransaction, lado: 'BUY' | 'SELL',
+): ParsedTransaction {
+  return {
+    operationType: 'FEE_EXCHANGE',
+    timestamp:     orden.timestamp,
+    asset:         otra.coin,
+    amount:        otra.amount,
+    amountNet:     otra.amount,
+    account:       orden.account,
+    notes:         `Fee en ${otra.coin} para ${lado} ${orden.asset}`,
+    subTradeCount: otra.rows.length,
+    rawRowHashes:  otra.rows.map(r => r.rowHash),
+    comisionDe:    orden.rawRowHashes[0],
+  };
+}
+
+/** La orden y, detrás, sus comisiones en otras monedas. */
+function conComisiones(
+  orden: ParsedTransaction, reparto: RepartoComisiones, lado: 'BUY' | 'SELL',
+): ParsedTransaction | ParsedTransaction[] {
+  if (reparto.otras.length === 0) return orden;
+  return [orden, ...reparto.otras.map(o => comisionEnlazada(o, orden, lado))];
+}
+
 // ── Swap de 2 filas (entrada + salida → BUY) ───────────────────────────────
 // Binance Convert y los dos handlers de ETH 2.0 Staking son estructuralmente
 // idénticos (1 fila de entrada + 1 de salida al mismo timestamp → permuta),
@@ -75,7 +135,7 @@ export function interpretEthStakingWithdrawals(
 
 export function interpretSoldRevenue(
   group: RawCsvRow[], hashes: string[], timestamp: Date, account: string
-): ParsedTransaction {
+): ParsedTransaction | ParsedTransaction[] {
   const soldRows    = group.filter((r) => r.operation === 'Transaction Sold');
   const revenueRows = group.filter((r) => r.operation === 'Transaction Revenue');
   const feeRows     = group.filter((r) => r.operation === 'Transaction Fee');
@@ -101,15 +161,10 @@ export function interpretSoldRevenue(
   const totalSold    = soldRows.reduce((s, r) => s + abs(r.change), 0);
   const totalRevenue = revenueRows.reduce((s, r) => s + abs(r.change), 0);
 
-  // Sumar fees por activo
-  const feeByAsset = new Map<string, number>();
-  for (const row of feeRows) {
-    feeByAsset.set(row.coin, (feeByAsset.get(row.coin) ?? 0) + abs(row.change));
-  }
-  const feeAsset  = feeRows[0]?.coin;
-  const feeAmount = feeAsset ? feeByAsset.get(feeAsset) : undefined;
+  // Comisiones de los fills (#543): la del par en la venta; otras monedas, enlazadas.
+  const reparto = repartirComisiones(feeRows, [revenueAsset, soldAsset]);
 
-  return {
+  const venta: ParsedTransaction = {
     operationType: 'SELL',
     timestamp,
     asset:        soldAsset,
@@ -118,13 +173,14 @@ export function interpretSoldRevenue(
     costAsset:    revenueAsset,
     costAmount:   totalRevenue,
     pricePerUnit: totalSold > 0 ? totalRevenue / totalSold : 0,
-    feeAsset,
-    feeAmount,
+    feeAsset:     reparto.feeAsset,
+    feeAmount:    reparto.feeAmount,
     account,
     notes: soldRows.length > 1 ? `${soldRows.length} fills parciales` : undefined,
     subTradeCount: soldRows.length,
-    rawRowHashes: hashes,
+    rawRowHashes: hashesSinOtras(hashes, reparto),
   };
+  return conComisiones(venta, reparto, 'SELL');
 }
 
 export function interpretBuyCryptoWithFiat(
@@ -246,10 +302,10 @@ export async function interpretTransactionBuy(
     const soldAsset   = buyAssets[0];
     const totalSold   = abs(totalBoughtSigned);
     const totalProc   = abs(totalSpentSigned);
-    const feeAsset    = feeRows[0]?.coin;
-    const totalFee    = feeRows.reduce((s, r) => s + abs(r.change), 0);
+    // Antes se sumaban comisiones de monedas distintas en una sola (#543).
+    const reparto     = repartirComisiones(feeRows, [spendAssets[0], soldAsset]);
 
-    return {
+    const venta: ParsedTransaction = {
       operationType: 'SELL',
       timestamp,
       asset:        soldAsset,
@@ -258,13 +314,14 @@ export async function interpretTransactionBuy(
       costAsset:    spendAssets[0],
       costAmount:   totalProc,
       pricePerUnit: totalSold > 0 ? totalProc / totalSold : 0,
-      feeAsset:     feeAsset,
-      feeAmount:    totalFee > 0 ? totalFee : undefined,
+      feeAsset:     reparto.feeAsset,
+      feeAmount:    reparto.feeAmount,
       account,
       notes:        'Venta en margen (Transaction Buy con signo negativo)',
       subTradeCount: buyRows.length,
-      rawRowHashes: hashes,
+      rawRowHashes: hashesSinOtras(hashes, reparto),
     };
+    return conComisiones(venta, reparto, 'SELL');
   }
 
   if (buyAssets.length > 1) {
@@ -277,14 +334,11 @@ export async function interpretTransactionBuy(
   const totalBought = buyRows.reduce((s, r) => s + abs(r.change), 0);
   const totalSpent  = spendRows.reduce((s, r) => s + abs(r.change), 0);
 
-  const feesInSameAsset = feeRows.filter((r) => r.coin === asset);
-  const feesInOther     = feeRows.filter((r) => r.coin !== asset);
-
-  const feeInAssetTotal = feesInSameAsset.reduce((s, r) => s + abs(r.change), 0);
-  const feeInOtherTotal = feesInOther.reduce((s, r) => s + abs(r.change), 0);
-  const feeOtherAsset   = feesInOther[0]?.coin;
-
-  const amountNet    = totalBought - feeInAssetTotal;
+  // Comisiones de los fills (#543): la del activo comprado (o la del pagado) en
+  // la compra; si hay otra moneda (BNB), sale enlazada como gasto de la compra.
+  const reparto      = repartirComisiones(feeRows, [asset, costAsset]);
+  const feeEnActivo  = reparto.feeAsset === asset ? (reparto.feeAmount ?? 0) : 0;
+  const amountNet    = totalBought - feeEnActivo;
   const pricePerUnit = totalSpent / totalBought;
 
   const buyTx: ParsedTransaction = {
@@ -296,34 +350,13 @@ export async function interpretTransactionBuy(
     costAsset,
     costAmount: totalSpent,
     pricePerUnit,
-    // Si hay fees en el mismo activo Y en otro activo (ej: BAKE + BNB),
-    // el BUY solo registra la fee del mismo activo. La fee del otro activo
-    // se devuelve como FEE_EXCHANGE separado para que el FIFO la consuma.
-    feeAsset:  feeInAssetTotal > 0 ? asset : feeOtherAsset,
-    feeAmount: feeInAssetTotal > 0 ? feeInAssetTotal : (feeInOtherTotal > 0 ? feeInOtherTotal : undefined),
+    feeAsset:  reparto.feeAsset,
+    feeAmount: reparto.feeAmount,
     account,
     subTradeCount: buyRows.length,
-    rawRowHashes: hashes,
+    rawRowHashes: hashesSinOtras(hashes, reparto),
   };
-
-  // Fees en activo distinto al comprado (ej: BNB) cuando TAMBIÉN hay fees en el mismo activo.
-  // En este caso la fee BNB no cabe en el BUY → FEE_EXCHANGE independiente.
-  if (feeInAssetTotal > 0 && feeInOtherTotal > 0 && feeOtherAsset) {
-    const feeTx: ParsedTransaction = {
-      operationType: 'FEE_EXCHANGE',
-      timestamp,
-      asset:    feeOtherAsset,
-      amount:   feeInOtherTotal,
-      amountNet: feeInOtherTotal,
-      account,
-      notes: `Fee en ${feeOtherAsset} para BUY ${asset}`,
-      subTradeCount: feesInOther.length,
-      rawRowHashes: feesInOther.map(r => r.rowHash),
-    };
-    return [buyTx, feeTx];
-  }
-
-  return buyTx;
+  return conComisiones(buyTx, reparto, 'BUY');
 }
 
 async function interpretMultiAssetBuy(
@@ -391,15 +424,15 @@ async function interpretMultiAssetBuy(
 
 export function interpretTransactionSell(
   group: RawCsvRow[], hashes: string[], timestamp: Date, account: string
-): ParsedTransaction {
+): ParsedTransaction | ParsedTransaction[] {
   // Binance puede dividir una venta grande en varios fills al mismo segundo —
   // sumar todas las filas de venta y de contrapartida, igual que ya hace
   // interpretSoldRevenue para Transaction Sold/Revenue, en vez de tomar solo
-  // la primera con find(). La fee (si aparece) nunca co-agrupa aquí por cómo
-  // clasifica mainOpType() — sale siempre como FEE_EXCHANGE independiente.
+  // la primera con find(). Las comisiones del mismo instante se agrupan con la
+  // venta (#543) y se reparten como en el resto de órdenes.
   const sellRows    = group.filter((r) => r.operation === 'Transaction Sell' && r.change < 0);
   const receiveRows = group.filter((r) => r.change > 0 && r.operation !== 'Transaction Fee');
-  const feeRow      = group.find((r) => r.operation === 'Transaction Fee');
+  const feeRows     = group.filter((r) => r.operation === 'Transaction Fee');
 
   if (sellRows.length === 0) {
     throw new Error(`Transaction Sell sin fila de venta en ${timestamp.toISOString()}`);
@@ -410,7 +443,9 @@ export function interpretTransactionSell(
   const receiveAsset  = receiveRows[0]?.coin;
   const totalReceived = receiveRows.length > 0 ? receiveRows.reduce((s, r) => s + abs(r.change), 0) : undefined;
 
-  return {
+  const reparto = repartirComisiones(feeRows, receiveAsset ? [receiveAsset, soldAsset] : [soldAsset]);
+
+  const venta: ParsedTransaction = {
     operationType: 'SELL',
     timestamp,
     asset: soldAsset,
@@ -418,14 +453,14 @@ export function interpretTransactionSell(
     amountNet: totalSold,
     costAsset:  receiveAsset,
     costAmount: totalReceived,
-    feeAsset:  feeRow?.coin,
-    feeAmount: feeRow ? abs(feeRow.change) : undefined,
-
+    feeAsset:  reparto.feeAsset,
+    feeAmount: reparto.feeAmount,
     account,
     notes: sellRows.length > 1 ? `${sellRows.length} fills parciales` : undefined,
     subTradeCount: sellRows.length,
-    rawRowHashes: hashes,
+    rawRowHashes: hashesSinOtras(hashes, reparto),
   };
+  return conComisiones(venta, reparto, 'SELL');
 }
 
 export function interpretTransactionRelated(

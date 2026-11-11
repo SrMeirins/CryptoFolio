@@ -17,12 +17,8 @@ describe('parseBinanceCsv — Transaction Sell con múltiples fills', () => {
   // consistente con cómo interpretTransactionSell busca receiveRow — no hay
   // ningún ejemplo real de Binance para confirmarla.
   //
-  // La fee NO se incluye en estas aserciones: por cómo agrupa mainOpType()
-  // (ya documentado en shortSale.test.ts), una fila "Transaction Fee" nunca
-  // co-agrupa con "Transaction Sell" — sale siempre como FEE_EXCHANGE
-  // independiente, una transacción por fila, nunca sumada ni embebida en el
-  // SELL. El hallazgo de la auditoría original asumía que la fee sí se
-  // embebía; verificado contra el código real, no es así.
+  // Desde #543, las filas "Transaction Fee" del mismo instante (y sin compra
+  // en ese instante) se agrupan con la venta y se suman como su comisión.
   it('suma todos los fills de venta y de contrapartida recibida, no solo el primero', async () => {
     // Binance divide una venta grande en 3 fills al mismo segundo — cada uno
     // con su propia fila de venta y de contrapartida recibida.
@@ -46,7 +42,7 @@ describe('parseBinanceCsv — Transaction Sell con múltiples fills', () => {
     expect(sell!.costAmount).toBeCloseTo(40000, 8); // 20000+12000+8000, no solo 20000
   });
 
-  it('la fee, aunque presente en el mismo timestamp, sale como FEE_EXCHANGE independiente por cada fila (no se embebe ni se suma en el SELL)', async () => {
+  it('las fees del mismo instante se suman como comisión de la venta, sin FEE_EXCHANGE sueltas (#543)', async () => {
     const rows = [
       '123,2024-05-10 10:00:00,Spot,Transaction Sell,BTC,-0.5,',
       '123,2024-05-10 10:00:00,Spot,Transaction Sell,BTC,-0.3,',
@@ -63,9 +59,9 @@ describe('parseBinanceCsv — Transaction Sell con múltiples fills', () => {
     expect(sell!.amount).toBeCloseTo(0.8, 8);
     expect(sell!.costAmount).toBeCloseTo(32000, 8);
 
-    const fees = result.transactions.filter(t => t.operationType === 'FEE_EXCHANGE');
-    expect(fees.length).toBe(2);
-    expect(fees.reduce((s, f) => s + f.amount, 0)).toBeCloseTo(32, 8);
+    expect(sell!.feeAsset).toBe('USDT');
+    expect(sell!.feeAmount).toBeCloseTo(32, 8);
+    expect(result.transactions.filter(t => t.operationType === 'FEE_EXCHANGE')).toHaveLength(0);
   });
 
   it('un único fill (caso normal) sigue funcionando igual que antes', async () => {

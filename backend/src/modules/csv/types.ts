@@ -80,6 +80,12 @@ export interface ParsedTransaction {
   needsCostReview?: boolean;  // depósito externo: coste de adquisición desconocido
   /** Compra con fiat cuya fila de pago no está en el CSV (#435): coste a revisar, nunca rendimiento. */
   orphanFiatBuy?: boolean;
+  /**
+   * Comisión de una orden en una segunda moneda (#543): primer hash de la
+   * compra o venta a la que pertenece. El importador la enlaza (linked_tx_id)
+   * y el FIFO la cuenta como gasto de esa operación.
+   */
+  comisionDe?: string;
 }
 
 // Lo que devuelve el parser completo
