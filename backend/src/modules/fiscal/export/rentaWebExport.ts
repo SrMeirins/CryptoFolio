@@ -18,8 +18,9 @@ const fmtDate = (iso: string) => {
 // Claves de contraprestación (#531, ver contrapartida.ts): F dinero de curso
 // legal, N otra moneda virtual, B pago de un bien o servicio; vacía si hay que
 // revisarla (donaciones y pérdidas).
-// - valorTransmision = BRUTO (proceeds_neto + gastosTx) para que AEAT reste gastosTx correctamente.
-// - gastosAdquisicion = 0 porque el cost_basis ya incluye las comisiones de compra.
+// - Valores y gastos por separado (#543): el valor de transmisión es bruto y
+//   el de adquisición, sin la comisión de compra; los gastos van en sus
+//   columnas. (Transmisión - gastos) - (adquisición + gastos) = resultado.
 // - Decimal: coma (,). Fecha: DD/MM/YYYY.
 export function writeRentaWebCsv(res: Response, year: number, fiscalEvents: EventoFiscal[]): void {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -29,18 +30,15 @@ export function writeRentaWebCsv(res: Response, year: number, fiscalEvents: Even
   lines.push('Fecha;Denominacion moneda virtual transmitida;Clave contraprestacion;Descripcion contraprestacion;Valor transmision EUR;Gastos transmision EUR;Valor adquisicion EUR;Gastos adquisicion EUR;Ganancia/Perdida EUR');
 
   for (const e of fiscalEvents) {
-    // Valor transmisión bruto = neto + gastos tx (para que AEAT reste gastosTx sin doble conteo)
-    const valorTxBruto = e.valorTransmisionEur + e.gastosTransmisionEur;
-    // Gastos adquisición = 0 porque cost_basis ya incluye las comisiones de compra
     lines.push([
       fmtDate(e.fecha),
       sanitizeCsvField(e.activoTransmitido),
       e.contrapartidaClave,
       sanitizeCsvField(sinTildes(e.contrapartidaDescripcion)),
-      eur(valorTxBruto),
+      eur(e.valorTransmisionEur),
       eur(e.gastosTransmisionEur),
       eur(e.valorAdquisicionEur),
-      '0,00',
+      eur(e.gastosAdquisicionEur),
       eur(e.gananciaPerdidaEur),
     ].join(';'));
   }
