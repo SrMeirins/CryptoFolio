@@ -10,6 +10,8 @@ vi.mock('../../modules/prices/binance', async (orig) => ({
   ...(await orig<typeof import('../../modules/prices/binance')>()),
   getHistoricalPriceEur: vi.fn(() => Promise.resolve(1)),
   refreshLivePrices: vi.fn(() => Promise.resolve()),
+  // Sin velas (#599): el precio del momento cae al del día simulado, sin red.
+  fetchVelas: undefined,
 }));
 
 const BIN = 'User ID,Time,Account,Operation,Coin,Change,Remark';

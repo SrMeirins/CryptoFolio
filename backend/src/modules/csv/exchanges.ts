@@ -12,9 +12,12 @@ export function isExchange(value: unknown): value is Exchange {
   return typeof value === 'string' && (SUPPORTED_EXCHANGES as string[]).includes(value);
 }
 
-export async function parseExchangeCsv(exchange: Exchange, fileBuffer: Buffer): Promise<CsvParseResult> {
+/** Opciones de lectura de un CSV (#599): zona horaria de un CSV de Binance, que no la indica. */
+export interface OpcionesLectura { desfaseHoras?: number }
+
+export async function parseExchangeCsv(exchange: Exchange, fileBuffer: Buffer, opciones: OpcionesLectura = {}): Promise<CsvParseResult> {
   switch (exchange) {
-    case 'binance': return parseBinanceCsv(fileBuffer);
+    case 'binance': return parseBinanceCsv(fileBuffer, opciones);
     case 'bitvavo': return parseBitvavoCsv(fileBuffer);
   }
 }

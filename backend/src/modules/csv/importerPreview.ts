@@ -2,7 +2,7 @@ import { parse } from 'csv-parse/sync';
 import { db } from '../../db/client';
 import { ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
-import { Exchange, parseExchangeCsv, validateExchangeCsv } from './exchanges';
+import { Exchange, parseExchangeCsv, validateExchangeCsv, type OpcionesLectura } from './exchanges';
 import { getHistoricalPriceEur } from '../prices/binance';
 import { normalizeBinanceYear } from './csvUtils';
 import { destinosDeRetiros } from './retiradas/destinosDb';
@@ -40,7 +40,9 @@ export interface PreviewResult {
   originalRowsMissing?: number;
 }
 
-export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'binance', retiradasBuffers: readonly Buffer[] = []): Promise<PreviewResult> {
+export async function previewCsvFile(
+  fileBuffer: Buffer, exchange: Exchange = 'binance', retiradasBuffers: readonly Buffer[] = [], lectura: OpcionesLectura = {},
+): Promise<PreviewResult> {
   const validation = validateExchangeCsv(exchange, fileBuffer);
 
   if (!validation.valid) {
@@ -55,7 +57,7 @@ export async function previewCsvFile(fileBuffer: Buffer, exchange: Exchange = 'b
     };
   }
 
-  const parseResult = await parseExchangeCsv(exchange, fileBuffer);
+  const parseResult = await parseExchangeCsv(exchange, fileBuffer, lectura);
 
   // Construir muestras de operaciones desconocidas (solo aplica a Binance:
   // Bitvavo aborta directamente en el validator si encuentra un Type desconocido)

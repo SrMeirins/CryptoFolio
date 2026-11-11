@@ -34,20 +34,24 @@ export function useRunFifoStream() {
   const queryClient = useQueryClient()
   const [state, setState] = useState<FifoRunState>({ status: 'idle' })
 
-  async function run() {
-    setState({ status: 'running', step: 'precios', done: 0, total: 0 })
+  /** Recalcula y devuelve el estado final (terminado o error). */
+  async function run(): Promise<FifoRunState> {
+    let actual: FifoRunState = { status: 'running', step: 'precios', done: 0, total: 0 }
+    const poner = (s: FifoRunState) => { actual = s; setState(s) }
+    poner(actual)
     try {
       const res = await fetch('/api/fifo/run/stream', { method: 'POST' })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const terminal = await readProgressStream<FifoStreamEvent>(res, e => setState(s => nextFifoState(s, e)))
-      if (!terminal) setState({ status: 'error', message: 'Se perdió la conexión antes de terminar.' })
+      const terminal = await readProgressStream<FifoStreamEvent>(res, e => poner(nextFifoState(actual, e)))
+      if (!terminal) poner({ status: 'error', message: 'Se perdió la conexión antes de terminar.' })
     } catch {
-      setState({ status: 'error', message: 'No se pudo recalcular el FIFO' })
+      poner({ status: 'error', message: 'No se pudo recalcular el FIFO' })
     } finally {
       await queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
       await queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
       await queryClient.invalidateQueries({ queryKey: ['settings-stats'] })
     }
+    return actual
   }
 
   return { state, run, running: state.status === 'running' }

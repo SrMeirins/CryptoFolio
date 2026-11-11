@@ -1,8 +1,8 @@
 import { PoolClient } from 'pg';
-import { getHistoricalPriceEur } from '../../prices/binance';
 import { Transaction, FifoRunResult, FIAT_NO_LOT, FIFO_SHORTFALL_EPSILON, type OpcionesMotor } from '../constants';
 import { openLot, consumeLots, consumeWithoutEffect, getOpenLots, moveLots, updateLot } from '../lotPrimitives';
 import { valorComisionesEnlazadas } from '../comisionesEnlazadas';
+import { marcarValoracion, precioTransmision, valorarPermutaEnMomento, type Valoracion } from '../valoracion';
 
 // ── SELL ──────────────────────────────────────────────────────────────────
 export async function processSell(tx: Transaction, result: FifoRunResult, client: PoolClient): Promise<void> {
@@ -26,9 +26,10 @@ export async function processSell(tx: Transaction, result: FifoRunResult, client
         } else {
           // Fee en un tercer activo: disposición patrimonial propia, se consume aparte,
           // y su valor es coste de la compra (#543), como en processBuy.
-          const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
-          const feeProceedsEur = tx.fee_amount * feePrice;
+          const fee = await precioTransmision(tx.fee_asset, tx.timestamp);
+          const feeProceedsEur = tx.fee_amount * fee.precio;
           await consumeLots(tx.id, tx.fee_asset, tx.wallet_id, tx.fee_amount, feeProceedsEur, tx.timestamp, result, client);
+          await marcarValoracion(client, tx.id, tx.fee_asset, fee.diario ? 'diario' : 'momento');
           costBasisEur += feeProceedsEur;
           feeEur = feeProceedsEur;
         }
@@ -49,15 +50,22 @@ export async function processSell(tx: Transaction, result: FifoRunResult, client
   }
 
   let proceedsEur: number;
+  // Cómo se valoró (#599), para marcar el consumo de lo vendido.
+  let valoracion: Pick<Valoracion, 'criterio'> & Partial<Valoracion>;
 
   if (tx.cost_asset === 'EUR') {
     proceedsEur = tx.cost_amount ?? 0;
+    valoracion = { criterio: 'momento' };
   } else if (tx.cost_asset != null) {
-    const price = await getHistoricalPriceEur(tx.cost_asset, tx.timestamp);
-    proceedsEur = (tx.cost_amount ?? 0) * price;
+    // Permuta: valor de mercado en el momento, por el lado más líquido (#599).
+    const v = await valorarPermutaEnMomento(
+      { asset: tx.asset, cantidad: tx.amount }, { asset: tx.cost_asset, cantidad: tx.cost_amount ?? 0 }, tx.timestamp);
+    proceedsEur = v.valor;
+    valoracion = v;
   } else {
-    const price = await getHistoricalPriceEur(tx.asset, tx.timestamp);
-    proceedsEur = tx.amount * price;
+    const p = await precioTransmision(tx.asset, tx.timestamp);
+    proceedsEur = tx.amount * p.precio;
+    valoracion = { criterio: p.diario ? 'diario' : 'momento' };
   }
 
   // Comisiones pagadas en un activo que no es del par (#543).
@@ -68,15 +76,16 @@ export async function processSell(tx: Transaction, result: FifoRunResult, client
       // Fee en el activo vendido o en el recibido: reduce los proceeds de ESTA
       // venta (ya sea porque una parte de lo vendido nunca generó cash, o porque
       // llega menos del activo recibido — ese ajuste ya lo hace netReceived más abajo).
-      const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
-      proceedsEur -= tx.fee_amount * feePrice;
+      const fee = await precioTransmision(tx.fee_asset, tx.timestamp);
+      proceedsEur -= tx.fee_amount * fee.precio;
     } else {
       // Fee en un tercer activo (ej. BNB): entregar ese BNB es una disposición
       // propia (se consumen sus lotes aparte) y, además, su valor es gasto de
       // transmisión de esta venta (#543, art. 35 LIRPF): se resta de lo obtenido.
-      const feePrice = await getHistoricalPriceEur(tx.fee_asset, tx.timestamp);
-      const feeProceedsEur = tx.fee_amount * feePrice;
+      const fee = await precioTransmision(tx.fee_asset, tx.timestamp);
+      const feeProceedsEur = tx.fee_amount * fee.precio;
       await consumeLots(tx.id, tx.fee_asset, tx.wallet_id, tx.fee_amount, feeProceedsEur, tx.timestamp, result, client);
+      await marcarValoracion(client, tx.id, tx.fee_asset, fee.diario ? 'diario' : 'momento');
       gastosAparteEur += feeProceedsEur;
     }
   }
@@ -87,6 +96,9 @@ export async function processSell(tx: Transaction, result: FifoRunResult, client
   // El lote recibido conserva el valor de lo recibido: estas comisiones se
   // pagaron con otro activo y no reducen lo que llega.
   await consumeLots(tx.id, tx.asset, tx.wallet_id, tx.amount, proceedsEur - gastosAparteEur, tx.timestamp, result, client);
+  await marcarValoracion(client, tx.id, tx.asset, valoracion.criterio,
+    valoracion.valorEntregado !== undefined && valoracion.valorRecibido !== undefined
+      ? { valorEntregado: valoracion.valorEntregado, valorRecibido: valoracion.valorRecibido } : undefined);
 
   // Abrir lote para el activo recibido si no es fiat (SELL_CRYPTO y SELL cripto→cripto/stablecoin).
   // USDT es cripto en la legislación española, igual que cualquier otro token.
@@ -187,9 +199,10 @@ export async function processTransfer(tx: Transaction, result: FifoRunResult, cl
         result.shortfalls.push({ txId: tx.id, asset: tx.asset, walletId: tx.wallet_id, requested: tx.fee_amount, missing: fee.missing });
       }
     } else {
-      const feePrice = await getHistoricalPriceEur(tx.asset, tx.timestamp);
-      const feeProceedsEur = tx.fee_amount * feePrice;
+      const fee = await precioTransmision(tx.asset, tx.timestamp);
+      const feeProceedsEur = tx.fee_amount * fee.precio;
       await consumeLots(tx.id, tx.asset, tx.wallet_id, tx.fee_amount, feeProceedsEur, tx.timestamp, result, client);
+      await marcarValoracion(client, tx.id, tx.asset, fee.diario ? 'diario' : 'momento');
     }
   }
 
@@ -219,8 +232,9 @@ export async function processFee(tx: Transaction, result: FifoRunResult, client:
 
   if (!feeAsset || feeAmount <= 0) return;
 
-  const priceEur = await getHistoricalPriceEur(feeAsset, tx.timestamp);
-  const proceedsEur = feeAmount * priceEur;
+  const precio = await precioTransmision(feeAsset, tx.timestamp);
+  const proceedsEur = feeAmount * precio.precio;
 
   await consumeLots(tx.id, feeAsset, tx.wallet_id, feeAmount, proceedsEur, tx.timestamp, result, client);
+  await marcarValoracion(client, tx.id, feeAsset, precio.diario ? 'diario' : 'momento');
 }

@@ -20,6 +20,7 @@ import { ImportStepper } from './import/ImportStepper'
 import { pasoDeStage, type Paso } from './import/wizard'
 import { navIcon } from '../constants/navigation'
 import { anadirASeleccion, clasificarArchivo, firmaLote, indicesAConfirmar, type ArchivoSel } from './import/lote'
+import { desfaseDetectado, type DeteccionZona } from './import/zonaHoraria'
 import { useAvisoSalida } from './import/useAvisoSalida'
 import { useTituloImportacion } from './import/useTituloImportacion'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -27,6 +28,14 @@ import { failure } from '../utils/queryFailure'
 
 // Firma de la selección: si se vuelven a subir los mismos archivos, se conserva lo asignado (#318, #326).
 const FIRMA_KEY = 'import_file_signature'
+
+/** Exchange con que se leyó el archivo i del lote (o el único). */
+function exchangeDeArchivo(preview: PreviewResult, i: number): 'binance' | 'bitvavo' | null {
+  const archivos = preview.archivos ?? []
+  if (archivos.length === 0) return preview.exchange ?? 'binance'
+  const a = archivos.find(x => x.indice === i)
+  return a && a.estado !== 'no_reconocido' ? a.exchange : null
+}
 
 export function ImportPage() {
   const queryClient = useQueryClient()
@@ -51,6 +60,8 @@ export function ImportPage() {
   const [showTxTable, setShowTxTable] = useState(false)
   const [txPage, setTxPage]           = useState(0)
   const [showManualTx, setShowManualTx] = useState(false)
+  // Detección de la zona horaria de los CSV de Binance en curso (#599).
+  const [comprobandoZona, setComprobandoZona] = useState(false)
   const TX_PAGE_SIZE = 20
 
   const importsQ = useQuery({
@@ -95,6 +106,7 @@ export function ImportPage() {
       tx.forEach(f => form.append('files', f.file))
       sel.filter(s => s.tipo === 'retiradas').forEach(f => form.append('withdrawals', f.file))
       if (tx.some(f => f.forzado)) form.append('exchanges', JSON.stringify(tx.map(f => f.forzado)))
+      if (tx.some(f => f.desfase != null)) form.append('desfases', JSON.stringify(tx.map(f => f.desfase ?? null)))
       const res  = await fetch('/api/imports/preview', { method: 'POST', body: form })
       const body: unknown = await res.json()
 
@@ -107,11 +119,50 @@ export function ImportPage() {
       setPreview(data)
       setExchange(data.exchange ?? 'binance')
       setStage('preview')
+      // Zona horaria de los CSV de Binance aún sin comprobar (#599), en segundo plano.
+      if (tx.some((f, i) => exchangeDeArchivo(data, i) === 'binance' && !f.zona)) void detectarZonas(sel, data)
     } catch {
       setError('No se pudieron leer los archivos. Comprueba que la aplicación sigue en marcha y vuelve a intentarlo.')
     } finally {
       setLoading(false)
     }
+  }
+
+  // Zona horaria de los CSV de Binance (#599): se compara con el mercado y, si la
+  // detección es clara y difiere, se vuelve a leer el lote con esa zona.
+  async function detectarZonas(sel: ArchivoSel[], data: PreviewResult) {
+    const tx = sel.filter(s => s.tipo === 'transacciones')
+    setComprobandoZona(true)
+    try {
+      const form = new FormData()
+      tx.forEach(f => form.append('files', f.file))
+      form.append('exchanges', JSON.stringify(tx.map((_, i) => exchangeDeArchivo(data, i))))
+      const res = await fetch('/api/imports/zona-horaria', { method: 'POST', body: form })
+      if (!res.ok) return
+      const { archivos } = await res.json() as { archivos: { deteccion: DeteccionZona | null }[] }
+      let cambia = false
+      const porId = new Map(tx.map((f, i) => {
+        const deteccion = archivos[i]?.deteccion
+        if (!deteccion) return [f.id, f] as const
+        const d = desfaseDetectado(deteccion)
+        const nuevo = !f.desfaseManual && d !== null && d !== (f.desfase ?? 0) ? d : f.desfase
+        if (nuevo !== f.desfase) cambia = true
+        return [f.id, { ...f, zona: deteccion, desfase: nuevo }] as const
+      }))
+      const sig = sel.map(s => porId.get(s.id) ?? s)
+      setSeleccion(sig)
+      if (cambia) await analizar(sig)
+    } catch {
+      // Sin conexión: la zona queda sin comprobar y se puede elegir a mano.
+    } finally {
+      setComprobandoZona(false)
+    }
+  }
+
+  // Zona elegida a mano para un archivo (#599): se vuelve a leer con ella.
+  function cambiarZona(indice: number, desfase: number) {
+    const objetivo = transacciones[indice]
+    if (objetivo) void analizar(seleccion.map(s => (s.id === objetivo.id ? { ...s, desfase, desfaseManual: true } : s)))
   }
 
   // Archivos soltados o elegidos: se clasifican (transacciones o retiradas) y se añaden a la
@@ -199,6 +250,8 @@ export function ImportPage() {
     indices.forEach(i => form.append('files', transacciones[i].file))
     retiradasSel.forEach(f => form.append('withdrawals', f.file))
     form.append('exchanges', JSON.stringify(indices.map(i => archivos.find(a => a.indice === i)?.exchange ?? exchange)))
+    // Zona horaria elegida de cada CSV de Binance (#599).
+    form.append('desfases', JSON.stringify(indices.map(i => transacciones[i].desfase ?? null)))
     if (Object.keys(resolvedOps).length > 0)
       form.append('resolvedOperations', JSON.stringify(resolvedOps))
     if (Object.keys(withdrawalDestinations).length > 0)
@@ -348,6 +401,10 @@ export function ImportPage() {
           onReset={handleReset}
           onVerHistorial={() => navigate('/history')}
           exchange={exchange}
+          zonas={transacciones.flatMap((f, i) => exchangeDeArchivo(preview, i) === 'binance'
+            ? [{ indice: i, nombre: f.file.name, desfase: f.desfase ?? 0, deteccion: f.zona }] : [])}
+          comprobandoZona={comprobandoZona}
+          onCambiarZona={cambiarZona}
           onCambiarExchange={ex => leerComo(0, ex)}
           onLeerComo={leerComo}
           onQuitarArchivo={quitarArchivo}

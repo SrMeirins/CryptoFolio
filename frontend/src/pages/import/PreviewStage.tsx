@@ -10,6 +10,7 @@ import { EXCHANGE_LABEL, textoPendiente } from './wizard'
 import { ExchangeBadge } from './ExchangeBadge'
 import { RetiradasCard } from './RetiradasCard'
 import { LoteCard } from './LoteCard'
+import { ZonaHorariaCard, type ZonaArchivo } from './ZonaHorariaCard'
 import { EncajeCard } from './EncajeCard'
 import { RetirosExistentes } from './RetirosExistentes'
 
@@ -18,6 +19,7 @@ export function PreviewStage({
   resolvedOps, withdrawalDestinations, depositCosts,
   onWithdrawalDestination, onDepositCost, onIgnoreOp, onCatalog, onConfirm, error, onReset, onVerHistorial,
   exchange, onCambiarExchange, onLeerComo, onQuitarArchivo, cambiando, retiradasNombre, onRetiradas, onGuardarExistentes,
+  zonas = [], comprobandoZona = false, onCambiarZona = () => {},
 }: {
   preview: PreviewResult
   showTxTable: boolean
@@ -49,6 +51,10 @@ export function PreviewStage({
   onRetiradas: (file: File | null) => void
   /** Retiros ya importados (#330): guarda direcciones y destinos cambiados. */
   onGuardarExistentes: (reasignaciones: Record<string, string>) => Promise<ResultadoExistentes>
+  /** Zona horaria de los CSV de Binance (#599): detectada y elegible. */
+  zonas?: ZonaArchivo[]
+  comprobandoZona?: boolean
+  onCambiarZona?: (indice: number, desfase: number) => void
 }) {
   const hasUnresolved = preview.validation.unknownOperations.some(op => !resolvedOps[op] || resolvedOps[op].operationTypeId === '')
 
@@ -117,6 +123,7 @@ export function PreviewStage({
     <LoteCard archivos={archivos} repetidas={preview.repetidasEnLote ?? 0} cambiando={cambiando}
       onLeerComo={onLeerComo} onQuitar={onQuitarArchivo} />
   )
+  const zonaCard = <ZonaHorariaCard zonas={zonas} comprobando={comprobandoZona} cambiando={cambiando} onCambiar={onCambiarZona} />
 
   // Lote sin ningún archivo legible (#326): el motivo de cada uno y qué hacer.
   if (loteIlegible(preview)) {
@@ -267,6 +274,8 @@ export function PreviewStage({
       {preview.encaje && <EncajeCard cobertura={preview.encaje.cobertura} cambios={preview.encaje.cambios} />}
 
       {loteCard}
+
+      {zonaCard}
 
       {existentesCard}
 

@@ -235,6 +235,23 @@ export interface ImportRecord {
   sell_count: string
   withdraw_count: string
   deposit_count: string
+  /** Zona horaria con que se leyó el CSV, en horas respecto de UTC (#599). */
+  desfase_horas?: number
+}
+
+/** Zona horaria de una importación de Binance (#599). */
+export interface EstadoZonaImportacion {
+  exchange: string
+  desfaseActual: number
+  deteccion: { desfaseHoras: number | null; coincidencias: number; muestras: number; confianza: 'alta' | 'baja' | 'sin_datos' }
+}
+
+/** Qué cambia al pasar una importación a otra zona horaria (#599). */
+export interface ImpactoZonaImportacion {
+  desplazadas: number
+  respetadas: number
+  cambianDia: number
+  cambianAnio: number
 }
 
 export interface AssetMetadata {
@@ -724,6 +741,12 @@ export const portfolioApi = {
     api.get<{ asset: string; date: string; price_eur: number }>(`/prices/historical?asset=${asset}&date=${date}`),
   getImports: () => api.get<ImportRecord[]>('/imports'),
   deleteImport: (id: string) => api.delete<{ success: boolean }>(`/imports/${id}`),
+  // Zona horaria de una importación de Binance (#599).
+  getZonaHoraria: (id: string) => api.get<EstadoZonaImportacion>(`/imports/${encodeURIComponent(id)}/zona-horaria`),
+  getImpactoZonaHoraria: (id: string, desfase: number) =>
+    api.get<ImpactoZonaImportacion>(`/imports/${encodeURIComponent(id)}/zona-horaria/impacto?desfase=${desfase}`),
+  setZonaHoraria: (id: string, desfaseHoras: number) =>
+    api.post<ImpactoZonaImportacion & { copiaPrevia: string }>(`/imports/${encodeURIComponent(id)}/zona-horaria`, { desfaseHoras }),
   getAssets: () => api.get<AssetMetadata[]>('/settings/assets'),
   createAsset: (data: Partial<AssetMetadata>) => api.post<{ success: boolean; symbol: string }>('/settings/assets', data),
   updateAsset: (symbol: string, data: Partial<AssetMetadata>) => api.put<{ success: boolean }>(`/settings/assets/${symbol}`, data),

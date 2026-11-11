@@ -138,3 +138,19 @@ export function exchangesForzados(body: Record<string, unknown>, n: number): (Ex
   const uno = body.exchange === 'binance' || body.exchange === 'bitvavo' ? body.exchange : null;
   return Array.from({ length: n }, (_, i) => (i === 0 ? uno : null));
 }
+
+const desfasesSchema = z.array(z.number().int().min(-12).max(14).nullable()).max(MAX_ARCHIVOS_LOTE);
+
+/**
+ * Zona horaria elegida para cada archivo (#599): `desfases` (JSON, horas
+ * respecto de UTC; null, sin elegir). Sin el campo, todos sin elegir. Lanza
+ * si no es válido.
+ */
+export function desfasesElegidos(body: Record<string, unknown>, n: number): (number | null)[] {
+  if (typeof body.desfases !== 'string') return Array.from({ length: n }, () => null);
+  let crudo: unknown;
+  try { crudo = JSON.parse(body.desfases); } catch { throw new Error('desfases no es JSON válido'); }
+  const v = desfasesSchema.safeParse(crudo);
+  if (!v.success || v.data.length > n) throw new Error('desfases no es válido');
+  return Array.from({ length: n }, (_, i) => v.data[i] ?? null);
+}

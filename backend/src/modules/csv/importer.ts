@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'crypto';
 import { db } from '../../db/client';
 import { ValidationResult } from './validator';
 import { ParsedTransaction } from './types';
-import { Exchange, parseExchangeCsv, validateExchangeCsv } from './exchanges';
+import { Exchange, parseExchangeCsv, validateExchangeCsv, type OpcionesLectura } from './exchanges';
 import { getHistoricalPriceEur, refreshLivePrices } from '../prices/binance';
 import { requestLivePriceResync } from '../prices/liveFeed';
 import { getOrDetectPairInfo } from '../prices/pairDetector';
@@ -42,6 +42,7 @@ export async function importCsvFile(
   onStatus?: (message: string, progress?: number, total?: number) => void,
   exchange: Exchange = 'binance',
   retiradasBuffers: readonly Buffer[] = [],
+  lectura: OpcionesLectura = {},
 ): Promise<ImportResult> {
   const validation = validateExchangeCsv(exchange, fileBuffer);
   if (!validation.valid) {
@@ -50,7 +51,7 @@ export async function importCsvFile(
 
   onStatus?.('Parseando CSV...');
   const fileHash = createHash('sha256').update(fileBuffer).digest('hex');
-  const parseResult = await parseExchangeCsv(exchange, fileBuffer);
+  const parseResult = await parseExchangeCsv(exchange, fileBuffer, lectura);
 
   // Modo degradado: un grupo no reconocido (ej. Binance renombra una
   // operación) no debe bloquear el CSV entero — se importa lo que sí se
@@ -115,10 +116,10 @@ export async function importCsvFile(
     }
 
     const importRes = await client.query(
-      `INSERT INTO csv_imports (filename, file_hash, row_count, skipped_count, exchange)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO csv_imports (filename, file_hash, row_count, skipped_count, exchange, desfase_horas)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id`,
-      [filename, fileHash, parseResult.stats.totalRows, parseResult.stats.ignoredRows, exchange]
+      [filename, fileHash, parseResult.stats.totalRows, parseResult.stats.ignoredRows, exchange, lectura.desfaseHoras ?? 0]
     );
     const importId: string = importRes.rows[0].id;
 

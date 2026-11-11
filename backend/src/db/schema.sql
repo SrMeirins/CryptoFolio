@@ -200,7 +200,9 @@ CREATE TABLE csv_imports (
   row_count     INTEGER NOT NULL DEFAULT 0,
   skipped_count INTEGER NOT NULL DEFAULT 0,
   exchange      TEXT NOT NULL DEFAULT 'binance' CHECK (exchange IN ('binance', 'bitvavo')),
-  notes         TEXT
+  notes         TEXT,
+  -- Zona horaria del CSV en horas respecto de UTC (#599): Binance no la indica.
+  desfase_horas SMALLINT NOT NULL DEFAULT 0 CONSTRAINT chk_csv_imports_desfase_horas CHECK (desfase_horas BETWEEN -12 AND 14)
 );
 
 -- Revisiones de cobertura (#328): huecos o tramo pendiente marcados como «no operé».
@@ -356,7 +358,13 @@ CREATE TABLE fifo_lot_consumptions (
   gain_loss_eur            NUMERIC(38, 18) NOT NULL,
   fiscal_event_type        fiscal_event_type NOT NULL,
   consumed_at              TIMESTAMPTZ NOT NULL,
-  created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- Cómo se valoró la transmisión (#599): con el precio del momento, por «el
+  -- mayor» de los dos lados de una permuta, o con el precio del día como respaldo.
+  valoracion               TEXT CHECK (valoracion IN ('momento', 'mayor', 'diario')),
+  -- Valores de los dos lados de la permuta en el momento, para explicar «el mayor».
+  valor_entregado_eur      NUMERIC(38, 18),
+  valor_recibido_eur       NUMERIC(38, 18)
 );
 
 CREATE INDEX idx_consumptions_lot         ON fifo_lot_consumptions(lot_id);
@@ -392,6 +400,17 @@ CREATE TABLE price_cache (
 );
 
 CREATE INDEX idx_price_cache_asset ON price_cache(asset, price_date DESC);
+
+-- Precio del momento de una operación (#599): por activo y minuto UTC. Fuente:
+-- vela de 1 minuto, de 1 hora o precio del día como respaldo.
+CREATE TABLE price_momento (
+  asset      TEXT NOT NULL CHECK (char_length(asset) <= 32),
+  momento    TIMESTAMPTZ NOT NULL,
+  price_eur  NUMERIC(38, 18) NOT NULL CHECK (price_eur > 0),
+  fuente     TEXT NOT NULL CHECK (fuente IN ('1m', '1h', '1d')),
+  fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (asset, momento)
+);
 
 -- ============================================================
 -- TABLA: price_close_daily: cierre diario a las 00:00 locales de cada zona

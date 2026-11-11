@@ -1,5 +1,5 @@
 import { db } from '../../db/client';
-import { Exchange, parseExchangeCsv } from './exchanges';
+import { Exchange, parseExchangeCsv, type OpcionesLectura } from './exchanges';
 import { importCsvFile, ImportResult } from './importer';
 import type { ResumenImportacion } from './resumenImportacion';
 import { runFifoEngine, FifoRunResult } from '../fifo/engine';
@@ -34,8 +34,9 @@ export async function checkPreImportDepositGate(
   exchange: Exchange,
   fileBuffer: Buffer,
   depositCostsRaw: Record<string, number | null>,
+  lectura: OpcionesLectura = {},
 ): Promise<DepositGateResult & { preparse: Awaited<ReturnType<typeof parseExchangeCsv>> }> {
-  const preparse = await parseExchangeCsv(exchange, fileBuffer);
+  const preparse = await parseExchangeCsv(exchange, fileBuffer, lectura);
   const csvExternalDeposits = preparse.transactions.filter(tx => tx.needsCostReview);
 
   const csvDepHashes = csvExternalDeposits.map(tx => tx.rawRowHashes[0]).filter(Boolean);
@@ -114,6 +115,7 @@ export async function importTransactionsPhase(
   exchange: Exchange,
   emit: ProgressEmitter,
   retiradasBuffers: readonly Buffer[] = [],
+  lectura: OpcionesLectura = {},
 ): Promise<ImportResult> {
   const IMPORT_REPORT_EVERY = 5;
   let lastImportReport = 0;
@@ -135,6 +137,7 @@ export async function importTransactionsPhase(
     },
     exchange,
     retiradasBuffers,
+    lectura,
   );
 
   emit('importing', `✓ ${importResult.newTransactions} transacciones nuevas importadas (${importResult.duplicateRows} duplicadas ignoradas)`);

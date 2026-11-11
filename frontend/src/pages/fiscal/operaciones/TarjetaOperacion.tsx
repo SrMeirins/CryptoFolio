@@ -4,7 +4,7 @@ import { sinEfecto, type FilaTabla } from '../../../utils/operacionesTabla'
 import { EventWarnings } from '../EventWarnings'
 import { ClaveCell, FechaCell, ParCell, Resultado, TypeBadge } from '../FiscalEventRow'
 import { RentaCell } from './FilaOperacion'
-import { textoNota } from './textoComision'
+import { textoNota, textoValoracion } from './textoComision'
 
 // Operación o grupo de microoperaciones como tarjeta, en pantallas estrechas (#299, #543).
 export function TarjetaOperacion({ fila }: { fila: FilaTabla }) {
@@ -39,6 +39,7 @@ export function TarjetaOperacion({ fila }: { fila: FilaTabla }) {
         {o.gastosAdquisicionEur > 0.005 && <div><dt className="text-fg-subtle">Gastos de adquisición</dt><dd className="mono text-fg">{formatEur(o.gastosAdquisicionEur)}</dd></div>}
         <div className="col-span-2 flex items-center gap-2 text-fg-subtle"><ClaveCell e={o} /> <RentaCell declara={!sinEfecto(o)} /> <span className="truncate">{o.wallet}{o.lotes.length > 1 ? ` · ${o.lotes.length} lotes` : ''}</span></div>
         {textoNota(o) && <p className="col-span-2 text-[11px] text-fg-muted">{textoNota(o)}</p>}
+        {textoValoracion(o) && <p className="col-span-2 text-[11px] text-fg-muted">{textoValoracion(o)}</p>}
       </dl>
     </li>
   )
