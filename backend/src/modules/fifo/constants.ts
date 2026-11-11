@@ -5,6 +5,8 @@ export interface FifoLot {
   quantityRemaining: number;
   costBasisEur: number;
   pricePerUnitEur: number;
+  /** Comisión de compra de todo el lote (sobre quantityOriginal), incluida en el coste (#603). */
+  feeEur: number;
   openedAt: Date;
   walletId: string;
   openTransactionId: string;

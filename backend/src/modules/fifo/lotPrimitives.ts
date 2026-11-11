@@ -157,7 +157,10 @@ export async function consumeLots(
  * fecha de adquisición, el precio y el tipo USD del lote de origen (#174).
  * `extraCostEur` (#532, comisión de red sumada al coste) se reparte entre los
  * lotes que llegan en proporción a su cantidad y se anota como gasto de
- * adquisición (`fee_eur`). Devuelve la cantidad que no se pudo trasladar.
+ * adquisición (`fee_eur`). El lote que llega hereda además su parte de la
+ * comisión de compra del de origen (#603); el de origen no cambia, porque los
+ * gastos se reparten sobre su cantidad original. Devuelve la cantidad que no se
+ * pudo trasladar.
  */
 export async function moveLots(
   client: PoolClient,
@@ -189,6 +192,8 @@ export async function moveLots(
     );
 
     const extraShare = extra > 0 && movable > 0 ? extra * (consumed / movable) : 0;
+    // Parte de la comisión de compra que viaja con lo trasladado (#603), ya incluida en costMoved.
+    const feeHeredada = lot.quantityOriginal > 0 ? lot.feeEur * consumed / lot.quantityOriginal : 0;
     await client.query(
       `INSERT INTO fifo_lots (
         asset, quantity_original, quantity_remaining,
@@ -196,7 +201,7 @@ export async function moveLots(
         open_transaction_id, opened_at, wallet_id, usd_per_eur
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [move.asset, consumed, consumed, costMoved + extraShare,
-        extraShare > 0 ? (costMoved + extraShare) / consumed : lot.pricePerUnitEur, extraShare,
+        extraShare > 0 ? (costMoved + extraShare) / consumed : lot.pricePerUnitEur, feeHeredada + extraShare,
         move.txId, lot.openedAt, move.toWalletId, lot.usdPerEur]
     );
 
@@ -242,7 +247,7 @@ export async function consumeWithoutEffect(
 export async function getOpenLots(asset: string, walletId: string | null, client: PoolClient): Promise<FifoLot[]> {
   const res = await client.query(
     `SELECT id, asset, quantity_original, quantity_remaining,
-            cost_basis_eur, price_per_unit_eur, opened_at, wallet_id, open_transaction_id, usd_per_eur
+            cost_basis_eur, price_per_unit_eur, fee_eur, opened_at, wallet_id, open_transaction_id, usd_per_eur
      FROM fifo_lots
      WHERE asset = $1
        AND ($2::uuid IS NULL OR wallet_id = $2::uuid)
@@ -258,6 +263,7 @@ export async function getOpenLots(asset: string, walletId: string | null, client
     quantityRemaining: parseFloat(r.quantity_remaining as string),
     costBasisEur: parseFloat(r.cost_basis_eur as string),
     pricePerUnitEur: parseFloat(r.price_per_unit_eur as string),
+    feeEur: parseFloat(r.fee_eur as string) || 0,
     openedAt: r.opened_at as Date,
     walletId: r.wallet_id as string,
     openTransactionId: r.open_transaction_id as string,
