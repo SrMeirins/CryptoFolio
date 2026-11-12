@@ -43,16 +43,18 @@ interface TxDatos {
   operation_type: string; timestamp: string; asset: string; amount: number; amount_net?: number;
   cost_asset?: string | null; cost_amount?: number | null;
   fee_asset?: string | null; fee_amount?: number | null; linked_tx_id?: string | null;
+  destination_wallet_id?: string | null;
 }
 
 async function tx(d: TxDatos): Promise<string> {
   const id = randomUUID();
   await db.query(
     `INSERT INTO transactions (id, operation_type, timestamp, asset, amount, amount_net, cost_asset, cost_amount,
-       fee_asset, fee_amount, wallet_id, linked_tx_id)
-     VALUES ($1, $2::operation_type, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+       fee_asset, fee_amount, wallet_id, linked_tx_id, destination_wallet_id)
+     VALUES ($1, $2::operation_type, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [id, d.operation_type, d.timestamp, d.asset, d.amount, d.amount_net ?? d.amount, d.cost_asset ?? null,
-     d.cost_amount ?? null, d.fee_asset ?? null, d.fee_amount ?? null, walletId, d.linked_tx_id ?? null],
+     d.cost_amount ?? null, d.fee_asset ?? null, d.fee_amount ?? null, walletId, d.linked_tx_id ?? null,
+     d.destination_wallet_id ?? null],
   );
   return id;
 }
@@ -125,6 +127,24 @@ describe('comisiones de una orden en el FIFO (#543)', () => {
     expect(l.cantidad).toBe(100);
     expect(l.coste).toBe(50);
     expect(l.comision).toBeCloseTo(0.13, 9);
+  });
+
+  it('un traslado entre wallets conserva la parte de la comisión de compra de lo trasladado (#603)', async () => {
+    const otra = (await db.query(`SELECT id FROM wallets WHERE id <> $1 ORDER BY name LIMIT 1`, [walletId])).rows[0].id;
+    const id = await tx({ operation_type: 'BUY', timestamp: '2024-02-01T00:00:00Z', asset: 'XRP', amount: 100, cost_asset: 'EUR', cost_amount: 50 });
+    await db.query(`UPDATE transactions SET included_fee_asset = 'EUR', included_fee_amount = 0.2 WHERE id = $1`, [id]);
+    await tx({ operation_type: 'TRANSFER_INTERNAL', timestamp: '2024-03-01T00:00:00Z', asset: 'XRP', amount: 40, cost_asset: null, destination_wallet_id: otra });
+    expect((await runFifoEngine()).errors).toEqual([]);
+    const lotes = (await db.query(
+      `SELECT wallet_id = $1 AS origen, quantity_original::float AS q, cost_basis_eur::float AS coste, fee_eur::float AS comision
+       FROM fifo_lots WHERE asset = 'XRP' ORDER BY origen DESC`, [walletId])).rows;
+    // Origen: sigue con su comisión total sobre su cantidad original (100 → 0,2 €).
+    expect(lotes[0]).toMatchObject({ origen: true, q: 100 });
+    expect(lotes[0].comision).toBeCloseTo(0.2, 9);
+    // Destino: 40 de 100, con 20 € de coste y 0,08 € de comisión (40 % de 0,2).
+    expect(lotes[1]).toMatchObject({ origen: false, q: 40 });
+    expect(lotes[1].coste).toBeCloseTo(20, 9);
+    expect(lotes[1].comision).toBeCloseTo(0.08, 9);
   });
 
   it('una FEE_EXCHANGE sin enlazar no cambia la venta (comisión suelta, como antes)', async () => {
