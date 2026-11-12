@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { compararCifras, type CifrasRenta } from '../../modules/fiscal/declaraciones';
 import { borrarDeclaracion, cifrasRenta, guardarDeclaracion, listarDeclaraciones, restaurarDeclaracion } from '../../modules/fiscal/declaracionesRepo';
-import { getUmbral721, sumaValorCustodiaExchange, valorizarLotesEnFecha } from '../../modules/fiscal/lotesValoracion';
+import { estado721, posicionesDe } from '../../modules/fiscal/modelo721';
 import { parseYear, sendZodError } from './fiscalShared';
 import { sendInternalError } from '../../middleware/errorHandler';
 import { resetObligaciones721Cache } from '../../modules/fiscal/obligacion721';
@@ -102,12 +102,11 @@ router.put('/:year/declaracion/modelo721', async (req: Request, res: Response) =
   const parsed = modelo721Schema.safeParse(req.body ?? {});
   if (!parsed.success) return sendZodError(res, parsed.error);
   try {
-    let valor = parsed.data.valor;
-    if (valor === undefined) {
-      const { activos } = await valorizarLotesEnFecha(endOfLocalYear(tz, year));
-      valor = Math.round(sumaValorCustodiaExchange(activos) * 100) / 100;
-    }
-    const guardada = await guardarDeclaracion(year, 'modelo721', { valor, umbral: await getUmbral721() });
+    // Valor a 31 de diciembre que computa y, para la regla de extinción del año
+    // siguiente, las monedas declaradas por entidad (#545).
+    const { grupos, veredicto } = await estado721(year, endOfLocalYear(tz, year));
+    const valor = parsed.data.valor ?? Math.round(veredicto.valorEur * 100) / 100;
+    const guardada = await guardarDeclaracion(year, 'modelo721', { valor, umbral: veredicto.umbral, posiciones: posicionesDe(grupos) });
     resetObligaciones721Cache();   // cambia la regla del incremento para el calendario
     res.json(guardada);
   } catch (e) {

@@ -14,7 +14,7 @@ import { DesglosePorActivo } from './fiscal/charts/DesglosePorActivo'
 import { filtersFromUrl, monthRange } from '../utils/fiscalCharts'
 import { AvisoCaducidad, PerdidasPendientes } from './fiscal/PerdidasPendientes'
 import { caducanEsteAnio } from '../utils/perdidasPendientes'
-import { Modelo721Card } from './fiscal/Modelo721Card'
+import { Modelo721Vista } from './fiscal/modelo721/Modelo721Vista'
 import { TablaEventos } from './fiscal/TablaEventos'
 import { SeccionRendimientos } from './fiscal/rendimientos/SeccionRendimientos'
 import { ExportPanel } from './fiscal/ExportPanel'
@@ -319,7 +319,7 @@ export function Fiscal() {
       { key: 'ops', label: 'Operaciones', value: ov.numOperaciones, format: v => formatNumber(v, 0) },
     ] : [],
     modelo721: m721 ? [
-      { key: 'custodia', label: 'En custodia de terceros', value: m721.totalValorCustodia, format: formatEur },
+      { key: 'custodia', label: 'En custodia en el extranjero', value: m721.totalValorCustodia, format: formatEur },
       { key: 'umbral', label: 'Umbral', value: m721.umbral, format: formatEur },
       { key: 'margen', label: margenUmbral(m721) >= 0 ? 'Margen hasta el umbral' : 'Por encima del umbral', value: Math.abs(margenUmbral(m721)), format: formatEur,
         tone: margenUmbral(m721) < 0 ? 'warning' as const : undefined },
@@ -427,7 +427,7 @@ export function Fiscal() {
         ) : summary && vista === 'modelo721' ? (
           modelo721Loading ? (
             <div className={cardClasses('md')}><Skeleton className="h-4 w-48" /></div>
-          ) : modelo721 && <Block i={0}><Modelo721Card data={modelo721} activeYear={activeYear} /></Block>
+          ) : modelo721 && <Block i={0}><Modelo721Vista data={modelo721} activeYear={activeYear} /></Block>
         ) : null}
 
         <PieMetodologia tema={TEMA_VISTA[vista]}>

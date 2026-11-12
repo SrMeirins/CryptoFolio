@@ -8,6 +8,7 @@ import type { EscalaAhorro } from '../../api/portfolio'
 import { Dropdown, QueryError } from '../../components/ui'
 import { SettingsCard } from './SettingsCard'
 import { ComisionRedCard } from './ComisionRedCard'
+import { CustodiaExchangesCard } from './CustodiaExchangesCard'
 import { SavedMark } from './SavedMark'
 import { useSettingFeedback } from '../../hooks/useSettingFeedback'
 import { useToast } from '../../hooks/useToast'
@@ -205,7 +206,10 @@ export function FiscalSection() {
       </SettingsCard>
 
       {/* Tramos IRPF por ejercicio (#452) */}
-      <SettingsCard index={2} icon={Percent} title="Tramos IRPF de la base del ahorro" status={<SavedMark stamp={saved} id="tramos" />}
+      {/* Custodia de los exchanges para el 721 (#545): lo mismo que en Fiscal, Modelo 721 */}
+      <CustodiaExchangesCard index={2} />
+
+      <SettingsCard index={3} icon={Percent} title="Tramos IRPF de la base del ahorro" status={<SavedMark stamp={saved} id="tramos" />}
         description="Cada ejercicio usa la escala oficial de su año. Puedes cambiar los porcentajes; los tramos en euros son fijos por ley."
         action={
           <div className="flex items-center gap-2">
@@ -257,10 +261,10 @@ export function FiscalSection() {
       </SettingsCard>
 
       {/* Comisión de red en traspasos propios (#532) */}
-      <ComisionRedCard index={3} />
+      <ComisionRedCard index={4} />
 
       {/* Recordatorios de plazos (#451): la categoría Fiscal de los avisos */}
-      <SettingsCard index={4} icon={BellRing} title="Recordatorios de plazos" status={<SavedMark stamp={saved} id="recordatorios" />}
+      <SettingsCard index={5} icon={BellRing} title="Recordatorios de plazos" status={<SavedMark stamp={saved} id="recordatorios" />}
         description="Aviso en la campana a 30 días de la campaña de la Renta y del plazo del Modelo 721, y de nuevo a 7 días. Es la misma opción que la categoría Fiscal de General."
         action={
           <label className="inline-flex items-center cursor-pointer shrink-0">

@@ -29,15 +29,10 @@ export function compararCifras(declaradas: Partial<CifrasRenta>, actuales: Cifra
 /** Incremento a partir del cual hay que volver a presentar el 721. */
 export const INCREMENTO_721 = 20_000;
 
-export interface Presentacion721 { ejercicio: number; valor: number }
-
-/**
- * Obligación del 721 de un ejercicio: el valor en custodia de terceros supera
- * el umbral y, si ya se presentó en un ejercicio anterior, ha aumentado más
- * de 20.000 € respecto a esa última presentación.
- */
-export function obligacion721(valor: number, umbral: number, ultima: Presentacion721 | null): boolean {
-  if (!(valor > umbral)) return false;
-  if (!ultima) return true;
-  return valor - ultima.valor > INCREMENTO_721;
+export interface Presentacion721 {
+  ejercicio: number;
+  valor: number;
+  /** Monedas declaradas por entidad (#545), para la regla de extinción; no en presentaciones anteriores. */
+  posiciones?: { clave: string; entidad: string; asset: string; unidades: number; valorEur: number }[];
 }
+

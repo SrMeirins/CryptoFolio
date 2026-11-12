@@ -91,7 +91,8 @@ export async function presentadas(): Promise<(id: string, ejercicio: number) => 
 /** Último Modelo 721 presentado antes de `ejercicio`; null si no hay. */
 export async function ultimaPresentacion721(ejercicio: number): Promise<Presentacion721 | null> {
   const r = await db.query(
-    `SELECT ejercicio, (cifras->>'valor')::float AS valor FROM fiscal_declaraciones
+    `SELECT ejercicio, (cifras->>'valor')::float AS valor, cifras->'posiciones' AS posiciones FROM fiscal_declaraciones
      WHERE tipo = 'modelo721' AND ejercicio < $1 ORDER BY ejercicio DESC LIMIT 1`, [ejercicio]);
-  return r.rows[0] ? { ejercicio: r.rows[0].ejercicio, valor: r.rows[0].valor } : null;
+  const x = r.rows[0];
+  return x ? { ejercicio: x.ejercicio, valor: x.valor, ...(Array.isArray(x.posiciones) ? { posiciones: x.posiciones } : {}) } : null;
 }

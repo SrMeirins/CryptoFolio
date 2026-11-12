@@ -99,36 +99,107 @@ export interface EstadoUnidades {
   anios: number[]
 }
 
-export interface Modelo721Activo {
-  asset: string
-  wallet_id: string
-  wallet_name: string
-  wallet_color: string
-  wallet_kind: string
-  quantity: number
-  costBasisEur: number
-  precioEur: number
+/** Entidad que custodia las monedas de una o varias wallets (#545). */
+/** Datos de la entidad custodia para el formulario del 721; país null: fuera de España sin identificar. */
+export interface DatosEntidad721 { nombre: string; nif: string | null; pais: string | null; web: string | null }
+
+/** Cómo se sabe la custodia de una wallet: lo indicó el usuario, regla automática de su exchange o no se sabe. */
+export type OrigenCustodia = 'usuario' | 'automatico' | 'desconocido'
+
+export type ClaveRegla = 'binance' | 'bitvavo'
+
+/** Custodia de una wallet en una fecha (#545). */
+export interface Custodia721 {
+  /** null: no se sabe (computa por prudencia). */
+  enEspana: boolean | null
+  entidad: DatosEntidad721 | null
+  origen: OrigenCustodia
+  desde: string | null
+  /** Fila del usuario que la fija, para poder quitarla. */
+  filaId: string | null
+  regla: ClaveRegla | null
+}
+
+/** Regla automática de un exchange que la app importa, con sus fuentes. */
+export interface Regla721 {
+  clave: ClaveRegla
+  exchange: string
+  tramos: { desde: string | null; enEspana: boolean; entidad: DatosEntidad721 }[]
+  fuentes: { titulo: string; url: string }[]
+  nota: string | null
+}
+
+/** Lo que indicó el usuario para una wallet desde una fecha (null: desde siempre). */
+export interface FilaCustodia721 { id: string; walletId: string; desde: string | null; enEspana: boolean; entidad: DatosEntidad721 | null }
+
+/** Custodia de una wallet de exchange: la de hoy y lo indicado por el usuario. */
+export interface CustodiaWallet721 { walletId: string; nombre: string; regla: ClaveRegla | null; hoy: Custodia721; filas: FilaCustodia721[] }
+
+/** Monedas custodiadas por una entidad (o una wallet cuya entidad no se conoce). */
+export interface Grupo721 {
+  clave: string
+  entidad: DatosEntidad721 | null
+  /** null: no se sabe (computa por prudencia). */
+  enEspana: boolean | null
+  /** Cada wallet con cómo se sabe su custodia. */
+  wallets: ({ id: string; nombre: string } & Pick<Custodia721, 'origen' | 'desde' | 'filaId' | 'regla'>)[]
+  /** Computa para el 721: custodia fuera de España o desconocida. */
+  computa: boolean
+  activos: { asset: string; unidades: number; valorEur: number; sinPrecio: boolean }[]
+  totalEur: number
+}
+
+export type Motivo721 = 'umbral' | 'incremento' | 'extincion' | 'no_supera' | 'incremento_insuficiente'
+
+export interface Veredicto721 {
+  /** true: hay que presentarlo; false: no; null: faltan precios para saberlo. */
+  obligado: boolean | null
+  motivo: Motivo721
   valorEur: number
-  /** Sin precio a la fecha: valorEur = 0 (#267). */
-  sinPrecio: boolean
+  umbral: number
+  /** Valor a superar para volver a presentarlo, si ya se presentó. */
+  objetivoIncremento: number | null
+  /** Monedas declaradas que ya no tienes en su entidad. */
+  extinguidas: { entidad: string; asset: string }[]
+}
+
+export interface Historico721 {
+  ejercicio: number
+  /** Lo que computa: custodia fuera de España o desconocida. */
+  valorEur: number
+  /** Lo que hay en exchanges con custodia en España: no computa. */
+  noComputaEur: number
+  /** Lo que está fuera de los exchanges (autocustodia): no computa. */
+  autocustodiaEur: number
+  estimado: boolean
+  presentado: boolean
+  incompleto: boolean
 }
 
 export interface Modelo721 {
   year: number
   esAnioEnCurso: boolean
   fecha: string
-  activos: Modelo721Activo[]
+  /** Por entidad custodia (#545); solo wallets de exchange. */
+  grupos: Grupo721[]
+  veredicto: Veredicto721
+  historico: Historico721[]
+  /** Toda la cartera, autocustodia incluida. */
   totalValor: number
+  /** Lo que computa: custodia en el extranjero o sin entidad. */
   totalValorCustodia: number
   superaUmbral: boolean
   umbral: number
+  /** Wallets de exchange sin entidad asignada: computan, pero falta el dato. */
+  /** Wallets de exchange cuya custodia no se sabe: computan por prudencia. */
+  sinCustodia: { id: string; nombre: string }[]
+  /** Reglas automáticas de los exchanges que la app importa. */
+  reglas: Regla721[]
   /** Activos sin precio ahora: los totales son un mínimo (#267). */
   preciosPendientes: string[]
   incompleto: boolean
-  aviso: string
   /** Último 721 presentado antes de este ejercicio (#311). */
   ultimaPresentacion?: { ejercicio: number; valor: number } | null
-  /** Obligación con la regla del incremento de 20.000 € (#311). */
   obligado?: boolean
   /** Este ejercicio ya se presentó. */
   presentado?: { declaradoEn: string; valor: number } | null

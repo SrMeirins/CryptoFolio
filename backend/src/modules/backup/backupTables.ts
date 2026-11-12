@@ -12,6 +12,7 @@ export const BACKUP_TABLES = [
   { name: 'networks',             order: 'name' },
   { name: 'network_assets',       order: 'network_id, asset' },
   { name: 'wallets',              order: 'created_at, name' },
+  { name: 'wallet_custodia',      order: 'wallet_id, desde NULLS FIRST, id' },
   { name: 'wallet_addresses',     order: 'created_at, id' },
   { name: 'csv_imports',          order: 'imported_at, id' },
   { name: 'transactions',         order: 'timestamp, id' },

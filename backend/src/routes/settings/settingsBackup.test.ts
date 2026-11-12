@@ -66,7 +66,7 @@ describe('routes/settings — copias de seguridad (#453)', () => {
     expect(res.body).toMatchObject({ format: 'cryptofolio-backup', encrypted: false });
     expect(Object.keys(res.body.data).sort()).toEqual([
       'app_config', 'asset_metadata', 'cobertura_revisiones', 'csv_imports', 'fiscal_declaraciones', 'irpf_escalas',
-      'network_assets', 'networks', 'raw_transactions', 'transactions', 'wallet_addresses', 'wallets',
+      'network_assets', 'networks', 'raw_transactions', 'transactions', 'wallet_addresses', 'wallet_custodia', 'wallets',
     ]);
     expect(res.body.counts).toMatchObject({ transactions: 2, raw_transactions: 1, wallet_addresses: 1, irpf_escalas: 1 });
     expect(JSON.stringify(res.body)).not.toMatch(/network_api_keys|price_cache|fifo_lots/);
@@ -101,6 +101,24 @@ describe('routes/settings — copias de seguridad (#453)', () => {
     expect(res.body.code).toBe('datos');
     expect(await count('transactions')).toBe(2);
     expect(await count('backup_snapshots')).toBe(0);
+  });
+
+  it('la custodia indicada para cada wallet viaja en la copia (#545)', async () => {
+    await pool.query(
+      `INSERT INTO wallet_custodia (wallet_id, desde, en_espana, entidad_nombre, entidad_pais)
+       SELECT id, '2024-03-01', false, 'Entidad sintética', 'MT' FROM wallets WHERE name = 'Binance Spot'`);
+    const file = (await request(app).post('/api/settings/backup').send({})).body;
+    expect(file.data.wallet_custodia).toEqual([expect.objectContaining({ entidad_nombre: 'Entidad sintética', en_espana: false })]);
+    await pool.query('DELETE FROM wallet_custodia');
+    const res = await request(app).post('/api/settings/backup/restore').send({ backup: file, confirm: true });
+    expect(res.status).toBe(200);
+    const w = (await pool.query(
+      `SELECT c.entidad_nombre, to_char(c.desde, 'YYYY-MM-DD') AS desde FROM wallet_custodia c
+       JOIN wallets w ON w.id = c.wallet_id WHERE w.name = 'Binance Spot'`)).rows;
+    expect(w).toEqual([{ entidad_nombre: 'Entidad sintética', desde: '2024-03-01' }]);
+    // Deja la base como estaba para los siguientes casos (la restauración guardó una copia previa).
+    await pool.query('DELETE FROM wallet_custodia');
+    await pool.query('DELETE FROM backup_snapshots');
   });
 
   it('una columna que la versión actual no conoce se rechaza', async () => {
