@@ -16,7 +16,7 @@ import { AvisoCaducidad, PerdidasPendientes } from './fiscal/PerdidasPendientes'
 import { caducanEsteAnio } from '../utils/perdidasPendientes'
 import { Modelo721Card } from './fiscal/Modelo721Card'
 import { TablaEventos } from './fiscal/TablaEventos'
-import { TablaRendimientos } from './fiscal/TablaRendimientos'
+import { SeccionRendimientos } from './fiscal/rendimientos/SeccionRendimientos'
 import { ExportPanel } from './fiscal/ExportPanel'
 import { YearTabs } from './fiscal/YearTabs'
 import { YearCards } from './fiscal/YearCards'
@@ -28,7 +28,7 @@ import { EstadoDeclaracion } from './fiscal/declaracion/EstadoDeclaracion'
 import type { FiscalHito } from '../api/portfolio'
 import { useFiscalShortcuts } from './fiscal/useFiscalShortcuts'
 import { EurOnlyBadge } from '../components/EurOnlyBadge'
-import { badgeClasses, cardClasses, EmptyState, Notice, QueryError, Skeleton, PageHeader, panelEnterStyle, tabId, tabPanelId, SectionNav, RefreshBar, ViewHeader, type StatStripCell } from '../components/ui'
+import { badgeClasses, cardClasses, EmptyState, QueryError, Skeleton, PageHeader, panelEnterStyle, tabId, tabPanelId, SectionNav, RefreshBar, ViewHeader, type StatStripCell } from '../components/ui'
 import { navIcon } from '../constants/navigation'
 import { FirstUseEmpty } from '../components/FirstUseEmpty'
 import { useHasTransactions } from '../hooks/useHasTransactions'
@@ -420,18 +420,8 @@ export function Fiscal() {
             <>
               {/* La clave remonta la tabla cuando un gráfico trae filtros nuevos */}
               <Block i={0}><TablaEventos key={JSON.stringify(urlFilters)} events={events.fiscalEvents} summary={summary} initialFilters={urlFilters} /></Block>
-              <Block i={1}><TablaRendimientos rendimientos={events.rendimientos.filter(r => r.base === 'ahorro')} year={activeYear} /></Block>
-              {/* Base general (#537): airdrops, minería y cashback, fuera de la cuota del ahorro. */}
-              {events.rendimientos.some(r => r.base === 'general') && (
-                <Block i={2}>
-                  <TablaRendimientos rendimientos={events.rendimientos.filter(r => r.base === 'general')} year={activeYear}
-                    id="fiscal-base-general" title="Base general (informativo)" archivo="base_general_fiscal"
-                    nota={<Notice tipo="informacion" compact>
-                      Ganancias no derivadas de transmisión (airdrops, minería y cashback). Tributan en la base general a tu tipo marginal,
-                      que depende del resto de tus ingresos: no entran en la cuota estimada ni se compensan con las pérdidas del ahorro.
-                    </Notice>} />
-                </Block>
-              )}
+              {/* Rendimientos (#544): tira por tipo, gráfico mensual y las dos bases (#537) agrupadas por mes. */}
+              <Block i={1}><SeccionRendimientos rendimientos={events.rendimientos} year={activeYear} /></Block>
             </>
           )
         ) : summary && vista === 'modelo721' ? (

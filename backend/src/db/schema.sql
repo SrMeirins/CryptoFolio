@@ -336,7 +336,9 @@ CREATE TABLE fifo_lots (
   -- Mismo umbral que FIFO_DUST_EPSILON del motor: un lote cerrado no puede
   -- tener remanente relevante.
   CONSTRAINT chk_fifo_lots_closed_no_remaining CHECK (NOT is_closed OR quantity_remaining <= 0.000001),
-  CONSTRAINT chk_fifo_lots_usd_per_eur_pos CHECK (usd_per_eur IS NULL OR usd_per_eur > 0)
+  CONSTRAINT chk_fifo_lots_usd_per_eur_pos CHECK (usd_per_eur IS NULL OR usd_per_eur > 0),
+  -- Lote del que viene un traslado entre wallets (#544), para seguir unas unidades.
+  origin_lot_id       UUID REFERENCES fifo_lots(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_fifo_lots_asset      ON fifo_lots(asset);
@@ -368,6 +370,7 @@ CREATE TABLE fifo_lot_consumptions (
 );
 
 CREATE INDEX idx_consumptions_lot         ON fifo_lot_consumptions(lot_id);
+CREATE INDEX idx_fifo_lots_origin ON fifo_lots(origin_lot_id) WHERE origin_lot_id IS NOT NULL;
 CREATE INDEX idx_consumptions_transaction ON fifo_lot_consumptions(consuming_transaction_id);
 CREATE INDEX idx_consumptions_date        ON fifo_lot_consumptions(consumed_at);
 

@@ -19,6 +19,10 @@ export const CHART_COLOR_VARS = {
   tooltipBg: '--cf-chart-tooltip-bg',
   tooltipBorder: '--cf-chart-tooltip-border',
   tooltipLabel: '--cf-chart-tooltip-label',
+  // Series por categoría (#544): tokens del tema, también con tema claro.
+  brand: '--cf-brand-solid',
+  info: '--cf-info',
+  purple: '--cf-accent-purple',
 } as const
 
 export type ChartColors = Record<keyof typeof CHART_COLOR_VARS, string>
@@ -30,6 +34,7 @@ export const DARK_CHART_COLORS: ChartColors = {
   grid: 'rgba(255,255,255,0.04)', gridStrong: '#2a2d3e', cursor: 'rgba(255,255,255,0.15)',
   cursorSoft: 'rgba(255,255,255,0.03)', cursorLine: 'rgba(255,255,255,0.1)', tooltipBg: '#0f1117', tooltipBorder: 'rgba(255,255,255,0.08)',
   tooltipLabel: '#9ca3af',
+  brand: '#6b4ef5', info: '#4b8cf7', purple: '#8b5cf6',
 }
 
 /** Lee cada variable con `get`; si alguna falta o está vacía, usa el valor oscuro. */

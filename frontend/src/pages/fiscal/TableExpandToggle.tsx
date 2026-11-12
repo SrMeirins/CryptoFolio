@@ -2,8 +2,7 @@ import { ChevronUp, ChevronDown, type LucideIcon } from 'lucide-react'
 
 /**
  * Botón de expandir/contraer de cabecera de tabla (icono + título + contador
- * + chevron) — mismo patrón repetido en TablaRendimientos.tsx y
- * TablaEventos.tsx (pendiente de migrar en su propio turno).
+ * + chevron) de TablaEventos.tsx. Los rendimientos (#544) usan su propia cabecera.
  */
 export function TableExpandToggle({ icon: Icon, title, count, expanded, onToggle }: {
   icon: LucideIcon
