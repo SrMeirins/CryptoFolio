@@ -41,7 +41,8 @@ test('el índice lleva a cada tema', async ({ page }) => {
   await page.goto('/fiscal')
   const { panel } = await abrirConTeclado(page)
   const indice = panel.getByRole('navigation', { name: 'Temas' })
-  await expect(indice.getByRole('button')).toHaveCount(5)
+  // Uno por tema, incluido «Rendimientos» (#544).
+  await expect(indice.getByRole('button')).toHaveCount(6)
   await indice.getByRole('button', { name: 'Rentabilidad' }).click()
   await expect(panel.getByRole('heading', { name: 'Rentabilidad', level: 3 })).toBeFocused()
 })
