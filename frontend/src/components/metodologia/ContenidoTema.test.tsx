@@ -7,8 +7,8 @@ import { TEMAS_METODO, temaHeadingId } from './temas'
 // ejemplo, y según la guía de estilo de textos (sin raya larga ni flechas).
 describe('Cómo calculamos (#493)', () => {
   it('cubre los cinco temas en orden y con id de encabezado único', () => {
-    expect(TEMAS_METODO.map(t => t.id)).toEqual(['fifo', 'valoracion', 'rentabilidad', 'compensacion', 'modelo721'])
-    expect(new Set(TEMAS_METODO.map(t => temaHeadingId(t.id))).size).toBe(5)
+    expect(TEMAS_METODO.map(t => t.id)).toEqual(['fifo', 'valoracion', 'rentabilidad', 'compensacion', 'rendimientos', 'modelo721'])
+    expect(new Set(TEMAS_METODO.map(t => temaHeadingId(t.id))).size).toBe(6)
   })
 
   it.each(TEMAS_METODO.map(t => t.id))('%s: tiene texto y un ejemplo, sin raya larga ni flechas', tema => {

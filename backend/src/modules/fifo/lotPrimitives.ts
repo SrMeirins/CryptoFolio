@@ -198,11 +198,12 @@ export async function moveLots(
       `INSERT INTO fifo_lots (
         asset, quantity_original, quantity_remaining,
         cost_basis_eur, price_per_unit_eur, fee_eur,
-        open_transaction_id, opened_at, wallet_id, usd_per_eur
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        open_transaction_id, opened_at, wallet_id, usd_per_eur, origin_lot_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [move.asset, consumed, consumed, costMoved + extraShare,
         extraShare > 0 ? (costMoved + extraShare) / consumed : lot.pricePerUnitEur, feeHeredada + extraShare,
-        move.txId, lot.openedAt, move.toWalletId, lot.usdPerEur]
+        // Lote de origen (#544): permite seguir las unidades a través de wallets.
+        move.txId, lot.openedAt, move.toWalletId, lot.usdPerEur, lot.id]
     );
 
     quantityToMove -= consumed;

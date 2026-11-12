@@ -55,6 +55,17 @@ export function ContenidoTema({ tema }: { tema: TemaMetodo }) {
           <Fuente>arts. 48 y 49 de la Ley del IRPF (integración y compensación en la base del ahorro).</Fuente>
         </>
       )
+    case 'rendimientos':
+      return (
+        <>
+          <p>Lo que recibes sin vender nada se declara por su valor de mercado al recibirlo: cantidad por precio de ese día. Ese mismo valor pasa a ser el coste de esas unidades en el FIFO, así que cuando las vendas o permutes solo tributa la diferencia con lo que valían al recibirlas.</p>
+          <p>El staking y los intereses (Simple Earn y similares) son rendimientos del capital mobiliario: van a la base del ahorro y entran en la cuota estimada. Las pérdidas patrimoniales pueden compensar hasta el 25 % de ellos.</p>
+          <p>Airdrops, minería y cashback son ganancias patrimoniales no derivadas de transmisión: van a la base general, a tu tipo marginal, y la app solo los informa. Airdrops y cashback se marcan «Revisar» porque su tratamiento no está fijado: no hay consulta vinculante específica para los airdrops, y un cashback que devuelve una comisión podría tratarse como menor coste de la operación.</p>
+          <p>El estado de cada rendimiento sigue sus unidades aunque las muevas de wallet: dice si siguen en tu poder o qué parte se ha transmitido ya, con su resultado y en qué ejercicios.</p>
+          <Ejemplo>Recibes 10 AAA de staking cuando valen 2 €: declaras 20 € de rendimiento. Si después vendes 3 por 30 €, la ganancia es 30 menos 6 (lo que valían al recibirlas): 24 €.</Ejemplo>
+          <Fuente>arts. 25.2, 25.4 y 33.1 de la Ley del IRPF; manual práctico de Renta de la AEAT, «Monedas virtuales».</Fuente>
+        </>
+      )
     case 'modelo721':
       return (
         <>

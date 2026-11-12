@@ -77,6 +77,26 @@ export interface RendimientoEvent {
   wallet: string
   /** Base del IRPF (#537): el ahorro entra en la cuota; la general solo se informa. */
   base: 'ahorro' | 'general'
+  /** Transacción del rendimiento (#544), para enlazarla en Historial. */
+  txId?: string
+  /** Tipo de operación (STAKING_REWARD, AIRDROP…) (#544). */
+  operacion?: string
+  /** Precio por unidad al recibir (#544): de él salen el valor y el coste FIFO. */
+  precioEur?: number
+  /** Cuánto de lo recibido se ha transmitido ya y con qué resultado (#544); null sin lote (cobrado en EUR). */
+  estado?: EstadoUnidades | null
+}
+
+/** Estado de las unidades de un rendimiento (#544). */
+export interface EstadoUnidades {
+  cantidad: number
+  /** Lo que sigue en tu poder, en cualquier wallet. */
+  conservada: number
+  /** Lo que salió sin efecto fiscal: devolución de un préstamo de margen o comisión de red al coste. */
+  sinEfecto: number
+  transmitida: number
+  resultadoEur: number
+  anios: number[]
 }
 
 export interface Modelo721Activo {

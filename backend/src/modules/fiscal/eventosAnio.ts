@@ -6,6 +6,7 @@ import { hayRecompra, type Adquisicion } from './antiRecompra';
 import { getPrecioMomentoEur } from '../prices/momento';
 import { OPS_RENTA_ESPECIE, baseDeRenta, type BaseIrpf } from './clasificacionRentas';
 import type { CriterioValor } from '../fifo/valoracion';
+import { estadoDeRendimientos, type EstadoUnidades } from './estadoUnidades';
 
 function getTipoRendimiento(operationType: string): string {
   const map: Record<string, string> = {
@@ -94,6 +95,14 @@ export interface Rendimiento {
   wallet: string;
   /** Base del IRPF en la que se integra (#537): el ahorro entra en la cuota; la general solo se informa. */
   base: BaseIrpf;
+  /** Transacción del rendimiento (#544), para enlazarla en Historial. */
+  txId: string;
+  /** Tipo de operación (STAKING_REWARD, AIRDROP…), para agrupar y marcar los que se revisan (#544). */
+  operacion: string;
+  /** Precio por unidad al recibir: el valor y el coste FIFO de esas unidades salen de él (#544). */
+  precioEur: number;
+  /** Cuánto de lo recibido se ha transmitido ya y con qué resultado (#544); null sin lote FIFO. */
+  estado: EstadoUnidades | null;
 }
 
 // Carga y formatea los eventos fiscales y rendimientos de un año dado.
@@ -281,9 +290,11 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
 
   const rendRows = await db.query(`
     SELECT
+      t.id           AS tx_id,
       t.timestamp    AS fecha,
       t.operation_type,
       t.asset        AS activo,
+      COALESCE(t.price_per_unit, 0) AS precio,
       t.amount_net   AS cantidad,
       t.amount_net * COALESCE(t.price_per_unit, 0) AS valor_eur,
       w.name         AS wallet
@@ -294,6 +305,9 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
     ORDER BY t.timestamp ASC
   `, [year, tz, OPS_RENTA_ESPECIE]);
 
+  // Estado de las unidades recibidas (#544): una sola consulta para todo el año.
+  const estados = await estadoDeRendimientos(rendRows.rows.map((r: Record<string, unknown>) => r.tx_id as string), tz);
+
   const rendimientos: Rendimiento[] = rendRows.rows.map((row: Record<string, unknown>) => ({
     fecha:    localDate(tz, new Date(row.fecha as string)),
     fechaHora: new Date(row.fecha as string).toISOString(),
@@ -303,6 +317,10 @@ export async function getEventosAnio(year: number): Promise<{ fiscalEvents: Even
     cantidad: parseFloat(row.cantidad as string),
     valorEur: parseFloat(row.valor_eur as string),
     wallet:   row.wallet as string,
+    txId:     row.tx_id as string,
+    operacion: row.operation_type as string,
+    precioEur: parseFloat(row.precio as string),
+    estado:   estados.get(row.tx_id as string) ?? null,
   }));
 
   return { fiscalEvents, rendimientos };
