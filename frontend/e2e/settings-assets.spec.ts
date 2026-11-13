@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Activos en Ajustes (#450): tabla ordenable, filtros, edición en panel, salud
 // de los precios y reintento. Solo lectura: el reintento se intercepta.
@@ -59,11 +59,11 @@ for (const theme of ['dark', 'light'] as const) {
     await page.goto('/settings?tab=assets')
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
     await page.getByRole('table', { name: 'Activos y sus precios' }).waitFor({ timeout: 15_000 })
-    let r = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+    let r = await (await axeEstable(page)).withTags(WCAG).analyze()
     expect(r.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
     await page.getByRole('button', { name: /^Editar [A-Z0-9]+$/ }).first().click()
     await page.waitForTimeout(400)
-    r = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+    r = await (await axeEstable(page)).withTags(WCAG).analyze()
     expect(r.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Fallo de una consulta (#498): el panel dice qué no se pudo cargar y ofrece
 // Reintentar; el resto de la página sigue. Se fuerza un 500 sintético y, al
@@ -40,6 +40,6 @@ test('el error no tiene violaciones de axe', async ({ page }) => {
   await page.goto('/')
   const error = page.getByRole('alert').filter({ hasText: 'No se pudieron cargar las posiciones' })
   await expect(error).toBeVisible({ timeout: 15_000 })
-  const r = await new AxeBuilder({ page }).withTags(WCAG).include('main').analyze()
+  const r = await (await axeEstable(page)).withTags(WCAG).include('main').analyze()
   expect(r.violations).toEqual([])
 })

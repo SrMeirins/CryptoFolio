@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Copias de seguridad en Datos (#453). Solo lectura: exportar, revisar,
 // restaurar, la lista de estados previos y volver atrás se interceptan con
@@ -151,7 +151,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
     await card(page).getByLabel('Elegir copia').setInputFiles({ name: 'copia.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(SEALED)) })
     await page.waitForTimeout(800)
-    const { violations } = await new AxeBuilder({ page }).include('section[aria-label="Copias de seguridad"]').withTags(WCAG).analyze()
+    const { violations } = await (await axeEstable(page)).include('section[aria-label="Copias de seguridad"]').withTags(WCAG).analyze()
     expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }

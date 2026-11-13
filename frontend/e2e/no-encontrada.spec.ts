@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Página «no encontrada» (#487). Solo lectura: se bloquea cualquier petición
 // que no sea GET.
@@ -45,6 +45,6 @@ for (const theme of ['dark', 'light'] as const) {
     await page.emulateMedia({ colorScheme: theme })
     await page.goto('/portfolioo')
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-    expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([])
+    expect((await (await axeEstable(page)).withTags(WCAG).analyze()).violations).toEqual([])
   })
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Modelo 721 por custodia (#545): la respuesta con su motivo, margen y barra;
 // dónde está tu dinero (tres cifras); «Te falta» con la pregunta de tres
@@ -151,14 +151,14 @@ test('el histórico tiene su tabla accesible y la vista no tiene violaciones de 
   await expect(vista).toContainText(`Resaltado, ${anio}.`)
   await expect(vista).toContainText('arriba, la autocustodia. Estas dos no computan')
   await expect(tabla.getByRole('row', { name: new RegExp(`^${anio} `) })).toContainText('4.500,00')
-  const r = await new AxeBuilder({ page }).include(`[aria-labelledby="m721-title"]`).withTags(WCAG).analyze()
+  const r = await (await axeEstable(page)).include(`[aria-labelledby="m721-title"]`).withTags(WCAG).analyze()
   expect(r.violations).toEqual([])
   // Qué cuenta y qué no está en la ayuda.
   await vista.getByRole('button', { name: '¿Cómo funciona?' }).click()
   await expect(page.getByRole('dialog')).toContainText('no va en el 721, sino en el 720')
   await page.keyboard.press('Escape')
   await vista.getByRole('button', { name: 'Cambiar la custodia de Nativo Spain SL' }).click()
-  const d = await new AxeBuilder({ page }).include('[role="dialog"]').withTags(WCAG).analyze()
+  const d = await (await axeEstable(page)).include('[role="dialog"]').withTags(WCAG).analyze()
   expect(d.violations).toEqual([])
 })
 

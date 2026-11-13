@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Comisión de red en traspasos propios (#532). Solo lectura: guardar el ajuste
 // y recalcular el FIFO se interceptan; la base de datos real no se toca.
@@ -59,7 +59,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.goto('/settings?tab=fiscal')
     await grupo(page).getByRole('radio', { name: 'Sumar al coste' }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
-    const r = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+    const r = await (await axeEstable(page)).withTags(WCAG).analyze()
     expect(r.violations).toEqual([])
   })
 }

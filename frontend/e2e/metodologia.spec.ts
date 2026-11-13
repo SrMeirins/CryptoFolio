@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Pie de metodología y panel «Cómo calculamos» (#493): se abre con teclado en
 // el tema de la pantalla, el índice lleva a los demás y Escape devuelve el
@@ -57,7 +57,7 @@ for (const theme of ['dark', 'light'] as const) {
     // medio fundido. Se espera a que acaben las animaciones finitas.
     await page.waitForFunction(() => document.getAnimations()
       .every(a => a.playState !== 'running' || a.effect?.getComputedTiming().iterations === Infinity))
-    const r = await new AxeBuilder({ page }).withTags(WCAG).include('[role="dialog"]').analyze()
+    const r = await (await axeEstable(page)).withTags(WCAG).include('[role="dialog"]').analyze()
     expect(r.violations).toEqual([])
   })
 }

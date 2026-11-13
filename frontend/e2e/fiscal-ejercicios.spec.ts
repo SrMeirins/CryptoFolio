@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Ejercicios como tarjetas con estado en Resumen (#536). Solo lectura.
 
@@ -71,7 +71,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.emulateMedia({ colorScheme: theme })
     await page.goto('/fiscal')
     await expect(tarjetas(page)).toBeVisible()
-    const r = await new AxeBuilder({ page }).withTags(WCAG).include('[aria-label="Ejercicios fiscales"]').analyze()
+    const r = await (await axeEstable(page)).withTags(WCAG).include('[aria-label="Ejercicios fiscales"]').analyze()
     expect(r.violations.map(x => `${x.id}: ${x.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }

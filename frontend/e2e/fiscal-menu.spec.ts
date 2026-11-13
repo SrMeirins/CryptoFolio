@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Fiscal con menú lateral y cabecera de vista (#535). Solo lectura.
 
@@ -67,7 +67,7 @@ for (const theme of ['dark', 'light'] as const) {
       // En CI, con la suite en paralelo, las cifras pueden tardar más de 5 s.
       await expect(page.getByRole('list', { name: /^Cifras:/ })).toBeVisible({ timeout: 15_000 })
       await page.waitForLoadState('networkidle')
-      const r = await new AxeBuilder({ page }).withTags(WCAG).include('main').analyze()
+      const r = await (await axeEstable(page)).withTags(WCAG).include('main').analyze()
       expect(r.violations.map(x => `${v}: ${x.id}: ${x.nodes.map(n => n.target.join(" ")).slice(0, 4).join(" | ")}`)).toEqual([])
     }
   })

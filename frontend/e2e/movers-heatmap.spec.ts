@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Mapa de movimientos del Dashboard (#438): con una tesela activa, el resto se
 // atenúa solo en el fondo; el texto conserva su opacidad y su contraste.
@@ -22,7 +22,7 @@ for (const theme of ['dark', 'light'] as const) {
     const opacity = await dimmed.first().evaluate(el => [getComputedStyle(el).opacity, getComputedStyle(el.querySelector('.font-semibold')!).opacity])
     expect(opacity).toEqual(['1', '1'])
     await page.waitForTimeout(300)
-    const { violations } = await new AxeBuilder({ page }).include('[data-heat-tile]').withTags(WCAG).analyze()
+    const { violations } = await (await axeEstable(page)).include('[data-heat-tile]').withTags(WCAG).analyze()
     expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }
