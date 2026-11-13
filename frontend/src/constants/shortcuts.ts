@@ -31,6 +31,9 @@ export const ATAJOS_PANTALLA: Readonly<Record<string, GrupoAtajos>> = {
     atajos: [
       [['1', '2', '3', '4'], 'Ir a Resumen, Operaciones, Modelo 721 o Planificar'],
       [['Flecha izquierda', 'Flecha derecha'], 'Ejercicio anterior o siguiente'],
+      [['A'], 'En Planificar, añadir al plan la sugerencia enfocada'],
+      [['Supr'], 'En el plan, quitar la venta enfocada'],
+      [['P'], 'En Planificar, abrir o cerrar el plan'],
     ],
   },
   '/history': {
