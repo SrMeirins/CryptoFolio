@@ -1,6 +1,4 @@
-import { getUmbral721, sumaValorCustodiaExchange, valorizarLotesEnFecha } from './lotesValoracion';
-import { obligacion721 } from './declaraciones';
-import { ultimaPresentacion721 } from './declaracionesRepo';
+import { estado721 } from './modelo721';
 import { endOfLocalYear, localDate, localYearMonth } from '../time/localTime';
 import { getAppTimezone } from '../time/appTimezone';
 import { db } from '../../db/client';
@@ -15,11 +13,8 @@ let cache: { dia: string; tz: string; valor: Promise<Map<number, boolean | null>
 // Marcar o desmarcar un 721 cambia la regla: los endpoints de declaraciones vacían la caché.
 
 async function obligacionA(ejercicio: number, fecha: Date): Promise<boolean | null> {
-  const { activos, preciosPendientes } = await valorizarLotesEnFecha(fecha);
-  // Regla del incremento de 20.000 € respecto al último 721 presentado (#311).
-  const supera = obligacion721(sumaValorCustodiaExchange(activos), await getUmbral721(), await ultimaPresentacion721(ejercicio));
-  // Con precios pendientes el valor es un mínimo: si ya supera, la obligación es segura.
-  return supera ? true : preciosPendientes.length > 0 ? null : false;
+  // Umbral, incremento de 20.000 € y extinción, solo con custodia en el extranjero (#311, #545).
+  return (await estado721(ejercicio, fecha)).veredicto.obligado;
 }
 
 export async function obligaciones721(now: Date = new Date()): Promise<Obligacion721> {

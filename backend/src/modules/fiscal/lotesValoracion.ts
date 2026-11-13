@@ -160,10 +160,3 @@ export async function valorizarLotesEnFecha(fecha: Date, budgetMs = priceBudgetM
   return { activos, preciosPendientes };
 }
 
-// Solo la custodia de terceros (exchanges) computa para el umbral del
-// Modelo 721; la autocustodia (hardware/software) no se declara.
-export function sumaValorCustodiaExchange(activos: LoteValorizado[]): number {
-  return activos
-    .filter(a => a.wallet_kind === 'exchange')
-    .reduce((sum, a) => sum + a.valorEur, 0);
-}

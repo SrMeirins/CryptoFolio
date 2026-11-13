@@ -15,7 +15,8 @@ let pool: Pool;
 let app: import('express').Express;
 
 async function seedLot(asset: string, quantity: number) {
-  const w = (await pool.query(`SELECT id FROM wallets WHERE name = 'Binance Spot'`)).rows[0].id;
+  // Bitvavo: su custodia está fuera de España por la regla automática, así que computa (#545).
+  const w = (await pool.query(`SELECT id FROM wallets WHERE name = 'Bitvavo'`)).rows[0].id;
   const tx = await pool.query(
     `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id)
      VALUES ('BUY', '2024-01-10T10:00:00Z', $1, $2, $2, $3) RETURNING id`,
@@ -62,8 +63,10 @@ describe('rutas fiscales con precios no disponibles (#267)', () => {
     expect(res.body.incompleto).toBe(true);
     // El mínimo ya supera el umbral: la obligación es segura aunque falten precios.
     expect(res.body.superaUmbral).toBe(true);
-    const ada = res.body.activos.find((a: { asset: string }) => a.asset === 'ADA');
-    const dot = res.body.activos.find((a: { asset: string }) => a.asset === 'DOT');
+    // Los activos van por entidad custodia (#545).
+    const activos = (res.body.grupos as { activos: { asset: string }[] }[]).flatMap(g => g.activos);
+    const ada = activos.find(a => a.asset === 'ADA');
+    const dot = activos.find(a => a.asset === 'DOT');
     expect(ada).toMatchObject({ sinPrecio: true, valorEur: 0 });
     expect(dot).toMatchObject({ sinPrecio: true, valorEur: 0 });
   });

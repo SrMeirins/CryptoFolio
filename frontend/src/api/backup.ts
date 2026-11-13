@@ -5,6 +5,7 @@ import { api } from './client'
 export type BackupTable =
   | 'networks' | 'network_assets' | 'wallets' | 'wallet_addresses' | 'csv_imports' | 'transactions'
   | 'raw_transactions' | 'asset_metadata' | 'app_config' | 'cobertura_revisiones' | 'fiscal_declaraciones' | 'irpf_escalas'
+  | 'entidades_custodia' | 'wallet_entidades'
 
 export type BackupCounts = Partial<Record<BackupTable, number>>
 

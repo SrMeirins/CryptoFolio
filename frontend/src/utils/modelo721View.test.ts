@@ -1,69 +1,107 @@
 import { describe, expect, it } from 'vitest'
-import { buildModelo721Csv, liveModelo721, margenUmbral, modelo721View } from './modelo721View'
-import type { Modelo721, Modelo721Activo } from '../pages/fiscal/types'
+import { autocustodiaEur, buildModelo721Csv, escalaBarra, escalaRedonda, liveModelo721, margenUmbral, repartoEntidades, textoMargen, textoVeredicto } from './modelo721View'
+import type { Grupo721, Modelo721, Veredicto721 } from '../pages/fiscal/types'
 
-// Modelo 721 (#303). Datos sintéticos.
-const act = (asset: string, wallet: string, kind: string, valor: number, extra: Partial<Modelo721Activo> = {}): Modelo721Activo => ({
-  asset, wallet_id: wallet, wallet_name: `W ${wallet}`, wallet_color: '#123456', wallet_kind: kind,
-  quantity: 2, costBasisEur: 0, precioEur: valor / 2, valorEur: valor, sinPrecio: false, ...extra,
+// Modelo 721 por entidad (#545). Datos sintéticos.
+const entidad = { nombre: 'Exchange Sintético Ltd', nif: 'MT000', pais: 'MT', web: 'https://ejemplo.test' }
+const grupo = (p: Partial<Grupo721>): Grupo721 => ({
+  clave: 'entidad:e1', entidad, enEspana: false, wallets: [{ id: 'w1', nombre: 'Spot', origen: 'automatico', desde: null, filaId: null, regla: null }, { id: 'w2', nombre: 'Margen', origen: 'automatico', desde: null, filaId: null, regla: null }], computa: true,
+  activos: [{ asset: 'AAA', unidades: 2, valorEur: 40_000, sinPrecio: false }], totalEur: 40_000, ...p,
+})
+const veredicto = (p: Partial<Veredicto721> = {}): Veredicto721 => ({
+  obligado: false, motivo: 'no_supera', valorEur: 40_000, umbral: 50_000, objetivoIncremento: null, extinguidas: [], ...p,
+})
+const datos = (p: Partial<Modelo721> = {}): Modelo721 => ({
+  year: 2026, esAnioEnCurso: true, fecha: '2026-11-12', grupos: [grupo({})], veredicto: veredicto(), historico: [],
+  totalValor: 55_000, totalValorCustodia: 40_000, superaUmbral: false, umbral: 50_000, sinCustodia: [], reglas: [],
+  preciosPendientes: [], incompleto: false, ...p,
 })
 
-const activos = [
-  act('BTC', 'spot', 'exchange', 30_000),
-  act('ETH', 'spot', 'exchange', 5_000),
-  act('ADA', 'fund', 'exchange', 1_000),
-  act('XRP', 'ledger', 'hardware', 20_000),
-  act('NEW', 'fund', 'exchange', 0, { sinPrecio: true }),
-]
+describe('textoVeredicto', () => {
+  it('umbral, incremento y extinción explican por qué obliga', () => {
+    expect(textoVeredicto(veredicto({ obligado: true, motivo: 'umbral', valorEur: 60_000 }), false)).toMatchObject({ titulo: 'Tienes que presentarlo', tono: 'obligado' })
+    expect(textoVeredicto(veredicto({ obligado: true, motivo: 'incremento' }), false).motivo).toMatch(/más de 20\.000 €/)
+    const e = textoVeredicto(veredicto({ obligado: true, motivo: 'extincion', extinguidas: [{ entidad: 'X Ltd', asset: 'BBB' }] }), false)
+    expect(e.motivo).toMatch(/BBB en X Ltd/)
+    expect(textoVeredicto(veredicto({ obligado: true, motivo: 'umbral' }), true).titulo).toMatch(/ya está presentado/)
+  })
+  it('no obliga, con el objetivo si ya se presentó; sin precios, dudoso', () => {
+    expect(textoVeredicto(veredicto(), false)).toMatchObject({ titulo: 'No tienes que presentarlo', tono: 'libre' })
+    expect(textoVeredicto(veredicto({ motivo: 'incremento_insuficiente', objetivoIncremento: 80_000 }), false).motivo).toMatch(/80\.000/)
+    expect(textoVeredicto(veredicto({ obligado: null }), false).tono).toBe('dudoso')
+  })
+})
 
-describe('modelo721View', () => {
-  const v = modelo721View(activos)
-  it('agrupa por exchange de mayor a menor y resume la autocustodia', () => {
-    expect(v.exchanges.map(g => `${g.name}:${g.valor}`)).toEqual(['W spot:35000', 'W fund:1000'])
-    expect(v.exchanges[0].activos.map(a => a.asset)).toEqual(['BTC', 'ETH'])
-    expect(v.exchanges[1].sinPrecio).toBe(1)
-    expect(v.autocustodia).toEqual({ valor: 20_000, activos: 1, wallets: 1 })
+describe('escalaBarra, margen y autocustodia', () => {
+  it('la escala cubre el valor, el umbral y el objetivo con margen', () => {
+    const e = escalaBarra({ valorEur: 40_000, umbral: 50_000, objetivoIncremento: 80_000 })
+    expect(e.max).toBeCloseTo(88_000, 6)
+    expect(e.pct(80_000)).toBeCloseTo(90.909, 2)
+    expect(e.pct(200_000)).toBe(100)
   })
-  it('la suma de los exchanges es el total en custodia de terceros', () => {
-    expect(v.totalExchanges).toBe(36_000)
-  })
-  it('margen hasta el umbral', () => {
-    expect(margenUmbral({ totalValorCustodia: 36_000, umbral: 50_000 })).toBe(14_000)
-    expect(margenUmbral({ totalValorCustodia: 60_000, umbral: 50_000 })).toBe(-10_000)
+  it('margen hasta el umbral y valor en autocustodia', () => {
+    expect(margenUmbral(datos())).toBe(10_000)
+    expect(autocustodiaEur(datos())).toBe(15_000)
   })
 })
 
 describe('buildModelo721Csv', () => {
-  const base = { year: 2025, esAnioEnCurso: false, fecha: '2025-12-31', totalValor: 0, totalValorCustodia: 0, superaUmbral: false, umbral: 50_000, preciosPendientes: [], incompleto: false, aviso: '' } as Omit<Modelo721, 'activos'>
-  it('solo exchanges, con la fecha de valoración', () => {
-    const lines = buildModelo721Csv({ ...base, activos }).split('\n')
-    expect(lines).toHaveLength(1 + 4)
-    expect(lines[1]).toBe('2025-12-31;W spot;BTC;2;15000;30000.00;')
-    expect(lines.some(l => l.includes('XRP'))).toBe(false)
-    expect(lines.find(l => l.includes(';NEW;'))?.endsWith(';sí')).toBe(true)
-  })
-  it('neutraliza fórmulas en los nombres', () => {
-    const csv = buildModelo721Csv({ ...base, activos: [act('BTC', 'x', 'exchange', 10, { wallet_name: '=cmd|calc' })] })
-    expect(csv.split('\n')[1]).toContain(";'=cmd|calc;")
+  it('una fila por entidad y activo, con los datos de la entidad y si computa', () => {
+    const csv = buildModelo721Csv(datos({ grupos: [grupo({}), grupo({ clave: 'wallet:w9', entidad: null, wallets: [{ id: 'w9', nombre: 'Otra', origen: 'desconocido', desde: null, filaId: null, regla: null }], computa: true })] }))
+    const [cab, a, b] = csv.split('\n')
+    expect(cab).toBe('Fecha de valoración;Entidad;NIF;País;Web;Wallets;Activo;Unidades;Valor (EUR);Computa;Sin precio')
+    expect(a).toBe('2026-11-12;Exchange Sintético Ltd;MT000;MT;https://ejemplo.test;Spot, Margen;AAA;2;40000.00;sí;')
+    expect(b).toMatch(/^2026-11-12;Sin entidad asignada;;;;Otra;AAA/)
   })
 })
 
 describe('liveModelo721', () => {
-  const data = { year: 2026, esAnioEnCurso: true, fecha: '2026-10-19', activos, totalValor: 56_000, totalValorCustodia: 36_000, superaUmbral: false, umbral: 50_000, preciosPendientes: ['NEW'], incompleto: true, aviso: '' } as Modelo721
-  it('revalora con el precio en vivo y recalcula totales y estado', () => {
-    const live = liveModelo721(data, { BTC: 25_000, XRP: 12_000, NEW: 3 })
-    expect(live.activos.find(a => a.asset === 'BTC')?.valorEur).toBe(50_000)
-    expect(live.totalValorCustodia).toBe(50_000 + 5_000 + 1_000 + 6)
-    expect(live.totalValor).toBe(live.totalValorCustodia + 24_000)
-    expect(live.superaUmbral).toBe(true)
-    expect(live.incompleto).toBe(false)
+  it('año en curso: revalora con el precio en vivo y rehace el veredicto', () => {
+    const d = liveModelo721(datos(), { AAA: 30_000 })
+    expect(d.totalValorCustodia).toBe(60_000)
+    expect(d.veredicto).toMatchObject({ obligado: true, motivo: 'umbral', valorEur: 60_000 })
+    expect(d.totalValor).toBe(75_000)
   })
-  it('sin precio en vivo se mantiene la valoración del backend', () => {
-    expect(liveModelo721(data, {})).toBe(data)
-    expect(liveModelo721(data, { ETH: 0 })).toBe(data)
+  it('con presentación previa, solo obliga por encima del objetivo; la extinción se mantiene', () => {
+    const conObjetivo = datos({ veredicto: veredicto({ objetivoIncremento: 80_000 }) })
+    expect(liveModelo721(conObjetivo, { AAA: 30_000 }).veredicto).toMatchObject({ obligado: false, motivo: 'incremento_insuficiente' })
+    const ext = datos({ veredicto: veredicto({ extinguidas: [{ entidad: 'X', asset: 'BBB' }] }) })
+    expect(liveModelo721(ext, { AAA: 1 }).veredicto).toMatchObject({ obligado: true, motivo: 'extincion' })
   })
-  it('los años cerrados no se tocan', () => {
-    const closed = { ...data, esAnioEnCurso: false }
-    expect(liveModelo721(closed, { BTC: 1 })).toBe(closed)
+  it('años cerrados no se tocan', () => {
+    const cerrado = datos({ esAnioEnCurso: false })
+    expect(liveModelo721(cerrado, { AAA: 30_000 })).toBe(cerrado)
+  })
+})
+
+describe('escalaRedonda', () => {
+  it('divisiones redondas que cubren el máximo y el umbral', () => {
+    expect(escalaRedonda(30_000, 50_000)).toEqual({ top: 60_000, ticks: [0, 20_000, 40_000, 60_000] })
+    expect(escalaRedonda(130_000, 50_000)).toEqual({ top: 150_000, ticks: [0, 50_000, 100_000, 150_000] })
+    expect(escalaRedonda(0, 50_000).ticks.at(-1)).toBeGreaterThanOrEqual(50_000)
+  })
+  it('nunca más de 6 divisiones', () => {
+    for (const m of [1, 999, 12_345, 77_777, 1_234_567]) expect(escalaRedonda(m, 50_000).ticks.length).toBeLessThanOrEqual(6)
+  })
+})
+
+describe('textoMargen', () => {
+  it('por debajo, lo que falta; por encima, cuánto lo supera', () => {
+    expect(textoMargen(veredicto({ valorEur: 40_000 }))).toMatch(/^Te faltan 10\.000,00\s€ para el umbral$/)
+    expect(textoMargen(veredicto({ valorEur: 65_000 }))).toMatch(/^Superas el umbral en 15\.000,00\s€$/)
+  })
+  it('ya presentado y por encima del umbral: lo que falta para volver a obligar', () => {
+    expect(textoMargen(veredicto({ valorEur: 70_000, objetivoIncremento: 80_000 }))).toMatch(/^Te faltan 10\.000,00\s€ para volver a estar obligado$/)
+  })
+})
+
+describe('repartoEntidades', () => {
+  it('solo los grupos que computan, de mayor a menor, con su porcentaje', () => {
+    const r = repartoEntidades([
+      grupo({ totalEur: 10_000 }),
+      grupo({ clave: 'entidad:e2', entidad: { ...entidad, nombre: 'Española', pais: 'ES' }, enEspana: true, computa: false, totalEur: 99_000 }),
+      grupo({ clave: 'wallet:w9', entidad: null, wallets: [{ id: 'w9', nombre: 'Otra', origen: 'desconocido', desde: null, filaId: null, regla: null }], totalEur: 30_000 }),
+    ])
+    expect(r.map(x => [x.nombre, x.pct])).toEqual([['Otra', 75], ['Exchange Sintético Ltd', 25]])
   })
 })

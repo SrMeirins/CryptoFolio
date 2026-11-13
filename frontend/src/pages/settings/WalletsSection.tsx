@@ -12,6 +12,7 @@ import { SyncBadge } from './wallets/SyncBadge'
 import { AddAddressForm } from './wallets/AddAddressForm'
 import { AddWalletForm } from './wallets/AddWalletForm'
 import { WalletEditPanel, type WalletEdit } from './wallets/WalletEditPanel'
+import { CustodiaLinea } from '../fiscal/modelo721/CustodiaLinea'
 import { useWalletValues } from '../../hooks/useWalletValues'
 import { useSettingFeedback } from '../../hooks/useSettingFeedback'
 import { formatMoney, formatNumber } from '../../utils/format'
@@ -199,6 +200,9 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                   </div>
                 </div>
 
+                {/* Custodia para el 721 (#545): solo las wallets de exchange. */}
+                {wallet.type === 'exchange' && <div className="px-4 pb-2 -mt-1"><CustodiaLinea wallet={wallet} /></div>}
+
                 <div className="flex items-center gap-4 px-4 pb-3 -mt-1 text-xs">
                   <Link to={`/portfolio?wallet=${wallet.id}`} className="inline-flex items-center gap-1 text-brand-ink hover:underline rounded-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
                     <WalletIcon size={11} aria-hidden="true" /> Ver en Portfolio
@@ -303,10 +307,14 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
           </summary>
           <div className="mt-2 space-y-2">
             {systemWallets.map(w => (
-              <div key={w.id} className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-border bg-background-card/50 opacity-60">
-                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: w.color }} />
-                <span className="text-sm text-fg-muted">{w.name}</span>
-                <span className="text-xs text-fg-subtle ml-auto">Sistema</span>
+              <div key={w.id} role="group" aria-label={`Wallet del sistema ${w.name}`} className="px-4 py-2.5 rounded-xl border border-border bg-background-card/50 space-y-1">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: w.color }} />
+                  <span className="text-sm text-fg-muted">{w.name}</span>
+                  <span className="text-xs text-fg-subtle ml-auto">Sistema</span>
+                </div>
+                {/* Las subcuentas nativas de los exchanges también llevan su custodia del 721 (#545). */}
+                {w.type === 'exchange' && <div className="pl-5"><CustodiaLinea wallet={w} /></div>}
               </div>
             ))}
           </div>

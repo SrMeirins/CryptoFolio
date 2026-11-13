@@ -16,6 +16,8 @@ export const BACKUP_TABLE_LABELS: ReadonlyArray<{ table: BackupTable; label: str
   { table: 'raw_transactions',     label: 'Filas originales de los CSV' },
   { table: 'csv_imports',          label: 'Importaciones' },
   { table: 'wallets',              label: 'Wallets' },
+  { table: 'entidades_custodia',   label: 'Entidades custodias' },
+  { table: 'wallet_entidades',     label: 'Entidad de cada wallet' },
   { table: 'wallet_addresses',     label: 'Direcciones' },
   { table: 'asset_metadata',       label: 'Activos' },
   { table: 'app_config',           label: 'Ajustes' },

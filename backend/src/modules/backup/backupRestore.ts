@@ -21,11 +21,13 @@ const CLEAR_ORDER = [
   'fifo_lot_consumptions', 'fifo_lots', 'fifo_shortfalls', 'balance_sync_log',
   'raw_transactions', 'transactions', 'csv_imports', 'wallet_addresses',
   'cobertura_revisiones', 'fiscal_declaraciones', 'irpf_escalas', 'asset_metadata', 'app_config',
+  // Custodia de las wallets (#545), que apunta a ellas.
+  'wallet_custodia',
 ] as const;
 
 // Tablas que se insertan tal cual (tras traducir ids), en orden de dependencias.
 const INSERT_ORDER: readonly BackupTable[] = [
-  'csv_imports', 'transactions', 'raw_transactions', 'wallet_addresses',
+  'csv_imports', 'transactions', 'raw_transactions', 'wallet_addresses', 'wallet_custodia',
   'asset_metadata', 'app_config', 'cobertura_revisiones', 'fiscal_declaraciones', 'irpf_escalas',
 ];
 
@@ -138,6 +140,7 @@ export async function replaceData(client: PoolClient, partial: Partial<BackupDat
   const rows: Partial<Record<BackupTable, BackupRow[]>> = {
     transactions: remap(remap(data.transactions, ['wallet_id', 'destination_wallet_id'], wallets.map), ['counterparty_network_id'], nets.map),
     wallet_addresses: remap(remap(data.wallet_addresses, ['wallet_id'], wallets.map), ['network_id'], nets.map),
+    wallet_custodia: remap(data.wallet_custodia, ['wallet_id'], wallets.map),
   };
   for (const t of INSERT_ORDER) await insertRows(client, t, rows[t] ?? data[t]);
 }

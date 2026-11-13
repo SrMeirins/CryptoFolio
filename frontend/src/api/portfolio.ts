@@ -6,7 +6,7 @@ import type { Currency } from '../utils/format'
 // para tipar los métodos de red, igual que ya se hacía desde pages/fiscal/
 // para el resto de tipos de esta API.
 import type {
-  FiscalSummary, FiscalEvent, RendimientoEvent, Modelo721,
+  FiscalSummary, FiscalEvent, RendimientoEvent, Modelo721, CustodiaWallet721, Regla721, DatosEntidad721,
   YearOverview, Carryforward, BreakdownItem, MonthlyData,
 } from '../pages/fiscal/types'
 
@@ -219,6 +219,8 @@ export interface FiscalYear {
   total_losses_eur: string
   num_operations: string
 }
+
+/** Datos de una entidad custodia al crearla o editarla (#545). */
 
 export interface ImportRecord {
   id: string
@@ -934,6 +936,14 @@ export const portfolioApi = {
   getFiscalEvents: (year: number) =>
     api.get<{ fiscalEvents: FiscalEvent[]; rendimientos: RendimientoEvent[] }>(`/fiscal/${year}/events`),
   getFiscalModelo721: (year: number) => api.get<Modelo721>(`/fiscal/${year}/modelo721`),
+  // Custodia de las wallets de exchange para el 721 (#545).
+  getCustodia: () => api.get<{ wallets: CustodiaWallet721[]; reglas: Regla721[] }>('/fiscal/custodia'),
+  /** Lo que indica el usuario para una wallet desde una fecha (null: desde siempre); con la misma fecha, lo sustituye. */
+  guardarCustodia: (walletId: string, d: { desde: string | null; enEspana: boolean; entidad: DatosEntidad721 | null }) =>
+    api.put<{ ok: true }>(`/fiscal/custodia/${encodeURIComponent(walletId)}`, d),
+  quitarFilaCustodia: (id: string) => api.delete<{ ok: true }>(`/fiscal/custodia/filas/${encodeURIComponent(id)}`),
+  /** Vuelve a lo automático (o a «no se sabe»). */
+  restablecerCustodia: (walletId: string) => api.delete<{ ok: true; quitadas: number }>(`/fiscal/custodia/${encodeURIComponent(walletId)}`),
   getFiscalBreakdown: (year: number) => api.get<BreakdownItem[]>(`/fiscal/${year}/breakdown`),
   getFiscalMonthly: (year: number) => api.get<MonthlyData>(`/fiscal/${year}/monthly`),
   /** Ejercicios declarados (#311): Renta y Modelo 721 presentados, con los cambios de la Renta. */

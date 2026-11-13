@@ -69,9 +69,11 @@ export function ContenidoTema({ tema }: { tema: TemaMetodo }) {
     case 'modelo721':
       return (
         <>
-          <p>Declaración informativa de las criptomonedas que custodian por ti entidades en el extranjero a 31 de diciembre. Solo cuenta lo que está en exchanges; lo que tienes en autocustodia no computa.</p>
-          <p>Hay que presentarlo si ese valor supera el umbral, 50.000 € por defecto, configurable en Ajustes. Si ya lo presentaste, los años siguientes solo es obligatorio cuando el valor sube más de 20.000 € sobre el último presentado.</p>
+          <p>Declaración informativa de las criptomonedas que custodian por ti entidades en el extranjero a 31 de diciembre. Cuenta lo que tienes en exchanges cuya custodia está fuera de España; la autocustodia no computa. Las subcuentas de un mismo exchange suman juntas en su entidad.</p>
+          <p>Para los exchanges que la app importa, la custodia sale de sus condiciones para residentes en España, por fechas (Binance pasó a una sociedad española en julio de 2022; Bitvavo está en los Países Bajos). Si tu cuenta es distinta, lo cambias en el 721 o en Ajustes. De un exchange que añades tú, se pregunta; mientras no lo sepas, computa por prudencia.</p>
+          <p>Hay que presentarlo si ese valor supera el umbral, 50.000 € por defecto, configurable en Ajustes. Si ya lo presentaste, los años siguientes solo es obligatorio cuando el valor sube más de 20.000 € sobre el último presentado, y en todo caso si dejas de tener una moneda que habías declarado.</p>
           <p>Cada activo se valora con su precio a 31 de diciembre; si falta algún precio, el total es un mínimo. El plazo va del 1 de enero al 31 de marzo del año siguiente.</p>
+          <p>Se declara por entidad: razón social, NIF de su país y domicilio, con las unidades y el valor de cada moneda. El dinero (euros u otra moneda de curso legal) que tengas en un exchange no va en el 721, sino en el 720.</p>
           <Ejemplo>Presentas el 721 con 60.000 €. Al año siguiente tienes 75.000 € en exchanges: sube 15.000 €, así que no hace falta volver a presentarlo.</Ejemplo>
         </>
       )

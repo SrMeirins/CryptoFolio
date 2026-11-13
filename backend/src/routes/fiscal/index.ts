@@ -8,6 +8,7 @@ import fiscalPlannerRouter from './fiscalPlanner';
 import fiscalCalendarRouter from './fiscalCalendar';
 import fiscalDeclaracionesRouter from './fiscalDeclaraciones';
 import fiscalEscalasRouter from './fiscalEscalas';
+import fiscalCustodiaRouter from './fiscalCustodia';
 
 // Orquestador puro: monta los 4 sub-routers en /api/fiscal sin cambiar
 // ninguna ruta externa. Fragmentado desde el fichero más grande de todo el
@@ -18,6 +19,8 @@ import fiscalEscalasRouter from './fiscalEscalas';
 // modules/fiscal/lotesValoracion.ts respectivamente.
 const router = Router();
 
+// Antes que las rutas /:year: «custodia» no es un año (#545).
+router.use('/', fiscalCustodiaRouter);
 router.use('/', fiscalOverviewRouter);
 router.use('/', fiscalYearDetailRouter);
 router.use('/', fiscalExportRouter);

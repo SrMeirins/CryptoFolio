@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../../db/client';
 import { getEventosAnio } from '../../modules/fiscal/eventosAnio';
-import { getUmbral721, sumaValorCustodiaExchange, valorizarLotesEnFecha } from '../../modules/fiscal/lotesValoracion';
+import { getUmbral721, valorizarLotesEnFecha } from '../../modules/fiscal/lotesValoracion';
+import { estado721, grupos721, historico721 } from '../../modules/fiscal/modelo721';
 import { parseYear } from './fiscalShared';
-import { obligacion721 } from '../../modules/fiscal/declaraciones';
-import { listarDeclaraciones, ultimaPresentacion721 } from '../../modules/fiscal/declaracionesRepo';
+import { listarDeclaraciones } from '../../modules/fiscal/declaracionesRepo';
+import { reglasPublicas } from '../../modules/fiscal/custodia';
 import { endOfLocalYear, localDate, localYearMonth } from '../../modules/time/localTime';
 import { getAppTimezone } from '../../modules/time/appTimezone';
 import { OPS_BASE_GENERAL, OPS_RCM_AHORRO } from '../../modules/fiscal/clasificacionRentas';
@@ -131,9 +132,9 @@ router.get('/:year/summary', async (req: Request, res: Response) => {
 
   const dec31 = esAnioEnCurso ? new Date() : endOfLocalYear(tz, year);
   const { activos, preciosPendientes } = await valorizarLotesEnFecha(dec31);
-  // Modelo 721: solo cuenta la custodia de terceros (exchanges); la
-  // autocustodia (hardware/software) no se declara en este modelo.
-  const valorTotal721 = sumaValorCustodiaExchange(activos);
+  // Modelo 721: solo cuenta la custodia de terceros en el extranjero (#545);
+  // la autocustodia y las entidades españolas no se declaran en este modelo.
+  const valorTotal721 = (await grupos721(activos, dec31)).filter(g => g.computa).reduce((s, g) => s + g.totalEur, 0);
 
   const umbral = await getUmbral721();
 
@@ -168,6 +169,8 @@ router.get('/:year/events', async (req: Request, res: Response) => {
 });
 
 // ── GET /api/fiscal/:year/modelo721 ───────────────────────────────────────
+// Por entidad custodia, con veredicto (umbral, incremento y extinción) e
+// histórico a 31 de diciembre (#545).
 router.get('/:year/modelo721', async (req: Request, res: Response) => {
   const tz = await getAppTimezone(db);
   const year = parseYear(req.params.year);
@@ -177,33 +180,36 @@ router.get('/:year/modelo721', async (req: Request, res: Response) => {
   const esAnioEnCurso = year === currentYear;
   const dec31 = esAnioEnCurso ? new Date() : endOfLocalYear(tz, year);
 
-  const { activos, preciosPendientes } = await valorizarLotesEnFecha(dec31);
-  const umbral = await getUmbral721();
-
-  const totalValor = activos.reduce((sum, a) => sum + a.valorEur, 0);
-  const ultimaPresentacion = await ultimaPresentacion721(year);
-  const presentado = (await listarDeclaraciones()).find(d => d.ejercicio === year && d.tipo === 'modelo721') ?? null;
-  // Solo la custodia de terceros computa para el umbral del 721.
-  const totalValorCustodia = sumaValorCustodiaExchange(activos);
+  const [estado, historico, declaraciones] = await Promise.all([
+    estado721(year, dec31), historico721(tz, currentYear), listarDeclaraciones(),
+  ]);
+  const presentado = declaraciones.find(d => d.ejercicio === year && d.tipo === 'modelo721') ?? null;
+  const { grupos, veredicto, preciosPendientes, ultimaPresentacion, totalCartera } = estado;
 
   res.json({
     year,
     esAnioEnCurso,
     // Día de Madrid (#303): en el año en curso, recortar el ISO daba el día UTC.
     fecha:        localDate(tz, dec31),
-    activos,
-    totalValor,
-    totalValorCustodia,
-    superaUmbral: totalValorCustodia > umbral,
-    umbral,
-    // Regla del incremento de 20.000 € respecto al último 721 presentado (#311).
+    grupos,
+    veredicto,
+    historico,
+    // Toda la cartera (autocustodia incluida) y lo que computa: custodia de
+    // terceros en el extranjero (o sin entidad asignada).
+    totalValor:   totalCartera,
+    totalValorCustodia: veredicto.valorEur,
+    superaUmbral: veredicto.valorEur > veredicto.umbral,
+    umbral:       veredicto.umbral,
     ultimaPresentacion,
-    obligado: obligacion721(totalValorCustodia, umbral, ultimaPresentacion),
-    presentado: presentado ? { declaradoEn: presentado.declaradoEn, valor: presentado.cifras.valor } : null,
+    obligado:     veredicto.obligado === true,
+    presentado:   presentado ? { declaradoEn: presentado.declaradoEn, valor: presentado.cifras.valor } : null,
+    // Wallets de exchange cuya custodia no se sabe: computan por prudencia.
+    sinCustodia:  grupos.flatMap(g => g.wallets.filter(w => w.origen === 'desconocido').map(w => ({ id: w.id, nombre: w.nombre }))),
+    // Reglas automáticas de los exchanges que la app importa, con sus fuentes.
+    reglas:       reglasPublicas(),
     // Activos sin precio: los totales son un mínimo (#267).
     preciosPendientes,
-    incompleto: preciosPendientes.length > 0,
-    aviso: 'El Modelo 721 aplica a criptoactivos cuya custodia está en manos de un tercero situado en el extranjero (exchanges). Se cuentan todos los exchanges registrados; confirma con tu asesor fiscal cuáles son entidades extranjeras. La autocustodia no computa.',
+    incompleto:   preciosPendientes.length > 0,
   });
 });
 
