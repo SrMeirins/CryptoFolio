@@ -9,6 +9,7 @@ import fiscalCalendarRouter from './fiscalCalendar';
 import fiscalDeclaracionesRouter from './fiscalDeclaraciones';
 import fiscalEscalasRouter from './fiscalEscalas';
 import fiscalCustodiaRouter from './fiscalCustodia';
+import fiscalPlanRouter from './fiscalPlan';
 
 // Orquestador puro: monta los 4 sub-routers en /api/fiscal sin cambiar
 // ninguna ruta externa. Fragmentado desde el fichero más grande de todo el
@@ -21,6 +22,8 @@ const router = Router();
 
 // Antes que las rutas /:year: «custodia» no es un año (#545).
 router.use('/', fiscalCustodiaRouter);
+// «plan» tampoco es un año (#546).
+router.use('/', fiscalPlanRouter);
 router.use('/', fiscalOverviewRouter);
 router.use('/', fiscalYearDetailRouter);
 router.use('/', fiscalExportRouter);

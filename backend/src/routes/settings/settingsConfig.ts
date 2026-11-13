@@ -11,6 +11,7 @@ import { listAutoBackups } from '../../modules/backup/autoBackupStore';
 import { DISMISSED_KEY } from '../../modules/notifications/preferences';
 import { DEFAULT_TIMEZONE, TIMEZONE_CONFIG_KEY, getTimezoneInfo, invalidateTimezoneCache, isValidTimeZone } from '../../modules/time/appTimezone';
 import { COMISION_RED_CRITERIOS, COMISION_RED_KEY } from '../../modules/fifo/constants';
+import { COMISION_PLAN_KEY } from '../../modules/fiscal/planRepo';
 
 const router = Router();
 
@@ -39,6 +40,9 @@ const restrictedValues: Record<string, z.ZodType<string>> = {
   ...preferenceSchemas,
   // Comisión de red en traspasos a wallets propias (#532).
   [COMISION_RED_KEY]: z.enum(COMISION_RED_CRITERIOS, { error: `${COMISION_RED_KEY} debe ser transmision o coste` }),
+  // Comisión estimada del plan de ventas (#546): porcentaje de 0 a 10 con hasta 3 decimales.
+  [COMISION_PLAN_KEY]: z.string().regex(/^\d{1,2}(\.\d{1,3})?$/, `${COMISION_PLAN_KEY}: porcentaje con punto decimal`)
+    .refine(v => Number(v) <= 10, `${COMISION_PLAN_KEY} va de 0 a 10`),
 };
 
 // ── GET /api/settings/config ───────────────────────────────────────────────

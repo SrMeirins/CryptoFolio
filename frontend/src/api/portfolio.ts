@@ -202,6 +202,25 @@ export interface FiscalPlanner {
   comprasRecientes: Record<string, string>
 }
 
+// Plan de ventas de fin de año (#546).
+export interface VentaPlanGuardada { asset: string; walletId: string; walletNombre: string; cantidad: number; precioEur: number | null }
+export interface PlanGuardado { ejercicio: number; comisionPct: number; ventas: VentaPlanGuardada[]; archivados: { ejercicio: number; ventas: number }[] }
+export interface VentaPlanSimular { asset: string; walletId: string; cantidad: number; precioEur: number }
+export type AvisoPlan =
+  | { tipo: 'colchon'; exceso: number; cuotaExtra: number }
+  | { tipo: 'recompra'; asset: string; compras: string[] }
+  | { tipo: 'saldo'; asset: string; walletId: string; pedido: number; disponible: number }
+export interface EfectoPlan {
+  ventas: { indice: number; asset: string; walletId: string; cantidad: number; cantidadVendida: number; precioEur: number; bruto: number; comision: number; coste: number; resultado: number }[]
+  ganancia: number
+  perdida: number
+  neto: number
+  cuotaAntes: number
+  cuotaDespues: number
+  colchon: number
+  avisos: AvisoPlan[]
+}
+
 export interface LockedAmount {
   wallet_id:    string
   wallet_name:  string
@@ -961,6 +980,10 @@ export const portfolioApi = {
   /** Planificador de fin de año (#307): contexto del ejercicio en curso y lotes abiertos en orden FIFO. */
   getFiscalPlanner: () => api.get<FiscalPlanner>('/fiscal/planificador'),
   /** Cuota del ejercicio en curso con cada ganancia (o pérdida) adicional (máx. 200). */
+  getPlan: (ejercicio?: number) => api.get<PlanGuardado>(`/fiscal/plan${ejercicio ? `?ejercicio=${ejercicio}` : ''}`),
+  guardarPlan: (ventas: Omit<VentaPlanGuardada, 'walletNombre'>[]) => api.put<{ ok: true }>('/fiscal/plan', { ventas }),
+  vaciarPlan: (ejercicio?: number) => api.delete<{ ok: true; quitadas: number }>(`/fiscal/plan${ejercicio ? `?ejercicio=${ejercicio}` : ''}`),
+  simularPlan: (ventas: VentaPlanSimular[], comisionPct: number) => api.post<EfectoPlan>('/fiscal/plan/simular', { ventas, comisionPct }),
   getFiscalCuotas: (ganancias: number[]) => api.post<{ cuotaBase: number; cuotas: number[] }>('/fiscal/planificador/cuotas', { ganancias }),
   /** Neto del ejercicio hasta un día de Madrid (MM-DD), para comparar periodos (#297). */
   getFiscalNetoHasta: (year: number, hasta: string) =>

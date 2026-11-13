@@ -1,28 +1,45 @@
-import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Calculator, Hourglass, PiggyBank, Repeat, TrendingDown, TrendingUp } from 'lucide-react'
+import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Archive, Calculator, Check, ListPlus, Repeat, TrendingDown, TrendingUp } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { SaleSimulatorModal } from '../../components/SaleSimulatorModal'
-import { buttonClasses, cardClasses, fieldClasses, Notice, Skeleton, TextTooltip, NotApplicable, QueryError } from '../../components/ui'
-import { useDebounce } from '../../hooks/useDebounce'
+import { buttonClasses, Notice, Skeleton, TextTooltip, NotApplicable, QueryError } from '../../components/ui'
 import { usePricesStore } from '../../store/pricesStore'
 import { ink } from '../../utils/colors'
 import { formatEur, formatEurSigned } from '../../utils/format'
 import { formatFiscalQty } from '../../utils/fiscalTable'
 import { ahorroDe, importesPendientes, trocear } from '../../utils/ahorroIrpf'
 import { sugerencias, type Sugerencia } from '../../utils/planificador'
+import { useToast } from '../../hooks/useToast'
+import { isTypingTarget } from '../../utils/fiscalHeader'
+import { formatFiscalDate } from '../../utils/fiscalTable'
+import { today } from '../../utils/date'
+import { saldos, textoPlan } from '../../utils/planVentas'
 import { FiscalChartCard } from './FiscalChartCard'
+import { ColchonBarra } from './plan/ColchonBarra'
+import { PlanBarra } from './plan/PlanBarra'
+import { usePlan } from './plan/usePlan'
+import { VentaLibreDialog } from './plan/VentaLibreDialog'
 
-// Planificador de fin de año (#307): colchón sin tributar, pérdidas latentes
-// aprovechables y ganancias que caben, con precios en vivo y el mismo motor
-// fiscal que el simulador de venta (las cuotas las calcula el backend).
+// Planificador de fin de año (#307, #546): colchón sin tributar con su
+// composición, pérdidas latentes aprovechables y ganancias que caben, con
+// precios en vivo y el mismo motor fiscal que el simulador de venta. Las
+// sugerencias y cualquier otra venta se añaden a un plan guardado, cuyo efecto
+// conjunto se ve en la barra fija del pie. Atajos: A añade la sugerencia
+// enfocada y P abre o cierra el plan (Supr, en la barra).
 
 const signed = formatEurSigned
 
-function Fila({ s, nota, onSimular }: { s: Sugerencia; nota: React.ReactNode; onSimular: () => void }) {
+function Fila({ s, nota, enPlan, onSimular, onAnadir }: { s: Sugerencia; nota: ReactNode; enPlan: boolean; onSimular: () => void; onAnadir: () => void }) {
+  function tecla(e: KeyboardEvent<HTMLLIElement>) {
+    if (e.key.toLowerCase() !== 'a' || e.altKey || e.ctrlKey || e.metaKey || isTypingTarget(e.target as Element)) return
+    e.preventDefault()
+    if (!enPlan) onAnadir()
+  }
   return (
-    <li className="flex items-center gap-3 flex-wrap rounded-xl border border-border px-3 py-2.5">
+    <li tabIndex={0} onKeyDown={tecla} aria-label={`${s.asset} de ${s.walletName}. A: añadir al plan`}
+      className="flex items-center gap-3 flex-wrap rounded-xl border border-border px-3 py-2.5 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
       <span className="flex items-center gap-2 min-w-0 flex-1">
         <CryptoIcon symbol={s.asset} size={22} />
         <span className="min-w-0">
@@ -43,21 +60,41 @@ function Fila({ s, nota, onSimular }: { s: Sugerencia; nota: React.ReactNode; on
         <span className={`block mono font-semibold text-sm ${s.pnl < 0 ? 'text-negative' : 'text-positive'}`}>{signed(s.pnl)}</span>
         <span className="block text-[11px] text-fg-subtle">{nota}</span>
       </span>
-      <button type="button" onClick={onSimular} className={buttonClasses('secondary', 'sm', 'flex gap-1')}
-        aria-label={`Simular la venta de ${formatFiscalQty(s.quantity)} ${s.asset} de ${s.walletName}`}>
-        <Calculator size={12} aria-hidden="true" /> Simular
-      </button>
+      <span className="flex items-center gap-2">
+        <button type="button" onClick={onSimular} className={buttonClasses('ghost', 'sm', 'flex gap-1')}
+          aria-label={`Simular la venta de ${formatFiscalQty(s.quantity)} ${s.asset} de ${s.walletName}`}>
+          <Calculator size={12} aria-hidden="true" /> Simular
+        </button>
+        <button type="button" onClick={onAnadir} disabled={enPlan} className={buttonClasses('secondary', 'sm', 'flex gap-1')}
+          aria-label={enPlan ? `${s.asset} de ${s.walletName} ya está en el plan` : `Añadir al plan la venta de ${formatFiscalQty(s.quantity)} ${s.asset} de ${s.walletName}`}>
+          {enPlan ? <><Check size={12} aria-hidden="true" /> En el plan</> : <><ListPlus size={12} aria-hidden="true" /> Añadir al plan</>}
+        </button>
+      </span>
     </li>
   )
 }
 
 export function PlanificadorTab() {
   const prices = usePricesStore(s => s.prices)
+  const plan = usePlan(prices)
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [planAbierto, setPlanAbierto] = useState(false)
+  const [ventaLibre, setVentaLibre] = useState(false)
+  // P abre o cierra el plan, salvo al escribir o con un diálogo abierto.
+  useEffect(() => {
+    function onKey(e: globalThis.KeyboardEvent) {
+      if (e.key.toLowerCase() !== 'p' || e.altKey || e.ctrlKey || e.metaKey) return
+      if (isTypingTarget(document.activeElement) || document.querySelector('[role="dialog"][aria-modal="true"]')) return
+      e.preventDefault()
+      setPlanAbierto(a => !a)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const plannerQ = useQuery({ queryKey: ['fiscal-planner'], queryFn: portfolioApi.getFiscalPlanner, staleTime: 60_000 })
   const { data, isLoading, isError, dataUpdatedAt } = plannerQ
   const [simular, setSimular] = useState<Sugerencia | null>(null)
-  const [extraInput, setExtraInput] = useState('')
-  const extra = useDebounce(parseFloat(extraInput.replace(',', '.')), 350)
 
   const sug = useMemo(
     () => (data ? sugerencias(data.lotes, prices, data.colchon, data.comprasRecientes) : { perdidas: [], ganancias: [] }),
@@ -92,67 +129,34 @@ export function PlanificadorTab() {
     const previas = vigente.version === nuevas.version ? vigente.cuotas : new Map<number, number>()
     setCache({ version: nuevas.version, base: nuevas.base, cuotas: new Map([...previas, ...nuevas.pares]) })
   }
-  const rapidaQ = useQuery({
-    queryKey: ['fiscal-cuotas', 'rapida', extra],
-    queryFn: () => portfolioApi.getFiscalCuotas([extra]),
-    enabled: Number.isFinite(extra) && Math.abs(extra) <= 1e9,
-    staleTime: 60_000,
-  })
-  const { data: rapida } = rapidaQ
 
   if (isLoading) return <div className="space-y-3">{[0, 1, 2].map(i => <Skeleton key={i} className="h-28 rounded-xl" />)}</div>
   if (isError || !data) return <QueryError what="el planificador" error={plannerQ.error} onRetry={() => void plannerQ.refetch()} compact={false} />
 
-  const rapidaCuota = rapida?.cuotas[0]
+  const enPlan = (s: Sugerencia) => plan.ventas.some(v => v.asset === s.asset && v.walletId === s.walletId)
+  const anadir = (s: Sugerencia) => {
+    plan.cambiar([...plan.ventas, { asset: s.asset, walletId: s.walletId, walletNombre: s.walletName, cantidad: s.quantity, precioEur: null }])
+    toast.success('Añadida al plan', `${formatFiscalQty(s.quantity)} ${s.asset} de ${s.walletName}`)
+  }
+  const archivados = plan.planQ.data?.archivados ?? []
+  async function copiarArchivado(ejercicio: number) {
+    try {
+      const p = await portfolioApi.getPlan(ejercicio)
+      await navigator.clipboard.writeText(textoPlan({ ejercicio, fecha: formatFiscalDate(today()), ventas: p.ventas, prices: {}, efecto: null, comisionPct: p.comisionPct }))
+      toast.success(`Plan de ${ejercicio} copiado`)
+    } catch (e) { toast.fail('No se pudo copiar el plan', e) }
+  }
+  async function borrarArchivado(ejercicio: number) {
+    try {
+      await portfolioApi.vaciarPlan(ejercicio)
+      void qc.invalidateQueries({ queryKey: ['fiscal-plan'] })
+      toast.success(`Plan de ${ejercicio} borrado`)
+    } catch (e) { toast.fail('No se pudo borrar el plan', e) }
+  }
 
   return (
     <div className="space-y-5">
-      {/* Colchón */}
-      <section aria-labelledby="plan-colchon" className={cardClasses('md', 'bg-linear-to-br from-positive/8 to-transparent')}>
-        <div className="flex items-start justify-between gap-6 flex-wrap">
-          <div>
-            <h2 id="plan-colchon" className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-fg-subtle">
-              <PiggyBank size={13} aria-hidden="true" /> Ganancia sin tributar en {data.year}
-            </h2>
-            <p className="text-3xl font-bold mono tabular-nums text-positive mt-2">{formatEur(data.colchon)}</p>
-            <p className="text-xs text-fg-subtle mt-1 max-w-md">
-              Puedes realizar hasta esta ganancia antes del 31 de diciembre sin que suba tu cuota: la absorben las pérdidas del año y las pendientes de años anteriores.
-            </p>
-          </div>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
-            <div><dt className="text-fg-subtle">Neto del año</dt><dd className={`mono font-semibold ${data.netoAnio >= 0 ? 'text-positive' : 'text-negative'}`}>{signed(data.netoAnio)}</dd></div>
-            <div><dt className="text-fg-subtle">Cuota actual</dt><dd className="mono font-semibold text-warning">{formatEur(data.cuotaActual)}</dd></div>
-            <div><dt className="text-fg-subtle">Pérdidas pendientes</dt><dd className="mono font-semibold text-fg">{formatEur(data.pendienteVigente)}</dd></div>
-            <div><dt className="text-fg-subtle">Rendimientos del año</dt><dd className="mono font-semibold text-fg">{formatEur(data.rendimientosAnio)}</dd></div>
-          </dl>
-        </div>
-        {data.caducanEsteAnio > 0.01 && (
-          <Notice tipo="aviso" icon={Hourglass} compact className="mt-4">
-            <span className="mono font-semibold text-warning-ink">{formatEur(data.caducanEsteAnio)}</span> de ese colchón son pérdidas que caducan el 31 de diciembre: si no las usas este año, se pierden.
-          </Notice>
-        )}
-      </section>
-
-      {/* Simulador rápido */}
-      <FiscalChartCard icon={Calculator} title="¿Cuánto pagaría?">
-        {rapidaQ.isError && <QueryError what="la estimación" error={rapidaQ.error} onRetry={() => void rapidaQ.refetch()} className="py-4" />}
-        <div className="flex items-center gap-3 flex-wrap text-sm">
-          <label className="flex items-center gap-2">
-            <span className="text-fg-muted">Si realizo</span>
-            <input type="text" inputMode="decimal" value={extraInput} onChange={e => setExtraInput(e.target.value)} placeholder="1.000"
-              aria-label="Ganancia o pérdida adicional en euros" maxLength={14} className={fieldClasses('sm', false, 'w-32 mono text-right')} />
-            <span className="text-fg-muted">€ más de ganancia</span>
-          </label>
-          {rapidaCuota !== undefined && Number.isFinite(extra) && (
-            <p aria-live="polite" className="text-fg-muted">
-              pagaría <span className="mono font-semibold text-warning">{formatEur(rapidaCuota)}</span> en total
-              {' '}(<span className="mono">{signed(rapidaCuota - data.cuotaActual)}</span> sobre lo actual)
-              {extra > 0 && extra <= data.colchon && <span className="text-positive"> · dentro del colchón</span>}
-            </p>
-          )}
-        </div>
-        <p className="text-[11px] text-fg-subtle mt-2">Usa un número negativo para una pérdida. Cuota del ahorro con tus tramos de Ajustes.</p>
-      </FiscalChartCard>
+      <ColchonBarra data={data} />
 
       {/* Pérdidas latentes */}
       <FiscalChartCard icon={TrendingDown} title="Pérdidas latentes que puedes realizar">
@@ -163,7 +167,7 @@ export function PlanificadorTab() {
             {sug.perdidas.map(s => {
               const a = ahorroDe(s.pnl, vigente.base, vigente.cuotas)
               return (
-                <Fila key={s.asset} s={s} onSimular={() => setSimular(s)}
+                <Fila key={s.asset} s={s} onSimular={() => setSimular(s)} enPlan={enPlan(s)} onAnadir={() => anadir(s)}
                   nota={a === null
                     ? (cuotasQuery.isError
                       ? <>No se pudo calcular el ahorro. <button type="button" onClick={() => void cuotasQuery.refetch()} className="text-brand-ink underline rounded-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">Reintentar</button></>
@@ -190,17 +194,33 @@ export function PlanificadorTab() {
           ) : (
             <ul className="space-y-2">
               {sug.ganancias.map(s => (
-                <Fila key={s.asset} s={s} onSimular={() => setSimular(s)} nota="sin tributar" />
+                <Fila key={s.asset} s={s} onSimular={() => setSimular(s)} enPlan={enPlan(s)} onAnadir={() => anadir(s)} nota="sin tributar" />
               ))}
             </ul>
           )}
-          <p className="text-[11px] text-fg-subtle mt-3">Cada sugerencia usa el colchón por sí sola: si realizas varias, la suma no debe pasar de {formatEur(data.colchon)}. Realizar ganancia sin tributar sube tu precio de compra de cara al futuro.</p>
+          <p className="text-[11px] text-fg-subtle mt-3">Cada sugerencia usa el colchón por sí sola; añádelas al plan para ver su efecto conjunto y si pasan de {formatEur(data.colchon)}. Realizar ganancia sin tributar sube tu precio de compra de cara al futuro.</p>
         </FiscalChartCard>
       )}
 
+      {archivados.map(a => (
+        <Notice key={a.ejercicio} tipo="informacion" icon={Archive} compact action={<>
+          <button type="button" onClick={() => void copiarArchivado(a.ejercicio)} className={buttonClasses('ghost', 'sm')}>Copiar</button>
+          <button type="button" onClick={() => void borrarArchivado(a.ejercicio)} className={buttonClasses('ghost', 'sm')}>Borrar</button>
+        </>}>
+          Tienes guardado el plan de {a.ejercicio} ({a.ventas} {a.ventas === 1 ? 'venta' : 'ventas'}): ya no se calcula, pero puedes copiarlo como texto.
+        </Notice>
+      ))}
+
       <p className="text-[11px] text-fg-subtle">
-        Cálculos con los precios en vivo y sin comisión; «Simular» muestra el resultado exacto con comisión e IRPF. Las ventas siguen el FIFO global por activo: salen primero las unidades compradas antes, estén en la wallet que estén.
+        Sugerencias con los precios en vivo y sin comisión; «Simular» muestra el resultado exacto con comisión e IRPF, y el plan suma el efecto de todas sus ventas. Las ventas siguen el FIFO global por activo: salen primero las unidades compradas antes, estén en la wallet que estén.
       </p>
+
+      <PlanBarra plan={plan} prices={prices} abierto={planAbierto} setAbierto={setPlanAbierto} onVentaLibre={() => setVentaLibre(true)} />
+
+      {ventaLibre && (
+        <VentaLibreDialog disponibles={saldos(data.lotes)} prices={prices} onClose={() => setVentaLibre(false)}
+          onAdd={v => { plan.cambiar([...plan.ventas, v]); setPlanAbierto(true); toast.success('Añadida al plan', `${v.asset} de ${v.walletNombre}`) }} />
+      )}
 
       {simular && (
         <SaleSimulatorModal asset={simular.asset} totalQty={simular.disponible} currentPrice={prices[simular.asset] ?? 0}

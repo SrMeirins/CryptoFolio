@@ -7,6 +7,7 @@ import { useRunFifoStream } from '../../hooks/useRunFifoStream'
 import { T } from '../../utils/colors'
 import { buttonClasses, fieldClasses, StatCard, Button, QueryError } from '../../components/ui'
 import { SettingsCard } from './SettingsCard'
+import { PlanGuardadoCard } from './PlanGuardadoCard'
 import { formatNumber } from '../../utils/format'
 import { BackupCard } from './backup/BackupCard'
 import { AutoBackupCard } from './backup/AutoBackupCard'
@@ -104,9 +105,11 @@ export function DatosSection() {
       {/* Copias de seguridad (#453) y automáticas (#454) */}
       <BackupCard index={1} />
       <AutoBackupCard index={2} />
+      {/* Plan de ventas de fin de año (#546) */}
+      <PlanGuardadoCard index={3} />
 
       {/* Mantenimiento */}
-      <SettingsCard index={3} icon={Wrench} title="Mantenimiento">
+      <SettingsCard index={4} icon={Wrench} title="Mantenimiento">
         <div className="space-y-2">
 
           {/* Limpiar caché */}
@@ -143,7 +146,7 @@ export function DatosSection() {
       </SettingsCard>
 
       {/* Zona de peligro */}
-      <SettingsCard index={4} icon={AlertTriangle} title="Zona de peligro" tone="danger">
+      <SettingsCard index={5} icon={AlertTriangle} title="Zona de peligro" tone="danger">
 
         {!showResetConfirm ? (
           <div className="flex items-center justify-between">

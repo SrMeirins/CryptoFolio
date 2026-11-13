@@ -159,6 +159,19 @@ CREATE TABLE wallet_custodia (
 CREATE UNIQUE INDEX wallet_custodia_desde_key ON wallet_custodia(wallet_id, desde) WHERE desde IS NOT NULL;
 CREATE UNIQUE INDEX wallet_custodia_siempre_key ON wallet_custodia(wallet_id) WHERE desde IS NULL;
 
+-- Plan de ventas de fin de año (#546): un plan por ejercicio; precio_eur NULL usa el precio en vivo.
+CREATE TABLE plan_ventas (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ejercicio  INTEGER NOT NULL CHECK (ejercicio BETWEEN 2009 AND 2100),
+  orden      INTEGER NOT NULL CHECK (orden >= 0),
+  asset      TEXT NOT NULL CHECK (asset ~ '^[A-Z0-9]{1,20}$'),
+  wallet_id  UUID NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  cantidad   NUMERIC(38, 18) NOT NULL CHECK (cantidad > 0),
+  precio_eur NUMERIC(38, 10) CHECK (precio_eur IS NULL OR precio_eur > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT plan_ventas_orden_key UNIQUE (ejercicio, orden)
+);
+
 -- ============================================================
 -- TABLA: wallet_addresses
 -- ============================================================

@@ -14,7 +14,7 @@ import {
 
 export const BACKUP_FORMAT = 'cryptofolio-backup';
 // Debe coincidir con la última migración de db/migrations (lo comprueba un test).
-export const BACKUP_SCHEMA = 26;
+export const BACKUP_SCHEMA = 27;
 const MAX_ROWS = 1_000_000;
 
 export class BackupFormatError extends Error {

@@ -66,7 +66,7 @@ describe('routes/settings — copias de seguridad (#453)', () => {
     expect(res.body).toMatchObject({ format: 'cryptofolio-backup', encrypted: false });
     expect(Object.keys(res.body.data).sort()).toEqual([
       'app_config', 'asset_metadata', 'cobertura_revisiones', 'csv_imports', 'fiscal_declaraciones', 'irpf_escalas',
-      'network_assets', 'networks', 'raw_transactions', 'transactions', 'wallet_addresses', 'wallet_custodia', 'wallets',
+      'network_assets', 'networks', 'plan_ventas', 'raw_transactions', 'transactions', 'wallet_addresses', 'wallet_custodia', 'wallets',
     ]);
     expect(res.body.counts).toMatchObject({ transactions: 2, raw_transactions: 1, wallet_addresses: 1, irpf_escalas: 1 });
     expect(JSON.stringify(res.body)).not.toMatch(/network_api_keys|price_cache|fifo_lots/);

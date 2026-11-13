@@ -9,6 +9,7 @@ import { Dropdown, QueryError } from '../../components/ui'
 import { SettingsCard } from './SettingsCard'
 import { ComisionRedCard } from './ComisionRedCard'
 import { CustodiaExchangesCard } from './CustodiaExchangesCard'
+import { ComisionPlanCard } from './ComisionPlanCard'
 import { SavedMark } from './SavedMark'
 import { useSettingFeedback } from '../../hooks/useSettingFeedback'
 import { useToast } from '../../hooks/useToast'
@@ -263,8 +264,11 @@ export function FiscalSection() {
       {/* Comisión de red en traspasos propios (#532) */}
       <ComisionRedCard index={4} />
 
+      {/* Comisión estimada del plan de ventas (#546): la misma que en Planificar */}
+      <ComisionPlanCard index={5} />
+
       {/* Recordatorios de plazos (#451): la categoría Fiscal de los avisos */}
-      <SettingsCard index={5} icon={BellRing} title="Recordatorios de plazos" status={<SavedMark stamp={saved} id="recordatorios" />}
+      <SettingsCard index={6} icon={BellRing} title="Recordatorios de plazos" status={<SavedMark stamp={saved} id="recordatorios" />}
         description="Aviso en la campana a 30 días de la campaña de la Renta y del plazo del Modelo 721, y de nuevo a 7 días. Es la misma opción que la categoría Fiscal de General."
         action={
           <label className="inline-flex items-center cursor-pointer shrink-0">
