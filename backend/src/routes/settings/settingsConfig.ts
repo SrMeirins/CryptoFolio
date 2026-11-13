@@ -12,6 +12,7 @@ import { DISMISSED_KEY } from '../../modules/notifications/preferences';
 import { DEFAULT_TIMEZONE, TIMEZONE_CONFIG_KEY, getTimezoneInfo, invalidateTimezoneCache, isValidTimeZone } from '../../modules/time/appTimezone';
 import { COMISION_RED_CRITERIOS, COMISION_RED_KEY } from '../../modules/fifo/constants';
 import { COMISION_PLAN_KEY } from '../../modules/fiscal/planRepo';
+import { EXPORT_PREFS_KEY, FORMATOS_EXPORT, SECCIONES } from '../../modules/fiscal/export/datosExport';
 
 const router = Router();
 
@@ -41,6 +42,12 @@ const restrictedValues: Record<string, z.ZodType<string>> = {
   // Comisión de red en traspasos a wallets propias (#532).
   [COMISION_RED_KEY]: z.enum(COMISION_RED_CRITERIOS, { error: `${COMISION_RED_KEY} debe ser transmision o coste` }),
   // Comisión estimada del plan de ventas (#546): porcentaje de 0 a 10 con hasta 3 decimales.
+  // Preferencias de exportación (#547): JSON con el formato y las secciones.
+  [EXPORT_PREFS_KEY]: z.string().refine(v => {
+    try {
+      return z.object({ formato: z.enum(FORMATOS_EXPORT), secciones: z.array(z.enum(SECCIONES)).min(1).max(SECCIONES.length) }).strict().safeParse(JSON.parse(v)).success;
+    } catch { return false; }
+  }, `${EXPORT_PREFS_KEY}: JSON con formato y secciones válidos`),
   [COMISION_PLAN_KEY]: z.string().regex(/^\d{1,2}(\.\d{1,3})?$/, `${COMISION_PLAN_KEY}: porcentaje con punto decimal`)
     .refine(v => Number(v) <= 10, `${COMISION_PLAN_KEY} va de 0 a 10`),
 };

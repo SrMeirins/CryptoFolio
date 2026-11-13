@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
+import ExcelJS from 'exceljs';
 import { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../test/setup-test-db';
 
@@ -83,5 +84,24 @@ describe('GET /api/fiscal/:year/export — mitigación de CSV Formula Injection'
 
     expect(csv).not.toMatch(/;=cmd\|/);
     expect(csv).toContain(`;'${ASSET_MALICIOSO};`);
+  });
+
+  it('ninguna celda de texto del Excel empieza por =, +, - o @ sin escapar (#547)', async () => {
+    const res = await request(app).get('/api/fiscal/2025/export?format=excel').buffer().parse((r, cb) => {
+      const chunks: Buffer[] = [];
+      r.on('data', (c: Buffer) => chunks.push(c));
+      r.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(res.status).toBe(200);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(res.body as Buffer);
+    const textos: string[] = [];
+    wb.eachSheet(ws => ws.eachRow(row => row.eachCell(cell => { if (typeof cell.value === 'string') textos.push(cell.value); })));
+    expect(textos).toContain(`'${ASSET_MALICIOSO}`);
+    expect(textos.filter(t => /^[=+\-@]/.test(t))).toEqual([]);
+    // Y ninguna celda es una fórmula.
+    const formulas: unknown[] = [];
+    wb.eachSheet(ws => ws.eachRow(row => row.eachCell(cell => { if (cell.formula) formulas.push(cell.formula); })));
+    expect(formulas).toEqual([]);
   });
 });

@@ -44,15 +44,11 @@ describe('Rentas en especie: base del ahorro y base general (#537)', () => {
     expect(ov.body.find((o: { year: number }) => o.year === 2025)).toMatchObject({ totalRendimientos: 40 });
   });
 
-  it('los eventos llevan su base y el CSV los separa en dos secciones', async () => {
+  it('los eventos llevan su base y el CSV la dice en su columna (#547: una sola tabla)', async () => {
     const ev = await request(app).get('/api/fiscal/2025/events');
     expect(ev.body.rendimientos.map((r: { tipo: string; base: string }) => `${r.tipo}:${r.base}`).sort()).toEqual(['Airdrop:general', 'Staking:ahorro']);
-    const csv = (await request(app).get('/api/fiscal/2025/export?format=csv')).text;
-    const ahorro = csv.indexOf('RENDIMIENTOS DEL CAPITAL MOBILIARIO (base del ahorro)');
-    const general = csv.indexOf('GANANCIAS NO DERIVADAS DE TRANSMISIÓN (BASE GENERAL, INFORMATIVO)');
-    expect(ahorro).toBeGreaterThan(-1);
-    expect(general).toBeGreaterThan(ahorro);
-    expect(csv.slice(ahorro, general)).toContain(';Staking;');
-    expect(csv.slice(general)).toContain(';Airdrop;');
+    const lineas = (await request(app).get('/api/fiscal/2025/export?format=csv')).text.split('\r\n');
+    expect(lineas.find(l => l.includes(';Staking;'))).toMatch(/;Staking;Ahorro;/);
+    expect(lineas.find(l => l.includes(';Airdrop;'))).toMatch(/;Airdrop;General;/);
   });
 });
