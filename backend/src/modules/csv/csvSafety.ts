@@ -33,3 +33,13 @@ export function sanitizeCsvField(value: string): string {
 
   return v;
 }
+
+/**
+ * Texto de una celda de hoja de cálculo (#547): solo la protección contra
+ * fórmulas, sin entrecomillar (en un Excel cada celda ya es un campo). Un
+ * texto que empieza por =, +, -, @, tabulador o retorno lleva una comilla
+ * simple delante para que nunca se interprete como fórmula.
+ */
+export function escaparFormula(value: string): string {
+  return FORMULA_TRIGGER_RE.test(value) ? `'${value}` : value;
+}

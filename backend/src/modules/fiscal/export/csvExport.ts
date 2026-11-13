@@ -1,49 +1,42 @@
 import { Response } from 'express';
 import { sanitizeCsvField } from '../../csv/csvSafety';
-import { EventoFiscal, Rendimiento } from '../eventosAnio';
-import { separarPorBase, TITULO_BASE_GENERAL } from '../clasificacionRentas';
+import { fechaEs, type DatosExport } from './datosExport';
 
-// Formato Modelo 100 (declaración IRPF española) — CSV con ; como separador.
-export function writeModelo100Csv(
-  res: Response, year: number, fiscalEvents: EventoFiscal[], rendimientos: Rendimiento[],
-): void {
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="fiscal_${year}_modelo100.csv"`);
+// CSV general del ejercicio (#547): una sola tabla que abre bien en hojas de
+// cálculo en castellano. Separador punto y coma, coma decimal sin miles,
+// fechas DD/MM/AAAA, BOM y saltos CRLF. Cada fila es una transmisión
+// (agrupada por operación) o un rendimiento, con su Tipo y su Base del IRPF.
+// Los textos que vienen de datos importados se sanean contra la inyección de
+// fórmulas (csvSafety.ts).
 
-  const lines: string[] = [];
-  lines.push('GANANCIAS Y PÉRDIDAS PATRIMONIALES - MODELO 100');
-  lines.push('Fecha;Denominación activo transmitido;Clave contrapartida;Descripción contrapartida;Valor transmisión EUR;Gastos transmisión EUR;Valor adquisición EUR;Gastos adquisición EUR;Ganancia/Pérdida EUR');
+const num = (n: number, decimales = 2) => n.toFixed(decimales).replace('.', ',');
+const cantidad = (n: number) => String(Math.round(n * 1e8) / 1e8).replace('.', ',');
 
-  // activoTransmitido y contrapartidaDescripcion (esta última incrusta un
-  // símbolo de activo, ver contrapartida.ts) provienen en última instancia
-  // de la columna "Coin" de un CSV de exchange importado, sin whitelist —
-  // se sanean contra CSV Formula Injection antes de escribirlos (ver
-  // csvSafety.ts). El resto de campos son literales o números propios.
-  for (const e of fiscalEvents) {
-    lines.push([
-      e.fecha,
-      sanitizeCsvField(e.activoTransmitido),
-      e.contrapartidaClave,
-      sanitizeCsvField(e.contrapartidaDescripcion),
-      e.valorTransmisionEur.toFixed(2),
-      e.gastosTransmisionEur.toFixed(2),
-      e.valorAdquisicionEur.toFixed(2),
-      e.gastosAdquisicionEur.toFixed(2),
-      e.gananciaPerdidaEur.toFixed(2),
+export const CABECERA_CSV = [
+  'Fecha', 'Tipo', 'Base', 'Activo', 'Cantidad', 'Wallet', 'Canal', 'Clave contraprestación', 'Descripción contraprestación',
+  'Valor transmisión EUR', 'Gastos transmisión EUR', 'Valor adquisición EUR', 'Gastos adquisición EUR', 'Resultado EUR',
+];
+
+export function csvGeneral(d: DatosExport): string {
+  const lineas = [CABECERA_CSV.join(';')];
+  for (const o of d.operaciones) {
+    lineas.push([
+      fechaEs(o.fecha), sanitizeCsvField(o.tipo), 'Ahorro', sanitizeCsvField(o.activo), cantidad(o.cantidad), sanitizeCsvField(o.wallet),
+      o.canal, o.clave, sanitizeCsvField(o.descripcion),
+      num(o.valorTransmision), num(o.gastosTransmision), num(o.valorAdquisicion), num(o.gastosAdquisicion), num(o.resultado),
     ].join(';'));
   }
-
-  // Por base del IRPF (#537): el ahorro entra en la cuota; la general solo se informa.
-  const { ahorro, general } = separarPorBase(rendimientos);
-  for (const [titulo, lista] of [['RENDIMIENTOS DEL CAPITAL MOBILIARIO (base del ahorro)', ahorro], [TITULO_BASE_GENERAL.toUpperCase(), general]] as const) {
-    if (lista === general && lista.length === 0) continue;
-    lines.push('');
-    lines.push(titulo);
-    lines.push('Fecha;Tipo;Activo;Cantidad;Valor EUR');
-    for (const r of lista) {
-      lines.push([r.fecha, r.tipo, sanitizeCsvField(r.activo), r.cantidad.toFixed(8), r.valorEur.toFixed(2)].join(';'));
-    }
+  for (const r of d.rendimientos) {
+    lineas.push([
+      fechaEs(r.fecha), sanitizeCsvField(r.tipo), r.base, sanitizeCsvField(r.activo), cantidad(r.cantidad), sanitizeCsvField(r.wallet),
+      '', '', '', '', '', '', '', num(r.valor),
+    ].join(';'));
   }
+  return '﻿' + lineas.join('\r\n');
+}
 
-  res.send('﻿' + lines.join('\n'));
+export function writeCsvGeneral(res: Response, d: DatosExport): void {
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="fiscal_${d.year}.csv"`);
+  res.send(csvGeneral(d));
 }

@@ -4,9 +4,15 @@ import ExcelJS from 'exceljs';
 import { Pool } from 'pg';
 import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
 
-// Los formatos excel y pdf de /:year/export no tenían NINGÚN test propio
-// (csv y rentaweb sí, en fiscalCsvInjection.test.ts) — smoke test de
-// status/content-type/tamaño no vacío, sin parsear el binario.
+// Exportaciones del ejercicio (#547): Excel con sus hojas, fechas reales,
+// filtros y totales iguales a la pantalla; PDF con las secciones elegidas;
+// CSV en una tabla con formato castellano; validación del formato y las
+// secciones. La inyección de fórmulas en CSV está en fiscalCsvInjection.test.ts.
+const binario = (response: NodeJS.ReadableStream, callback: (e: Error | null, b: Buffer) => void) => {
+  const chunks: Buffer[] = [];
+  response.on('data', (chunk: Buffer) => chunks.push(chunk));
+  response.on('end', () => callback(null, Buffer.concat(chunks)));
+};
 let testDb: TestDatabase;
 let pool: Pool;
 let app: import('express').Express;
@@ -54,24 +60,47 @@ describe('GET /api/fiscal/:year/export — excel y pdf', () => {
   it('format=excel devuelve un .xlsx no vacío con el content-type correcto', async () => {
     // exceljs escribe al stream de respuesta sin Content-Length (chunked) —
     // se bufferiza el binario igual que en el test de pdf.
-    const res = await request(app).get('/api/fiscal/2023/export?format=excel').buffer().parse((response, callback) => {
-      const chunks: Buffer[] = [];
-      response.on('data', (chunk: Buffer) => chunks.push(chunk));
-      response.on('end', () => callback(null, Buffer.concat(chunks)));
-    });
+    const res = await request(app).get('/api/fiscal/2023/export?format=excel').buffer().parse(binario);
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('spreadsheetml');
     expect(res.headers['content-disposition']).toContain('fiscal_2023.xlsx');
     expect((res.body as Buffer).length).toBeGreaterThan(0);
 
-    // El fichero se puede leer y contiene las hojas y la fila esperadas (#204).
+    // El fichero se puede leer y contiene las hojas y la fila esperadas (#204, #547).
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(res.body as Buffer);
-    expect(wb.worksheets.map(w => w.name)).toEqual(['Ganancias Patrimoniales', 'Rendimientos Capital Mob.']);
-    const gains = wb.getWorksheet('Ganancias Patrimoniales')!;
-    expect(gains.getRow(1).getCell(1).value).toBe('Fecha');
-    expect(gains.getRow(2).getCell(2).value).toBe('BTC');
-    expect(gains.getRow(2).getCell(10).value).toBe(50);
+    expect(wb.worksheets.map(w => w.name)).toEqual(['Resumen', 'Compensación', 'Por activo', 'Operaciones', 'Rendimientos', 'Lotes FIFO']);
+    const ops = wb.getWorksheet('Operaciones')!;
+    expect(ops.getRow(1).getCell(1).value).toBe('Fecha');
+    // Fecha real (no texto), con formato DD/MM/AAAA.
+    expect(ops.getRow(2).getCell(1).value).toBeInstanceOf(Date);
+    expect(ops.getColumn(1).numFmt).toBe('dd/mm/yyyy');
+    expect(ops.getRow(2).getCell(3).value).toBe('BTC');
+    expect(ops.getRow(2).getCell(14).value).toBe(50);
+    expect(ops.autoFilter).toBeTruthy();
+    // El neto del Resumen coincide con el de la pantalla.
+    const summary = (await request(app).get('/api/fiscal/2023/summary')).body;
+    const resumen = wb.getWorksheet('Resumen')!;
+    const neto = resumen.getRows(2, resumen.rowCount - 1)!.find(r => r.getCell(1).value === 'Neto de ganancias y pérdidas')!;
+    expect(neto.getCell(2).value).toBeCloseTo(summary.netoPatrimonial, 2);
+  });
+
+  it('las secciones elegidas deciden las hojas del Excel; una sección desconocida es un 400', async () => {
+    const res = await request(app).get('/api/fiscal/2023/export?format=excel&secciones=operaciones,resumen').buffer().parse(binario);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(res.body as Buffer);
+    expect(wb.worksheets.map(w => w.name)).toEqual(['Resumen', 'Operaciones']);
+    expect((await request(app).get('/api/fiscal/2023/export?format=excel&secciones=otra')).status).toBe(400);
+  });
+
+  it('el CSV general es una tabla con punto y coma, coma decimal y fechas DD/MM/AAAA', async () => {
+    const res = await request(app).get('/api/fiscal/2023/export?format=csv');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toContain('fiscal_2023.csv');
+    const lineas = res.text.replace(/^\uFEFF/, '').split('\r\n');
+    expect(lineas[0]).toBe('Fecha;Tipo;Base;Activo;Cantidad;Wallet;Canal;Clave contraprestación;Descripción contraprestación;Valor transmisión EUR;Gastos transmisión EUR;Valor adquisición EUR;Gastos adquisición EUR;Resultado EUR');
+    expect(lineas[1]).toMatch(/^01\/06\/2023;[^;]*;Ahorro;BTC;1;Wallet export test;/);
+    expect(lineas[1].endsWith(';50,00')).toBe(true);
   });
 
   it('exceljs genera identificadores con uuid (versión forzada por overrides, #204)', async () => {
@@ -93,15 +122,20 @@ describe('GET /api/fiscal/:year/export — excel y pdf', () => {
   });
 
   it('format=pdf devuelve un PDF no vacío con el content-type correcto', async () => {
-    const res = await request(app).get('/api/fiscal/2023/export?format=pdf').buffer().parse((response, callback) => {
-      const chunks: Buffer[] = [];
-      response.on('data', (chunk: Buffer) => chunks.push(chunk));
-      response.on('end', () => callback(null, Buffer.concat(chunks)));
-    });
+    const res = await request(app).get('/api/fiscal/2023/export?format=pdf&secciones=resumen,operaciones').buffer().parse(binario);
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toBe('application/pdf');
     expect(res.headers['content-disposition']).toContain('fiscal_2023.pdf');
     expect((res.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
+  it('las preferencias de exportación solo admiten un formato y secciones válidos', async () => {
+    const put = (value: string) => request(app).put('/api/settings/config').send({ key: 'export_preferencias', value });
+    expect((await put(JSON.stringify({ formato: 'excel', secciones: ['resumen', 'lotes'] }))).status).toBe(200);
+    expect((await put(JSON.stringify({ formato: 'xml', secciones: ['resumen'] }))).status).toBe(400);
+    expect((await put(JSON.stringify({ formato: 'pdf', secciones: [] }))).status).toBe(400);
+    expect((await put('no es json')).status).toBe(400);
+    await pool.query(`DELETE FROM app_config WHERE key = 'export_preferencias'`);
   });
 
   it('format desconocido devuelve 400', async () => {

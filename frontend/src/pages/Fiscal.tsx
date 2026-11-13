@@ -17,7 +17,7 @@ import { caducanEsteAnio } from '../utils/perdidasPendientes'
 import { Modelo721Vista } from './fiscal/modelo721/Modelo721Vista'
 import { TablaEventos } from './fiscal/TablaEventos'
 import { SeccionRendimientos } from './fiscal/rendimientos/SeccionRendimientos'
-import { ExportPanel } from './fiscal/ExportPanel'
+import { BotonExportar } from './fiscal/exportar/BotonExportar'
 import { YearTabs } from './fiscal/YearTabs'
 import { YearCards } from './fiscal/YearCards'
 import { historyYearLink } from './history/keyboard/yearNav'
@@ -357,7 +357,7 @@ export function Fiscal() {
           actions={<>
             {/* En Resumen el selector son las tarjetas de ejercicio (#536), justo debajo. */}
             {vista !== 'resumen' && <YearTabs years={years} activeYear={activeYear} overview={overview} declarados={declarados} onSelect={elegirAnio} />}
-            <ExportPanel year={activeYear} />
+            <BotonExportar year={activeYear} />
           </>}
           stats={cifras[vista]}
           footer={

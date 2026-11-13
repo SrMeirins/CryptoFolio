@@ -58,3 +58,30 @@ export const api = {
     request<T>(path, { method: 'DELETE', body: body ? JSON.stringify(body) : undefined }),
 }
 
+
+/**
+ * Descarga de un fichero generado por la API (#547): el contenido y el nombre
+ * que propone el servidor en Content-Disposition. Mismo manejo de errores que
+ * `request`, con más tiempo: un PDF o un Excel de un año largo tarda más.
+ */
+export async function descargarFichero(path: string, nombrePorDefecto: string): Promise<{ blob: Blob; nombre: string }> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 120_000)
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${path}`, { signal: controller.signal })
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('Tiempo de espera agotado (120s) al generar el fichero', { cause: err })
+    }
+    throw err
+  } finally {
+    clearTimeout(timeout)
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }))
+    throw new ApiError(res.status, body?.error || res.statusText, body)
+  }
+  const nombre = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? nombrePorDefecto
+  return { blob: await res.blob(), nombre }
+}

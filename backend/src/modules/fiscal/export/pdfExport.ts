@@ -1,270 +1,173 @@
 import { Response } from 'express';
 import PDFDocument from 'pdfkit';
-import { EventoFiscal, Rendimiento } from '../eventosAnio';
-import { separarPorBase, TITULO_BASE_GENERAL } from '../clasificacionRentas';
+import { fechaEs, TITULO_SECCION, type DatosExport, type Seccion } from './datosExport';
 
-const PW = 595.28, PH = 841.89, ML = 40, MR = 40;
-const W = PW - ML - MR;
+// Informe fiscal en PDF (#547), pensado para imprimir: A4 apaisado, fondo
+// blanco, márgenes de impresión, cabecera con el ejercicio y «Página N de M»
+// en cada página. Las tablas repiten su cabecera al cambiar de página y no
+// parten una fila. Secciones según lo elegido en el diálogo de exportar.
 
-// Palette
-const C_DARK = '#0d1117', C_NAVY = '#1e293b', C_BLUE = '#3b82f6';
-const C_GREEN = '#10b981', C_RED = '#ef4444', C_VIOLET = '#a78bfa';
-const C_GRAY5 = '#64748b', C_GRAY3 = '#94a3b8', C_GRAY1 = '#e2e8f0';
-const C_ROW_ALT = '#f8fafc', C_TEXT = '#0f172a';
+const PW = 841.89, PH = 595.28;
+const M = 36;
+const W = PW - 2 * M;
+const TOP = M + 26;           // bajo la cabecera de página
+const BOTTOM = PH - M - 16;   // sobre el pie
+const ROW = 15;
 
-type ColDef = { text: string; w: number; align?: 'left' | 'right' | 'center'; color?: string; bold?: boolean };
+const C_TEXT = '#0f172a', C_MUTED = '#475569', C_LINE = '#cbd5e1', C_HEAD = '#e2e8f0', C_ALT = '#f8fafc';
+const C_POS = '#047857', C_NEG = '#b91c1c';
 
-const fmtEurPdf = (n: number, sign = false) => {
-  const abs = Math.abs(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (sign) return (n >= 0 ? '+' : '-') + ' ' + abs + ' €';
-  return (n < 0 ? '-' : '') + abs + ' €';
-};
+/** Número con punto de miles y coma decimal (también con 4 cifras, que es-ES no agrupa). */
+function miles(n: number, decimales: number, minimo = decimales): string {
+  const [ent, dec = ''] = Math.abs(n).toFixed(decimales).split('.');
+  const recortado = dec.replace(/0+$/, '').padEnd(minimo, '0');
+  const negativo = n < 0 && /[1-9]/.test(ent + dec)
+  return `${negativo ? '-' : ''}${ent.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}${recortado ? `,${recortado}` : ''}`;
+}
+export const eur = (n: number) => `${miles(Math.round(n * 100) / 100, 2)} €`;
+export const cant = (n: number) => miles(n, 8, 0);
 
-export function writePdfExport(
-  res: Response, year: number, fiscalEvents: EventoFiscal[], rendimientos: Rendimiento[],
-): void {
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="fiscal_${year}.pdf"`);
+type Alin = 'left' | 'right';
+interface ColPdf { titulo: string; ancho: number; alin?: Alin }
+type Celda = { texto: string; color?: string; negrita?: boolean };
 
-  const doc = new PDFDocument({ margin: 0, size: 'A4', bufferPages: true });
-  doc.pipe(res);
+export function pdfBuffer(d: DatosExport, secciones: readonly Seccion[], generado: string): Promise<Buffer> {
+  const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: M, bufferPages: true, info: { Title: `Informe fiscal ${d.year}`, Creator: 'CryptoFolio' } });
+  const trozos: Buffer[] = [];
+  doc.on('data', (b: Buffer) => trozos.push(b));
+  const fin = new Promise<Buffer>(resolve => doc.on('end', () => resolve(Buffer.concat(trozos))));
 
-  // Computed totals
-  const totalGP        = fiscalEvents.reduce((s, e) => s + e.gananciaPerdidaEur, 0);
-  const totalGanancias = fiscalEvents.filter(e => e.gananciaPerdidaEur > 0).reduce((s, e) => s + e.gananciaPerdidaEur, 0);
-  const totalPerdidas  = fiscalEvents.filter(e => e.gananciaPerdidaEur < 0).reduce((s, e) => s + e.gananciaPerdidaEur, 0);
-  // Por base del IRPF (#537): el resumen solo suma los rendimientos del ahorro.
-  const { ahorro, general } = separarPorBase(rendimientos);
-  const totalRend      = ahorro.reduce((s, r) => s + r.valorEur, 0);
+  let y = TOP;
+  const nuevaPagina = () => { doc.addPage(); y = TOP; };
+  const espacio = (h: number) => { if (y + h > BOTTOM) nuevaPagina(); };
 
-  // Per-asset breakdown
-  const byAsset = new Map<string, { ops: number; ganancias: number; perdidas: number; neto: number }>();
-  for (const e of fiscalEvents) {
-    const p = byAsset.get(e.activoTransmitido) ?? { ops: 0, ganancias: 0, perdidas: 0, neto: 0 };
-    byAsset.set(e.activoTransmitido, {
-      ops: p.ops + 1,
-      ganancias: p.ganancias + Math.max(0, e.gananciaPerdidaEur),
-      perdidas:  p.perdidas  + Math.min(0, e.gananciaPerdidaEur),
-      neto:      p.neto      + e.gananciaPerdidaEur,
-    });
-  }
-  const assetBreakdown = [...byAsset.entries()].sort((a, b) => Math.abs(b[1].neto) - Math.abs(a[1].neto));
-
-  // ── Layout helpers ────────────────────────────────────────────────────
-  let pageNum = 0;
-
-  const addPage = () => {
-    if (pageNum > 0) doc.addPage({ margin: 0, size: 'A4' });
-    pageNum++;
-    // Footer
-    const fy = PH - 26;
-    doc.rect(ML, fy - 4, W, 0.4).fill(C_GRAY1);
-    doc.fontSize(7).font('Helvetica').fillColor(C_GRAY3)
-      .text(
-        `CryptoFolio · Informe Fiscal ${year} · ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}`,
-        ML, fy, { width: W - 50, lineBreak: false }
-      )
-      .text(`${pageNum}`, ML, fy, { width: W, align: 'right', lineBreak: false });
-    doc.y = pageNum === 1 ? 100 : 36;
+  // El título reserva sitio para la cabecera de su tabla y dos filas: nunca queda huérfano al pie.
+  const tituloSeccion = (t: string) => {
+    espacio(30 + (ROW + 2) + ROW * 2);
+    y += 6;
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(C_TEXT).text(t, M, y, { width: W });
+    y += 18;
+    doc.moveTo(M, y).lineTo(M + W, y).lineWidth(0.6).strokeColor(C_LINE).stroke();
+    y += 6;
   };
 
-  const needsPage = (h: number) => { if (doc.y + h > PH - 42) addPage(); };
-
-  const sectionHeader = (title: string) => {
-    needsPage(28);
-    const y = doc.y;
-    doc.rect(ML, y, W, 21).fill(C_NAVY);
-    doc.rect(ML, y, 3, 21).fill(C_BLUE);
-    doc.fontSize(8.5).font('Helvetica-Bold').fillColor(C_BLUE)
-      .text(title, ML + 12, y + 6, { width: W - 20, lineBreak: false });
-    doc.y = y + 25;
+  const tabla = (cols: ColPdf[], filas: Celda[][], total?: Celda[]) => {
+    const escala = W / cols.reduce((s, c) => s + c.ancho, 0);
+    const anchos = cols.map(c => c.ancho * escala);
+    const cabecera = () => {
+      doc.rect(M, y, W, ROW + 2).fill(C_HEAD);
+      let x = M;
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor(C_TEXT);
+      cols.forEach((c, i) => { doc.text(c.titulo, x + 3, y + 4, { width: anchos[i] - 6, height: ROW - 5, align: c.alin ?? 'left', lineBreak: false, ellipsis: true }); x += anchos[i]; });
+      y += ROW + 2;
+    };
+    const fila = (celdas: Celda[], fondo?: string, negrita = false) => {
+      if (y + ROW > BOTTOM) { nuevaPagina(); cabecera(); }
+      if (fondo) doc.rect(M, y, W, ROW).fill(fondo);
+      let x = M;
+      celdas.forEach((c, i) => {
+        doc.font(c.negrita || negrita ? 'Helvetica-Bold' : 'Helvetica').fontSize(7.5).fillColor(c.color ?? C_TEXT)
+          .text(c.texto, x + 3, y + 4, { width: anchos[i] - 6, height: ROW - 5, align: cols[i].alin ?? 'left', lineBreak: false, ellipsis: true });
+        x += anchos[i];
+      });
+      y += ROW;
+    };
+    espacio(ROW * 3);
+    cabecera();
+    if (filas.length === 0) fila([{ texto: 'Sin datos en este ejercicio.', color: C_MUTED }, ...cols.slice(1).map(() => ({ texto: '' }))]);
+    filas.forEach((f, i) => fila(f, i % 2 === 1 ? C_ALT : undefined));
+    if (total) {
+      if (y + ROW > BOTTOM) { nuevaPagina(); cabecera(); }
+      doc.moveTo(M, y).lineTo(M + W, y).lineWidth(0.6).strokeColor(C_LINE).stroke();
+      fila(total, undefined, true);
+    }
+    y += 8;
   };
+  const imp = (n: number): Celda => ({ texto: eur(n), color: n < 0 ? C_NEG : n > 0 ? C_POS : C_TEXT });
+  const r = d.resumen;
 
-  const tHead = (cols: ColDef[]) => {
-    const y = doc.y;
-    const tw = cols.reduce((s, c) => s + c.w, 0);
-    doc.rect(ML, y, tw, 17).fill(C_NAVY);
-    let cx = ML;
-    cols.forEach(col => {
-      doc.fontSize(6.5).font('Helvetica-Bold').fillColor(C_GRAY3)
-        .text(col.text.toUpperCase(), cx + 4, y + 5, { width: col.w - 8, align: col.align ?? 'left', lineBreak: false });
-      cx += col.w;
-    });
-    doc.y = y + 17;
-  };
+  // Portada breve
+  doc.font('Helvetica-Bold').fontSize(20).fillColor(C_TEXT).text(`Informe fiscal ${d.year}`, M, y);
+  y += 28;
+  doc.font('Helvetica').fontSize(9).fillColor(C_MUTED)
+    .text(`Ganancias y pérdidas patrimoniales y rendimientos de criptomonedas. Generado el ${generado}. Método FIFO.`, M, y, { width: W });
+  y += 22;
 
-  const tRow = (cols: ColDef[], idx: number) => {
-    const ROW_H = 15;
-    needsPage(ROW_H + 2);
-    const y = doc.y;
-    const tw = cols.reduce((s, c) => s + c.w, 0);
-    doc.rect(ML, y, tw, ROW_H).fill(idx % 2 === 0 ? '#ffffff' : C_ROW_ALT);
-    let cx = ML;
-    cols.forEach(col => {
-      doc.fontSize(7.5)
-        .font(col.bold ? 'Helvetica-Bold' : 'Helvetica')
-        .fillColor(col.color ?? C_TEXT)
-        .text(col.text, cx + 4, y + 4, { width: col.w - 8, align: col.align ?? 'left', lineBreak: false });
-      cx += col.w;
-    });
-    doc.rect(ML, y + ROW_H, tw, 0.3).fill(C_GRAY1);
-    doc.y = y + ROW_H;
-  };
-
-  const totalRow = (label: string, value: string, color: string, totalW: number) => {
-    const y = doc.y;
-    doc.rect(ML, y, totalW, 17).fill(C_NAVY);
-    doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C_GRAY3)
-      .text(label, ML + 8, y + 5, { width: totalW / 2, lineBreak: false });
-    doc.fontSize(8).font('Helvetica-Bold').fillColor(color)
-      .text(value, ML + 8, y + 5, { width: totalW - 16, align: 'right', lineBreak: false });
-    doc.y = y + 19;
-  };
-
-  // ── PAGE 1: HEADER ────────────────────────────────────────────────────
-  addPage();
-
-  // Dark header band
-  doc.rect(0, 0, PW, 88).fill(C_DARK);
-  doc.rect(0, 85, PW, 3).fill(C_BLUE);
-
-  // Logo + title
-  doc.fontSize(8).font('Helvetica-Bold').fillColor(C_BLUE)
-    .text('CRYPTOFOLIO', ML, 16, { lineBreak: false });
-  doc.fontSize(24).font('Helvetica-Bold').fillColor('#ffffff')
-    .text(`Informe Fiscal ${year}`, ML, 30, { lineBreak: false });
-  doc.fontSize(8.5).font('Helvetica').fillColor(C_GRAY3)
-    .text(
-      `España · IRPF · Método FIFO · Generado el ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}`,
-      ML, 60, { lineBreak: false }
-    );
-
-  doc.y = 100;
-
-  // Summary boxes
-  const summaryItems = [
-    { label: 'RESULTADO NETO',  value: fmtEurPdf(totalGP, true), color: totalGP >= 0 ? C_GREEN : C_RED },
-    { label: 'GANANCIAS',       value: '+' + fmtEurPdf(totalGanancias), color: C_GREEN },
-    { label: 'PÉRDIDAS',        value: fmtEurPdf(totalPerdidas),         color: C_RED   },
-    { label: 'OPERACIONES',     value: String(fiscalEvents.length),       color: C_BLUE  },
-    ...(totalRend > 0 ? [{ label: 'RENDIMIENTOS', value: fmtEurPdf(totalRend), color: C_VIOLET }] : []),
-  ];
-  const nbx = summaryItems.length;
-  const bw  = W / nbx;
-  const bStartY = doc.y;
-
-  summaryItems.forEach((item, i) => {
-    const bx = ML + i * bw;
-    doc.rect(bx + 1, bStartY, bw - 2, 58).fill(C_NAVY);
-    doc.rect(bx + 1, bStartY, bw - 2, 3).fill(item.color);
-    doc.fontSize(6.5).font('Helvetica-Bold').fillColor(C_GRAY5)
-      .text(item.label, bx + 10, bStartY + 12, { width: bw - 20, lineBreak: false });
-    doc.fontSize(11).font('Helvetica-Bold').fillColor(item.color)
-      .text(item.value, bx + 10, bStartY + 28, { width: bw - 20, lineBreak: false });
-  });
-  doc.y = bStartY + 66;
-
-  // ── ASSET BREAKDOWN ───────────────────────────────────────────────────
-  sectionHeader(`Desglose por activo — ${assetBreakdown.length} activos`);
-
-  const ac = [
-    { text: 'Activo',      w: 70                                         },
-    { text: 'Operaciones', w: 65,  align: 'right' as const               },
-    { text: 'Ganancias',   w: 105, align: 'right' as const               },
-    { text: 'Pérdidas',    w: 105, align: 'right' as const               },
-    { text: 'Neto',        w: W - 345, align: 'right' as const           },
-  ];
-  ac[4].w = W - ac.slice(0, 4).reduce((s, c) => s + c.w, 0);
-  tHead(ac);
-
-  assetBreakdown.forEach(([asset, d], i) => {
-    tRow([
-      { text: asset,                                            w: ac[0].w, bold: true },
-      { text: String(d.ops),                                   w: ac[1].w, align: 'right', color: C_GRAY5 },
-      { text: d.ganancias > 0 ? '+' + fmtEurPdf(d.ganancias) : '—', w: ac[2].w, align: 'right', color: d.ganancias > 0 ? C_GREEN : C_GRAY5 },
-      { text: d.perdidas < 0 ? fmtEurPdf(d.perdidas) : '—',   w: ac[3].w, align: 'right', color: d.perdidas < 0 ? C_RED : C_GRAY5 },
-      { text: fmtEurPdf(d.neto, true),                         w: ac[4].w, align: 'right', bold: true, color: d.neto >= 0 ? C_GREEN : C_RED },
-    ], i);
-  });
-  totalRow('TOTAL', fmtEurPdf(totalGP, true), totalGP >= 0 ? C_GREEN : C_RED, W);
-
-  // ── TRANSACTIONS DETAIL ───────────────────────────────────────────────
-  addPage();
-  sectionHeader(`Detalle de operaciones — ${fiscalEvents.length} transmisiones`);
-
-  const tc = [
-    { text: 'Fecha',    w: 55 },
-    { text: 'Activo',   w: 42 },
-    { text: 'Cantidad', w: 62, align: 'right' as const },
-    { text: 'Clave',    w: 28, align: 'center' as const },
-    { text: 'V. Transmisión', w: 87, align: 'right' as const },
-    { text: 'V. Adquisición', w: 87, align: 'right' as const },
-    { text: 'G/P EUR',  w: W - 361, align: 'right' as const },
-  ];
-  tc[6].w = W - tc.slice(0, 6).reduce((s, c) => s + c.w, 0);
-  tHead(tc);
-
-  fiscalEvents.forEach((e, i) => {
-    tRow([
-      { text: e.fecha,                                      w: tc[0].w, color: C_GRAY5 },
-      { text: e.activoTransmitido,                         w: tc[1].w, bold: true },
-      { text: (e.cantidadTransmitida ?? 0).toFixed(4),     w: tc[2].w, align: 'right', color: C_GRAY5 },
-      { text: e.contrapartidaClave || 'Rev.',               w: tc[3].w, align: 'center', color: C_GRAY5 },
-      { text: fmtEurPdf(e.valorTransmisionEur),            w: tc[4].w, align: 'right' },
-      { text: fmtEurPdf(e.valorAdquisicionEur),            w: tc[5].w, align: 'right', color: C_GRAY5 },
-      { text: fmtEurPdf(e.gananciaPerdidaEur, true),       w: tc[6].w, align: 'right', bold: true, color: e.gananciaPerdidaEur >= 0 ? C_GREEN : C_RED },
-    ], i);
-  });
-  totalRow(
-    `Total ${fiscalEvents.length} operaciones`,
-    `Ganancias ${fmtEurPdf(totalGanancias)}   Pérdidas ${fmtEurPdf(totalPerdidas)}   Neto ${fmtEurPdf(totalGP, true)}`,
-    totalGP >= 0 ? C_GREEN : C_RED,
-    W
-  );
-
-  // ── RENDIMIENTOS (ahorro) Y BASE GENERAL (informativo, #537) ───────────
-  const secciones: Array<[string, string, Rendimiento[]]> = [
-    ['Rendimientos del Capital Mobiliario (base del ahorro)', 'Total rendimientos', ahorro],
-    [TITULO_BASE_GENERAL, 'Total base general', general],
-  ];
-  for (const [titulo, etiquetaTotal, lista] of secciones) {
-    if (lista.length === 0) continue;
-    needsPage(60);
-    doc.y += 10;
-    sectionHeader(`${titulo} — ${lista.length} operaciones`);
-
-    const rc = [
-      { text: 'Fecha',    w: 60 },
-      { text: 'Tipo',     w: 130 },
-      { text: 'Activo',   w: 55 },
-      { text: 'Cantidad', w: 80, align: 'right' as const },
-      { text: 'Valor EUR', w: W - 325, align: 'right' as const },
-    ];
-    rc[4].w = W - rc.slice(0, 4).reduce((s, c) => s + c.w, 0);
-    tHead(rc);
-
-    lista.forEach((r, i) => {
-      tRow([
-        { text: r.fecha,              w: rc[0].w, color: C_GRAY5 },
-        { text: r.tipo,               w: rc[1].w },
-        { text: r.activo,             w: rc[2].w, bold: true },
-        { text: r.cantidad.toFixed(6), w: rc[3].w, align: 'right', color: C_GRAY5 },
-        { text: fmtEurPdf(r.valorEur), w: rc[4].w, align: 'right', bold: true, color: C_VIOLET },
-      ], i);
-    });
-    totalRow(etiquetaTotal, fmtEurPdf(lista.reduce((s, r) => s + r.valorEur, 0)), C_VIOLET, W);
+  for (const s of secciones) {
+    tituloSeccion(TITULO_SECCION[s]);
+    if (s === 'resumen') {
+      tabla([{ titulo: 'Concepto', ancho: 3 }, { titulo: 'Importe', ancho: 1, alin: 'right' }], [
+        [{ texto: 'Ganancias patrimoniales' }, imp(r.ganancias)],
+        [{ texto: 'Pérdidas patrimoniales' }, imp(r.perdidas)],
+        [{ texto: 'Neto de ganancias y pérdidas', negrita: true }, { ...imp(r.neto), negrita: true }],
+        [{ texto: 'Rendimientos del capital mobiliario (base del ahorro)' }, imp(r.rendimientosAhorro)],
+        [{ texto: 'Rentas de la base general (informativo)' }, imp(r.rendimientosGeneral)],
+        [{ texto: 'Pérdidas de años anteriores compensadas' }, imp(r.compensado)],
+        [{ texto: 'Base del ahorro', negrita: true }, { texto: eur(r.baseAhorro), negrita: true }],
+        [{ texto: 'Cuota estimada del ahorro', negrita: true }, { texto: eur(r.cuota), negrita: true }],
+        [{ texto: 'Operaciones y rendimientos' }, { texto: `${r.operaciones} y ${r.rendimientos}` }],
+      ]);
+    } else if (s === 'compensacion') {
+      tabla([
+        { titulo: 'Año de la pérdida', ancho: 1 }, { titulo: 'Pérdida original', ancho: 1, alin: 'right' },
+        { titulo: `Aplicada en ${d.year}`, ancho: 1, alin: 'right' }, { titulo: `Pendiente tras ${d.year}`, ancho: 1, alin: 'right' },
+        { titulo: 'Caduca el 31/12 de', ancho: 1, alin: 'right' },
+      ], d.compensacion.map(c => [{ texto: String(c.anio) }, { texto: eur(c.original) }, { texto: eur(c.aplicadaEnEjercicio) }, { texto: eur(c.pendiente) }, { texto: String(c.caducaEn) }]),
+      [{ texto: 'Total' }, { texto: '' }, { texto: eur(r.compensado) }, { texto: eur(d.compensacion.reduce((t, c) => t + c.pendiente, 0)) }, { texto: '' }]);
+    } else if (s === 'activos') {
+      tabla([
+        { titulo: 'Activo', ancho: 1.2 }, { titulo: 'Operaciones', ancho: 1, alin: 'right' }, { titulo: 'Ganancias', ancho: 1.4, alin: 'right' },
+        { titulo: 'Pérdidas', ancho: 1.4, alin: 'right' }, { titulo: 'Neto', ancho: 1.4, alin: 'right' },
+      ], d.activos.map(a => [{ texto: a.activo }, { texto: String(a.operaciones) }, imp(a.ganancias), imp(a.perdidas), imp(a.neto)]),
+      [{ texto: 'Total' }, { texto: String(r.operaciones) }, imp(r.ganancias), imp(r.perdidas), imp(r.neto)]);
+    } else if (s === 'operaciones') {
+      tabla([
+        { titulo: 'Fecha', ancho: 0.8 }, { titulo: 'Tipo', ancho: 0.9 }, { titulo: 'Activo', ancho: 0.7 }, { titulo: 'Cantidad', ancho: 1, alin: 'right' },
+        { titulo: 'Wallet', ancho: 1.2 }, { titulo: 'Canal', ancho: 0.8 }, { titulo: 'Clave', ancho: 0.6 }, { titulo: 'Contraprestación', ancho: 1.3 },
+        { titulo: 'V. transmisión', ancho: 1, alin: 'right' }, { titulo: 'G. transm.', ancho: 0.8, alin: 'right' },
+        { titulo: 'V. adquisición', ancho: 1, alin: 'right' }, { titulo: 'G. adq.', ancho: 0.8, alin: 'right' }, { titulo: 'Resultado', ancho: 1, alin: 'right' },
+      ], d.operaciones.map(o => [
+        { texto: fechaEs(o.fecha) }, { texto: o.tipo }, { texto: o.activo }, { texto: cant(o.cantidad) }, { texto: o.wallet }, { texto: o.canal },
+        { texto: o.revisar ? 'Revisar' : o.clave, color: o.revisar ? C_NEG : undefined }, { texto: o.descripcion },
+        { texto: eur(o.valorTransmision) }, { texto: eur(o.gastosTransmision) }, { texto: eur(o.valorAdquisicion) }, { texto: eur(o.gastosAdquisicion) }, imp(o.resultado),
+      ]), [{ texto: 'Total' }, ...Array(11).fill({ texto: '' }), imp(r.neto)]);
+    } else if (s === 'rendimientos') {
+      tabla([
+        { titulo: 'Fecha', ancho: 0.8 }, { titulo: 'Tipo', ancho: 1.2 }, { titulo: 'Base', ancho: 0.7 }, { titulo: 'Activo', ancho: 0.8 },
+        { titulo: 'Cantidad', ancho: 1.1, alin: 'right' }, { titulo: 'Wallet', ancho: 1.4 }, { titulo: 'Valor', ancho: 1, alin: 'right' },
+      ], d.rendimientos.map(x => [{ texto: fechaEs(x.fecha) }, { texto: x.tipo }, { texto: x.base }, { texto: x.activo }, { texto: cant(x.cantidad) }, { texto: x.wallet }, { texto: eur(x.valor) }]),
+      [{ texto: 'Total' }, ...Array(5).fill({ texto: '' }), { texto: eur(r.rendimientosAhorro + r.rendimientosGeneral) }]);
+    } else {
+      tabla([
+        { titulo: 'Transmisión', ancho: 0.8 }, { titulo: 'Activo', ancho: 0.7 }, { titulo: 'Cantidad', ancho: 1, alin: 'right' }, { titulo: 'Adquisición', ancho: 0.8 },
+        { titulo: 'Wallet', ancho: 1.2 }, { titulo: 'V. transmisión', ancho: 1, alin: 'right' }, { titulo: 'G. transm.', ancho: 0.8, alin: 'right' },
+        { titulo: 'V. adquisición', ancho: 1, alin: 'right' }, { titulo: 'G. adq.', ancho: 0.8, alin: 'right' }, { titulo: 'Resultado', ancho: 1, alin: 'right' },
+      ], d.lotes.map(l => [
+        { texto: fechaEs(l.fecha) }, { texto: l.activo }, { texto: cant(l.cantidad) }, { texto: fechaEs(l.fechaAdquisicion) }, { texto: l.wallet },
+        { texto: eur(l.valorTransmision) }, { texto: eur(l.gastosTransmision) }, { texto: eur(l.valorAdquisicion) }, { texto: eur(l.gastosAdquisicion) }, imp(l.resultado),
+      ]), [{ texto: 'Total' }, ...Array(8).fill({ texto: '' }), imp(r.neto)]);
+    }
   }
 
-  // ── AVISO LEGAL ───────────────────────────────────────────────────────
-  needsPage(50);
-  doc.y += 14;
-  doc.rect(ML, doc.y, W, 0.4).fill(C_GRAY1);
-  doc.y += 8;
-  doc.fontSize(7).font('Helvetica').fillColor(C_GRAY3)
-    .text(
-      'AVISO LEGAL: Este informe es orientativo y no constituye asesoramiento fiscal. Los cálculos se basan en el método FIFO según la normativa española vigente (LIRPF). Los importes en EUR se obtienen aplicando el tipo de cambio en la fecha de cada operación. Consulta con un asesor fiscal antes de presentar tu declaración de la renta.',
-      ML, doc.y, { width: W, align: 'justify' }
-    );
-
+  // Cabecera y pie en todas las páginas, ya que se sabe cuántas hay.
+  const { start, count } = doc.bufferedPageRange();
+  for (let i = start; i < start + count; i++) {
+    doc.switchToPage(i);
+    // Sin margen inferior al escribir el pie: si no, pdfkit abriría una página nueva.
+    doc.page.margins.bottom = 0;
+    doc.font('Helvetica').fontSize(7.5).fillColor(C_MUTED)
+      .text(`CryptoFolio · Informe fiscal ${d.year}`, M, M - 4, { width: W / 2, lineBreak: false })
+      .text(`Página ${i - start + 1} de ${count}`, M + W / 2, PH - M - 4, { width: W / 2, align: 'right', lineBreak: false })
+      .text('Estimación orientativa: revisa los datos antes de presentar la declaración.', M, PH - M - 4, { width: W / 2, lineBreak: false });
+    doc.moveTo(M, M + 10).lineTo(M + W, M + 10).lineWidth(0.5).strokeColor(C_LINE).stroke();
+  }
   doc.end();
+  return fin;
+}
+
+export async function writePdfExport(res: Response, d: DatosExport, secciones: readonly Seccion[], generado: string): Promise<void> {
+  const buf = await pdfBuffer(d, secciones, generado);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="fiscal_${d.year}.pdf"`);
+  res.send(buf);
 }
