@@ -60,10 +60,12 @@ for (const theme of ['dark', 'light'] as const) {
     // Analiza cuatro pantallas completas: con la suite en paralelo superaba los 60 s (#542).
     test.slow()
     await soloLectura(page)
-    await page.emulateMedia({ colorScheme: theme })
+    // Sin animaciones de entrada, para que axe mida la pantalla asentada.
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })
     for (const v of ['resumen', 'operaciones', 'modelo721', 'planificar']) {
       await page.goto(v === 'resumen' ? '/fiscal' : `/fiscal?vista=${v}`)
-      await expect(page.getByRole('list', { name: /^Cifras:/ })).toBeVisible()
+      // En CI, con la suite en paralelo, las cifras pueden tardar más de 5 s.
+      await expect(page.getByRole('list', { name: /^Cifras:/ })).toBeVisible({ timeout: 15_000 })
       await page.waitForLoadState('networkidle')
       const r = await new AxeBuilder({ page }).withTags(WCAG).include('main').analyze()
       expect(r.violations.map(x => `${v}: ${x.id}: ${x.nodes.map(n => n.target.join(" ")).slice(0, 4).join(" | ")}`)).toEqual([])

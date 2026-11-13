@@ -22,6 +22,9 @@ async function abrir(page: Page) {
   test.skip(anio === null, 'Sin rendimientos en estos datos')
   await page.route('**/api/**', r => (r.request().method() === 'GET' ? r.continue() : r.abort()))
   await page.setViewportSize({ width: 1680, height: 1050 })
+  // Sin animaciones de entrada: axe mide el contraste de la pantalla asentada,
+  // no un fotograma del fundido (en CI, con el runner cargado, lo pillaba a medias).
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto(`/fiscal?vista=operaciones&anio=${anio}&seccion=rendimientos`)
   const seccion = page.locator('#fiscal-rendimientos')
   await seccion.waitFor({ timeout: 15_000 })

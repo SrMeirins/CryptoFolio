@@ -73,6 +73,8 @@ async function abrir(page: Page) {
     return r.continue()
   })
   await page.setViewportSize({ width: 1680, height: 1050 })
+  // Sin animaciones de entrada: axe mide la pantalla asentada.
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto(`/fiscal?vista=modelo721&anio=${anio}`)
   const vista = page.getByRole('region', { name: `Modelo 721 · ${anio}` })
   await vista.waitFor({ timeout: 15_000 })

@@ -23,6 +23,8 @@ async function preparar(page: Page) {
     ],
   }
   const escrituras: string[] = []
+  // Sin animaciones de entrada: axe mide la pantalla asentada.
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.route('**/api/fiscal/custodia**', async r => {
     if (r.request().method() !== 'GET') { escrituras.push(`${r.request().method()} ${new URL(r.request().url()).pathname}`); return r.fulfill({ json: { ok: true } }) }
     return r.fulfill({ json: custodia })
