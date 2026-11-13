@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FifoLot, FiatBalance } from '../api/portfolio'
-import { assetView, breakEvenDistance, filterByPnl, rowPnl, walletParam } from './portfolioView'
+import { activosParam, assetView, breakEvenDistance, filterByPnl, MAX_ACTIVOS_URL, rowPnl, walletParam } from './portfolioView'
 import { portfolioSections } from './portfolioSections'
 
 // Vista «Por activo» y filtros de Portfolio (#271).
@@ -79,5 +79,17 @@ describe('walletParam (#448)', () => {
   it('acepta un UUID y descarta cualquier otro valor', () => {
     expect(walletParam('3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d')).toBe('3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d')
     for (const raw of [null, '', '../settings', '1 OR 1=1', '3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d-x', '<script>']) expect(walletParam(raw)).toBeNull()
+  })
+})
+
+describe('activosParam (#524)', () => {
+  it('mayúsculas, sin repetir y solo símbolos válidos; lo demás se ignora', () => {
+    expect(activosParam('aaa, BBB,aaa,,c-c,<x>,DDD')).toEqual(['AAA', 'BBB', 'DDD'])
+    expect(activosParam(null)).toEqual([])
+    expect(activosParam('')).toEqual([])
+    expect(activosParam('A'.repeat(21))).toEqual([])
+  })
+  it('como mucho 50 activos', () => {
+    expect(activosParam(Array.from({ length: 80 }, (_, i) => `S${i}`).join(','))).toHaveLength(MAX_ACTIVOS_URL)
   })
 })

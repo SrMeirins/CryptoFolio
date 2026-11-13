@@ -50,3 +50,21 @@ export function filterByPnl(rows: readonly UnifiedRow[], filter: PnlFilter, pric
 export function walletParam(raw: string | null): string | null {
   return raw && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw) ? raw : null
 }
+
+/** Máximo de activos en ?activos= (#524): de sobra para un grupo «Otros» y sin URLs desmedidas. */
+export const MAX_ACTIVOS_URL = 50
+
+/**
+ * Activos de ?activos=AAA,BBB (#524): en mayúsculas, sin repetir y solo los
+ * símbolos válidos (letras y cifras, hasta 20); el resto se ignora sin romper.
+ */
+export function activosParam(raw: string | null): string[] {
+  if (!raw) return []
+  const vistos = new Set<string>()
+  for (const t of raw.split(',')) {
+    const s = t.trim().toUpperCase()
+    if (/^[A-Z0-9]{1,20}$/.test(s)) vistos.add(s)
+    if (vistos.size >= MAX_ACTIVOS_URL) break
+  }
+  return [...vistos]
+}
