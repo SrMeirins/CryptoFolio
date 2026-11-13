@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { portfolioApi } from '../api/portfolio'
 import { SaleSimulatorModal } from '../components/SaleSimulatorModal'
 import { Search, X, Settings, Rows3, Rows4 } from 'lucide-react'
@@ -11,7 +11,7 @@ import { usePricesStore } from '../store/pricesStore'
 import { WalletCards } from './portfolio/WalletCards'
 import { WalletSections } from './portfolio/WalletSections'
 import { DustSection } from './portfolio/DustSection'
-import { iconButtonClasses, fieldClasses, Button, FilteredEmpty, Notice, NotApplicable, PageHeader, Skeleton, SkeletonGroup, SegmentedControl, Dropdown, panelClasses, panelEnterStyle, panelSurface, QueryError } from '../components/ui'
+import { iconButtonClasses, fieldClasses, Button, FilteredEmpty, MultiDropdown, Notice, NotApplicable, PageHeader, Skeleton, SkeletonGroup, SegmentedControl, Dropdown, panelClasses, panelEnterStyle, panelSurface, QueryError } from '../components/ui'
 import { AssetTable } from '../components/AssetTable'
 import { navIcon } from '../constants/navigation'
 import { PieMetodologia } from '../components/metodologia'
@@ -20,7 +20,8 @@ import { useHasTransactions } from '../hooks/useHasTransactions'
 import { portfolioSubtitle } from '../utils/panelSubtitles'
 import { portfolioSections } from '../utils/portfolioSections'
 import { portfolioInventory } from '../utils/portfolioInventory'
-import { assetView, filterByPnl, walletParam, type PnlFilter, type PortfolioView } from '../utils/portfolioView'
+import { activosParam, assetView, filterByPnl, walletParam, type PnlFilter, type PortfolioView } from '../utils/portfolioView'
+import { FiltroActivos } from './portfolio/FiltroActivos'
 import { isSearchShortcut, readDensity, readDustOpen, readView, saveDensity, saveDustOpen, saveView, type Density } from '../utils/portfolioPrefs'
 import { failure } from '../utils/queryFailure'
 
@@ -64,6 +65,18 @@ export function Portfolio() {
   // ?activo=XRP llega desde el mapa de calor del Dashboard (#233): abre el
   // panel de detalle de ese activo (#272).
   const [params] = useSearchParams()
+  const navigate = useNavigate()
+  // ?activos=AAA,BBB (#524): grupo de activos, p. ej. «Otros» del Dashboard.
+  // Se lee de la URL, así que atrás y adelante del navegador lo respetan.
+  const activos = useMemo(() => activosParam(params.get('activos')), [params])
+  const setActivos = (lista: readonly string[]) => {
+    const next = new URLSearchParams(params)
+    if (lista.length > 0) next.set('activos', lista.join(',')); else next.delete('activos')
+    // Comas sin codificar: la URL se lee, se guarda y se comparte mejor (los
+    // símbolos solo llevan letras y cifras). navigate respeta la cadena tal cual.
+    const busqueda = next.toString().replace(/%2C/gi, ',')
+    navigate({ search: busqueda ? `?${busqueda}` : '' }, { replace: true })
+  }
   const [search, setSearch] = useState('')
   const [detailAsset, setDetailAsset] = useState<string | null>(() => params.get('activo')?.toUpperCase() ?? null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -101,21 +114,21 @@ export function Portfolio() {
     [displayLots, market.prices, fiatBalances, fiatPrice, market.dustThreshold],
   )
   const filtered = useMemo(() => {
-    if (!q && !walletFilter) return all
-    const keep = (asset: string, walletId: string) => asset.includes(q) && (!walletFilter || walletId === walletFilter)
+    if (!q && !walletFilter && activos.length === 0) return all
+    const keep = (asset: string, walletId: string) => asset.includes(q) && (!walletFilter || walletId === walletFilter) && (activos.length === 0 || activos.includes(asset))
     return portfolioSections(
       displayLots.filter(l => keep(l.asset, l.wallet_id)), market.prices,
       fiatBalances.filter(b => keep(b.asset, b.wallet_id)), fiatPrice, market.dustThreshold,
     )
-  }, [q, walletFilter, all, displayLots, market.prices, fiatBalances, fiatPrice, market.dustThreshold])
+  }, [q, walletFilter, activos, all, displayLots, market.prices, fiatBalances, fiatPrice, market.dustThreshold])
   // Vista «Por activo» (#271): una fila por activo con todas sus wallets.
   const byAsset = useMemo(() => {
-    const keep = (asset: string, walletId: string) => asset.includes(q) && (!walletFilter || walletId === walletFilter)
+    const keep = (asset: string, walletId: string) => asset.includes(q) && (!walletFilter || walletId === walletFilter) && (activos.length === 0 || activos.includes(asset))
     return assetView(
       displayLots.filter(l => keep(l.asset, l.wallet_id)), market.prices,
       fiatBalances.filter(b => keep(b.asset, b.wallet_id)), fiatPrice, market.dustThreshold,
     )
-  }, [q, walletFilter, displayLots, market.prices, fiatBalances, fiatPrice, market.dustThreshold])
+  }, [q, walletFilter, activos, displayLots, market.prices, fiatBalances, fiatPrice, market.dustThreshold])
   const assetRows = useMemo(() => filterByPnl(byAsset.rows, pnlFilter, market.prices), [byAsset.rows, pnlFilter, market.prices])
   const walletSections = useMemo(
     () => filtered.sections
@@ -136,6 +149,13 @@ export function Portfolio() {
     [displayLots, market.prices, fiatBalances, fiatPrice, lockedAmounts, market.dustThreshold],
   )
 
+  // Activos de la cartera para el selector «Activos» (#524); los que llegan por
+  // la URL y ya no están también se listan, para poder quitarlos.
+  const opcionesActivos = useMemo(() => {
+    const todos = new Set([...displayLots.map(l => l.asset), ...activos])
+    return [...todos].sort().map(a => ({ value: a, label: a }))
+  }, [displayLots, activos])
+
   const hasPrices = Object.keys(market.prices).length > 0
   const walletCount = new Set(lots.map(l => l.wallet_id)).size
   const assetsTotal = new Set(lots.map(l => l.asset)).size
@@ -145,15 +165,16 @@ export function Portfolio() {
     : { rows: pnlFilter === 'all' ? filtered.dust : [], value: filtered.dustValue }
   const mainCount = view === 'asset' ? assetRows.length : walletSections.length
   const nothingFound = mainCount === 0 && dust.rows.length === 0
-  const filtersActive = !!search || !!walletFilter || pnlFilter !== 'all'
+  const filtersActive = !!search || !!walletFilter || pnlFilter !== 'all' || activos.length > 0
   const walletOptions = [{ value: '', label: 'Todas las wallets' }, ...inventory.wallets.map(w => ({ value: w.walletId, label: w.name }))]
   // Resumen de los filtros activos para el vacío por filtros (#496).
   const filtersSummary = [
+    activos.length > 0 && `activos ${activos.join(', ')}`,
     search && `búsqueda «${search}»`,
     walletFilter && `wallet ${walletOptions.find(o => o.value === walletFilter)?.label ?? walletFilter}`,
     pnlFilter !== 'all' && PNL_OPTIONS.find(o => o.value === pnlFilter)?.label.toLowerCase(),
   ].filter(Boolean).join(', ')
-  const clearFilters = () => { setSearch(''); setWalletFilter(null); setPnlFilter('all') }
+  const clearFilters = () => { setSearch(''); setWalletFilter(null); setPnlFilter('all'); if (activos.length > 0) setActivos([]) }
 
   function changeView(next: PortfolioView) {
     setView(next)
@@ -223,10 +244,14 @@ export function Portfolio() {
                 <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] mono px-1.5 py-0.5 rounded border border-border text-fg-subtle pointer-events-none" aria-hidden="true">/</kbd>
               )}
             </div>
+            <MultiDropdown label="Filtrar por activos" placeholder="Todos los activos" plural="activos" searchable
+              values={activos} options={opcionesActivos} onChange={v => setActivos(opcionesActivos.map(o => o.value).filter(a => v.includes(a)))} />
             <SegmentedControl label="Densidad de la tabla" variant="accent" value={density} onChange={changeDensity} options={DENSITY_OPTIONS} />
           </>
         }
       />
+
+      <FiltroActivos activos={activos} onQuitar={a => setActivos(activos.filter(x => x !== a))} onLimpiar={() => setActivos([])} />
 
       {/* Activos sin precio: un único aviso para toda la cartera */}
       {all.unpriced.length > 0 && (
