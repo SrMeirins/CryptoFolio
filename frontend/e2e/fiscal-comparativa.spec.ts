@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Comparativa interanual y evolución mensual (#539): una fila en ancho grande,
 // métrica de la comparativa, clic en año o mes hacia Operaciones, comparar con
@@ -60,7 +60,7 @@ for (const theme of ['dark', 'light'] as const) {
     await abrir(page)
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
     await page.waitForTimeout(500)
-    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+    const { violations } = await (await axeEstable(page)).withTags(WCAG).analyze()
     expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }

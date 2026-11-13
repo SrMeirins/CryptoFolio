@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Tarjetas del Dashboard con StatCard (#412): cada KPI lleva a su destino y
 // Mejor día del P&L diario despliega su detalle. Solo lectura.
@@ -43,7 +43,7 @@ for (const theme of ['dark', 'light'] as const) {
     await best.first().click()
     await expect(page.getByRole('button', { name: /^Mejor día: .*día \d+\. Ocultar el detalle del día$/ })).toHaveAttribute('aria-expanded', 'true')
     await page.waitForTimeout(300)
-    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+    const { violations } = await (await axeEstable(page)).withTags(WCAG).analyze()
     expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }
@@ -62,7 +62,7 @@ for (const theme of ['dark', 'light'] as const) {
     // movimientos, que atenúa el resto: se aparta para medir el estado de reposo.
     await page.mouse.move(0, 0)
     await page.waitForTimeout(400)
-    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+    const { violations } = await (await axeEstable(page)).withTags(WCAG).analyze()
     expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }

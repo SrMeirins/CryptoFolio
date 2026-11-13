@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Copias automáticas, salud y FIFO con progreso en Datos (#454). Solo
 // lectura: el estado y las acciones de las copias, el guardado de ajustes y
@@ -141,7 +141,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('region', { name: 'Mantenimiento' }).getByRole('button', { name: 'Ejecutar' }).click()
     await page.getByRole('table', { name: 'Estado FIFO antes y después de recalcular' }).waitFor()
     await page.waitForTimeout(800)
-    const { violations } = await new AxeBuilder({ page }).include('main').withTags(WCAG).analyze()
+    const { violations } = await (await axeEstable(page)).include('main').withTags(WCAG).analyze()
     expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }

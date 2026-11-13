@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Corregir la zona horaria de una importación de Binance (#599). La detección y
 // el impacto se simulan; no se aplica nada (se bloquea cualquier escritura).
@@ -24,7 +24,7 @@ test('el diálogo muestra la zona detectada, el impacto y es accesible', async (
   await expect(dialogo.getByText(/^Se desplazarán 10 transacciones 2 horas antes; 1 cambian de día y 0 de año\./)).toBeVisible()
   await expect(dialogo.getByRole('button', { name: 'Aplicar UTC+2 y recalcular' })).toBeEnabled()
 
-  const r = await new AxeBuilder({ page }).include('[role="dialog"]').withTags(WCAG).analyze()
+  const r = await (await axeEstable(page)).include('[role="dialog"]').withTags(WCAG).analyze()
   expect(r.violations).toEqual([])
 
   await page.keyboard.press('Escape')

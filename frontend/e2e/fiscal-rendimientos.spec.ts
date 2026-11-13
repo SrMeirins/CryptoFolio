@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Rendimientos de Fiscal (#544): tira por tipo que filtra, secciones por base
 // agrupadas por mes, estado de las unidades, «Revisar» y ayuda. Solo lectura.
@@ -58,7 +58,7 @@ test('la tira filtra por tipo y cada fila dice el estado de sus unidades', async
 
 test('«¿Cómo tributan?» abre la ayuda en Rendimientos y la sección no tiene violaciones de axe', async ({ page }) => {
   const { seccion } = await abrir(page)
-  const r = await new AxeBuilder({ page }).include('#fiscal-rendimientos').withTags(WCAG).analyze()
+  const r = await (await axeEstable(page)).include('#fiscal-rendimientos').withTags(WCAG).analyze()
   expect(r.violations).toEqual([])
   await seccion.getByRole('button', { name: '¿Cómo tributan?' }).click()
   await expect(page.getByRole('heading', { name: 'Rendimientos', exact: true })).toBeFocused()

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Estados vacíos (#496): con la base vacía, Dashboard, Portfolio y Fiscal
 // muestran el vacío de primer uso; un filtro sin resultados en Historial ofrece
@@ -45,7 +45,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.emulateMedia({ colorScheme: theme })
     await page.goto('/')
     await expect(page.getByText('Aún no hay operaciones')).toBeVisible()
-    const r = await new AxeBuilder({ page }).withTags(WCAG).include('main').analyze()
+    const r = await (await axeEstable(page)).withTags(WCAG).include('main').analyze()
     expect(r.violations).toEqual([])
   })
 }

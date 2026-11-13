@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Distribución por wallet (#506): desglose por activo de cada wallet. Solo
 // lectura: lotes, saldos y precios se interceptan con datos sintéticos.
@@ -41,7 +41,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.goto('/')
     await panel(page).getByRole('radio', { name: 'Wallet' }).click()
     await panel(page).getByRole('button', { name: /Wallet w1/ }).click()
-    const r = await new AxeBuilder({ page }).withTags(WCAG).include('main').analyze()
+    const r = await (await axeEstable(page)).withTags(WCAG).include('main').analyze()
     expect(r.violations).toEqual([])
   })
 }

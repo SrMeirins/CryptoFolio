@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Salir de Importar a medias (#497): el aviso usa el diálogo común, no
 // window.confirm. Nada se importa: la vista previa es sintética y la
@@ -53,7 +53,7 @@ for (const theme of ['dark', 'light'] as const) {
     await importacionEnCurso(page)
     await page.getByRole('navigation').getByRole('link', { name: 'Historial' }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
-    const r = await new AxeBuilder({ page }).withTags(WCAG).include('[role="dialog"]').analyze()
+    const r = await (await axeEstable(page)).withTags(WCAG).include('[role="dialog"]').analyze()
     expect(r.violations).toEqual([])
   })
 }

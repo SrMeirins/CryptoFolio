@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Componentes comunes en su página de prueba (épica #479, solo desarrollo).
 // Datos sintéticos; solo lectura.
@@ -14,7 +14,7 @@ test.describe('StatStrip y StatCard (#490)', () => {
       await page.emulateMedia({ colorScheme: theme })
       await page.goto('/__componentes')
       await expect(page.getByRole('list', { name: 'Tira de prueba' })).toBeVisible()
-      const r = await new AxeBuilder({ page }).withTags(WCAG).include('main').analyze()
+      const r = await (await axeEstable(page)).withTags(WCAG).include('main').analyze()
       expect(r.violations).toEqual([])
     })
   }

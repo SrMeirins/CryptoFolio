@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Zona horaria en Ajustes (#390). Solo lectura: la zona y su cambio se simulan
 // con respuestas falsas, así que no se toca el ajuste real.
@@ -64,7 +64,7 @@ test('con ejercicios declarados se pide confirmación, y cancelar no cambia nada
   const dialog = page.getByRole('dialog', { name: 'Cambiar la zona horaria' })
   await expect(dialog).toContainText('2 ejercicios declarados')
   await expect(dialog).toContainText('Fiscal te mostrará si las actuales difieren')
-  const { violations } = await new AxeBuilder({ page }).withTags(WCAG).include('[role="dialog"]').analyze()
+  const { violations } = await (await axeEstable(page)).withTags(WCAG).include('[role="dialog"]').analyze()
   expect(violations.map(v => v.id)).toEqual([])
   await dialog.getByRole('button', { name: 'Cancelar' }).click()
   await expect(dialog).toHaveCount(0)
@@ -80,7 +80,7 @@ test('Ajustes con el selector de zona sin violaciones WCAG 2.2 AA en ambos temas
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
     await page.waitForTimeout(400)
-    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).include('main').analyze()
+    const { violations } = await (await axeEstable(page)).withTags(WCAG).include('main').analyze()
     expect(violations.map(v => `${theme}: ${v.id}`)).toEqual([])
   }
 })

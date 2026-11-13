@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Desglose por activo (#540): ranking ordenable y filtrable con «Otros»
 // desplegable y enlaces; contribución que termina en el neto. Axe en ambos
@@ -60,7 +60,7 @@ for (const theme of ['dark', 'light'] as const) {
     for (const v of ['Ranking', 'Contribución']) {
       await vista.getByRole('radio', { name: v }).click()
       await page.waitForTimeout(300)
-      const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+      const { violations } = await (await axeEstable(page)).withTags(WCAG).analyze()
       expect(violations.map(x => `${v} ${x.id}: ${x.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
     }
   })

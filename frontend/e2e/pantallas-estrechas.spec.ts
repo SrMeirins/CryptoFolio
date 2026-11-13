@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Pantallas estrechas (#499): sin scroll horizontal en ninguna ruta (WCAG
 // 1.4.10) y menú en cajón accesible. Solo lectura: se bloquea cualquier
@@ -87,9 +87,9 @@ test.describe('menú en cajón a 390 px', () => {
       await page.emulateMedia({ colorScheme: theme })
       await page.goto('/')
       await page.waitForLoadState('networkidle')
-      expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([])
+      expect((await (await axeEstable(page)).withTags(WCAG).analyze()).violations).toEqual([])
       await page.getByRole('button', { name: 'Abrir el menú' }).click()
-      expect((await new AxeBuilder({ page }).withTags(WCAG).include('#menu-principal').analyze()).violations).toEqual([])
+      expect((await (await axeEstable(page)).withTags(WCAG).include('#menu-principal').analyze()).violations).toEqual([])
     })
   }
 })

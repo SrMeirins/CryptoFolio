@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 import { pulsarInterruptor } from './interruptor'
 
 // Avisos (#447): campana accesible con Descartar y silenciado por categoría en
@@ -106,7 +106,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
     await page.getByRole('button', { name: /^Avisos del sistema/ }).click()
     await page.waitForTimeout(400)
-    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+    const { violations } = await (await axeEstable(page)).withTags(WCAG).analyze()
     expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }

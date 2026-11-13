@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Logo de un activo en Ajustes (#449): de dónde sale y corrección solo para el
 // logo. Solo lectura: el cambio se intercepta y no llega a la base de datos.
@@ -32,6 +32,6 @@ test('el panel del activo dice de dónde sale su logo y fija un id manual valida
 
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
   await page.waitForTimeout(300)
-  const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+  const { violations } = await (await axeEstable(page)).withTags(WCAG).analyze()
   expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
 })

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Pérdidas pendientes (#541): tira pulsable, escala común, cuenta atrás,
 // Planificar, detalle año a año y «¿Cómo funciona?». La compensación se
@@ -61,7 +61,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
     await page.getByRole('button', { name: /^Ver el detalle de \d{4}$/ }).click()
     await page.waitForTimeout(300)
-    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+    const { violations } = await (await axeEstable(page)).withTags(WCAG).analyze()
     expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 import { abrirMasFiltros } from './historyHelpers'
 
 // Atajos de teclado y saltos por año del Historial (#382). Solo lectura.
@@ -57,7 +57,7 @@ test('«?» abre la ayuda accesible; Esc la cierra y devuelve el foco', async ({
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
     await page.waitForTimeout(400)
-    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).include('[role="dialog"]').analyze()
+    const { violations } = await (await axeEstable(page)).withTags(WCAG).include('[role="dialog"]').analyze()
     expect(violations.map(v => `${theme}: ${v.id}`)).toEqual([])
   }
   await page.keyboard.press('Escape')

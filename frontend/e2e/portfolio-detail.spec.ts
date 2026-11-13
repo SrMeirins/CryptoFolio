@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Detalle de un activo en Portfolio (#460): se abre desde «Por activo», «Por
 // wallet» y Polvo, con ratón y con teclado. Solo lectura.
@@ -60,7 +60,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('radio', { name: 'Por wallet' }).click()
     await page.locator('tbody tr[data-row-key]').first().waitFor({ timeout: 15_000 })
     await page.mouse.move(0, 0)
-    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+    const { violations } = await (await axeEstable(page)).withTags(WCAG).analyze()
     expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }

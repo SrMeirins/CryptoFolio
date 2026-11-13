@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Sin title nativo (#495): tres explicaciones que antes eran title se abren
 // ahora con teclado, al pasar el ratón o al tocar, y se cierran con Escape.
@@ -57,7 +57,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.goto('/history')
     await page.getByRole('button', { name: 'Copiar el enlace de esta vista' }).focus()
     await expect(page.getByRole('tooltip')).toBeVisible()
-    const r = await new AxeBuilder({ page }).withTags(WCAG).include('[role="tooltip"]').analyze()
+    const r = await (await axeEstable(page)).withTags(WCAG).include('[role="tooltip"]').analyze()
     expect(r.violations).toEqual([])
   })
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Wallets en Ajustes (#448): resumen como en Portfolio, enlaces filtrados y
 // edición en panel. Solo lectura: la edición se intercepta y nunca llega a la
@@ -79,11 +79,11 @@ for (const theme of ['dark', 'light'] as const) {
     const editar = firstCard(page)
     await editar.waitFor({ timeout: 15_000 }).catch(() => {})
     test.skip(await editar.count() === 0, 'Sin wallets propias en estos datos')
-    let res = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+    let res = await (await axeEstable(page)).withTags(WCAG).analyze()
     expect(res.violations.map(v => v.id)).toEqual([])
     await editar.click()
     await page.waitForTimeout(400)
-    res = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+    res = await (await axeEstable(page)).withTags(WCAG).analyze()
     expect(res.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }

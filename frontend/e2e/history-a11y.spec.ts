@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 import { abrirMasFiltros } from './historyHelpers'
 
 // Teclado en Historial (#351): foco visible, panel de detalle (#373) y borrado
@@ -128,7 +128,7 @@ test('importada (#378): el modal avisa del archivo, tiene nombre y cancelar no g
   await expect(dialog).toBeVisible()
   await expect(dialog).toContainText('Transacción importada')
   await expect(dialog).toContainText('Podrás restaurarlos desde su detalle')
-  const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).include('[role="dialog"]').analyze()
+  const { violations } = await (await axeEstable(page)).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).include('[role="dialog"]').analyze()
   expect(violations.map(v => v.id)).toEqual([])
   await page.keyboard.press('Escape')
   await expect(dialog).toHaveCount(0)
@@ -179,7 +179,7 @@ test('panel de una importada editada (#378): cambios, restaurar con confirmació
   await expect(dialog).toBeVisible()
   await expect(restaurar).toBeFocused()
 
-  const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).include('[role="dialog"]').analyze()
+  const { violations } = await (await axeEstable(page)).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).include('[role="dialog"]').analyze()
   expect(violations.map(v => v.id)).toEqual([])
   expect(escrituras).toEqual([])
 })
@@ -236,7 +236,7 @@ test('saldo corrido (#380): con un activo filtrado, columna «Saldo», saldo act
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
     await page.waitForTimeout(400)
-    const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).include('main').analyze()
+    const { violations } = await (await axeEstable(page)).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).include('main').analyze()
     expect(violations.map(v => `${theme}: ${v.id}`)).toEqual([])
   }
 })

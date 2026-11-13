@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Tarjetas de Portfolio con StatCard (#417): una wallet filtra la tabla con
 // teclado y su estado activo se anuncia; axe en ambos temas. Solo lectura.
@@ -22,7 +22,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.getByRole('button', { name: /^Mostrando solo/ })).toBeVisible()
     await page.mouse.move(0, 0)
     await page.waitForTimeout(400)
-    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze()
+    const { violations } = await (await axeEstable(page)).withTags(WCAG).analyze()
     expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
     // Otra vez: quita el filtro.
     await page.keyboard.press('Enter')

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import AxeBuilder from '@axe-core/playwright'
+import { axeEstable } from './axe'
 
 // Custodia de los exchanges para el 721 en Ajustes (#545): la tarjeta de
 // Ajustes > Fiscal (una fila por exchange con sus subcuentas) y la lÃ­nea de
@@ -46,7 +46,7 @@ test('Ajustes > Fiscal: una fila por exchange con sus subcuentas, su estado y cÃ
   await filas.nth(0).getByRole('button', { name: 'Cambiar la custodia de Binance' }).click()
   await expect(page.getByRole('dialog', { name: 'Custodia de Binance' })).toContainText('Se aplica a sus 2 wallets')
   await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).last().click()
-  const r = await new AxeBuilder({ page }).include('section[aria-label="Custodia de tus exchanges (Modelo 721)"]').withTags(WCAG).analyze()
+  const r = await (await axeEstable(page)).include('section[aria-label="Custodia de tus exchanges (Modelo 721)"]').withTags(WCAG).analyze()
   expect(r.violations).toEqual([])
 })
 
@@ -62,6 +62,6 @@ test('Ajustes > Wallets: cada wallet nativa dice su custodia y se puede cambiar'
   await dialogo.getByRole('button', { name: 'Guardar' }).click()
   await expect.poll(() => escrituras.length).toBe(2)
   expect(escrituras).toContain(`PUT /api/fiscal/custodia/${spot}`)
-  const r = await new AxeBuilder({ page }).include('[role="group"][aria-label="Wallet del sistema Binance Spot"]').withTags(WCAG).analyze()
+  const r = await (await axeEstable(page)).include('[role="group"][aria-label="Wallet del sistema Binance Spot"]').withTags(WCAG).analyze()
   expect(r.violations).toEqual([])
 })
