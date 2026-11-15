@@ -51,6 +51,13 @@ describe('routes/wallets — edición y resumen (#448)', () => {
     expect((await request(app).put(`/api/wallets/${sys.id}`).send({ name: 'Sistema', type: 'bank' })).status).toBe(403);
   });
 
+  it('una wallet del sistema lleva el color de su exchange: no se cambia, pero reenviar el mismo vale (#525)', async () => {
+    const sys = (await pool.query(`SELECT id, name, color FROM wallets WHERE is_system = TRUE AND name = 'Binance Spot'`)).rows[0];
+    expect((await request(app).put(`/api/wallets/${sys.id}`).send({ name: sys.name, color: '#123456' })).status).toBe(403);
+    expect((await request(app).put(`/api/wallets/${sys.id}`).send({ name: sys.name, color: sys.color.toLowerCase() })).status).toBe(200);
+    expect((await pool.query('SELECT color FROM wallets WHERE id = $1', [sys.id])).rows[0].color).toBe(sys.color);
+  });
+
   it('el resumen cuenta las operaciones como origen o destino y la última fecha', async () => {
     const otra = (await pool.query(`INSERT INTO wallets (name, type) VALUES ('Destino sintético', 'exchange') RETURNING id`)).rows[0].id;
     await pool.query(

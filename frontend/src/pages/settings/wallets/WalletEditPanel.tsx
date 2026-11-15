@@ -65,7 +65,9 @@ export function WalletEditPanel({ wallet, onSave, onClose }: {
           </div>
           <div className="space-y-1">
             <span className="text-xs text-fg-subtle">Color</span>
-            <ColorPicker value={color} onChange={setColor} size="md" />
+            {wallet.is_system
+              ? <p className="text-xs text-fg-subtle flex items-center gap-2"><span className="size-3 rounded-full" style={{ backgroundColor: wallet.color }} />Lleva el color de su exchange y no se cambia.</p>
+              : <ColorPicker value={color} onChange={setColor} size="md" preview={trimmed} />}
           </div>
           <div className="space-y-1">
             <label htmlFor={`${titleId}-notas`} className="text-xs text-fg-subtle">Notas</label>

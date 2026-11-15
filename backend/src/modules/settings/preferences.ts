@@ -8,6 +8,8 @@ import { autoBackupSchemas } from '../backup/autoBackupSettings';
 export const DUST_THRESHOLD_KEY = 'dust_threshold_eur';
 export const PRIVACY_ON_START_KEY = 'privacy_on_start';
 export const START_PAGE_KEY = 'start_page';
+/** Peso de la mayor posición a partir del cual Portfolio avisa de concentración (#525). */
+export const CONCENTRACION_KEY = 'concentracion_aviso_pct';
 
 /** Páginas que se pueden elegir como inicio. */
 export const START_PAGES = ['/', '/portfolio', '/fiscal', '/history'] as const;
@@ -21,6 +23,9 @@ export const preferenceSchemas: Record<string, z.ZodType<string>> = {
   [DUST_THRESHOLD_KEY]: dustThresholdSchema,
   [PRIVACY_ON_START_KEY]: z.enum(['true', 'false'], { error: 'privacy_on_start debe ser true o false' }),
   [START_PAGE_KEY]: z.enum(START_PAGES, { error: 'start_page debe ser una de las páginas de inicio permitidas' }),
+  // Aviso de concentración (#525): porcentaje entero de 10 a 100.
+  [CONCENTRACION_KEY]: z.string().regex(/^\d{2,3}$/, `${CONCENTRACION_KEY} debe ser un porcentaje entero`)
+    .refine(v => Number(v) >= 10 && Number(v) <= 100, `${CONCENTRACION_KEY} va de 10 a 100`),
   // Categorías de avisos silenciadas (#447).
   [MUTED_KEY]: mutedSchema,
   // Copias automáticas (#454).

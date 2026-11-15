@@ -4,7 +4,22 @@ import { fieldClasses } from '../../../components/ui/classes'
 
 export const OTHER_NETWORK = '__other__'
 
-export const COLORS = ['#6366f1', '#00c896', '#e74c3c', '#f39c12', '#3498db', '#9b59b6', '#1abc9c', '#e67e22']
+/** Colores de wallet con su nombre (#525): el nombre lo lee el lector de pantalla y sale en la ayuda. */
+export const NAMED_COLORS: readonly { hex: string; name: string }[] = [
+  { hex: '#6366f1', name: 'Índigo' },
+  { hex: '#00c896', name: 'Verde' },
+  { hex: '#e74c3c', name: 'Rojo' },
+  { hex: '#f39c12', name: 'Naranja' },
+  { hex: '#3498db', name: 'Azul' },
+  { hex: '#9b59b6', name: 'Morado' },
+  { hex: '#1abc9c', name: 'Turquesa' },
+  { hex: '#e67e22', name: 'Calabaza' },
+  { hex: '#1f2937', name: 'Negro' },
+  { hex: '#9ca3af', name: 'Gris plata' },
+  { hex: '#ec4899', name: 'Rosa' },
+  { hex: '#ca8a04', name: 'Dorado' },
+]
+export const COLORS = NAMED_COLORS.map(c => c.hex)
 
 export const WALLET_TYPE_META: Record<string, { icon: typeof Shield; label: string }> = {
   hardware:  { icon: Shield,    label: 'Hardware' },

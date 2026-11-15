@@ -6,6 +6,8 @@ import { DUST_THRESHOLD_EUR } from './topMovers'
 export const DUST_THRESHOLD_KEY = 'dust_threshold_eur'
 export const PRIVACY_ON_START_KEY = 'privacy_on_start'
 export const START_PAGE_KEY = 'start_page'
+export const CONCENTRACION_KEY = 'concentracion_aviso_pct'
+export const CONCENTRACION_DEFECTO = 40
 
 export const START_PAGES = [
   { value: '/', label: 'Dashboard' },
@@ -23,6 +25,13 @@ export function dustThresholdEur(config: Config): number {
   if (!raw || !/^\d{1,4}(\.\d{1,2})?$/.test(raw)) return DUST_THRESHOLD_EUR
   const n = Number(raw)
   return n <= 1000 ? n : DUST_THRESHOLD_EUR
+}
+
+/** Peso de la mayor posición a partir del cual se avisa de concentración (#525); por defecto, 40 %. */
+export function concentracionAvisoPct(config: Config): number {
+  const raw = config?.[CONCENTRACION_KEY]
+  const n = raw && /^\d{2,3}$/.test(raw) ? Number(raw) : Number.NaN
+  return n >= 10 && n <= 100 ? n : CONCENTRACION_DEFECTO
 }
 
 /** ¿Arrancar con los importes ocultos? */

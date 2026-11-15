@@ -3,15 +3,15 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { portfolioApi } from '../api/portfolio'
 import { SaleSimulatorModal } from '../components/SaleSimulatorModal'
-import { Search, X, Settings, Rows3, Rows4 } from 'lucide-react'
+import { AlertTriangle, ChevronRight, History, Search, Sparkles, X, Settings, Rows3, Rows4 } from 'lucide-react'
 import { useDisplayLots, useDisplayMarket } from '../hooks/useDisplayMarket'
-import { InventoryStrip } from './portfolio/InventoryStrip'
+import { CabeceraPortfolio } from './portfolio/CabeceraPortfolio'
 import { AssetDetailPanel } from './portfolio/AssetDetailPanel'
 import { usePricesStore } from '../store/pricesStore'
 import { WalletCards } from './portfolio/WalletCards'
 import { WalletSections } from './portfolio/WalletSections'
 import { DustSection } from './portfolio/DustSection'
-import { iconButtonClasses, fieldClasses, Button, FilteredEmpty, MultiDropdown, Notice, NotApplicable, PageHeader, Skeleton, SkeletonGroup, SegmentedControl, Dropdown, panelClasses, panelEnterStyle, panelSurface, QueryError } from '../components/ui'
+import { iconButtonClasses, fieldClasses, Button, FilteredEmpty, MultiDropdown, Notice, NotApplicable, PageHeader, Skeleton, SkeletonGroup, SegmentedControl, panelClasses, panelEnterStyle, panelSurface, QueryError } from '../components/ui'
 import { AssetTable } from '../components/AssetTable'
 import { navIcon } from '../constants/navigation'
 import { PieMetodologia } from '../components/metodologia'
@@ -24,6 +24,13 @@ import { activosParam, assetView, filterByPnl, walletParam, type PnlFilter, type
 import { FiltroActivos } from './portfolio/FiltroActivos'
 import { isSearchShortcut, readDensity, readDustOpen, readView, saveDensity, saveDustOpen, saveView, type Density } from '../utils/portfolioPrefs'
 import { failure } from '../utils/queryFailure'
+import { concentracionAvisoPct } from '../utils/preferences'
+
+// Chips del subtítulo (#525): fichas con icono y fondo suave, que se ven como
+// controles y no solo por el color; foco visible.
+const CHIP = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium align-middle transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand'
+const CHIP_AVISO = `${CHIP} border-warning/40 bg-warning/10 text-warning-ink hover:bg-warning/20`
+const CHIP_NEUTRO = `${CHIP} border-border bg-overlay/5 text-fg-muted hover:bg-overlay/10 hover:text-fg`
 
 const VIEW_OPTIONS = [
   { value: 'asset' as const, label: 'Por activo', title: 'Una fila por activo con todas sus wallets' },
@@ -69,23 +76,26 @@ export function Portfolio() {
   // ?activos=AAA,BBB (#524): grupo de activos, p. ej. «Otros» del Dashboard.
   // Se lee de la URL, así que atrás y adelante del navegador lo respetan.
   const activos = useMemo(() => activosParam(params.get('activos')), [params])
-  const setActivos = (lista: readonly string[]) => {
+  /** Cambia un parámetro de la URL sin añadir historial; null lo quita. */
+  const setParam = (clave: string, valor: string | null) => {
     const next = new URLSearchParams(params)
-    if (lista.length > 0) next.set('activos', lista.join(',')); else next.delete('activos')
+    if (valor) next.set(clave, valor); else next.delete(clave)
     // Comas sin codificar: la URL se lee, se guarda y se comparte mejor (los
     // símbolos solo llevan letras y cifras). navigate respeta la cadena tal cual.
     const busqueda = next.toString().replace(/%2C/gi, ',')
     navigate({ search: busqueda ? `?${busqueda}` : '' }, { replace: true })
   }
+  const setActivos = (lista: readonly string[]) => setParam('activos', lista.length > 0 ? lista.join(',') : null)
   const [search, setSearch] = useState('')
   const [detailAsset, setDetailAsset] = useState<string | null>(() => params.get('activo')?.toUpperCase() ?? null)
   const searchRef = useRef<HTMLInputElement>(null)
   const [simulator, setSimulator] = useState<{ asset: string; qty: number; price: number } | null>(null)
   const [density, setDensity] = useState<Density>(readDensity)
   const [dustOpen, setDustOpen] = useState(readDustOpen)
-  // Wallet elegida en las tarjetas (#270): filtra la tabla; null = todas.
-  // ?wallet=<id> llega desde Ajustes (#448); solo se acepta un UUID.
-  const [walletFilter, setWalletFilter] = useState<string | null>(() => walletParam(params.get('wallet')))
+  // Wallet elegida en las tarjetas (#270, #525): el único filtro por wallet,
+  // en la URL (?wallet=<id>, también desde Ajustes, #448); solo un UUID.
+  const walletFilter = walletParam(params.get('wallet'))
+  const setWalletFilter = (id: string | null) => setParam('wallet', id)
   // Vista de la tabla (recordada) y filtro de resultado (#271).
   const [view, setView] = useState<PortfolioView>(readView)
   const [pnlFilter, setPnlFilter] = useState<PnlFilter>('all')
@@ -156,6 +166,9 @@ export function Portfolio() {
     return [...todos].sort().map(a => ({ value: a, label: a }))
   }, [displayLots, activos])
 
+  // Umbral del aviso de concentración (#525), de Ajustes > General.
+  const configQ = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
+
   const hasPrices = Object.keys(market.prices).length > 0
   const walletCount = new Set(lots.map(l => l.wallet_id)).size
   const assetsTotal = new Set(lots.map(l => l.asset)).size
@@ -174,7 +187,21 @@ export function Portfolio() {
     walletFilter && `wallet ${walletOptions.find(o => o.value === walletFilter)?.label ?? walletFilter}`,
     pnlFilter !== 'all' && PNL_OPTIONS.find(o => o.value === pnlFilter)?.label.toLowerCase(),
   ].filter(Boolean).join(', ')
-  const clearFilters = () => { setSearch(''); setWalletFilter(null); setPnlFilter('all'); if (activos.length > 0) setActivos([]) }
+  const clearFilters = () => {
+    setSearch(''); setPnlFilter('all')
+    const next = new URLSearchParams(params)
+    next.delete('wallet'); next.delete('activos')
+    const busqueda = next.toString()
+    navigate({ search: busqueda ? `?${busqueda}` : '' }, { replace: true })
+  }
+  // Recuentos del subtítulo (#525): siguen a los filtros activos.
+  const visibles = displayLots.filter(l => l.asset.includes(q) && (!walletFilter || l.wallet_id === walletFilter) && (activos.length === 0 || activos.includes(l.asset)))
+  const activosVisibles = new Set(visibles.map(l => l.asset)).size
+  const walletsVisibles = new Set(visibles.map(l => l.wallet_id)).size
+  function abrirResiduales() {
+    if (!dustOpen) toggleDust()
+    requestAnimationFrame(() => document.querySelector('section[aria-label="Polvo"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
 
   function changeView(next: PortfolioView) {
     setView(next)
@@ -211,8 +238,22 @@ export function Portfolio() {
         title="Portfolio"
         subtitle={isLoading ? <Skeleton className="inline-block h-3.5 w-40 align-middle" /> : (
           <>
-            {portfolioSubtitle(assetsTotal, walletCount)}
-            {all.unpriced.length > 0 && <span className="text-warning ml-2">· {all.unpriced.length} sin precio</span>}
+            {filtersActive ? portfolioSubtitle(activosVisibles, walletsVisibles) : portfolioSubtitle(assetsTotal, walletCount)}
+            <span className="inline-flex flex-wrap gap-1.5 ml-2 align-middle">
+              {all.unpriced.length > 0 && (
+                <Link to="/settings?tab=assets" className={CHIP_AVISO} aria-label={`${all.unpriced.length} sin precio: configurar en Ajustes`}>
+                  <AlertTriangle size={11} aria-hidden="true" />{all.unpriced.length} sin precio
+                </Link>
+              )}
+              {dust.rows.length > 0 && (
+                <button type="button" onClick={abrirResiduales} className={CHIP_NEUTRO}>
+                  <Sparkles size={11} aria-hidden="true" />{dust.rows.length} {dust.rows.length === 1 ? 'saldo residual' : 'saldos residuales'}
+                </button>
+              )}
+              <Link to="/history" className={CHIP_NEUTRO}>
+                <History size={11} aria-hidden="true" />Historial<ChevronRight size={11} aria-hidden="true" />
+              </Link>
+            </span>
           </>
         )}
         actions={
@@ -278,7 +319,8 @@ export function Portfolio() {
       )}
       {hasPrices && !isLoading && inventory.wallets.length > 0 && (
         <>
-          <InventoryStrip inventory={inventory} />
+          <CabeceraPortfolio lots={lots} fiatBalances={fiatBalances} inventory={inventory} pnlFilter={pnlFilter} onPnlFilter={setPnlFilter}
+            onDetalle={setDetailAsset} umbralConcentracion={concentracionAvisoPct(configQ.data)} />
           <WalletCards wallets={inventory.wallets} selected={walletFilter} onSelect={setWalletFilter} />
         </>
       )}
@@ -288,9 +330,6 @@ export function Portfolio() {
         <div className="flex items-center gap-2 flex-wrap" role="toolbar" aria-label="Vista y filtros de la tabla">
           <SegmentedControl label="Vista de la tabla" variant="accent" value={view} onChange={changeView} options={VIEW_OPTIONS} />
           <SegmentedControl label="Filtrar por resultado" variant="accent" value={pnlFilter} onChange={setPnlFilter} options={PNL_OPTIONS} />
-          {view === 'asset' && (
-            <Dropdown size="sm" label="Filtrar por wallet" value={walletFilter ?? ''} onChange={v => setWalletFilter(v || null)} options={walletOptions} />
-          )}
           {filtersActive && (
             <Button variant="ghost" size="sm" onClick={clearFilters}>Quitar filtros</Button>
           )}

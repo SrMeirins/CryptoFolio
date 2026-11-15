@@ -122,6 +122,12 @@ describe('routes/settings — config y stats', () => {
       expect((await request(app).get('/api/settings/config')).body.dust_threshold_eur).toBe('1000');
     });
 
+    it('aviso de concentración (#525): porcentaje entero de 10 a 100', async () => {
+      for (const value of ['10', '40', '100']) expect((await put('concentracion_aviso_pct', value)).status).toBe(200);
+      for (const value of ['9', '101', '40.5', 'abc', '', 40]) expect((await put('concentracion_aviso_pct', value)).status).toBe(400);
+      expect((await request(app).get('/api/settings/config')).body.concentracion_aviso_pct).toBe('100');
+    });
+
     it('privacidad al abrir: solo true o false', async () => {
       for (const value of ['true', 'false']) expect((await put('privacy_on_start', value)).status).toBe(200);
       for (const value of ['yes', '1', '', true]) expect((await put('privacy_on_start', value)).status).toBe(400);

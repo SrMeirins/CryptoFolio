@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dustThresholdEur, privacyOnStart, startPage } from './preferences'
+import { concentracionAvisoPct, dustThresholdEur, privacyOnStart, startPage } from './preferences'
 
 // Preferencias de General (#446).
 describe('preferencias', () => {
@@ -19,5 +19,15 @@ describe('preferencias', () => {
   it('página de inicio: solo de la lista; cualquier otra, el Dashboard', () => {
     expect(startPage({ start_page: '/fiscal' })).toBe('/fiscal')
     for (const v of ['https://ejemplo.invalid', '//evil', '/settings', undefined]) expect(startPage({ start_page: v as string })).toBe('/')
+  })
+})
+
+describe('concentracionAvisoPct (#525)', () => {
+  it('40 % por defecto; solo enteros de 10 a 100', () => {
+    expect(concentracionAvisoPct(undefined)).toBe(40)
+    expect(concentracionAvisoPct({ concentracion_aviso_pct: '55' })).toBe(55)
+    expect(concentracionAvisoPct({ concentracion_aviso_pct: '5' })).toBe(40)
+    expect(concentracionAvisoPct({ concentracion_aviso_pct: '120' })).toBe(40)
+    expect(concentracionAvisoPct({ concentracion_aviso_pct: '40.5' })).toBe(40)
   })
 })

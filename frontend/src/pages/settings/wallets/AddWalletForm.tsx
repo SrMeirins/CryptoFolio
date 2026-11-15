@@ -34,7 +34,7 @@ export function AddWalletForm({ onSave, onCancel }: {
       </div>
       <div className="space-y-1">
         <label className="text-xs text-fg-subtle">Color</label>
-        <ColorPicker value={color} onChange={setColor} size="md" />
+        <ColorPicker value={color} onChange={setColor} size="md" preview={name.trim()} />
       </div>
       <div className="space-y-1">
         <label className="text-xs text-fg-subtle">Notas (opcional)</label>
