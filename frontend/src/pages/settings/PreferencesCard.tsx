@@ -8,8 +8,8 @@ import { useSettingFeedback } from '../../hooks/useSettingFeedback'
 import { formatNumber } from '../../utils/format'
 import { validateDust } from '../../utils/settingsValidation'
 import {
-  DUST_THRESHOLD_KEY, PRIVACY_ON_START_KEY, START_PAGES, START_PAGE_KEY,
-  dustThresholdEur, privacyOnStart, startPage, type StartPage,
+  CONCENTRACION_KEY, DUST_THRESHOLD_KEY, PRIVACY_ON_START_KEY, START_PAGES, START_PAGE_KEY,
+  concentracionAvisoPct, dustThresholdEur, privacyOnStart, startPage, type StartPage,
 } from '../../utils/preferences'
 import { SettingsCard } from './SettingsCard'
 import { SavedMark } from './SavedMark'
@@ -66,6 +66,20 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
     void save(DUST_THRESHOLD_KEY, String(v.value), `Polvo por debajo de ${eur(v.value)}`, String(previous))
   }
 
+  // Aviso de concentración de Portfolio (#525): porcentaje entero de 10 a 100.
+  const concentracion = concentracionAvisoPct(config)
+  const [concDraft, setConcDraft] = useState<string | null>(null)
+  const [concError, setConcError] = useState<string | null>(null)
+  function commitConcentracion() {
+    if (concDraft === null) return
+    const n = Number(concDraft.trim())
+    if (!/^\d{2,3}$/.test(concDraft.trim()) || n < 10 || n > 100) { setConcError('Escribe un porcentaje entero de 10 a 100'); return }
+    setConcDraft(null)
+    const previous = concentracionAvisoPct(current())
+    if (n === previous) return
+    void save(CONCENTRACION_KEY, String(n), `Aviso de concentración por encima del ${n} %`, String(previous))
+  }
+
   const privacy = privacyOnStart(config)
   const page = startPage(config)
   const pageLabel = (p: StartPage) => START_PAGES.find(s => s.value === p)?.label ?? 'Dashboard'
@@ -74,8 +88,8 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
   const fallo = failure(configQ)
   return (
     <SettingsCard index={index} icon={SlidersHorizontal} title="Preferencias"
-      status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /></>}
-      description="Cómo se comporta la app al abrirla y qué posiciones cuentan como polvo.">
+      status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /><SavedMark stamp={saved} id={CONCENTRACION_KEY} /></>}
+      description="Cómo se comporta la app al abrirla, qué posiciones cuentan como polvo y cuándo avisar de una cartera concentrada.">
       {fallo && <QueryError what="tus preferencias" error={fallo.error} onRetry={fallo.retry} className="mb-3 rounded-xl border border-border" />}
       <div>
         <Row label="Umbral de polvo" htmlFor="pref-polvo"
@@ -92,6 +106,25 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
             {dustError && (
               <p id="pref-polvo-error" role="alert" className="text-xs text-negative-ink flex items-center justify-end gap-1">
                 <AlertCircle size={11} aria-hidden="true" /> {dustError}. Se mantiene {eur(dust)}.
+              </p>
+            )}
+          </div>
+        </Row>
+
+        <Row label="Aviso de concentración" htmlFor="pref-concentracion"
+          hint="Portfolio avisa en «Mayor posición» si un activo pesa más que este porcentaje de la cartera.">
+          <div className="space-y-1 text-right">
+            <div className={`inline-flex items-center bg-background-tertiary border rounded-lg overflow-hidden transition-colors ${concError ? 'border-negative' : 'border-border focus-within:border-brand'}`}>
+              <input id="pref-concentracion" type="text" inputMode="numeric" value={concDraft ?? String(concentracion)} maxLength={3}
+                aria-invalid={!!concError} aria-describedby={concError ? 'pref-concentracion-error' : undefined}
+                onChange={e => { setConcDraft(e.target.value); setConcError(null) }}
+                onBlur={commitConcentracion} onKeyDown={blurOnEnter}
+                className="px-3 py-2 text-sm mono bg-transparent text-fg w-16 text-right focus:outline-hidden" />
+              <span className="px-3 py-2 text-sm text-fg-subtle border-l border-border bg-background-secondary">%</span>
+            </div>
+            {concError && (
+              <p id="pref-concentracion-error" role="alert" className="text-xs text-negative-ink flex items-center justify-end gap-1">
+                <AlertCircle size={11} aria-hidden="true" /> {concError}. Se mantiene el {concentracion} %.
               </p>
             )}
           </div>

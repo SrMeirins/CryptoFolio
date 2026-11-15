@@ -129,14 +129,15 @@ INSERT INTO wallets (name, type, is_system, is_default, color, notes)
 VALUES ('Wallets externas', 'software', TRUE, FALSE, '#6b7280',
   'Activos retirados a wallets no registradas en esta app (MetaMask, otros exchanges, etc.)');
 
--- Sub-cuentas de Binance (no borrables). Una por cada tipo de cuenta del CSV exportado.
+-- Sub-cuentas de Binance (no borrables). Una por cada tipo de cuenta del CSV
+-- exportado, todas con el amarillo de Binance (#525).
 INSERT INTO wallets (name, type, is_system, is_default, color) VALUES
   ('Binance Spot',             'exchange', TRUE, TRUE,  '#F0B90B'),
   ('Binance Funding',          'exchange', TRUE, FALSE, '#F0B90B'),
-  ('Binance Cross Margin',     'exchange', TRUE, FALSE, '#E8892B'),
-  ('Binance Isolated Margin',  'exchange', TRUE, FALSE, '#C8812B'),
-  ('Binance Strategy',         'exchange', TRUE, FALSE, '#8B5CF6'),
-  ('Binance Staking',          'exchange', TRUE, FALSE, '#f59e0b');
+  ('Binance Cross Margin',     'exchange', TRUE, FALSE, '#F0B90B'),
+  ('Binance Isolated Margin',  'exchange', TRUE, FALSE, '#F0B90B'),
+  ('Binance Strategy',         'exchange', TRUE, FALSE, '#F0B90B'),
+  ('Binance Staking',          'exchange', TRUE, FALSE, '#F0B90B');
 
 -- Bitvavo: cuenta única, sin sub-cuentas (a diferencia de Binance).
 INSERT INTO wallets (name, type, is_system, is_default, color) VALUES

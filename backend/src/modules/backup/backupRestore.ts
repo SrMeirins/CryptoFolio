@@ -132,7 +132,7 @@ export async function replaceData(client: PoolClient, partial: Partial<BackupDat
   // Wallets: las del sistema conservan su tipo; las que sobran se borran
   // antes de renombrar, para no chocar con sus nombres.
   const wallets = await mergeByIdOrName(client, 'wallets', data.wallets,
-    l => (l.is_system ? ['name', 'is_default', 'color', 'notes'] : ['name', 'type', 'is_default', 'color', 'notes']),
+    l => (l.is_system ? ['name', 'is_default', 'notes'] : ['name', 'type', 'is_default', 'color', 'notes']),
     async matched => {
       await client.query('DELETE FROM wallets WHERE NOT is_system AND NOT (id = ANY($1::uuid[]))', [[...matched]]);
     });

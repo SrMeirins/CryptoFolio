@@ -153,7 +153,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   const { id } = paramsValidation.data;
   const { name, type, color, notes } = bodyValidation.data;
 
-  const wallet = await db.query('SELECT is_system FROM wallets WHERE id = $1', [id]);
+  const wallet = await db.query('SELECT is_system, color FROM wallets WHERE id = $1', [id]);
   if (wallet.rows.length === 0) {
     res.status(404).json({ error: 'Wallet no encontrada' });
     return;
@@ -161,6 +161,11 @@ router.put('/:id', async (req: Request, res: Response) => {
   // Las wallets del sistema (sub-cuentas de exchange) no cambian de tipo.
   if (type !== undefined && wallet.rows[0].is_system) {
     res.status(403).json({ error: 'No se puede cambiar el tipo de una wallet del sistema' });
+    return;
+  }
+  // Ni de color: llevan el de la marca de su exchange (#525).
+  if (color && wallet.rows[0].is_system && color.toLowerCase() !== String(wallet.rows[0].color).toLowerCase()) {
+    res.status(403).json({ error: 'El color de una wallet del sistema es el de su exchange y no se puede cambiar' });
     return;
   }
 
@@ -172,7 +177,8 @@ router.put('/:id', async (req: Request, res: Response) => {
        color = COALESCE($3, color),
        notes = CASE WHEN $4::boolean THEN $5 ELSE notes END
      WHERE id = $6`,
-    [name, type ?? null, color ?? null, notes !== undefined, notes ?? null, id]
+    // En las del sistema el color no se escribe nunca (es el de su exchange).
+    [name, type ?? null, wallet.rows[0].is_system ? null : color ?? null, notes !== undefined, notes ?? null, id]
   );
   res.json({ success: true });
 });

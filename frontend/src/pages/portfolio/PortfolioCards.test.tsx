@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { InventoryStrip } from './InventoryStrip'
 import { WalletCards } from './WalletCards'
-import type { Inventory, WalletSummary } from '../../utils/portfolioInventory'
+import type { WalletSummary } from '../../utils/portfolioInventory'
 
-// Franja de inventario y tarjetas de wallet con StatCard (#417). Datos sintéticos.
+// Tarjetas de wallet con StatCard (#417). Datos sintéticos. La franja de
+// inventario la sustituyó la cabecera de #525 (CabeceraPortfolio).
 const withQuery = (node: ReactNode) => renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}>{node}</QueryClientProvider>)
 
 const wallet = (over: Partial<WalletSummary> = {}): WalletSummary => ({
@@ -15,35 +15,6 @@ const wallet = (over: Partial<WalletSummary> = {}): WalletSummary => ({
   pnl: 120, pnlPct: 13.6, avgOpenedAt: Date.parse('2025-06-01T00:00:00Z'), ...over,
 })
 
-const inventory = (over: Partial<Inventory> = {}): Inventory => ({
-  total: 1250, custody: { exchange: 250, self: 1000, exchangePct: 20 },
-  positions: { assets: 4, wallets: 2, top: { asset: 'SINT', pct: 56 } },
-  locked: { value: 0, assets: 0 }, wallets: [wallet()], avgOpenedAt: Date.parse('2025-06-01T00:00:00Z'), ...over,
-})
-
-describe('InventoryStrip (#417)', () => {
-  it('tres tarjetas estáticas; Autocustodia con su anillo', () => {
-    const html = withQuery(<InventoryStrip inventory={inventory()} />)
-    expect(html.match(/stat-card stat-card-in/g)).toHaveLength(3)
-    expect(html).not.toContain('absolute inset-px')
-    expect(html).toContain('Autocustodia')
-    expect(html).toContain('stroke-brand')
-    expect(html).toContain('Antigüedad media')
-  })
-
-  it('sin texto bajo las cifras: importes, mayor peso y fecha media en la ayuda', () => {
-    const html = withQuery(<InventoryStrip inventory={inventory()} />)
-    expect(html).not.toContain('en autocustodia')
-    expect(html).not.toContain('Mayor peso')
-    expect(html).not.toContain('Fecha media de compra')
-  })
-
-  it('con algo bloqueado, Bloqueado en lugar de la antigüedad', () => {
-    const html = withQuery(<InventoryStrip inventory={inventory({ locked: { value: 50, assets: 1 } })} />)
-    expect(html).toContain('Bloqueado')
-    expect(html).not.toContain('Antigüedad media')
-  })
-})
 
 describe('WalletCards (#417)', () => {
   it('color de la wallet, chip con el P&L y su %, y barra de composición', () => {
