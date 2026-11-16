@@ -37,7 +37,7 @@ export function DustSection({ rows, value, total, threshold, compact, open, onTo
       </button>
       {open && (
         <div className="border-t border-border">
-          <AssetTable rows={rows} portfolioTotal={total} compact={compact} keyByWallet onOpen={onOpen} />
+          <AssetTable rows={rows} portfolioTotal={total} compact={compact} keyByWallet parcial onOpen={onOpen} />
         </div>
       )}
     </section>

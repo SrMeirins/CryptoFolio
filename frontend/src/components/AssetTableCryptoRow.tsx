@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState } from 'react'
+import { Fragment, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Settings, Calculator, Lock, PanelRight, History } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { type LockedAmount } from '../api/portfolio'
@@ -13,11 +13,19 @@ import { iconButtonClasses, tableRowClasses, Hint, Tooltip, TextTooltip } from '
 import { useFlashOnChange, type FlashDirection } from '../hooks/useFlashOnChange'
 import { BreakEvenCell } from './BreakEvenCell'
 import { PnlPill, WeightCell } from './AssetTableCells'
+import { AntiguedadCell, IngresosCell, MaximoCell, ResultadoCell } from './AssetTableMetricCells'
+import { valueIndex, type ColumnDef } from '../utils/portfolioColumns'
+import type { RowMetrics } from '../utils/positionMetrics'
 
 const flashClass = (f: FlashDirection) => (f === 'up' ? 'flash-up' : f === 'down' ? 'flash-down' : '')
 
-export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate, lockedAmounts = [], hideWalletChips = false, onOpen, spark, rowKey }: {
+export function CryptoRowComponent({ row, columns, showQty = true, metrics, prices, yesterdayPrices, totalPortfolioValue, compact = false, onSimulate, lockedAmounts = [], hideWalletChips = false, onOpen, spark, rowKey }: {
   row: CryptoRow
+  /** Columnas visibles, sin «Activo» ni «Valor» (#527). */
+  columns: readonly ColumnDef[]
+  /** Cantidad bajo el nombre del activo (columna «Cantidad» elegida). */
+  showQty?: boolean
+  metrics?: RowMetrics
   prices: Record<string, number>
   yesterdayPrices: Record<string, number>
   totalPortfolioValue: number
@@ -66,6 +74,15 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
     ? (row.value / totalPortfolioValue) * 100
     : null
 
+  // «Valor» va siempre detrás de cantidad, precio y tendencia (#527).
+  const valueAt = valueIndex(columns)
+  const valueCell = (
+    <td key="valor" className={`px-2.5 ${pad} text-right mono font-semibold whitespace-nowrap`}>
+      {hasPrice ? <span className={`rounded px-0.5 ${flashClass(valueFlash)}`}>{formatMoney(row.value, currency)}</span>
+        : <span className="text-fg-subtle text-xs">—</span>}
+    </td>
+  )
+
   return (
     <>
       <tr
@@ -75,8 +92,8 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
         className={tableRowClasses(canExpand || !!onOpen, expanded, 'group/row hover:shadow-[inset_3px_0_0_var(--row-accent)] focus-within:shadow-[inset_3px_0_0_var(--row-accent)]')}
         onClick={() => (onOpen ? open() : canExpand && setExpanded(e => !e))}
       >
-        {/* Activo */}
-        <td className={`px-5 ${pad}`}>
+        {/* Activo, con la cantidad debajo (#527) */}
+        <td className={`pl-4 pr-2.5 ${pad}`}>
           <div className="flex items-center gap-2">
             <div className="w-4 shrink-0 flex items-center justify-center">
               {canExpand
@@ -91,6 +108,7 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
               }
             </div>
             <CryptoIcon symbol={row.asset} size={compact ? 22 : 28} />
+            <div className="flex flex-col items-start min-w-0">
             {onOpen
               ? (
                 // data-row-nav: destino de la navegación con ↑↓ (#282).
@@ -103,6 +121,8 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                 </button>
               )
               : <span className="font-medium">{row.asset}</span>}
+              {showQty && <span className="text-[11px] leading-tight mono text-fg-subtle whitespace-nowrap">{formatAmount(row.totalQuantity)}</span>}
+            </div>
             {!expanded && (
               <div className="flex items-center gap-1 ml-1 flex-wrap">
                 {/* Un punto por wallet en lugar del chip de texto (#282) */}
@@ -154,70 +174,53 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
           </div>
         </td>
 
-        {/* Cantidad */}
-        <td className={`px-4 ${pad} text-right mono text-fg`}>{formatAmount(row.totalQuantity)}</td>
-
-        {/* Precio actual + 24h */}
-        <td className={`px-4 ${pad} text-right mono`}>
-          {hasPrice ? (
-            <div className="flex flex-col items-end gap-0.5">
-              <span className={`rounded px-0.5 ${flashClass(priceFlash)}`}>{formatPrice(price, currency)}</span>
-              {change24h !== null && (
-                // Mismo chip que la tarjeta Valor del Dashboard (#247): ventana visible.
-                <span
-                  className={`inline-flex items-center gap-1 text-[11px] leading-none font-semibold px-1.5 py-0.5 rounded-md border ${
-                  change24h >= 0
-                    ? 'text-positive-ink bg-positive/8 border-positive/25'
-                    : 'text-negative-ink bg-negative/8 border-negative/25'
-                }`}><TextTooltip label="Variación 24 h" tip="Variación respecto al precio de hace 24 horas"><span className="font-medium">24 h</span>
-                  <span aria-hidden="true">{change24h >= 0 ? '▲' : '▼'}</span>
-                  {formatPercent(change24h, 2, true)}</TextTooltip></span>
-              )}
-            </div>
-          ) : (
-            <Link to="/settings?tab=assets" onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1 text-xs text-warning/80 hover:text-warning-ink bg-warning/8 border border-warning/20 px-2 py-0.5 rounded-lg transition-colors"
-              title="Configura el par de precio en Ajustes → Activos"
-            >
-              <Settings size={10} aria-hidden="true" />Sin precio
-            </Link>
-          )}
-        </td>
-
-        {/* Tendencia de 7 días (#282) */}
-        <td className={`px-2 ${pad}`}>
-          {spark && spark.length > 1
-            ? <Sparkline values={spark} days={7} className="w-20 h-7 ml-auto block" />
-            : <span className="block text-right text-fg-subtle text-xs">—</span>}
-        </td>
-
-        {/* Valor en la moneda de visualización */}
-        <td className={`px-4 ${pad} text-right mono font-semibold`}>
-          {hasPrice ? <span className={`rounded px-0.5 ${flashClass(valueFlash)}`}>{formatMoney(row.value, currency)}</span>
-            : <span className="text-fg-subtle text-xs">—</span>}
-        </td>
-
-        {/* P&L € con pastilla de % (#271) */}
-        <td className={`px-4 ${pad} text-right mono`}>
-          {hasPrice ? (
-            <div className="flex flex-col items-end gap-0.5">
-              <span className={`font-medium ${pnlColor(pnl)}`}>{pnl >= 0 ? '+' : ''}{formatMoney(pnl, currency)}</span>
-              <PnlPill pct={pnlPct} />
-            </div>
-          ) : <span className="text-fg-subtle">—</span>}
-        </td>
-
-        {/* Break-even (#271) — oculto en compacto */}
-        {!compact && (
-          <td className={`px-4 ${pad} text-right mono`}>
-            <BreakEvenCell price={price} avgPrice={breakEvenPrice} currency={currency} />
-          </td>
-        )}
-
-        {/* % Cartera */}
-        <td className={`px-4 ${pad}`}>
-          <WeightCell pct={portfolioWeight} />
-        </td>
+        {columns.map(col => {
+          const td = (content: ReactNode, cls = 'px-2.5 text-right mono whitespace-nowrap') => <td key={col.key} className={`${cls} ${pad}`}>{content}</td>
+          switch (col.key) {
+            case 'precio': return td(hasPrice ? (
+              <div className="flex flex-col items-end gap-0.5">
+                <span className={`rounded px-0.5 whitespace-nowrap ${flashClass(priceFlash)}`}>{formatPrice(price, currency)}</span>
+                {change24h !== null && (
+                  // Mismo chip que la tarjeta Valor del Dashboard (#247): ventana visible.
+                  <span
+                    className={`inline-flex items-center gap-1 whitespace-nowrap text-[11px] leading-none font-semibold px-1.5 py-0.5 rounded-md border ${
+                    change24h >= 0
+                      ? 'text-positive-ink bg-positive/8 border-positive/25'
+                      : 'text-negative-ink bg-negative/8 border-negative/25'
+                  }`}><TextTooltip label="Variación 24 h" tip="Variación respecto al precio de hace 24 horas"><span className="font-medium">24 h</span>
+                    <span aria-hidden="true">{change24h >= 0 ? '▲' : '▼'}</span>
+                    {formatPercent(change24h, 2, true)}</TextTooltip></span>
+                )}
+              </div>
+            ) : (
+              <Link to="/settings?tab=assets" onClick={e => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-xs text-warning/80 hover:text-warning-ink bg-warning/8 border border-warning/20 px-2 py-0.5 rounded-lg transition-colors"
+                title="Configura el par de precio en Ajustes → Activos"
+              >
+                <Settings size={10} aria-hidden="true" />Sin precio
+              </Link>
+            ))
+            // Tendencia de 7 días (#282)
+            case 'tendencia': return td(spark && spark.length > 1
+              ? <Sparkline values={spark} days={7} className="w-16 h-7 ml-auto block" />
+              : <span className="block text-right text-fg-subtle text-xs">—</span>, 'px-2')
+            case 'coste': return td(row.totalCostBasis > 0 ? formatMoney(row.totalCostBasis, currency) : <span className="text-fg-subtle text-xs">—</span>, 'px-2.5 text-right mono text-fg-muted whitespace-nowrap')
+            // P&L con pastilla de % (#271)
+            case 'pnl': return td(hasPrice ? (
+              <div className="flex flex-col items-end gap-0.5">
+                <span className={`font-medium ${pnlColor(pnl)}`}>{pnl >= 0 ? '+' : ''}{formatMoney(pnl, currency)}</span>
+                <PnlPill pct={pnlPct} />
+              </div>
+            ) : <span className="text-fg-subtle">—</span>)
+            case 'resultado': return td(<ResultadoCell m={metrics} currency={currency} />)
+            case 'breakeven': return td(<BreakEvenCell price={price} avgPrice={breakEvenPrice} currency={currency} />)
+            case 'antiguedad': return td(<AntiguedadCell m={metrics} />)
+            case 'maximo90': return td(<MaximoCell m={metrics} currency={currency} />)
+            case 'ingresos': return td(<IngresosCell m={metrics} currency={currency} />)
+            case 'peso': return td(<WeightCell pct={portfolioWeight} />, 'px-2.5')
+          }
+        }).flatMap((cell, i) => i === valueAt ? [valueCell, cell] : [cell])}
+        {valueAt === columns.length && valueCell}
       </tr>
 
       {/* Sub-filas por wallet */}
@@ -226,6 +229,11 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
         const wPnl       = hasPrice ? wValue - w.costBasis : null
         const wPnlPct    = w.costBasis > 0 && wPnl !== null ? (wPnl / w.costBasis) * 100 : null
         const wLocked    = lockedAmounts.filter(l => l.wallet_id === w.wallet_id)
+        const wValueCell = (
+          <td key="valor" className="px-2.5 py-2 text-right mono text-xs whitespace-nowrap">
+            {hasPrice ? <span className="text-fg">{formatMoney(wValue, currency)}</span> : <span className="text-fg-subtle">—</span>}
+          </td>
+        )
 
         return (
           // key en el Fragment, no solo en el <tr> interno: antes faltaba
@@ -235,31 +243,28 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
           <Fragment key={w.wallet_id}>
             <tr className="bg-background-tertiary/20 border-l-2"
               style={{ borderLeftColor: w.wallet_color }}>
-              <td className="pl-12 pr-4 py-2">
+              <td className="pl-12 pr-2.5 py-2">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: w.wallet_color }} />
-                  <span className="text-xs text-fg-muted">{w.wallet_name}</span>
+                  <span className="flex flex-col">
+                    <span className="text-xs text-fg-muted">{w.wallet_name}</span>
+                    {showQty && <span className="text-[11px] leading-tight mono text-fg-subtle">{formatAmount(w.quantity)}</span>}
+                  </span>
                 </div>
               </td>
-              <td className="px-4 py-2 text-right mono text-xs text-fg-muted">{formatAmount(w.quantity)}</td>
-              <td className="px-4 py-2 text-right mono text-xs text-fg-subtle">—</td>
-              <td />
-              <td className="px-4 py-2 text-right mono text-xs">
-                {hasPrice ? <span className="text-fg">{formatMoney(wValue, currency)}</span> : <span className="text-fg-subtle">—</span>}
-              </td>
-              <td className={`px-4 py-2 text-right mono text-xs ${wPnl !== null ? pnlColor(wPnl) : 'text-fg-subtle'}`}>
-                {wPnl !== null ? <>{wPnl >= 0 ? '+' : ''}{formatMoney(wPnl, currency)}{wPnlPct !== null && <span className="ml-1 opacity-80">({formatPercent(wPnlPct, 1, true)})</span>}</> : '—'}
-              </td>
-              {!compact && <td className="px-4 py-2 text-right mono text-xs text-fg-subtle">
-                {w.quantity > 0 ? formatPrice(w.costBasis / w.quantity, currency) : '—'}
-              </td>}
-              <td className="px-4 py-2 text-right">
-                {hasPrice && totalPortfolioValue > 0 ? (
-                  <span className="text-xs mono text-fg-subtle">
-                    {formatPercent((wValue / totalPortfolioValue) * 100, 1)}
-                  </span>
-                ) : <span className="text-fg-subtle text-xs">—</span>}
-              </td>
+              {columns.map(col => {
+                const sub = (content: ReactNode, cls = 'text-fg-subtle') => <td key={col.key} className={`px-2.5 py-2 text-right mono text-xs whitespace-nowrap ${cls}`}>{content}</td>
+                switch (col.key) {
+                  case 'coste': return sub(w.costBasis > 0 ? formatMoney(w.costBasis, currency) : '—', 'text-fg-muted')
+                  case 'pnl': return sub(wPnl !== null ? <>{wPnl >= 0 ? '+' : ''}{formatMoney(wPnl, currency)}{wPnlPct !== null && <span className="ml-1 opacity-80">({formatPercent(wPnlPct, 1, true)})</span>}</> : '—',
+                    wPnl !== null ? pnlColor(wPnl) : 'text-fg-subtle')
+                  case 'breakeven': return sub(w.quantity > 0 ? formatPrice(w.costBasis / w.quantity, currency) : '—')
+                  case 'peso': return sub(hasPrice && totalPortfolioValue > 0 ? formatPercent((wValue / totalPortfolioValue) * 100, 1) : '—')
+                  case 'tendencia': return <td key={col.key} />
+                  default: return sub('—')
+                }
+              }).flatMap((cell, i) => i === valueAt ? [wValueCell, cell] : [cell])}
+              {valueAt === columns.length && wValueCell}
             </tr>
             {/* Sub-filas de staking bloqueado */}
             {wLocked.map((l, i) => {
@@ -272,12 +277,10 @@ export function CryptoRowComponent({ row, prices, yesterdayPrices, totalPortfoli
                     <div className="flex items-center gap-1.5">
                       <Lock size={10} className={`${clr.icon} shrink-0`} aria-hidden="true" />
                       <span className={`text-xs ${clr.text}`}>{l.staking_type}</span>
+                      <span className={`text-xs mono ${clr.amount}`}>{formatAmount(parseFloat(l.locked_amount))}</span>
                     </div>
                   </td>
-                  <td className={`px-4 py-1.5 text-right mono text-xs ${clr.amount}`}>
-                    {formatAmount(parseFloat(l.locked_amount))}
-                  </td>
-                  <td colSpan={compact ? 5 : 6} className={`px-4 py-1.5 text-xs ${clr.label} italic`}>
+                  <td colSpan={columns.length + 1} className={`px-2.5 py-1.5 text-xs ${clr.label} italic`}>
                     {isLaunchpool ? 'bloqueado en launchpool' : 'bloqueado en staking'}
                   </td>
                 </tr>

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, X, type LucideIcon } from 'lucide-react'
 import { NAV_ITEMS } from '../constants/navigation'
@@ -7,7 +6,6 @@ import { useModalA11y } from '../hooks/useModalA11y'
 import { useNavStore } from '../store/navStore'
 import { Hint } from './ui'
 
-const COLLAPSED_KEY = 'cflio_sidebar_collapsed'
 
 interface SidebarNavItemProps {
   to: string
@@ -103,19 +101,15 @@ function MobileNav({ onClose }: { onClose: () => void }) {
 }
 
 function SidebarPanel({ forceCollapsed }: { forceCollapsed: boolean }) {
-  // Persistido: un usuario que colapsa el menú espera que siga colapsado
-  // tras recargar, igual que el resto de preferencias de UI del proyecto
-  // (ver SETUP_KEY en pages/Import.tsx / pages/Settings.tsx).
-  const [savedCollapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === 'true')
+  // Persistido en el store (#527): un usuario que colapsa el menú espera que
+  // siga colapsado tras recargar, y la tabla de Portfolio puede plegarlo.
+  const savedCollapsed = useNavStore(s => s.collapsed)
+  const setCollapsed = useNavStore(s => s.setCollapsed)
   // En pantallas medianas se pliega sin cambiar la preferencia guardada.
   const collapsed = forceCollapsed || savedCollapsed
 
   function toggleCollapsed() {
-    setCollapsed(c => {
-      const next = !c
-      localStorage.setItem(COLLAPSED_KEY, String(next))
-      return next
-    })
+    setCollapsed(!savedCollapsed)
   }
 
   return (

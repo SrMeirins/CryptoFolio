@@ -71,8 +71,10 @@ describe('routes/fifo — endpoints de agregación', () => {
     }
 
     const { default: router } = await import('./fifoAggregations');
+    const { default: salesRouter } = await import('./fifoSalesDetail');
     app = express();
     app.use('/api/fifo', router);
+    app.use('/api/v1/fifo', salesRouter);
   });
 
   afterAll(async () => {
@@ -126,6 +128,64 @@ describe('routes/fifo — endpoints de agregación', () => {
     expect(new Date(eth.avg_opened_at).toISOString()).toBe('2024-01-23T12:00:00.000Z');
     const btc = res.body.find((r: { asset: string }) => r.asset === 'BTC');
     expect(new Date(btc.avg_opened_at).toISOString()).toBe('2024-01-01T00:00:00.000Z');
+  });
+
+  it('GET /realized-pnl cuadra con el realizado del detalle de ventas de cada activo (#527)', async () => {
+    const realizado = (await request(app).get('/api/fifo/realized-pnl')).body.byAsset as { asset: string; net_pnl: string }[];
+    expect(realizado.length).toBeGreaterThan(0);
+    for (const r of realizado) {
+      const detalle = (await request(app).get(`/api/v1/fifo/sales/${r.asset}`)).body;
+      expect(detalle.realizedEur).toBeCloseTo(Number(r.net_pnl), 2);
+    }
+  });
+
+  it('GET /lots incluye el lote abierto más antiguo para la antigüedad (#527)', async () => {
+    const eth = (await request(app).get('/api/fifo/lots')).body.find((r: { asset: string }) => r.asset === 'ETH');
+    expect(new Date(eth.first_opened_at).toISOString()).toBe('2024-01-01T00:00:00.000Z');
+  });
+
+  it('GET /income-by-asset suma lo recibido por activo con su precio al recibirlo (#527)', async () => {
+    await pool.query(
+      `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, price_per_unit, wallet_id) VALUES
+       ('STAKING_REWARD', '2024-03-01T00:00:00Z', 'DOT', 2, 2, 5, $1),
+       ('STAKING_REWARD', '2024-04-01T00:00:00Z', 'DOT', 1, 1, 6, $1),
+       ('AIRDROP', '2024-05-01T00:00:00Z', 'ARB', 10, 10, 0.5, $1)`, [walletId]);
+    const res = await request(app).get('/api/fifo/income-by-asset');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(expect.arrayContaining([
+      { asset: 'DOT', operations: 2, total_eur: 16 },
+      { asset: 'ARB', operations: 1, total_eur: 5 },
+    ]));
+    expect(res.body.some((r: { asset: string }) => r.asset === 'BTC')).toBe(false);
+    await pool.query(`DELETE FROM transactions WHERE operation_type IN ('STAKING_REWARD', 'AIRDROP')`);
+  });
+
+  it('GET /realized-by-asset separa ventas, permutas y comisiones y cuadra con /realized-pnl (#527)', async () => {
+    // Consumos sintéticos sobre el lote de BTC: una permuta y una comisión de red.
+    const lot = (await pool.query(`SELECT id FROM fifo_lots WHERE asset = 'BTC' LIMIT 1`)).rows[0].id;
+    const ops = await pool.query(
+      `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id) VALUES
+       ('BUY', '2024-03-01T00:00:00Z', 'SOL', 1, 1, $1), ('WITHDRAW', '2024-03-02T00:00:00Z', 'BTC', 0.01, 0.01, $1)
+       RETURNING id`, [walletId]);
+    await pool.query(
+      `INSERT INTO fifo_lot_consumptions (lot_id, consuming_transaction_id, quantity_consumed, cost_basis_consumed_eur, proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at)
+       VALUES ($1, $2, 0.1, 10, 13, 3, 'GAIN', '2024-03-01T00:00:00Z'), ($1, $3, 0.01, 1, 0.5, -0.5, 'LOSS', '2024-03-02T00:00:00Z')`,
+      [lot, ops.rows[0].id, ops.rows[1].id]);
+    try {
+      const res = await request(app).get('/api/fifo/realized-by-asset');
+      expect(res.status).toBe(200);
+      const btc = res.body.filter((r: { asset: string }) => r.asset === 'BTC');
+      expect(btc).toEqual([
+        { asset: 'BTC', categoria: 'comisiones', operations: 1, net_eur: -0.5 },
+        { asset: 'BTC', categoria: 'permutas', operations: 1, net_eur: 3 },
+        { asset: 'BTC', categoria: 'ventas', operations: 1, net_eur: 20 },
+      ]);
+      const total = (await request(app).get('/api/fifo/realized-pnl')).body.byAsset.find((r: { asset: string }) => r.asset === 'BTC');
+      expect(Number(total.net_pnl)).toBeCloseTo(btc.reduce((s: number, r: { net_eur: number }) => s + r.net_eur, 0), 2);
+    } finally {
+      await pool.query(`DELETE FROM fifo_lot_consumptions WHERE consuming_transaction_id = ANY($1)`, [ops.rows.map(r => r.id)]);
+      await pool.query(`DELETE FROM transactions WHERE id = ANY($1)`, [ops.rows.map(r => r.id)]);
+    }
   });
 
   it('GET /locked devuelve vacío cuando no hay operaciones de staking/launchpool', async () => {

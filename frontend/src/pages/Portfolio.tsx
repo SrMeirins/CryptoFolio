@@ -13,6 +13,8 @@ import { WalletSections } from './portfolio/WalletSections'
 import { DustSection } from './portfolio/DustSection'
 import { iconButtonClasses, fieldClasses, Button, FilteredEmpty, MultiDropdown, Notice, NotApplicable, PageHeader, Skeleton, SkeletonGroup, SegmentedControl, panelClasses, panelEnterStyle, panelSurface, QueryError } from '../components/ui'
 import { AssetTable } from '../components/AssetTable'
+import { ColumnasSelector } from '../components/ColumnasSelector'
+import { usePortfolioColumnas } from '../hooks/usePortfolioColumnas'
 import { navIcon } from '../constants/navigation'
 import { PieMetodologia } from '../components/metodologia'
 import { FirstUseEmpty } from '../components/FirstUseEmpty'
@@ -170,6 +172,7 @@ export function Portfolio() {
 
   // Umbral del aviso de concentración (#525), de Ajustes > General.
   const configQ = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
+  const { columnas, cambiar: cambiarColumnas } = usePortfolioColumnas()
 
   // Colores de cada activo, los mismos que Distribución del Dashboard (#526).
   const valoracion = usePortfolioValuation(lots, fiatBalances)
@@ -228,7 +231,7 @@ export function Portfolio() {
   // Sin ninguna operación (#496): un único vacío de primer uso.
   if (firstUse.empty) {
     return (
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="p-6 space-y-6 max-w-[1920px] mx-auto">
         <PageHeader icon={navIcon('/portfolio')} title="Portfolio" />
         <FirstUseEmpty what="tus posiciones y su P&L" />
       </div>
@@ -237,7 +240,7 @@ export function Portfolio() {
 
   return (
     <>
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 max-w-[1920px] mx-auto">
 
       <PageHeader
         icon={navIcon('/portfolio')}
@@ -293,6 +296,7 @@ export function Portfolio() {
             </div>
             <MultiDropdown label="Filtrar por activos" placeholder="Todos los activos" plural="activos" searchable
               values={activos} options={opcionesActivos} onChange={v => setActivos(opcionesActivos.map(o => o.value).filter(a => v.includes(a)))} />
+            <ColumnasSelector values={columnas} onChange={cols => void cambiarColumnas(cols)} />
             <SegmentedControl label="Densidad de la tabla" variant="accent" value={density} onChange={changeDensity} options={DENSITY_OPTIONS} />
           </>
         }
@@ -359,7 +363,7 @@ export function Portfolio() {
         <>
           {view === 'asset' ? (
             <section aria-label="Posiciones" className={panelClasses(panelSurface('none', 'overflow-clip'))} style={panelEnterStyle(1)}>
-              <AssetTable rows={assetRows} portfolioTotal={all.total} compact={compact}
+              <AssetTable rows={assetRows} portfolioTotal={all.total} compact={compact} parcial={!!walletFilter}
                 onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} onOpen={setDetailAsset} exportName="posiciones"
                 header={<>
                   <h2 className="text-sm font-semibold text-fg">Posiciones</h2>

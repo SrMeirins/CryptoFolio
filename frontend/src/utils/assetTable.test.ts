@@ -139,3 +139,19 @@ describe('sortRows — break-even por distancia (#271)', () => {
     expect(sortRows(rows, 'breakeven', 'desc', prices, 1_000).map(r => r.asset)).toEqual(['BARATO', 'CARO', 'SIN'])
   })
 })
+
+describe('buildRows: primera apertura (#527)', () => {
+  it('la más antigua de todas las wallets; sin fechas, null', () => {
+    const rows = buildRows([
+      lot({ wallet_id: 'w1', first_opened_at: '2025-03-01T00:00:00Z' }),
+      lot({ wallet_id: 'w2', first_opened_at: '2024-07-15T00:00:00Z' }),
+      lot({ wallet_id: 'w3', first_opened_at: null }),
+      lot({ asset: 'ETH' }),
+    ], { BTC: 1, ETH: 1 }, [])
+    const byAsset = new Map(rows.map(r => [r.asset, r]))
+    const btc = byAsset.get('BTC')
+    const eth = byAsset.get('ETH')
+    expect(btc?.kind === 'crypto' && btc.firstOpenedAt).toBe(Date.parse('2024-07-15T00:00:00Z'))
+    expect(eth?.kind === 'crypto' && eth.firstOpenedAt).toBeNull()
+  })
+})

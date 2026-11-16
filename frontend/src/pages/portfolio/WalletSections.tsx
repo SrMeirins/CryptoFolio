@@ -32,7 +32,7 @@ export function WalletSections({ sections, total, compact, onSimulate, onOpen }:
         return (
           <section key={s.walletId} aria-label={`Wallet ${s.name}`}
             className={panelClasses(panelSurface('none', 'overflow-clip'))} style={panelEnterStyle(i + 1)}>
-            <AssetTable rows={s.rows} portfolioTotal={total} compact={compact} hideWalletChips onSimulate={onSimulate} onOpen={onOpen}
+            <AssetTable rows={s.rows} portfolioTotal={total} compact={compact} hideWalletChips parcial onSimulate={onSimulate} onOpen={onOpen}
               header={
                 <>
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} aria-hidden="true" />

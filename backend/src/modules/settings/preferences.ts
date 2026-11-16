@@ -12,6 +12,9 @@ export const START_PAGE_KEY = 'start_page';
 export const CONCENTRACION_KEY = 'concentracion_aviso_pct';
 /** Peso por debajo del cual una wallet va a «Otras» en Portfolio (#526). */
 export const WALLETS_OTRAS_KEY = 'wallets_otras_pct';
+/** Columnas visibles de la tabla de posiciones de Portfolio (#527); Activo y Valor van siempre. */
+export const PORTFOLIO_COLUMNAS_KEY = 'portfolio_columnas';
+export const PORTFOLIO_COLUMNAS = ['cantidad', 'precio', 'tendencia', 'coste', 'pnl', 'resultado', 'breakeven', 'antiguedad', 'peso', 'maximo90', 'ingresos'] as const;
 
 /** Páginas que se pueden elegir como inicio. */
 export const START_PAGES = ['/', '/portfolio', '/fiscal', '/history'] as const;
@@ -27,6 +30,13 @@ export const preferenceSchemas: Record<string, z.ZodType<string>> = {
   [START_PAGE_KEY]: z.enum(START_PAGES, { error: 'start_page debe ser una de las páginas de inicio permitidas' }),
   // Aviso de concentración (#525): porcentaje entero de 10 a 100.
   // Wallets en «Otras» (#526): porcentaje entero de 0 (nunca) a 20.
+  // Columnas de Portfolio (#527): JSON con una lista sin repetir de columnas conocidas.
+  [PORTFOLIO_COLUMNAS_KEY]: z.string().max(400).refine(v => {
+    try {
+      const lista = JSON.parse(v);
+      return z.array(z.enum(PORTFOLIO_COLUMNAS)).max(PORTFOLIO_COLUMNAS.length).safeParse(lista).success && new Set(lista).size === lista.length;
+    } catch { return false; }
+  }, `${PORTFOLIO_COLUMNAS_KEY}: lista JSON de columnas conocidas sin repetir`),
   [WALLETS_OTRAS_KEY]: z.string().regex(/^\d{1,2}$/, `${WALLETS_OTRAS_KEY} debe ser un porcentaje entero`)
     .refine(v => Number(v) <= 20, `${WALLETS_OTRAS_KEY} va de 0 a 20`),
   [CONCENTRACION_KEY]: z.string().regex(/^\d{2,3}$/, `${CONCENTRACION_KEY} debe ser un porcentaje entero`)

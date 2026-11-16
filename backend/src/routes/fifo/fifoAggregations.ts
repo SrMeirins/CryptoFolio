@@ -1,3 +1,4 @@
+import { OPS_RENTA_ESPECIE } from '../../modules/fiscal/clasificacionRentas';
 import { Router } from 'express';
 import { db } from '../../db/client';
 import { EUR_MOVEMENTS_SQL } from '../../modules/fiat/eurMovements';
@@ -144,13 +145,55 @@ router.get('/lots', async (_req, res) => {
          SUM(fl.quantity_remaining * fl.price_per_unit_eur * EXTRACT(EPOCH FROM fl.opened_at))
            / NULLIF(SUM(fl.quantity_remaining * fl.price_per_unit_eur), 0),
          SUM(fl.quantity_remaining * EXTRACT(EPOCH FROM fl.opened_at)) / NULLIF(SUM(fl.quantity_remaining), 0)
-       )::double precision) AS avg_opened_at
+       )::double precision) AS avg_opened_at,
+       -- Lote abierto más antiguo, para la antigüedad de la posición (#527).
+       MIN(fl.opened_at) AS first_opened_at
      FROM fifo_lots fl
      JOIN wallets w ON w.id = fl.wallet_id
      WHERE fl.is_closed = FALSE AND fl.quantity_remaining > 0
      GROUP BY fl.asset, fl.wallet_id, w.name, w.color, w.type
      ORDER BY fl.asset, w.name`
   );
+  res.json(result.rows);
+});
+
+// GET /api/fifo/realized-by-asset — Realizado por activo y por tipo (#527),
+// para el desglose del «Resultado total» de Portfolio. Mismo criterio que
+// /realized-pnl (toda transmisión con efecto fiscal), separado según la
+// operación que consumió el lote: venta, permuta (se pagó otra cripto con
+// este activo), comisión (de red al retirar o del exchange) u otra.
+router.get('/realized-by-asset', async (_req, res) => {
+  const result = await db.query(`
+    SELECT fl.asset,
+           CASE
+             WHEN t.operation_type = 'SELL' THEN 'ventas'
+             WHEN t.operation_type = 'BUY' THEN 'permutas'
+             WHEN t.operation_type IN ('WITHDRAW', 'FEE_EXCHANGE') THEN 'comisiones'
+             ELSE 'otros'
+           END AS categoria,
+           COUNT(DISTINCT flc.consuming_transaction_id)::int AS operations,
+           ROUND(SUM(flc.gain_loss_eur)::numeric, 2)::float AS net_eur
+    FROM fifo_lot_consumptions flc
+    JOIN fifo_lots fl ON fl.id = flc.lot_id
+    JOIN transactions t ON t.id = flc.consuming_transaction_id
+    WHERE flc.fiscal_event_type != 'NONE'
+    GROUP BY 1, 2
+    ORDER BY 1, 2
+  `);
+  res.json(result.rows);
+});
+
+// GET /api/fifo/income-by-asset — Ingresos por activo (#527): staking,
+// intereses, minería, cashback y airdrops recibidos desde siempre, valorados
+// al recibirlos con la misma fórmula que Fiscal (cantidad neta por precio).
+router.get('/income-by-asset', async (_req, res) => {
+  const result = await db.query(
+    `SELECT asset, COUNT(*)::int AS operations,
+            ROUND(SUM(amount_net * COALESCE(price_per_unit, 0))::numeric, 2)::float AS total_eur
+     FROM transactions
+     WHERE operation_type = ANY($1)
+     GROUP BY asset
+     ORDER BY asset`, [OPS_RENTA_ESPECIE]);
   res.json(result.rows);
 });
 

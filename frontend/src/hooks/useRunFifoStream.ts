@@ -50,6 +50,9 @@ export function useRunFifoStream() {
       await queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
       await queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
       await queryClient.invalidateQueries({ queryKey: ['settings-stats'] })
+      // Desglose del resultado total e ingresos de Portfolio (#527).
+      await queryClient.invalidateQueries({ queryKey: ['realized-by-asset'] })
+      await queryClient.invalidateQueries({ queryKey: ['income-by-asset'] })
     }
     return actual
   }

@@ -224,7 +224,7 @@ export function Fiscal() {
   // Sin la lista de ejercicios no se sabe si hay datos (#498): se dice antes que el vacío.
   if (yearsQ.isError) {
     return (
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="p-6 space-y-6 max-w-[1920px] mx-auto">
         <PageHeader icon={navIcon('/fiscal')} title="Fiscal" />
         <QueryError what="los ejercicios fiscales" error={yearsQ.error} onRetry={() => void yearsQ.refetch()} compact={false} />
       </div>
@@ -244,7 +244,7 @@ export function Fiscal() {
   // Sin ejercicios (#496): primer uso si no hay operaciones; si las hay, aún falta el cálculo FIFO.
   if (!activeYear) {
     return (
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="p-6 space-y-6 max-w-[1920px] mx-auto">
         <PageHeader icon={navIcon('/fiscal')} title="Fiscal" />
         {firstUse.empty
           ? <FirstUseEmpty what="tus ganancias, pérdidas y obligaciones fiscales" />

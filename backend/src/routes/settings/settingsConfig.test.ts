@@ -122,6 +122,11 @@ describe('routes/settings — config y stats', () => {
       expect((await request(app).get('/api/settings/config')).body.dust_threshold_eur).toBe('1000');
     });
 
+    it('columnas de Portfolio (#527): lista JSON de columnas conocidas sin repetir', async () => {
+      for (const value of ['[]', '["coste","resultado"]', '["ingresos","maximo90"]']) expect((await put('portfolio_columnas', value)).status).toBe(200);
+      for (const value of ['["otra"]', '["coste","coste"]', 'coste', '{}', '']) expect((await put('portfolio_columnas', value)).status).toBe(400);
+    });
+
     it('wallets en «Otras» (#526): porcentaje entero de 0 a 20', async () => {
       for (const value of ['0', '2', '20']) expect((await put('wallets_otras_pct', value)).status).toBe(200);
       for (const value of ['21', '2.5', '-1', 'abc', '', 2]) expect((await put('wallets_otras_pct', value)).status).toBe(400);
