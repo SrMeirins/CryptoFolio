@@ -8,8 +8,8 @@ import { useSettingFeedback } from '../../hooks/useSettingFeedback'
 import { formatNumber } from '../../utils/format'
 import { validateDust } from '../../utils/settingsValidation'
 import {
-  CONCENTRACION_KEY, DUST_THRESHOLD_KEY, PRIVACY_ON_START_KEY, START_PAGES, START_PAGE_KEY,
-  concentracionAvisoPct, dustThresholdEur, privacyOnStart, startPage, type StartPage,
+  CONCENTRACION_KEY, WALLETS_OTRAS_KEY, DUST_THRESHOLD_KEY, PRIVACY_ON_START_KEY, START_PAGES, START_PAGE_KEY,
+  concentracionAvisoPct, walletsOtrasPct, dustThresholdEur, privacyOnStart, startPage, type StartPage,
 } from '../../utils/preferences'
 import { SettingsCard } from './SettingsCard'
 import { SavedMark } from './SavedMark'
@@ -80,6 +80,20 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
     void save(CONCENTRACION_KEY, String(n), `Aviso de concentración por encima del ${n} %`, String(previous))
   }
 
+  // Wallets en «Otras» de Portfolio (#526): porcentaje entero de 0 (nunca) a 20.
+  const otras = walletsOtrasPct(config)
+  const [otrasDraft, setOtrasDraft] = useState<string | null>(null)
+  const [otrasError, setOtrasError] = useState<string | null>(null)
+  function commitOtras() {
+    if (otrasDraft === null) return
+    const n = Number(otrasDraft.trim())
+    if (!/^\d{1,2}$/.test(otrasDraft.trim()) || n > 20) { setOtrasError('Escribe un porcentaje entero de 0 a 20'); return }
+    setOtrasDraft(null)
+    const previous = walletsOtrasPct(current())
+    if (n === previous) return
+    void save(WALLETS_OTRAS_KEY, String(n), n === 0 ? 'Ninguna wallet se agrupa en «Otras»' : `Las wallets de menos del ${n} % van a «Otras»`, String(previous))
+  }
+
   const privacy = privacyOnStart(config)
   const page = startPage(config)
   const pageLabel = (p: StartPage) => START_PAGES.find(s => s.value === p)?.label ?? 'Dashboard'
@@ -88,7 +102,7 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
   const fallo = failure(configQ)
   return (
     <SettingsCard index={index} icon={SlidersHorizontal} title="Preferencias"
-      status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /><SavedMark stamp={saved} id={CONCENTRACION_KEY} /></>}
+      status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /><SavedMark stamp={saved} id={CONCENTRACION_KEY} /><SavedMark stamp={saved} id={WALLETS_OTRAS_KEY} /></>}
       description="Cómo se comporta la app al abrirla, qué posiciones cuentan como polvo y cuándo avisar de una cartera concentrada.">
       {fallo && <QueryError what="tus preferencias" error={fallo.error} onRetry={fallo.retry} className="mb-3 rounded-xl border border-border" />}
       <div>
@@ -125,6 +139,25 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
             {concError && (
               <p id="pref-concentracion-error" role="alert" className="text-xs text-negative-ink flex items-center justify-end gap-1">
                 <AlertCircle size={11} aria-hidden="true" /> {concError}. Se mantiene el {concentracion} %.
+              </p>
+            )}
+          </div>
+        </Row>
+
+        <Row label="Wallets en «Otras»" htmlFor="pref-otras"
+          hint="En Portfolio, las wallets que pesan menos que este porcentaje se juntan en una tarjeta «Otras». Con 0, ninguna.">
+          <div className="space-y-1 text-right">
+            <div className={`inline-flex items-center bg-background-tertiary border rounded-lg overflow-hidden transition-colors ${otrasError ? 'border-negative' : 'border-border focus-within:border-brand'}`}>
+              <input id="pref-otras" type="text" inputMode="numeric" value={otrasDraft ?? String(otras)} maxLength={2}
+                aria-invalid={!!otrasError} aria-describedby={otrasError ? 'pref-otras-error' : undefined}
+                onChange={e => { setOtrasDraft(e.target.value); setOtrasError(null) }}
+                onBlur={commitOtras} onKeyDown={blurOnEnter}
+                className="px-3 py-2 text-sm mono bg-transparent text-fg w-16 text-right focus:outline-hidden" />
+              <span className="px-3 py-2 text-sm text-fg-subtle border-l border-border bg-background-secondary">%</span>
+            </div>
+            {otrasError && (
+              <p id="pref-otras-error" role="alert" className="text-xs text-negative-ink flex items-center justify-end gap-1">
+                <AlertCircle size={11} aria-hidden="true" /> {otrasError}. Se mantiene el {otras} %.
               </p>
             )}
           </div>

@@ -52,16 +52,22 @@ describe('portfolioInventory', () => {
 
 // Composición, P&L y antigüedad media por wallet (#283). Datos sintéticos.
 describe('walletComposition', () => {
-  const values = new Map([['A', 500], ['B', 300], ['C', 100], ['D', 50], ['E', 40], ['DUST', 0.5]])
-  const total = 990.5
-  it('4 principales y el resto (con el polvo) en «otros»; suma el valor de la wallet', () => {
+  const values = new Map([['A', 500], ['B', 300], ['C', 100], ['D', 50], ['E', 40], ['F', 30], ['G', 20], ['DUST', 0.5]])
+  const total = 1040.5
+  it('6 principales (#526) y el resto (con el polvo) en «otros»; suma el valor de la wallet', () => {
     const c = walletComposition(values, total, 1)
-    expect(c.top.map(p => p.asset)).toEqual(['A', 'B', 'C', 'D'])
-    expect(c.others.value).toBeCloseTo(40.5, 9)
-    expect(c.others.count).toBe(1)          // E; el polvo no cuenta
-    expect(c.assetCount).toBe(5)
+    expect(c.top.map(p => p.asset)).toEqual(['A', 'B', 'C', 'D', 'E', 'F'])
+    expect(c.others.value).toBeCloseTo(20.5, 9)
+    expect(c.others.count).toBe(1)          // G; el polvo no cuenta
+    expect(c.assetCount).toBe(7)
     expect(c.top.reduce((s, p) => s + p.value, 0) + c.others.value).toBeCloseTo(total, 9)
     expect(c.top.reduce((s, p) => s + p.pct, 0) + c.others.pct).toBeCloseTo(100, 9)
+  })
+  it('con el coste de cada activo, su P&L en la wallet; sin coste, null (#526)', () => {
+    const c = walletComposition(values, total, 1, new Map([['A', 400], ['B', 0]]))
+    expect(c.top[0].pnlPct).toBeCloseTo(25, 9)
+    expect(c.top[1].pnlPct).toBeNull()
+    expect(c.top[2].pnlPct).toBeNull()
   })
   it('una wallet con solo polvo lo muestra', () => {
     const c = walletComposition(new Map([['X', 0.1], ['Y', 0.04]]), 0.14, 1)

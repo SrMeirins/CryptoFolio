@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { concentracionAvisoPct, dustThresholdEur, privacyOnStart, startPage } from './preferences'
+import { concentracionAvisoPct, walletsOtrasPct, dustThresholdEur, privacyOnStart, startPage } from './preferences'
 
 // Preferencias de General (#446).
 describe('preferencias', () => {
@@ -29,5 +29,14 @@ describe('concentracionAvisoPct (#525)', () => {
     expect(concentracionAvisoPct({ concentracion_aviso_pct: '5' })).toBe(40)
     expect(concentracionAvisoPct({ concentracion_aviso_pct: '120' })).toBe(40)
     expect(concentracionAvisoPct({ concentracion_aviso_pct: '40.5' })).toBe(40)
+  })
+})
+
+describe('walletsOtrasPct (#526)', () => {
+  it('2 % por defecto; enteros de 0 (nunca) a 20', () => {
+    expect(walletsOtrasPct(undefined)).toBe(2)
+    expect(walletsOtrasPct({ wallets_otras_pct: '0' })).toBe(0)
+    expect(walletsOtrasPct({ wallets_otras_pct: '5' })).toBe(5)
+    expect(walletsOtrasPct({ wallets_otras_pct: '25' })).toBe(2)
   })
 })

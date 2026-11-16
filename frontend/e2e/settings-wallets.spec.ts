@@ -32,10 +32,12 @@ test('Ver en Portfolio filtra por esa wallet y el valor coincide', async ({ page
   await expect(page.getByRole('button', { name: new RegExp(`^Mostrando solo ${name}`) })).toBeVisible()
   // La tarjeta de Portfolio nombra la wallet con su valor: el mismo cálculo que
   // en Ajustes. Los precios en vivo se mueven entre una página y otra: margen del 0,5 %.
-  const portfolioCard = page.getByRole('group', { name: 'Filtrar la tabla por wallet' }).getByRole('button', { name: new RegExp(`^${name}: `) })
+  const portfolioCard = page.getByRole('list', { name: /^Wallets:/ }).getByRole('button', { name: new RegExp(`^${name}: `) })
   const amount = (text: string) => Number((text.match(/-?[\d.]+,\d+|-?[\d.]+/)?.[0] ?? 'NaN').replace(/\./g, '').replace(',', '.'))
   const enAjustes = amount(valor)
-  const enPortfolio = amount(((await portfolioCard.getAttribute('aria-label')) ?? '').replace(`${name}: `, ''))
+  // La etiqueta es «Nombre: N % de la cartera, IMPORTE. …»: se toma el importe.
+  const etiqueta = (await portfolioCard.getAttribute('aria-label')) ?? ''
+  const enPortfolio = amount(etiqueta.slice(etiqueta.indexOf(', ') + 2))
   expect(Math.abs(enPortfolio - enAjustes)).toBeLessThanOrEqual(Math.max(0.01, Math.abs(enAjustes) * 0.005))
 })
 
