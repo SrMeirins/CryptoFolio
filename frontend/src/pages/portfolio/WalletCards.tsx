@@ -99,6 +99,18 @@ function Tarjeta({ w, on, colores, onSelect, onDetalle }: {
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-x-4 gap-y-0.5 text-xs" aria-label={`Activos de ${w.name}`}>
           {top.map(p => (
             <li key={p.asset} onMouseEnter={() => setResaltado(p.asset)} onMouseLeave={() => setResaltado(null)}>
+              {/* El dinero (EUR, USD...) no tiene panel de detalle: se muestra, pero no se pulsa. */}
+              {p.fiat ? (
+                <span className="w-full flex items-center gap-2 rounded-md px-1.5 py-1 transition-opacity"
+                  style={{ opacity: resaltado !== null && resaltado !== p.asset ? 0.55 : 1 }}>
+                  <span className="rounded-full shrink-0 grid place-items-center" aria-hidden="true" style={{ boxShadow: `0 0 0 2px ${color(p.asset)}` }}>
+                    <CryptoIcon symbol={p.asset} size={16} />
+                  </span>
+                  <span className="mono font-semibold text-fg">{p.asset}</span>
+                  <span className="mono text-fg-muted ml-auto">{formatPercent(p.pct, 1)}</span>
+                  <span className="mono w-16 text-right text-fg-subtle">dinero</span>
+                </span>
+              ) : (
               <button type="button" onClick={() => onDetalle(p.asset)} onFocus={() => setResaltado(p.asset)} onBlur={() => setResaltado(null)}
                 aria-label={`${p.asset}: ${formatPercent(p.pct, 1)} de ${w.name}${p.pnlPct !== null ? `, P&L ${formatPercent(p.pnlPct, 1, true)}` : ''}. Ver su detalle`}
                 className={`w-full flex items-center gap-2 rounded-md px-1.5 py-1 transition-[background-color,opacity] ${resaltado === p.asset ? 'bg-overlay/8' : 'hover:bg-overlay/5'} ${FOCO}`}
@@ -112,6 +124,7 @@ function Tarjeta({ w, on, colores, onSelect, onDetalle }: {
                   {p.pnlPct === null ? 'sin coste' : formatPercent(p.pnlPct, 1, true)}
                 </span>
               </button>
+              )}
             </li>
           ))}
         </ul>

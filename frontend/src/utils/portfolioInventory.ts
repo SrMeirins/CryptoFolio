@@ -5,7 +5,7 @@ import type { FifoLot, FiatBalance, LockedAmount } from '../api/portfolio'
 // puras sobre lotes y saldos ya convertidos a la moneda de visualización.
 
 /** Segmento de la barra de composición de una wallet (#283), con su P&L en esa wallet (#526). */
-export interface CompositionPart { asset: string; value: number; pct: number; pnlPct: number | null }
+export interface CompositionPart { asset: string; value: number; pct: number; pnlPct: number | null; /** Dinero (EUR, USD...): sin panel de detalle. */ fiat: boolean }
 
 export interface WalletSummary {
   walletId: string
@@ -52,6 +52,7 @@ function weightedDate(items: ReadonlyArray<{ at: number; weight: number }>): num
  */
 export function walletComposition(
   values: ReadonlyMap<string, number>, total: number, dustThreshold: number, costs: ReadonlyMap<string, number> = new Map(),
+  fiats: ReadonlySet<string> = new Set(),
 ): WalletSummary['composition'] & { assetCount: number } {
   const all = [...values].map(([asset, value]) => ({ asset, value })).sort((a, b) => b.value - a.value)
   const solid = all.filter(a => a.value >= dustThreshold)
@@ -62,7 +63,7 @@ export function walletComposition(
     const c = costs.get(asset)
     return c !== undefined && c > 0 ? ((value - c) / c) * 100 : null
   }
-  const top = shown.slice(0, TOP_PARTS).filter(a => a.value > 0).map(a => ({ ...a, pct: pct(a.value), pnlPct: pnlPct(a.asset, a.value) }))
+  const top = shown.slice(0, TOP_PARTS).filter(a => a.value > 0).map(a => ({ ...a, pct: pct(a.value), pnlPct: pnlPct(a.asset, a.value), fiat: fiats.has(a.asset) }))
   const othersValue = total - top.reduce((s, a) => s + a.value, 0)
   return {
     top,
@@ -81,13 +82,13 @@ export function portfolioInventory(
   locked: readonly LockedAmount[],
   dustThreshold = 0,
 ): Inventory {
-  interface Acc { walletId: string; name: string; color: string; kind: string; value: number; assets: Map<string, number>; costs: Map<string, number>; cost: number; pricedValue: number; dates: { at: number; weight: number }[] }
+  interface Acc { walletId: string; name: string; color: string; kind: string; value: number; assets: Map<string, number>; costs: Map<string, number>; fiats: Set<string>; cost: number; pricedValue: number; dates: { at: number; weight: number }[] }
   const wallets = new Map<string, Acc>()
   const byAsset = new Map<string, number>()
   const allDates: { at: number; weight: number }[] = []
   const wallet = (id: string, name: string, color: string, kind: string) => {
     let w = wallets.get(id)
-    if (!w) { w = { walletId: id, name, color, kind, value: 0, assets: new Map(), costs: new Map(), cost: 0, pricedValue: 0, dates: [] }; wallets.set(id, w) }
+    if (!w) { w = { walletId: id, name, color, kind, value: 0, assets: new Map(), costs: new Map(), fiats: new Set(), cost: 0, pricedValue: 0, dates: [] }; wallets.set(id, w) }
     return w
   }
 
@@ -107,7 +108,7 @@ export function portfolioInventory(
     const value = parseFloat(f.balance) * fiatPrice
     const w = wallet(f.wallet_id, f.wallet_name, f.wallet_color, f.wallet_kind)
     w.value += value
-    if (parseFloat(f.balance) > 0) w.assets.set(f.asset, (w.assets.get(f.asset) ?? 0) + value)
+    if (parseFloat(f.balance) > 0) { w.assets.set(f.asset, (w.assets.get(f.asset) ?? 0) + value); w.fiats.add(f.asset) }
     byAsset.set(f.asset, (byAsset.get(f.asset) ?? 0) + value)
   }
 
@@ -133,8 +134,8 @@ export function portfolioInventory(
     },
     locked: { value: lockedValue, assets: lockedAssets.size },
     wallets: list
-      .map(({ assets, costs, cost, pricedValue, dates, ...w }) => {
-        const { assetCount, ...composition } = walletComposition(assets, w.value, dustThreshold, costs)
+      .map(({ assets, costs, fiats, cost, pricedValue, dates, ...w }) => {
+        const { assetCount, ...composition } = walletComposition(assets, w.value, dustThreshold, costs, fiats)
         const pnl = cost > 0 ? pricedValue - cost : null
         return {
           ...w, assetCount, composition,
