@@ -144,7 +144,7 @@ export function Dashboard() {
   // Sin ninguna operación (#496): un único vacío de primer uso en lugar de los paneles en blanco.
   if (firstUse.empty) {
     return (
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="p-6 space-y-6 max-w-[1920px] mx-auto">
         <PageHeader icon={navIcon('/')} title="Dashboard" />
         <FirstUseEmpty what="tu cartera, su evolución y el resumen fiscal" />
       </div>
@@ -152,7 +152,7 @@ export function Dashboard() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 max-w-[1920px] mx-auto">
       {/* Header */}
       {/* El estado de los precios vive solo en la barra superior (#200) */}
       <PageHeader icon={navIcon('/')} title="Dashboard" subtitle={dashboardSubtitle(assetCount, new Date(now))} />

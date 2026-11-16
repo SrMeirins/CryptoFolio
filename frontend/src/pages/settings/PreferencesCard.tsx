@@ -12,6 +12,8 @@ import {
   concentracionAvisoPct, walletsOtrasPct, dustThresholdEur, privacyOnStart, startPage, type StartPage,
 } from '../../utils/preferences'
 import { SettingsCard } from './SettingsCard'
+import { ColumnasSelector } from '../../components/ColumnasSelector'
+import { PORTFOLIO_COLUMNAS_KEY, portfolioColumnas, serializarColumnas } from '../../utils/portfolioColumns'
 import { SavedMark } from './SavedMark'
 import { failure } from '../../utils/queryFailure'
 
@@ -94,6 +96,9 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
     void save(WALLETS_OTRAS_KEY, String(n), n === 0 ? 'Ninguna wallet se agrupa en «Otras»' : `Las wallets de menos del ${n} % van a «Otras»`, String(previous))
   }
 
+  // Columnas de la tabla de posiciones (#527), las mismas que se eligen en Portfolio.
+  const columnas = portfolioColumnas(config)
+
   const privacy = privacyOnStart(config)
   const page = startPage(config)
   const pageLabel = (p: StartPage) => START_PAGES.find(s => s.value === p)?.label ?? 'Dashboard'
@@ -102,7 +107,7 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
   const fallo = failure(configQ)
   return (
     <SettingsCard index={index} icon={SlidersHorizontal} title="Preferencias"
-      status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /><SavedMark stamp={saved} id={CONCENTRACION_KEY} /><SavedMark stamp={saved} id={WALLETS_OTRAS_KEY} /></>}
+      status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /><SavedMark stamp={saved} id={CONCENTRACION_KEY} /><SavedMark stamp={saved} id={WALLETS_OTRAS_KEY} /><SavedMark stamp={saved} id={PORTFOLIO_COLUMNAS_KEY} /></>}
       description="Cómo se comporta la app al abrirla, qué posiciones cuentan como polvo y cuándo avisar de una cartera concentrada.">
       {fallo && <QueryError what="tus preferencias" error={fallo.error} onRetry={fallo.retry} className="mb-3 rounded-xl border border-border" />}
       <div>
@@ -161,6 +166,17 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
               </p>
             )}
           </div>
+        </Row>
+
+        <Row label="Columnas de Posiciones"
+          hint="Qué columnas muestra la tabla de Portfolio, además de activo y valor. Resultado total e ingresos solo se ven en la vista por activo sin filtro de wallet.">
+          <ColumnasSelector values={columnas} className="w-44"
+            onChange={cols => {
+              const previous = serializarColumnas(portfolioColumnas(current()))
+              const next = serializarColumnas(cols)
+              if (next === previous) return
+              void save(PORTFOLIO_COLUMNAS_KEY, next, `Tabla de posiciones con ${cols.length} ${cols.length === 1 ? 'columna' : 'columnas'} opcionales`, previous)
+            }} />
         </Row>
 
         <Row label="Privacidad al abrir" htmlFor="pref-privacidad"

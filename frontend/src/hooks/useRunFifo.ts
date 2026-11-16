@@ -26,6 +26,9 @@ export function useRunFifo() {
       queryClient.invalidateQueries({ queryKey: ['fifo-lots'] })
       queryClient.invalidateQueries({ queryKey: ['fiscal-summary'] })
       queryClient.invalidateQueries({ queryKey: ['settings-stats'] })
+      // Desglose del resultado total e ingresos de Portfolio (#527).
+      queryClient.invalidateQueries({ queryKey: ['realized-by-asset'] })
+      queryClient.invalidateQueries({ queryKey: ['income-by-asset'] })
     } catch (e) {
       setResult(`Error: ${(e as Error).message}`)
     } finally {

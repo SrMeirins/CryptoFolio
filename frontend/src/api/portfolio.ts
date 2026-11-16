@@ -94,6 +94,20 @@ export interface LiveDayBase {
   pricesEur: Record<string, number>  // precios que usó el servidor, de respaldo
 }
 
+/** Realizado de un activo en un tipo de operación (#527), en EUR. */
+export interface RealizedByAsset {
+  asset: string
+  categoria: 'ventas' | 'permutas' | 'comisiones' | 'otros'
+  operations: number
+  net_eur: number
+}
+
+export interface IncomeByAsset {
+  asset: string
+  operations: number
+  total_eur: number
+}
+
 export interface FifoLot {
   asset: string
   wallet_id: string
@@ -108,6 +122,8 @@ export interface FifoLot {
   avg_price_usd?: string | null
   /** Fecha media de apertura de los lotes ponderada por coste (#283). */
   avg_opened_at?: string | null
+  /** Apertura del lote más antiguo que sigue abierto (#527). */
+  first_opened_at?: string | null
 }
 
 /** Lote FIFO abierto de un activo (#272), para el panel de detalle de Portfolio. */
@@ -755,6 +771,9 @@ export const portfolioApi = {
   getOpenLots: (asset: string) => api.get<{ asset: string; lots: OpenLot[] }>(`/v1/fifo/lots/${encodeURIComponent(asset)}`),
   getAssetSales: (asset: string) => api.get<AssetSales>(`/v1/fifo/sales/${encodeURIComponent(asset)}`),
   getFiatBalances: () => api.get<FiatBalance[]>('/fifo/fiat-balances'),
+  // Rentas en especie por activo (staking, airdrops...), en EUR al recibirlas (#527).
+  getRealizedByAsset: () => api.get<RealizedByAsset[]>('/fifo/realized-by-asset'),
+  getIncomeByAsset: () => api.get<IncomeByAsset[]>('/fifo/income-by-asset'),
   getFiscalSummary: () => api.get<FiscalYear[]>('/fifo/summary'),
   runFifo: () => api.post<{ success: boolean } & FifoRunResult>('/fifo/run'),
   getLivePrices: () => api.get<Record<string, number>>('/prices/live'),

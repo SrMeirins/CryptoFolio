@@ -1,4 +1,5 @@
 import { type FifoLot, type FiatBalance } from '../api/portfolio'
+import type { RowMetrics } from './positionMetrics'
 
 export interface WalletBreakdown {
   wallet_id:    string
@@ -17,6 +18,8 @@ export interface CryptoRow {
   totalCostBasis: number
   avgPrice:       number
   wallets:        WalletBreakdown[]
+  /** Apertura (ms) del lote abierto más antiguo de cualquier wallet (#527). */
+  firstOpenedAt?: number | null
 }
 
 export interface FiatRow {
@@ -67,9 +70,12 @@ export function buildRows(
         value: 0, totalQuantity: 0, totalCostBasis: 0,
         avgPrice: parseFloat(lot.avg_price_eur),
         wallets: [],
+        firstOpenedAt: null,
       })
     }
     const row = cryptoMap.get(lot.asset)!
+    const opened = lot.first_opened_at ? Date.parse(lot.first_opened_at) : Number.NaN
+    if (Number.isFinite(opened) && (row.firstOpenedAt == null || opened < row.firstOpenedAt)) row.firstOpenedAt = opened
     row.totalQuantity  += qty
     row.totalCostBasis += cost
     row.value           = row.totalQuantity * price
@@ -112,6 +118,7 @@ export function buildRows(
 }
 
 export type SortKey = 'asset' | 'quantity' | 'price' | 'value' | 'cost' | 'pnl' | 'pnlpct' | 'weight' | 'breakeven'
+  | 'resultado' | 'antiguedad' | 'maximo90' | 'ingresos'
 export type SortDir = 'asc' | 'desc'
 
 /** Siguiente orden al pulsar una columna: misma columna invierte la dirección; otra nueva empieza en descendente. */
@@ -120,8 +127,28 @@ export function nextSort(clicked: SortKey, key: SortKey, dir: SortDir): { key: S
   return { key: clicked, dir: 'desc' }
 }
 
-export function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices: Readonly<Record<string, number>>, total: number): UnifiedRow[] {
+/** Valor de orden de las columnas de #527; sin dato, al final. */
+function metricValue(r: UnifiedRow, key: SortKey, metrics: ReadonlyMap<string, RowMetrics> | undefined): number {
+  const m = r.kind === 'crypto' ? metrics?.get(r.asset) : undefined
+  const v = !m ? null
+    : key === 'resultado' ? m.resultado
+    : key === 'antiguedad' ? m.ageDays
+    : key === 'maximo90' ? m.desdeMaximo?.pct ?? null
+    : m.ingresos?.value ?? null
+  return v ?? -Infinity
+}
+
+export function sortRows(rows: UnifiedRow[], key: SortKey, dir: SortDir, prices: Readonly<Record<string, number>>, total: number,
+  metrics?: ReadonlyMap<string, RowMetrics>): UnifiedRow[] {
   return [...rows].sort((a, b) => {
+    if (key === 'resultado' || key === 'antiguedad' || key === 'maximo90' || key === 'ingresos') {
+      const va = metricValue(a, key, metrics), vb = metricValue(b, key, metrics)
+      // Sin dato siempre al final, en ambas direcciones.
+      if (va === vb) return 0
+      if (va === -Infinity) return 1
+      if (vb === -Infinity) return -1
+      return dir === 'asc' ? va - vb : vb - va
+    }
     let va = 0, vb = 0
     if (key === 'asset') {
       const cmp = a.asset.localeCompare(b.asset)
