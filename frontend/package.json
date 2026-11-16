@@ -9,7 +9,9 @@
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:local": "playwright test --workers=2 --trace=off",
+    "test:e2e:smoke": "playwright test e2e/console.spec.ts --workers=1"
   },
   "dependencies": {
     "@tanstack/react-query": "5.100.10",

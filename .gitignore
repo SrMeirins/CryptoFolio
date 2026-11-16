@@ -87,4 +87,5 @@ releases/
 
 # Resultados de Playwright (prueba de humo de consola, #201)
 frontend/test-results/
+test-results/
 frontend/playwright-report/
