@@ -10,6 +10,8 @@ export const PRIVACY_ON_START_KEY = 'privacy_on_start';
 export const START_PAGE_KEY = 'start_page';
 /** Peso de la mayor posición a partir del cual Portfolio avisa de concentración (#525). */
 export const CONCENTRACION_KEY = 'concentracion_aviso_pct';
+/** Peso por debajo del cual una wallet va a «Otras» en Portfolio (#526). */
+export const WALLETS_OTRAS_KEY = 'wallets_otras_pct';
 
 /** Páginas que se pueden elegir como inicio. */
 export const START_PAGES = ['/', '/portfolio', '/fiscal', '/history'] as const;
@@ -24,6 +26,9 @@ export const preferenceSchemas: Record<string, z.ZodType<string>> = {
   [PRIVACY_ON_START_KEY]: z.enum(['true', 'false'], { error: 'privacy_on_start debe ser true o false' }),
   [START_PAGE_KEY]: z.enum(START_PAGES, { error: 'start_page debe ser una de las páginas de inicio permitidas' }),
   // Aviso de concentración (#525): porcentaje entero de 10 a 100.
+  // Wallets en «Otras» (#526): porcentaje entero de 0 (nunca) a 20.
+  [WALLETS_OTRAS_KEY]: z.string().regex(/^\d{1,2}$/, `${WALLETS_OTRAS_KEY} debe ser un porcentaje entero`)
+    .refine(v => Number(v) <= 20, `${WALLETS_OTRAS_KEY} va de 0 a 20`),
   [CONCENTRACION_KEY]: z.string().regex(/^\d{2,3}$/, `${CONCENTRACION_KEY} debe ser un porcentaje entero`)
     .refine(v => Number(v) >= 10 && Number(v) <= 100, `${CONCENTRACION_KEY} va de 10 a 100`),
   // Categorías de avisos silenciadas (#447).

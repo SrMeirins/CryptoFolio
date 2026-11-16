@@ -11,7 +11,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })
     await page.goto('/portfolio')
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
-    const group = page.getByRole('group', { name: 'Filtrar la tabla por wallet' })
+    const group = page.getByRole('list', { name: /^Wallets:/ })
     const card = group.getByRole('button', { name: /Filtrar la tabla por esta wallet$/ }).first()
     await card.waitFor({ timeout: 15_000 }).catch(() => {})
     test.skip(await card.count() === 0, 'Sin wallets con estos datos')

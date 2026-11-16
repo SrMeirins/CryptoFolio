@@ -122,6 +122,12 @@ describe('routes/settings — config y stats', () => {
       expect((await request(app).get('/api/settings/config')).body.dust_threshold_eur).toBe('1000');
     });
 
+    it('wallets en «Otras» (#526): porcentaje entero de 0 a 20', async () => {
+      for (const value of ['0', '2', '20']) expect((await put('wallets_otras_pct', value)).status).toBe(200);
+      for (const value of ['21', '2.5', '-1', 'abc', '', 2]) expect((await put('wallets_otras_pct', value)).status).toBe(400);
+      expect((await request(app).get('/api/settings/config')).body.wallets_otras_pct).toBe('20');
+    });
+
     it('aviso de concentración (#525): porcentaje entero de 10 a 100', async () => {
       for (const value of ['10', '40', '100']) expect((await put('concentracion_aviso_pct', value)).status).toBe(200);
       for (const value of ['9', '101', '40.5', 'abc', '', 40]) expect((await put('concentracion_aviso_pct', value)).status).toBe(400);

@@ -8,6 +8,8 @@ export const PRIVACY_ON_START_KEY = 'privacy_on_start'
 export const START_PAGE_KEY = 'start_page'
 export const CONCENTRACION_KEY = 'concentracion_aviso_pct'
 export const CONCENTRACION_DEFECTO = 40
+export const WALLETS_OTRAS_KEY = 'wallets_otras_pct'
+export const WALLETS_OTRAS_DEFECTO = 2
 
 export const START_PAGES = [
   { value: '/', label: 'Dashboard' },
@@ -32,6 +34,13 @@ export function concentracionAvisoPct(config: Config): number {
   const raw = config?.[CONCENTRACION_KEY]
   const n = raw && /^\d{2,3}$/.test(raw) ? Number(raw) : Number.NaN
   return n >= 10 && n <= 100 ? n : CONCENTRACION_DEFECTO
+}
+
+/** Peso por debajo del cual una wallet va a «Otras» en Portfolio (#526); 0 nunca, por defecto 2 %. */
+export function walletsOtrasPct(config: Config): number {
+  const raw = config?.[WALLETS_OTRAS_KEY]
+  const n = raw && /^\d{1,2}$/.test(raw) ? Number(raw) : Number.NaN
+  return n >= 0 && n <= 20 ? n : WALLETS_OTRAS_DEFECTO
 }
 
 /** ¿Arrancar con los importes ocultos? */

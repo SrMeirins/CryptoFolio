@@ -63,7 +63,7 @@ test('las tarjetas de wallet son el único filtro por wallet y lo llevan a la UR
   await preparar(page)
   await page.goto('/portfolio')
   await expect(page.getByRole('button', { name: /^Filtrar por wallet/ })).toHaveCount(0)
-  const tarjeta = page.getByRole('group', { name: 'Filtrar la tabla por wallet' }).getByRole('button', { name: /Filtrar la tabla por esta wallet$/ }).first()
+  const tarjeta = page.getByRole('list', { name: /^Wallets:/ }).getByRole('button', { name: /Filtrar la tabla por esta wallet$/ }).first()
   await tarjeta.waitFor({ timeout: 15_000 })
   await tarjeta.click()
   await expect(page).toHaveURL(/[?&]wallet=[0-9a-f-]{36}/)

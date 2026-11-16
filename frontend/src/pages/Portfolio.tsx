@@ -24,7 +24,9 @@ import { activosParam, assetView, filterByPnl, walletParam, type PnlFilter, type
 import { FiltroActivos } from './portfolio/FiltroActivos'
 import { isSearchShortcut, readDensity, readDustOpen, readView, saveDensity, saveDustOpen, saveView, type Density } from '../utils/portfolioPrefs'
 import { failure } from '../utils/queryFailure'
-import { concentracionAvisoPct } from '../utils/preferences'
+import { concentracionAvisoPct, walletsOtrasPct } from '../utils/preferences'
+import { assetColors } from '../utils/allocation'
+import { usePortfolioValuation } from '../hooks/usePortfolioValuation'
 
 // Chips del subtítulo (#525): fichas con icono y fondo suave, que se ven como
 // controles y no solo por el color; foco visible.
@@ -168,6 +170,10 @@ export function Portfolio() {
 
   // Umbral del aviso de concentración (#525), de Ajustes > General.
   const configQ = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
+
+  // Colores de cada activo, los mismos que Distribución del Dashboard (#526).
+  const valoracion = usePortfolioValuation(lots, fiatBalances)
+  const coloresActivos = useMemo(() => assetColors(valoracion.assets), [valoracion.assets])
 
   const hasPrices = Object.keys(market.prices).length > 0
   const walletCount = new Set(lots.map(l => l.wallet_id)).size
@@ -321,7 +327,8 @@ export function Portfolio() {
         <>
           <CabeceraPortfolio lots={lots} fiatBalances={fiatBalances} inventory={inventory} pnlFilter={pnlFilter} onPnlFilter={setPnlFilter}
             onDetalle={setDetailAsset} umbralConcentracion={concentracionAvisoPct(configQ.data)} />
-          <WalletCards wallets={inventory.wallets} selected={walletFilter} onSelect={setWalletFilter} />
+          <WalletCards wallets={inventory.wallets} selected={walletFilter} onSelect={setWalletFilter} onDetalle={setDetailAsset}
+            colores={coloresActivos} umbralOtras={walletsOtrasPct(configQ.data)} />
         </>
       )}
 
