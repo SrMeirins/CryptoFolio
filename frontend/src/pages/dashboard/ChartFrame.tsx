@@ -12,7 +12,7 @@ export function ChartFrame({ loading, error, empty, errorText, onRetry, children
   children: ReactNode
 }) {
   return (
-    <div className="h-52 relative">
+    <div className="h-[300px] relative">
       {loading && (
         <SkeletonGroup label="Cargando el gráfico" className="absolute inset-0 flex flex-col justify-end gap-2 pb-6">
           <Skeleton className="h-full w-full rounded-xl opacity-60" />
