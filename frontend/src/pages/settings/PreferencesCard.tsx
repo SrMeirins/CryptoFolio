@@ -66,7 +66,7 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
     setDustDraft(null)
     const previous = dustThresholdEur(current())
     if (v.value === previous) return
-    void save(DUST_THRESHOLD_KEY, String(v.value), `Polvo por debajo de ${eur(v.value)}`, String(previous))
+    void save(DUST_THRESHOLD_KEY, String(v.value), `Saldos residuales por debajo de ${eur(v.value)}`, String(previous))
   }
 
   // Aviso de concentración de Portfolio (#525): porcentaje entero de 10 a 100.
@@ -111,10 +111,10 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
   return (
     <SettingsCard index={index} icon={SlidersHorizontal} title="Preferencias"
       status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /><SavedMark stamp={saved} id={CONCENTRACION_KEY} /><SavedMark stamp={saved} id={WALLETS_OTRAS_KEY} /><SavedMark stamp={saved} id={PORTFOLIO_COLUMNAS_KEY} /><SavedMark stamp={saved} id={GRAFICO_MARCAS_KEY} /></>}
-      description="Cómo se comporta la app al abrirla, qué posiciones cuentan como polvo y cuándo avisar de una cartera concentrada.">
+      description="Cómo se comporta la app al abrirla, qué posiciones cuentan como saldos residuales y cuándo avisar de una cartera concentrada.">
       {fallo && <QueryError what="tus preferencias" error={fallo.error} onRetry={fallo.retry} className="mb-3 rounded-xl border border-border" />}
       <div>
-        <Row label="Umbral de polvo" htmlFor="pref-polvo"
+        <Row label="Umbral de saldos residuales" htmlFor="pref-polvo"
           hint="Las posiciones que valen menos se agrupan aparte en Portfolio y no cuentan en los mejores y peores.">
           <div className="space-y-1 text-right">
             <div className={`inline-flex items-center bg-background-tertiary border rounded-lg overflow-hidden transition-colors ${dustError ? 'border-negative' : 'border-border focus-within:border-brand'}`}>

@@ -27,8 +27,12 @@ export function saveDensity(density: Density): void {
   try { localStorage.setItem(DENSITY_KEY, density) } catch { /* almacenamiento no disponible */ }
 }
 
-export function readDustOpen(): boolean {
-  try { return localStorage.getItem(DUST_KEY) === '1' } catch { return false }
+/** Saldos residuales abiertos o plegados; null si nunca se ha elegido (#530). */
+export function readDustOpen(): boolean | null {
+  try {
+    const v = localStorage.getItem(DUST_KEY)
+    return v === '1' ? true : v === '0' ? false : null
+  } catch { return null }
 }
 
 export function saveDustOpen(open: boolean): void {
