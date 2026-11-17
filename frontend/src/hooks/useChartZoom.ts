@@ -19,7 +19,15 @@ export function useChartZoom(
   /** Ventana controlada desde fuera (#508: el rango de la URL); sin ella, estado propio. */
   control?: { ventana: Ventana | null; set: (v: Ventana | null) => void },
 ) {
-  const containerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  // El contenedor puede montarse más tarde que la historia (p. ej. tras la
+  // preparación de los cierres): se guarda en estado para registrar la rueda
+  // en cuanto aparece, y en la referencia para los manejadores.
+  const [contenedor, setContenedor] = useState<HTMLDivElement | null>(null)
+  const refContenedor = useCallback((el: HTMLDivElement | null) => {
+    containerRef.current = el
+    setContenedor(el)
+  }, [])
   const [propia, setPropia] = useState<Ventana | null>(null)
   const ventana = control ? control.ventana : propia
   const setVentana = control ? control.set : setPropia
@@ -48,10 +56,9 @@ export function useChartZoom(
     return cur.from + frac * (cur.to - cur.from)
   }, [])
 
-  // El contenedor solo existe con historia: se registra la rueda al aparecer.
-  const hayHistoria = extent !== null
+  // La rueda se registra sobre el contenedor en cuanto se monta.
   useEffect(() => {
-    const el = containerRef.current
+    const el = contenedor
     if (!el) return
     const onWheel = (e: WheelEvent) => {
       const { v: cur, extent: ext } = actual.current
@@ -71,7 +78,7 @@ export function useChartZoom(
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [instanteEn, hayHistoria])
+  }, [instanteEn, contenedor])
 
   // Arrastrar para desplazar (ratón, lápiz o dedo); con Mayús, elegir un tramo.
   const inicio = useRef<{ x: number; v: Ventana } | null>(null)
@@ -139,7 +146,7 @@ export function useChartZoom(
     : null
 
   return {
-    v, containerRef, arrastrando, setVentana, reset, atras, puedeAtras: pila.length > 0, tramo,
+    v, containerRef: refContenedor, arrastrando, setVentana, reset, atras, puedeAtras: pila.length > 0, tramo,
     acercar: () => zoom(1 / ZOOM_STEP), alejar: () => zoom(ZOOM_STEP),
     handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onDoubleClick: reset, onKeyDown },
   }

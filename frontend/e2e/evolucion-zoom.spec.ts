@@ -62,6 +62,22 @@ test('rueda y selección de tramo con Mayús; el navegador sigue la ventana', as
   await expect(page.getByTestId('navegador-precio')).toBeVisible()
 })
 
+test('la rueda funciona aunque el gráfico aparezca tras preparar los históricos', async ({ page }) => {
+  // Las primeras respuestas dicen que faltan cierres (se muestra el progreso) y luego, que está listo.
+  let llamadas = 0
+  await page.route('**/api/v1/pnl/preparacion', async route => {
+    llamadas++
+    if (llamadas <= 1) { await route.fulfill({ json: { completo: false, progreso: { listos: 1, total: 2 } } }); return }
+    await route.fallback()
+  })
+  const g = await grafico(page)
+  await expect.poll(() => llamadas).toBeGreaterThan(1)
+  const box = (await g.boundingBox())!
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2)
+  for (let i = 0; i < 3; i++) await page.mouse.wheel(0, -200)
+  await expect(page).toHaveURL(/evolucion=/)
+})
+
 test('cruz con valor y fecha, último valor, aportado en Valor y tira de métricas', async ({ page }) => {
   const g = await grafico(page)
   await expect(page.getByTestId('ultimo-valor')).toBeVisible()
