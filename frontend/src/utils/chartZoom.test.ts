@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { desplazarVentana, encajar, esCompleta, MIN_SPAN, puntosEnVentana, rangoDeVentana, ventanaRango, zoomVentana } from './chartZoom'
+import { desplazarVentana, encajar, esCompleta, MIN_SPAN, puntosEnVentana, rangoAVentana, ventanaARango, zoomVentana } from './chartZoom'
 
 // Zoom y desplazamiento del gráfico de precio (#528).
 const D = 86_400_000
@@ -31,14 +31,21 @@ describe('desplazarVentana y encajar', () => {
   })
 })
 
-describe('rangos rápidos', () => {
-  it('30 d, 90 d y 1 a pegados al final; Todo es la historia completa', () => {
-    expect(ventanaRango('30d', extent)).toEqual({ from: 370 * D, to: 400 * D })
-    expect(ventanaRango('all', extent)).toEqual(extent)
-    expect(rangoDeVentana(ventanaRango('90d', extent), extent)).toBe('90d')
-    expect(rangoDeVentana(extent, extent)).toBe('all')
-    expect(rangoDeVentana({ from: 10 * D, to: 50 * D }, extent)).toBeNull()
-    expect(esCompleta({ from: 0, to: 399 * D }, extent)).toBe(false)
+describe('rango común y ventana (#508)', () => {
+  const ext = { from: Date.parse('2025-01-01T12:00:00Z'), to: Date.parse('2026-06-15T12:00:00Z') }
+  it('un rango da su ventana de días completos; «Todo», la vista completa', () => {
+    expect(rangoAVentana({ tipo: 'preset', preset: 'todo' }, '2026-06-15')).toBeNull()
+    expect(rangoAVentana({ tipo: 'preset', preset: '7d' }, '2026-06-15')).toEqual({
+      from: Date.parse('2026-06-09T00:00:00Z'), to: Date.parse('2026-06-15T23:59:59Z'),
+    })
+  })
+  it('una ventana de zoom es un rango personalizado; si llega al final, «Hasta hoy»', () => {
+    expect(ventanaARango({ from: Date.parse('2025-03-01T12:00:00Z'), to: Date.parse('2025-04-01T12:00:00Z') }, ext))
+      .toEqual({ tipo: 'rango', from: '2025-03-01', to: '2025-04-01', hastaHoy: false })
+    expect(ventanaARango({ from: Date.parse('2026-05-01T12:00:00Z'), to: ext.to }, ext)).toMatchObject({ hastaHoy: true })
+    expect(ventanaARango(ext, ext)).toEqual({ tipo: 'preset', preset: 'todo' })
+    expect(ventanaARango(null, ext)).toEqual({ tipo: 'preset', preset: 'todo' })
+    expect(esCompleta({ from: 0, to: D }, { from: 0, to: 400 * D })).toBe(false)
   })
 })
 

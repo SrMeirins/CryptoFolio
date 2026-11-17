@@ -8,15 +8,22 @@ import { desplazarVentana, encajar, zoomVentana, ZOOM_STEP, type Ventana } from 
  * margen del área de trazado dentro del contenedor (eje Y a la izquierda).
  * La rueda se escucha con `passive: false` para que no desplace el panel.
  */
-export function useChartZoom(extent: Ventana | null, inset: { left: number; right: number }) {
+export function useChartZoom(
+  extent: Ventana | null,
+  inset: { left: number; right: number },
+  /** Ventana controlada desde fuera (#508: el rango de la URL); sin ella, estado propio. */
+  control?: { ventana: Ventana | null; set: (v: Ventana | null) => void },
+) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [ventana, setVentana] = useState<Ventana | null>(null)
+  const [propia, setPropia] = useState<Ventana | null>(null)
+  const ventana = control ? control.ventana : propia
+  const setVentana = control ? control.set : setPropia
   const [arrastrando, setArrastrando] = useState(false)
   const v = extent ? (ventana ? encajar(ventana, extent) : extent) : null
 
   // Valores actuales para los manejadores nativos sin volver a registrarlos.
-  const actual = useRef({ v, extent, inset })
-  useLayoutEffect(() => { actual.current = { v, extent, inset } })
+  const actual = useRef({ v, extent, inset, setVentana })
+  useLayoutEffect(() => { actual.current = { v, extent, inset, setVentana } })
 
   /** Instante bajo una coordenada X de pantalla. */
   const instanteEn = useCallback((clientX: number): number | null => {
@@ -42,11 +49,11 @@ export function useChartZoom(extent: Ventana | null, inset: { left: number; righ
       // Desplazamiento horizontal del trackpad: mueve la ventana.
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
         const rect = el.getBoundingClientRect()
-        setVentana(desplazarVentana(cur, ext, (e.deltaX / Math.max(1, rect.width)) * (cur.to - cur.from)))
+        actual.current.setVentana(desplazarVentana(cur, ext, (e.deltaX / Math.max(1, rect.width)) * (cur.to - cur.from)))
         return
       }
       const anchor = instanteEn(e.clientX) ?? (cur.from + cur.to) / 2
-      setVentana(zoomVentana(cur, ext, e.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP, anchor))
+      actual.current.setVentana(zoomVentana(cur, ext, e.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP, anchor))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)

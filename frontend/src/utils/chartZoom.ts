@@ -1,4 +1,5 @@
-import type { ChartPoint, ChartRange } from './assetPriceChart'
+import type { ChartPoint } from './assetPriceChart'
+import { resolverRango, type RangoValor } from './rangoGrafico'
 
 // Zoom y desplazamiento del gráfico de precio del detalle (#528), como en un
 // gráfico de exchange: la ventana visible es un tramo [from, to] de la
@@ -45,22 +46,27 @@ export function esCompleta(v: Ventana, extent: Ventana): boolean {
   return v.from <= extent.from + DAY_MS / 2 && v.to >= extent.to - DAY_MS / 2
 }
 
-const PRESET_DAYS: Record<Exclude<ChartRange, 'all'>, number> = { '30d': 30, '90d': 90, '1y': 365 }
+const diaDe = (t: number) => new Date(t).toISOString().slice(0, 10)
 
-/** Ventana de un rango rápido, pegada al final de la historia. */
-export function ventanaRango(range: ChartRange, extent: Ventana): Ventana {
-  if (range === 'all') return extent
-  return encajar({ from: extent.to - PRESET_DAYS[range] * DAY_MS, to: extent.to }, extent)
+/**
+ * Ventana del gráfico para un rango común (#508); null es la vista completa
+ * («Todo»). Los días van de las 00:00 a las 23:59 (los puntos son de mediodía).
+ */
+export function rangoAVentana(r: RangoValor, today: string): Ventana | null {
+  if (r.tipo === 'preset' && r.preset === 'todo') return null
+  const res = resolverRango(r, today)
+  if (!res.from) return null
+  return { from: Date.parse(`${res.from}T00:00:00Z`), to: Date.parse(`${res.to}T23:59:59Z`) }
 }
 
-/** Rango rápido que coincide con la ventana, para marcarlo como activo; null si es un zoom libre. */
-export function rangoDeVentana(v: Ventana, extent: Ventana): ChartRange | null {
-  if (esCompleta(v, extent)) return 'all'
-  for (const r of ['30d', '90d', '1y'] as const) {
-    const w = ventanaRango(r, extent)
-    if (Math.abs(w.from - v.from) < DAY_MS / 2 && Math.abs(w.to - v.to) < DAY_MS / 2) return r
-  }
-  return null
+/**
+ * Rango personalizado de una ventana de zoom (#508): sus días y, si llega al
+ * final de la historia, «Hasta hoy»; la vista completa es «Todo».
+ */
+export function ventanaARango(v: Ventana | null, extent: Ventana): RangoValor {
+  if (v === null || esCompleta(v, extent)) return { tipo: 'preset', preset: 'todo' }
+  const hastaHoy = v.to >= extent.to - DAY_MS / 2
+  return { tipo: 'rango', from: diaDe(v.from), to: diaDe(v.to), hastaHoy }
 }
 
 /** Puntos dentro de la ventana, con el vecino de cada lado para que la línea llegue a los bordes. */

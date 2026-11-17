@@ -269,11 +269,18 @@ export function DateRangePicker({ from, to, onChange, placeholder = 'Rango de fe
               )}
             </div>
 
-            {/* Indicador de selección en curso */}
+            {/* Indicador de selección en curso. «Hasta hoy» (#508): con un inicio
+                antiguo no hace falta recorrer el calendario hasta hoy. */}
             {picking === 'to' && tmpFrom && (
-              <p className="text-center text-xs text-fg-subtle mt-2">
-                Desde <span className="text-fg-muted">{fmtShort(tmpFrom)}</span> — selecciona fecha de fin
-              </p>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <p className="text-xs text-fg-subtle">
+                  Desde <span className="text-fg-muted">{fmtShort(tmpFrom)}</span>: elige la fecha de fin
+                </p>
+                <button type="button" onClick={() => { const fin = max && todayStr > max ? max : todayStr; setTmpTo(fin); setPicking('from'); apply(tmpFrom, fin) }}
+                  className="shrink-0 px-2 py-1 rounded-lg text-xs font-medium bg-brand/12 text-brand-ink hover:bg-brand/20 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
+                  Hasta hoy
+                </button>
+              </div>
             )}
           </div>
         </div>
