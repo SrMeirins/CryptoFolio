@@ -30,6 +30,10 @@ export interface DayValuation {
   capitalOut?: number;
   complete: boolean; // false si falta algún precio de cierre (aún descargándose)
   live: boolean;     // día en curso, con precios en vivo
+  // Coste de las posiciones abiertas y EUR neto (depósitos menos retiradas a
+  // banco) acumulado al cierre, en la moneda de la serie (#507).
+  cost?: number;
+  eurNet?: number;
 }
 
 export interface DayPnl extends DayValuation {

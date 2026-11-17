@@ -54,6 +54,8 @@ export interface StatCardProps {
   delay?: number
   /** Reserva el hueco del chip y el de la mini gráfica aunque falten (#490): tarjetas alineadas en fila. */
   reserveSlots?: boolean
+  /** Clases extra del contenedor (p. ej. su ancho en una rejilla flexible, #507). */
+  className?: string
 }
 
 const TONE = { positive: 'text-positive', negative: 'text-negative' } as const
@@ -72,14 +74,14 @@ function Value({ value, format, tone, flash, compact }: Pick<StatCardProps, 'val
 export function StatCard(props: StatCardProps) {
   const {
     title, icon: Icon, visual, color, value, format, loading, chip, series, footer, help, helpLabel,
-    onSelect, active = false, expands = false, actionLabel, compact = false, delay = 0, reserveSlots = false,
+    onSelect, active = false, expands = false, actionLabel, compact = false, delay = 0, reserveSlots = false, className = '',
   } = props
   const hasSeries = !footer && series !== undefined && series.length > 1
   const text = typeof value === 'number' && format ? format(value) : String(value)
   const iconSize = compact ? 'w-6 h-6' : 'w-7 h-7'
 
   return (
-    <div className="stat-card stat-card-in relative rounded-2xl p-px" data-active={onSelect ? active : undefined}
+    <div className={`stat-card stat-card-in relative rounded-2xl p-px ${className}`} data-active={onSelect ? active : undefined}
       style={{ '--card': color, animationDelay: `${delay}ms` } as CSSProperties}>
       <div className={`stat-card-body block w-full h-full rounded-[15px] ${compact ? 'px-3 py-2.5' : 'p-4'} text-left`}>
         <span className="flex items-center gap-2 pr-6">

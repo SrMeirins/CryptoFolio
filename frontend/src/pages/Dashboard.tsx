@@ -28,7 +28,7 @@ import { FirstUseEmpty } from '../components/FirstUseEmpty'
 import { useHasTransactions } from '../hooks/useHasTransactions'
 import { dashboardSubtitle } from '../utils/panelSubtitles'
 import { useNow } from '../hooks/useNow'
-import { pnlSparkline, returnSparkline, valueSparkline } from '../utils/sparkline'
+import { fieldSparkline, unrealizedSparkline, returnSparkline, valueSparkline } from '../utils/sparkline'
 
 export function Dashboard() {
   const firstUse = useHasTransactions()
@@ -91,10 +91,17 @@ export function Dashboard() {
     () => (preparacion.listo && allPnl?.currency === currency ? valueSparkline(allPnl.days, hasPrices ? totalValue : null) : []),
     [preparacion.listo, allPnl, currency, hasPrices, totalValue],
   )
-  // P&L y Rentabilidad (#412): la misma serie diaria, sin peticiones nuevas.
+  // P&L, Rentabilidad, Coste y EUR neto (#412, #507): la misma serie diaria,
+  // sin peticiones nuevas. Coste y EUR neto vienen de la API, no se aproximan.
   const trendDays = preparacion.listo && allPnl?.currency === currency ? allPnl.days : null
-  const pnlTrend = useMemo(() => (trendDays ? pnlSparkline(trendDays, hasPrices ? totalPnl : null) : []), [trendDays, hasPrices, totalPnl])
+  const pnlTrend = useMemo(() => (trendDays ? unrealizedSparkline(trendDays, hasPrices ? totalPnl : null) : []), [trendDays, hasPrices, totalPnl])
   const returnTrend = useMemo(() => (trendDays ? returnSparkline(trendDays) : []), [trendDays])
+  const costTrend = useMemo(() => (trendDays ? fieldSparkline(trendDays, 'cost', totalCost) : []), [trendDays, totalCost])
+  // El EUR neto de la tarjeta viene en la moneda del flujo de euros: la punta solo si coincide.
+  const eurNetTrend = useMemo(
+    () => (trendDays ? fieldSparkline(trendDays, 'eurNet', eurFlow && eurFlow.currency === currency ? eurFlow.netFromBank : null) : []),
+    [trendDays, eurFlow, currency],
+  )
 
   // Destinos de las tarjetas (#412). Rentabilidad baja al gráfico de evolución
   // y le pasa el foco, para que el teclado y el lector sigan el salto.
@@ -173,11 +180,13 @@ export function Dashboard() {
         change24h={change24h}
         currency={currency}
         assetCount={assetCount}
-        todayPnl={preparacion.listo ? liveToday?.pnl ?? null : null}
+        todayPct={preparacion.listo ? liveToday?.pct ?? null : null}
         todayPending={!preparacion.listo}
         valueTrend={valueTrend}
+        costTrend={costTrend}
         pnlTrend={pnlTrend}
         returnTrend={returnTrend}
+        eurNetTrend={eurNetTrend}
         targets={targets}
         eurFlow={eurFlow}
         valueTooltip={

@@ -33,19 +33,29 @@ export function sparklineChange(values: readonly number[]): number | null {
 }
 
 /**
- * P&L de los últimos `days` días para la mini gráfica de la tarjeta P&L (#412):
- * se reconstruye hacia atrás desde la cifra actual restando el P&L de cada día,
- * así que la punta coincide con la tarjeta. Solo da la forma de la tendencia.
+ * Serie de los últimos `days` días de un campo diario de la API (#507): el
+ * coste o el EUR neto. El día en curso toma la cifra actual de la tarjeta,
+ * para que la punta coincida con ella. Días sin el dato (respuesta antigua)
+ * se omiten.
  */
-export function pnlSparkline(series: readonly { pnl: number }[], current: number | null, days = 30): number[] {
-  if (current === null) return []
-  const tail = series.slice(-days)
-  const out = new Array<number>(tail.length)
-  let acc = current
-  for (let i = tail.length - 1; i >= 0; i--) {
-    out[i] = acc
-    acc -= tail[i].pnl
-  }
+export function fieldSparkline<K extends 'cost' | 'eurNet'>(
+  series: readonly ({ live: boolean } & Partial<Record<K, number>>)[], field: K, current: number | null, days = 30,
+): number[] {
+  const tail = series.slice(-days).filter(d => typeof d[field] === 'number')
+  const out = tail.map(d => d[field] as number)
+  if (tail.length > 0 && tail[tail.length - 1].live && current !== null) out[out.length - 1] = current
+  return out
+}
+
+/**
+ * P&L no realizado de cada día (#507): valor menos coste al cierre, exacto
+ * (antes se reconstruía restando el P&L diario, que incluye lo realizado). El
+ * día en curso toma la cifra actual de la tarjeta.
+ */
+export function unrealizedSparkline(series: readonly { value: number; cost?: number; live: boolean }[], current: number | null, days = 30): number[] {
+  const tail = series.slice(-days).filter(d => typeof d.cost === 'number')
+  const out = tail.map(d => d.value - (d.cost as number))
+  if (tail.length > 0 && tail[tail.length - 1].live && current !== null) out[out.length - 1] = current
   return out
 }
 
