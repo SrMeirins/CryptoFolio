@@ -1,30 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { DailyPnlDay } from '../api/portfolio'
-import { evolutionQuery, formatPointDate, fromDaily, fromIntraday } from './evolutionSeries'
-import { metricFor, periodFrom } from './pnlChart'
+import { formatPointDate, fromDaily, fromIntraday } from './evolutionSeries'
 
-// Periodos del gráfico de evolución (#215).
-const TODAY = '2026-10-15'
-
-describe('periodos', () => {
-  it('24H pide la serie intradía; el resto, la diaria desde su primer día', () => {
-    expect(evolutionQuery('24H', TODAY, null)).toEqual({ intraday: true })
-    expect(evolutionQuery('7D', TODAY, null)).toEqual({ intraday: false, from: '2026-10-09' })
-    expect(evolutionQuery('Todo', TODAY, null)).toEqual({ intraday: false, from: undefined })
-  })
-
-  it('YTD empieza el 1 de enero del año en curso', () => {
-    expect(periodFrom('YTD', TODAY)).toBe('2026-01-01')
-    expect(evolutionQuery('YTD', '2027-01-01', null)).toEqual({ intraday: false, from: '2027-01-01' })
-    expect(metricFor('YTD')).toBe('peakCapital')
-  })
-
-  it('rango personalizado: fechas elegidas, acotadas a hoy y con un solo día si falta el final', () => {
-    expect(evolutionQuery('Rango', TODAY, { from: '2026-03-01', to: '2026-04-15' })).toEqual({ intraday: false, from: '2026-03-01', to: '2026-04-15' })
-    expect(evolutionQuery('Rango', TODAY, { from: '2026-10-01', to: '2026-12-31' })).toEqual({ intraday: false, from: '2026-10-01', to: TODAY })
-    expect(evolutionQuery('Rango', TODAY, { from: '2026-05-05', to: '' })).toEqual({ intraday: false, from: '2026-05-05', to: '2026-05-05' })
-  })
-})
+// Series del gráfico de evolución (#215; los periodos, en rangoGrafico, #508).
 
 describe('serie común de P&L y Valor', () => {
   const day = (date: string, value: number, pnl: number, pct: number, live = false): DailyPnlDay => ({

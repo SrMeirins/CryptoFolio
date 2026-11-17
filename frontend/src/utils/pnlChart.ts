@@ -13,18 +13,6 @@ import { zonedFormat } from './zonedFormat'
 // 15 min); YTD, desde el 1 de enero; Rango, fechas elegidas por el usuario.
 export type PnlPeriod = '24H' | '7D' | '30D' | '90D' | '180D' | '1A' | 'YTD' | 'Todo' | 'Rango'
 
-/** Periodos del selector; «Rango» se elige con el selector de fechas. */
-export const PNL_PERIODS: readonly PnlPeriod[] = ['24H', '7D', '30D', '90D', '180D', '1A', 'YTD', 'Todo']
-
-export const PERIOD_TITLES: Partial<Record<PnlPeriod, string>> = {
-  '24H': 'Últimas 24 horas',
-  YTD: 'Este año, desde el 1 de enero',
-  '1A': 'Último año',
-}
-
-type DayPeriod = '7D' | '30D' | '90D' | '180D' | '1A'
-const PERIOD_DAYS: Record<DayPeriod, number> = { '7D': 7, '30D': 30, '90D': 90, '180D': 180, '1A': 365 }
-
 export interface PnlDay {
   date: string
   pnl: number
@@ -57,14 +45,6 @@ export const METRIC_LABELS: Record<PnlMetric, { short: string; help: string }> =
 /** Día local de hoy en Madrid (YYYY-MM-DD). */
 export function localToday(now: Date = new Date()): string {
   return zonedFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
-}
-
-/** Primer día del periodo (incluido), o undefined para 'Todo' (y para 24H y Rango, que no son por días fijos). */
-export function periodFrom(period: PnlPeriod, today: string): string | undefined {
-  if (period === 'Todo' || period === '24H' || period === 'Rango') return undefined
-  if (period === 'YTD') return `${today.slice(0, 4)}-01-01`
-  const [y, m, d] = today.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, d - (PERIOD_DAYS[period as DayPeriod] - 1))).toISOString().slice(0, 10)
 }
 
 /**

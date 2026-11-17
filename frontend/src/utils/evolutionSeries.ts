@@ -1,5 +1,5 @@
 import type { DailyPnlDay } from '../api/portfolio'
-import { buildPnlSeries, periodFrom, type PnlPeriod } from './pnlChart'
+import { buildPnlSeries, type PnlPeriod } from './pnlChart'
 import { dayMs } from './chartAxes'
 import { zonedFormat } from './zonedFormat'
 
@@ -20,18 +20,6 @@ export interface EvolutionPoint {
 
 export interface IntradayPoint {
   at: string; value: number; pnl: number; pct: number; stepPct: number | null; capitalIn: number; capitalOut: number; live: boolean
-}
-
-export type EvolutionQuery = { intraday: true } | { intraday: false; from?: string; to?: string }
-
-/** Qué pedir al servidor para un periodo. El rango se acota a hoy (el servidor rechaza fechas futuras). */
-export function evolutionQuery(period: PnlPeriod, today: string, range: { from: string; to: string } | null): EvolutionQuery {
-  if (period === '24H') return { intraday: true }
-  if (period === 'Rango' && range?.from) {
-    const clamp = (d: string) => (d > today ? today : d)
-    return { intraday: false, from: clamp(range.from), to: clamp(range.to || range.from) }
-  }
-  return { intraday: false, from: periodFrom(period, today) }
 }
 
 export function fromDaily(days: readonly DailyPnlDay[], period: PnlPeriod): EvolutionPoint[] {

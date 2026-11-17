@@ -114,20 +114,20 @@ test('zoom: rueda, arrastre, teclado y volver a la vista inicial', async ({ page
   await abrir(page)
   const panel = page.getByRole('dialog')
   const grafico = panel.getByTestId('grafico-precio')
-  const todo = panel.getByRole('radio', { name: 'Desde la primera compra' })
+  const todo = panel.getByRole('radio', { name: 'Toda la historia' })
   await expect(todo).toHaveAttribute('aria-checked', 'true')
   const box = (await grafico.boundingBox())!
   await page.mouse.move(box.x + box.width * 0.7, box.y + box.height / 2)
   for (let i = 0; i < 4; i++) await page.mouse.wheel(0, -200)
   // Zoom libre: ningún rango rápido activo y el tramo visible con sus fechas.
   await expect(todo).toHaveAttribute('aria-checked', 'false')
-  await expect(panel.getByText(/^Del .+ al .+$/)).toBeVisible()
-  const antes = await panel.getByText(/^Del .+ al .+$/).textContent()
+  await expect(panel.getByText(/^(Del .+ al .+|Desde el .+ hasta hoy)$/)).toBeVisible()
+  const antes = await panel.getByText(/^(Del .+ al .+|Desde el .+ hasta hoy)$/).textContent()
   // Arrastrar desplaza el tramo.
   await page.mouse.down()
   await page.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2, { steps: 5 })
   await page.mouse.up()
-  await expect(panel.getByText(/^Del .+ al .+$/)).not.toHaveText(antes!)
+  await expect(panel.getByText(/^(Del .+ al .+|Desde el .+ hasta hoy)$/)).not.toHaveText(antes!)
   // El panel no se ha desplazado con la rueda.
   await expect(panel.getByRole('heading', { level: 2 })).toBeInViewport()
   await panel.getByRole('button', { name: 'Restablecer la vista del gráfico' }).click()

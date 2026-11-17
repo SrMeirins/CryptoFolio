@@ -1,17 +1,19 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { PnlChart, type PnlUnit } from './PnlChart'
 import { ValueChart } from './ValueChart'
 import { EvolutionSummary } from './EvolutionSummary'
 import { CalendarDayDetail } from './calendar/CalendarDayDetail'
-import { DateRangePicker } from '../../components/DateRangePicker'
+import { RangeSelector } from '../../components/RangeSelector'
+import { useRangoUrl } from '../../hooks/useRangoUrl'
+import { resolverRango, serializarRango, textoRango, type RangoPreset, type RangoValor } from '../../utils/rangoGrafico'
 import { SegmentedControl, PanelHeader, panelSurface, RefreshBar } from '../../components/ui'
 import { useCurrencyQuery } from '../../hooks/useCurrencyQuery'
 import { usePreparacionHistoricos } from '../../hooks/usePreparacionHistoricos'
 import { PreparandoHistoricos } from '../../components/PreparandoHistoricos'
 import { useLiveDayPnl } from '../../hooks/useLiveDayPnl'
 import { dailyPnlQuery, intradayPnlQuery } from '../../queries/currencyQueries'
-import { METRIC_LABELS, PERIOD_TITLES, PNL_PERIODS, localToday, metricFor, type PnlPeriod } from '../../utils/pnlChart'
-import { evolutionQuery, fromDaily, fromIntraday } from '../../utils/evolutionSeries'
+import { METRIC_LABELS, localToday, metricFor } from '../../utils/pnlChart'
+import { fromDaily, fromIntraday } from '../../utils/evolutionSeries'
 import { applyLiveToday, periodSummary } from '../../utils/evolutionSummary'
 import { evolutionSubtitle } from '../../utils/panelSubtitles'
 import { LineChart } from 'lucide-react'
@@ -21,8 +23,13 @@ import { formatPercent } from '../../utils/format'
 // acumulada, por defecto) y pestaña Valor (valor de la cartera). Desde #215
 // ambas comparten periodo (24H, 7D…Todo y rango personalizado) y la misma
 // consulta, así que cambiar de pestaña es inmediato y conserva el periodo.
+// Desde #508 el rango es el selector común de los gráficos, guardado en la
+// URL (?evolucion=30d o ?evolucion=2025-01-01_2025-12-31).
 
 type Tab = 'pnl' | 'value'
+
+const PRESETS: readonly RangoPreset[] = ['24h', '7d', '30d', '90d', '6m', '1a', 'anio', 'todo']
+const DEFECTO: RangoValor = { tipo: 'preset', preset: 'todo' }
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'pnl', label: 'P&L' },
@@ -31,13 +38,17 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function EvolutionCard() {
   const [tab, setTab] = useState<Tab>('pnl')
-  const [period, setPeriod] = useState<PnlPeriod>('Todo')
-  const [range, setRange] = useState<{ from: string; to: string } | null>(null)
+  const [rango, setRango] = useRangoUrl('evolucion', PRESETS, DEFECTO)
+  const panelRef = useRef<HTMLDivElement>(null)
   const [unit, setUnit] = useState<PnlUnit>('pct')
   // Día del mejor o peor resultado cuyo detalle se muestra bajo el resumen (#250).
   const [openDay, setOpenDay] = useState<{ day: string; key: string } | null>(null)
   const today = localToday()
-  const query = evolutionQuery(period, today, range)
+  // Días que se piden: «Todo» desde la primera actividad; los predefinidos, hasta hoy en vivo.
+  const resuelto = resolverRango(rango, today)
+  const query = resuelto.intradia
+    ? { intraday: true as const }
+    : { intraday: false as const, from: rango.tipo === 'preset' && rango.preset === 'todo' ? undefined : resuelto.from, to: rango.tipo === 'rango' ? resuelto.to : undefined }
 
   // Mientras el servidor descarga cierres se reconsulta cada 5 s; después, cada minuto.
   const daily = useCurrencyQuery(
@@ -48,41 +59,33 @@ export function EvolutionCard() {
   const active = query.intraday ? intraday : daily
   const currency = active.data?.currency ?? active.currency
 
-  const metric = metricFor(period)
+  const metric = metricFor('Todo')
+  // Dependencias primitivas: el rango se lee de la URL en cada render.
+  const intradia = serializarRango(rango) === '24h'
   const series = useMemo(
-    () => (query.intraday ? fromIntraday(intraday.data?.points ?? []) : fromDaily(daily.data?.days ?? [], period)),
-    [query.intraday, intraday.data, daily.data, period],
+    () => (intradia ? fromIntraday(intraday.data?.points ?? []) : fromDaily(daily.data?.days ?? [], 'Todo')),
+    [intradia, intraday.data, daily.data],
   )
   // El día de hoy se mueve con los precios en vivo (#213, #214).
   const liveToday = useLiveDayPnl(query.intraday ? null : daily.data?.today, currency)
   const points = useMemo(() => applyLiveToday(series, liveToday, metric), [series, liveToday, metric])
-  const summary = useMemo(() => periodSummary(points, query.intraday), [points, query.intraday])
+  const summary = useMemo(() => periodSummary(points, intradia), [points, intradia])
   const valueChange = points.length >= 2 ? points[points.length - 1].value - points[0].value : null
   const labels = METRIC_LABELS[metric]
   // TWR del periodo como dato técnico en la ayuda (#353).
   const twrPct = active.data?.twrPct ?? null
   const approximate = query.intraday ? intraday.data?.approximate ?? [] : []
   const preparacion = usePreparacionHistoricos()
-  const animationKey = `${period}-${range?.from ?? ''}-${range?.to ?? ''}-${tab}-${unit}`
-  // Al cambiar de periodo o de rango el detalle abierto deja de aplicar.
-  const periodKey = `${period}-${range?.from ?? ''}-${range?.to ?? ''}`
+  const periodKey = serializarRango(rango)
+  const animationKey = `${periodKey}-${tab}-${unit}`
+  // Al cambiar de rango el detalle abierto deja de aplicar.
   const detailDay = openDay?.key === periodKey ? openDay.day : null
   const toggleDay = (day: string) => setOpenDay(o => (o?.day === day && o.key === periodKey ? null : { day, key: periodKey }))
-
-  function pickRange(from: string, to: string) {
-    if (!from && !to) {
-      setRange(null)
-      if (period === 'Rango') setPeriod('Todo')
-      return
-    }
-    setRange({ from, to })
-    setPeriod('Rango')
-  }
 
   const state = { loading: active.isLoading, error: active.isError, onRetry: () => void active.refetch(), intraday: query.intraday, currency, points, animationKey }
 
   return (
-    <div className={panelSurface('none', 'relative px-5 py-5')} aria-busy={active.isPlaceholderData || undefined}>
+    <div ref={panelRef} className={panelSurface('none', 'relative px-5 py-5')} aria-busy={active.isPlaceholderData || undefined}>
       {/* Cambio de periodo (#494): la curva anterior sigue visible y una barra indica la recarga.
           Las reconsultas periódicas de fondo no la encienden. */}
       <RefreshBar active={active.isPlaceholderData} />
@@ -90,25 +93,13 @@ export function EvolutionCard() {
         icon={LineChart}
         title="Evolución"
         className="mb-3"
-        subtitle={evolutionSubtitle(period, series[0]?.x ?? null, range)}
+        subtitle={rango.tipo === 'preset' && rango.preset === 'todo' ? evolutionSubtitle('Todo', series[0]?.x ?? null, null)
+          : rango.tipo === 'preset' && rango.preset === '24h' ? 'Últimas 24 horas, cada 15 min' : textoRango(rango, today)}
         // Nivel 3 de la norma de selección (#492): opción del panel, sin URL.
         extra={<SegmentedControl label="Curva de evolución" variant="accent" value={tab} onChange={setTab}
           options={TABS.map(t => ({ value: t.id, label: t.label }))} />}
-        actions={<>
-          {/* En pantallas estrechas (#499) los periodos se desplazan dentro de su caja en vez de ensanchar la página. */}
-          <div className="max-w-full overflow-x-auto py-0.5">
-            <SegmentedControl label="Periodo del gráfico de evolución" variant="accent" value={period} onChange={p => { setPeriod(p); setRange(null) }}
-              options={PNL_PERIODS.map(p => ({ value: p, label: p, title: PERIOD_TITLES[p] }))} />
-          </div>
-          <DateRangePicker
-            placeholder="Rango"
-            align="right"
-            max={today}
-            from={period === 'Rango' ? range?.from ?? '' : ''}
-            to={period === 'Rango' ? range?.to ?? '' : ''}
-            onChange={pickRange}
-          />
-        </>}
+        actions={<RangeSelector value={rango} onChange={setRango} presets={PRESETS} defecto={DEFECTO}
+          minDate={daily.data?.from ?? null} label="gráfico de evolución" scopeRef={panelRef} primario />}
       />
 
       <div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPnlSeries, localToday, metricFor, periodFrom, type PnlDay } from './pnlChart'
+import { buildPnlSeries, localToday, metricFor, type PnlDay } from './pnlChart'
 
 const day = (date: string, pnl: number, twr: number, cap: number, live = false): PnlDay =>
   ({ date, pnl, cumulativePct: twr, cumulativePeakCapitalPct: cap, complete: true, live })
@@ -10,22 +10,6 @@ describe('localToday', () => {
     expect(localToday(new Date('2026-10-08T23:30:00Z'))).toBe('2026-10-09')
     // 23:30 UTC del 8 de enero = 00:30 del 9 en Madrid (CET)
     expect(localToday(new Date('2026-01-08T23:30:00Z'))).toBe('2026-01-09')
-  })
-})
-
-describe('periodFrom', () => {
-  it('incluye el día de hoy en el número de días del periodo', () => {
-    expect(periodFrom('7D', '2026-10-08')).toBe('2026-10-02')
-    expect(periodFrom('30D', '2026-10-08')).toBe('2026-09-09')
-    expect(periodFrom('1A', '2026-10-08')).toBe('2025-10-09')
-  })
-
-  it('cruza correctamente fin de mes y de año', () => {
-    expect(periodFrom('7D', '2026-01-03')).toBe('2025-12-28')
-  })
-
-  it("'Todo' no tiene fecha de inicio", () => {
-    expect(periodFrom('Todo', '2026-10-08')).toBeUndefined()
   })
 })
 

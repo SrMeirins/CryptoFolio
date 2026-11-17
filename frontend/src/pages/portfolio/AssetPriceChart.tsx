@@ -1,19 +1,22 @@
-import { useId, useMemo } from 'react'
+import { useId, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot, ResponsiveContainer, Customized } from 'recharts'
 import { Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
 import { pricesApi } from '../../api/prices'
 import type { AssetSale, ClosedBuy } from '../../api/portfolio'
 import { LiveDot } from '../dashboard/LiveDot'
-import { Dropdown, Hint, iconButtonClasses, SegmentedControl, Skeleton, QueryError } from '../../components/ui'
+import { Dropdown, Hint, iconButtonClasses, Skeleton, QueryError } from '../../components/ui'
 import { useChartColors } from '../../hooks/useChartColors'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { useChartZoom } from '../../hooks/useChartZoom'
 import { useMarcasGrafico } from '../../hooks/useMarcasGrafico'
 import { formatAmount, formatPercent, formatPrice, type Currency } from '../../utils/format'
 import { zeroSplit } from '../../utils/zeroSplit'
-import { axisPrice, chartMarkers, labelSide, operationDays, priceSeries, rangeDays, rangeStats, samplePoints, type ChartMarker, type ChartPoint, type ChartRange } from '../../utils/assetPriceChart'
-import { esCompleta, puntosEnVentana, rangoDeVentana, ventanaRango } from '../../utils/chartZoom'
+import { axisPrice, chartMarkers, labelSide, operationDays, priceSeries, rangeDays, rangeStats, samplePoints, type ChartMarker, type ChartPoint } from '../../utils/assetPriceChart'
+import { esCompleta, puntosEnVentana, rangoAVentana, ventanaARango } from '../../utils/chartZoom'
+import { RangeSelector } from '../../components/RangeSelector'
+import { useRangoUrl } from '../../hooks/useRangoUrl'
+import { hoyApp, textoRango, type RangoPreset, type RangoValor } from '../../utils/rangoGrafico'
 import { MARCAS_OPCIONES, type MarcasGrafico } from '../../utils/graficoMarcas'
 import { zonedFormat } from '../../utils/zonedFormat'
 import { NavegadorPrecio } from './detalle/NavegadorPrecio'
@@ -27,12 +30,10 @@ import { FRANJA_BANDERAS, MarcasBanderas } from './detalle/MarcasBanderas'
 // el cursor, arrastrar para desplazar, navegador con toda la historia,
 // teclado y botones; «Restablecer» y el doble clic vuelven a la vista inicial.
 
-const RANGES: { value: ChartRange; label: string; title: string; phrase: string }[] = [
-  { value: '30d', label: '30 d', title: 'Últimos 30 días', phrase: 'en los últimos 30 días' },
-  { value: '90d', label: '90 d', title: 'Últimos 90 días', phrase: 'en los últimos 90 días' },
-  { value: '1y', label: '1 a', title: 'Último año', phrase: 'en el último año' },
-  { value: 'all', label: 'Todo', title: 'Desde la primera compra', phrase: 'desde la primera compra' },
-]
+// Rangos del selector común (#508); el zoom es un rango personalizado y se
+// guarda en la URL (?rango-activo=).
+const PRESETS: readonly RangoPreset[] = ['7d', '30d', '90d', '6m', '1a', 'anio', 'todo']
+const TODO: RangoValor = { tipo: 'preset', preset: 'todo' }
 // Posición de la etiqueta de máximo/mínimo según su lado (no se corta en los bordes).
 const SIDE_POSITION = {
   top: { left: 'insideTopRight', right: 'insideTopLeft', center: 'top' },
@@ -136,8 +137,14 @@ export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice,
     [data, asset, livePriceEur, rate],
   )
   const extent = full.length > 1 ? { from: full[0].t, to: full[full.length - 1].t } : null
-  const { v, containerRef, arrastrando, setVentana, reset, acercar, alejar, handlers } = useChartZoom(extent, INSET)
-  const rango = v && extent ? rangoDeVentana(v, extent) : 'all'
+  const [rango, setRango] = useRangoUrl('rango-activo', PRESETS, TODO)
+  const today = hoyApp()
+  const panelRef = useRef<HTMLDivElement>(null)
+  const { v, containerRef, arrastrando, setVentana, reset, acercar, alejar, handlers } = useChartZoom(extent, INSET, {
+    ventana: rangoAVentana(rango, today),
+    set: w => { if (extent) setRango(ventanaARango(w, extent)) },
+  })
+  const textoTramo = textoRango(rango, today)
   // Límites de la ventana como primitivas: las dependencias de los useMemo no cambian por identidad.
   const vf = v?.from ?? 0
   const vt = v?.to ?? 0
@@ -157,8 +164,8 @@ export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice,
 
   const header = (
     <div className="flex items-center justify-between gap-2 flex-wrap">
-      <SegmentedControl options={RANGES} value={(rango ?? '') as ChartRange} label="Rango del gráfico de precio"
-        onChange={r => extent && setVentana(r === 'all' ? null : ventanaRango(r, extent))} />
+      <RangeSelector value={rango} onChange={setRango} presets={PRESETS} defecto={TODO}
+        minDate={firstOpenedAt?.slice(0, 10) ?? null} label="gráfico de precio" scopeRef={panelRef} />
       <div className="flex items-center gap-1">
         <Hint label="Acercar (+ o rueda del ratón)">
           <button type="button" onClick={acercar} disabled={!v} className={iconButtonClasses('sm')} aria-label="Acercar el gráfico">
@@ -200,8 +207,7 @@ export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice,
   const first = points.find(p => p.t >= v.from) ?? points[0]
   const last = [...points].reverse().find(p => p.t <= v.to) ?? points[points.length - 1]
   const changePct = first.price > 0 ? ((last.price - first.price) / first.price) * 100 : null
-  const phrase = rango ? RANGES.find(r => r.value === rango)?.phrase : `del ${fmtDayYear(v.from)} al ${fmtDayYear(v.to)}`
-  const label = `Precio de ${asset} ${phrase}: de ${formatPrice(first.price, currency)} a ${formatPrice(last.price, currency)}. Usa más y menos para acercar o alejar, las flechas para desplazarte e Inicio para volver a la vista inicial.`
+  const label = `Precio de ${asset}, ${textoTramo.toLowerCase()}: de ${formatPrice(first.price, currency)} a ${formatPrice(last.price, currency)}. Usa más y menos para acercar o alejar, las flechas para desplazarte e Inicio para volver a la vista inicial.`
   const liveVisible = livePriceEur !== undefined && v.to >= extent.to - 43_200_000
   const etiqueta = (m: ChartMarker) => `${MARKER_LABEL[m.kind]} · ${fmtDayYear(m.t)} · ${formatAmount(m.quantity)} a ${formatPrice(m.price, currency)}`
   const margin = {
@@ -211,10 +217,10 @@ export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice,
   }
 
   return (
-    <div className="space-y-2">
+    <div ref={panelRef} className="space-y-2">
       {header}
       <div className="flex items-center justify-between gap-2 text-[11px] text-fg-subtle">
-        <span>{rango ? RANGES.find(r => r.value === rango)?.title : `Del ${fmtDayYear(v.from)} al ${fmtDayYear(v.to)}`}</span>
+        <span>{textoTramo}</span>
         {changePct !== null && (
           <span className={`mono tabular-nums ${changePct >= 0 ? 'text-positive-ink' : 'text-negative-ink'}`}>
             {formatPercent(changePct, 1, true)} en el tramo visible
