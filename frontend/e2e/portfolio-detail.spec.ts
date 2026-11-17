@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { axeEstable } from './axe'
 
 // Detalle de un activo en Portfolio (#460): se abre desde «Por activo», «Por
-// wallet» y Polvo, con ratón y con teclado. Solo lectura.
+// wallet» y los saldos residuales, con ratón y con teclado. Solo lectura.
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 
@@ -35,14 +35,20 @@ test('detalle desde la vista «Por wallet», también con teclado', async ({ pag
   await expect(page.getByRole('dialog')).toBeVisible()
 })
 
-test('detalle desde Polvo', async ({ page }) => {
+test('detalle desde los saldos residuales', async ({ page }) => {
   await page.goto('/portfolio')
-  const polvo = page.getByRole('region', { name: 'Polvo' })
-  await polvo.waitFor({ timeout: 15_000 }).catch(() => {})
-  test.skip(await polvo.count() === 0, 'Sin polvo en estos datos')
-  const toggle = polvo.getByRole('button', { expanded: false })
-  if (await toggle.count()) await toggle.first().click()
-  await openFromRow(page, polvo)
+  const restos = page.getByRole('region', { name: 'Saldos residuales' })
+  await restos.waitFor({ timeout: 15_000 }).catch(() => {})
+  test.skip(await restos.count() === 0, 'Sin saldos residuales en estos datos')
+  const mostrar = restos.getByRole('button', { name: 'Mostrar restos' })
+  if (await mostrar.count()) await mostrar.click()
+  const ficha = restos.getByRole('button', { name: /^Ver detalle de / }).first()
+  const asset = (await ficha.getAttribute('aria-label'))!.match(/^Ver detalle de (\S+)/)![1]
+  await ficha.click()
+  const panel = page.getByRole('dialog')
+  await expect(panel.getByRole('heading', { name: asset, exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(panel).toHaveCount(0)
 })
 
 test('las tarjetas de wallet y las filas no comparten nombre accesible', async ({ page }) => {

@@ -24,9 +24,9 @@ async function withConfig(page: Page, preset: Record<string, string>) {
 const dustCount = async (page: Page) => {
   await page.goto('/portfolio')
   await page.getByRole('region', { name: 'Posiciones' }).waitFor({ timeout: 15_000 })
-  const polvo = page.getByRole('region', { name: 'Polvo' })
-  if (await polvo.count() === 0) return 0
-  return Number((await polvo.getByText(/posici(ón|ones)/).innerText()).match(/^(\d+)/)![1])
+  const restos = page.getByRole('region', { name: 'Saldos residuales' })
+  if (await restos.count() === 0) return 0
+  return Number((await restos.getByTestId('restos-recuento').innerText()).match(/^(\d+)/)![1])
 }
 
 test('el umbral de polvo cambia lo que Portfolio agrupa como polvo', async ({ page }) => {
@@ -67,7 +67,7 @@ test('las preferencias se guardan al momento con Deshacer', async ({ page }) => 
   await withConfig(page, {})
   await page.goto('/settings?tab=general')
   const card = page.getByRole('region', { name: 'Preferencias' })
-  const polvo = card.getByLabel('Umbral de polvo')
+  const polvo = card.getByLabel('Umbral de saldos residuales')
   await polvo.fill('2,5')
   await polvo.press('Enter')
   const toast = page.getByRole('status').filter({ hasText: 'Guardado' })

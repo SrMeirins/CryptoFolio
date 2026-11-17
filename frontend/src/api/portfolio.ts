@@ -14,6 +14,21 @@ import type {
 // tal cual /fifo/run y, anidado bajo `fifo`, los 3 endpoints de transacción
 // manual — antes había 3 copias inline de esta forma en este fichero, una de
 // ellas (deleteManualTx) desincronizada (solo 2 de los 4 campos reales).
+/** Conversión de restos (#530): varios restos de una wallet a otro activo, una permuta por resto. */
+export interface ConversionRestos {
+  walletId: string
+  timestamp: string
+  recibido: string
+  items: { asset: string; cantidad: number; recibido: number }[]
+}
+
+export interface ConversionRestosPreview {
+  recibido: string
+  precioRecibidoEur: number | null
+  items: { asset: string; cantidad: number; recibido: number; proceedsEur: number | null; costEur: number | null; gainLossEur: number | null }[]
+  totalGainLossEur: number | null
+}
+
 export interface FifoRunResult {
   lotsCreated:  number
   lotsConsumed: number
@@ -819,6 +834,10 @@ export const portfolioApi = {
   // cuando el recálculo FIFO falla, y en ese caso viene también `fifoError`
   // con el motivo (antes ninguno de los 3 tipos declaraba `fifoError`, así
   // que ese fallo se perdía en silencio para quien llamaba).
+  previewConversionRestos: (data: ConversionRestos) =>
+    api.post<ConversionRestosPreview>('/v1/transactions/conversion-restos/preview', data),
+  createConversionRestos: (data: ConversionRestos) =>
+    api.post<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>('/v1/transactions/conversion-restos', data),
   createManualTx: (data: Record<string, unknown>) =>
     api.post<{ success: boolean; fifo: FifoRunResult | null; fifoError?: string }>('/transactions/manual', data),
   updateManualTx: (id: string, data: Record<string, unknown>) =>

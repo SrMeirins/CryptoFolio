@@ -22,7 +22,8 @@ describe('isSearchShortcut', () => {
 describe('preferencias sin almacenamiento disponible', () => {
   it('valores por defecto y guardar no falla', () => {
     expect(readDensity()).toBe('comfortable')
-    expect(readDustOpen()).toBe(false)
+    // Sin elegir: null (Portfolio decide según haya o no posiciones principales, #530).
+    expect(readDustOpen()).toBeNull()
     expect(readView()).toBe('asset')
     expect(() => { saveDensity('compact'); saveDustOpen(true); saveView('wallet') }).not.toThrow()
   })

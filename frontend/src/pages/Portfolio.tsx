@@ -98,7 +98,8 @@ export function Portfolio() {
   const [detailOrder, setDetailOrder] = useState<readonly string[] | null>(null)
   const openDetail = (asset: string, order?: readonly string[]) => { setDetailAsset(asset); setDetailOrder(order ?? null) }
   const [density, setDensity] = useState<Density>(readDensity)
-  const [dustOpen, setDustOpen] = useState(readDustOpen)
+  // null: sin elegir; entonces se abren solos si no hay posiciones principales (#530).
+  const [dustChoice, setDustChoice] = useState(readDustOpen)
   // Wallet elegida en las tarjetas (#270, #525): el único filtro por wallet,
   // en la URL (?wallet=<id>, también desde Ajustes, #448); solo un UUID.
   const walletFilter = walletParam(params.get('wallet'))
@@ -190,12 +191,14 @@ export function Portfolio() {
   const hasPrices = Object.keys(market.prices).length > 0
   const walletCount = new Set(lots.map(l => l.wallet_id)).size
   const assetsTotal = new Set(lots.map(l => l.asset)).size
-  // El polvo no se filtra por resultado: sus importes son irrelevantes.
+  // Los saldos residuales no se filtran por resultado: sus importes son irrelevantes.
   const dust = view === 'asset'
     ? { rows: pnlFilter === 'all' ? byAsset.dust : [], value: byAsset.dustValue }
     : { rows: pnlFilter === 'all' ? filtered.dust : [], value: filtered.dustValue }
   const mainCount = view === 'asset' ? assetRows.length : walletSections.length
   const nothingFound = mainCount === 0 && dust.rows.length === 0
+  // Elección del usuario (Ocultar o Mostrar restos) o, sin elegir, abiertos si no hay nada más.
+  const dustOpen = dustChoice ?? (mainCount === 0 && dust.rows.length > 0)
   const filtersActive = !!search || !!walletFilter || pnlFilter !== 'all' || activos.length > 0
   const walletOptions = [{ value: '', label: 'Todas las wallets' }, ...inventory.wallets.map(w => ({ value: w.walletId, label: w.name }))]
   // Resumen de los filtros activos para el vacío por filtros (#496).
@@ -216,9 +219,11 @@ export function Portfolio() {
   const visibles = displayLots.filter(l => l.asset.includes(q) && (!walletFilter || l.wallet_id === walletFilter) && (activos.length === 0 || activos.includes(l.asset)))
   const activosVisibles = new Set(visibles.map(l => l.asset)).size
   const walletsVisibles = new Set(visibles.map(l => l.wallet_id)).size
+  // Activos de la cartera para sugerir el recibido al convertir restos (#530).
+  const sugerenciasRecibido = [...new Set(['BNB', ...displayLots.map(l => l.asset)])].sort()
   function abrirResiduales() {
     if (!dustOpen) toggleDust()
-    requestAnimationFrame(() => document.querySelector('section[aria-label="Polvo"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    requestAnimationFrame(() => document.querySelector('section[aria-label="Saldos residuales"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
   function changeView(next: PortfolioView) {
@@ -233,7 +238,7 @@ export function Portfolio() {
 
   function toggleDust() {
     const next = !dustOpen
-    setDustOpen(next)
+    setDustChoice(next)
     saveDustOpen(next)
   }
 
@@ -383,9 +388,8 @@ export function Portfolio() {
             <WalletSections sections={walletSections} total={all.total} compact={compact}
               onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} onOpen={openDetail} />
           )}
-          <DustSection rows={dust.rows} value={dust.value} total={all.total} threshold={market.dustThreshold}
-            compact={compact} open={dustOpen || (mainCount === 0 && dust.rows.length > 0)} onToggle={toggleDust}
-            index={mainCount + 1} onOpen={openDetail} />
+          <DustSection rows={dust.rows} value={dust.value} open={dustOpen} onToggle={toggleDust}
+            index={mainCount + 1} onOpen={openDetail} sugerencias={sugerenciasRecibido} />
         </>
       )}
 
