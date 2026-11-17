@@ -259,3 +259,28 @@ describe('getDailyPnl — flujos de capital y rendimiento', () => {
     }
   });
 });
+
+describe('getDailyPnl — coste y EUR neto de cada día (#507)', () => {
+  const byDate = (r: Awaited<ReturnType<typeof getDailyPnl>>) => Object.fromEntries(r.days.map(d => [d.date, d]));
+
+  it('coste de lo abierto al cierre y depósitos menos retiradas a banco acumulados', async () => {
+    await reset();
+    await tx('DEPOSIT_FIAT', '2026-02-01T10:00:00Z', 'EUR', 1000);
+    await tx('BUY', '2026-02-01T12:00:00Z', 'XRP', 400, { cost_asset: 'EUR', cost_amount: 400 });
+    await tx('BUY', '2026-02-02T12:00:00Z', 'XRP', 100, { cost_asset: 'EUR', cost_amount: 200 });
+    // Traspaso a otra wallet: el lote destino conserva la fecha de compra, pero el coste total no cambia.
+    await tx('WITHDRAW', '2026-02-03T09:00:00Z', 'XRP', 300, { destination_wallet_id: external });
+    // Venta del primer lote (FIFO): el coste baja lo consumido.
+    await tx('SELL', '2026-02-04T10:00:00Z', 'XRP', 50, { cost_asset: 'EUR', cost_amount: 60 });
+    await tx('WITHDRAW_FIAT', '2026-02-05T10:00:00Z', 'EUR', 250);
+    await closes('XRP', { '2026-01-31': 1, '2026-02-01': 1, '2026-02-02': 1, '2026-02-03': 1, '2026-02-04': 1, '2026-02-05': 1 });
+    await runFifoEngine();
+
+    const d = byDate(await getDailyPnl({ from: '2026-02-01', to: '2026-02-05' }));
+    expect(['2026-02-01', '2026-02-02', '2026-02-03', '2026-02-04', '2026-02-05'].map(k => d[k].cost)).toEqual([400, 600, 600, 550, 550]);
+    expect(['2026-02-01', '2026-02-02', '2026-02-03', '2026-02-04', '2026-02-05'].map(k => d[k].eurNet)).toEqual([1000, 1000, 1000, 1000, 750]);
+    // El último día coincide con el coste de los lotes abiertos (la tarjeta Coste).
+    const abiertos = parseFloat((await db.query(`SELECT COALESCE(SUM(cost_basis_eur), 0) AS c FROM fifo_lots WHERE is_closed = FALSE AND quantity_remaining > 0`)).rows[0].c);
+    expect(d['2026-02-05'].cost).toBeCloseTo(abiertos, 2);
+  });
+});

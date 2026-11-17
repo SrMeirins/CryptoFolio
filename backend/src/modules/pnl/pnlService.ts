@@ -1,6 +1,7 @@
 import { loadPositionEvents, holdingsAtInstants } from './positions';
 import { loadCapitalFlows } from './capitalFlows';
 import { computeDailyPnl, valueHoldings, type DayPnl, type DayValuation } from './dailyPnl';
+import { costeYNetoEn } from './costeYNeto';
 import {
   closeInstant, daysBetween, getCachedCloses, localDateOf, prefetchCloseRange,
 } from '../prices/closePrices';
@@ -153,12 +154,15 @@ export async function getDailyPnl(
 
   // ── Valoración y P&L ──
   const valueAt = (i: number) => valueHoldings(holdings[i], a => priceOf(a, i), fxAt(i) ?? 0).value;
+  // Coste y EUR neto de cada cierre (#507), para las tarjetas del Dashboard.
+  const { coste, eurNeto } = await costeYNetoEn(instants, currency, allDays.map((_, i) => fxAt(i)));
   const valuations: DayValuation[] = allDays.slice(1).map((date, k) => {
     const i = k + 1;
     return {
       date, value: valueAt(i), inflow: inflow[i], outflow: outflow[i], netCapitalFlow: netCapitalFlow[i],
       capitalIn: capitalIn[i], capitalOut: capitalOut[i],
       complete: !pendingDay[i], live: date === today,
+      cost: coste[i], eurNet: eurNeto[i],
     };
   });
   const { days, totalPnl, twrPct, dietzPct, peakCapitalPct } = computeDailyPnl(valueAt(0), valuations);

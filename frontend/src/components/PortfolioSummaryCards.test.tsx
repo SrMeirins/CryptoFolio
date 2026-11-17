@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { PortfolioSummaryCards } from './PortfolioSummaryCards'
+import { setAmountsHidden } from '../utils/format'
 
 // Tarjetas de resumen del Dashboard con StatCard (#412). Datos sintéticos.
 const noop = () => {}
@@ -38,13 +39,35 @@ describe('PortfolioSummaryCards (#412)', () => {
     expect(html).not.toContain('depositado')
   })
 
-  it('mini gráficas en Valor, P&L y Rentabilidad; ni en Coste ni en EUR neto', () => {
+  it('mini gráficas en las cinco con sus series; Coste y EUR neto no dependen de los precios (#507)', () => {
     expect(render().match(/<svg viewBox="0 0 100 28"/g)).toHaveLength(3)
-    expect(render({ hasPrices: false }).match(/<svg viewBox="0 0 100 28"/g)).toBeNull()
+    const conTodas = { costTrend: [5, 6], eurNetTrend: [7, 7] }
+    expect(render(conTodas).match(/<svg viewBox="0 0 100 28"/g)).toHaveLength(5)
+    expect(render({ ...conTodas, hasPrices: false }).match(/<svg viewBox="0 0 100 28"/g)).toHaveLength(2)
   })
 
-  it('chip Hoy en P&L con el dato del día', () => {
-    expect(render({ todayPnl: 12.3 })).toContain('Hoy')
+  it('tres huecos en las cinco: sin chip o sin serie, el hueco queda reservado (#507)', () => {
+    const html = render({ change24h: undefined, hasPrices: false })
+    // Sin precios ni dato de hoy: faltan los chips de Valor, P&L y Rentabilidad y las cinco series.
+    expect(html.match(/data-slot="chip"/g)).toHaveLength(3)
+    expect(html.match(/data-slot="serie"/g)).toHaveLength(5)
+  })
+
+  it('chips de contexto: activos, % del P&L, Hoy en Rentabilidad y retirado (#507)', () => {
+    const html = render({ todayPct: 0.8 })
+    expect(html).toContain('3 activos')
+    expect(html).toMatch(/\+20,00\s?%/)
+    expect(html).toContain('Hoy')
+    expect(html).toMatch(/Retirado 100,00\s€/)
     expect(render()).not.toContain('>Hoy<')
+  })
+
+  it('con la privacidad, ningún importe en tarjetas ni chips; los porcentajes, sí (#507)', () => {
+    setAmountsHidden(true)
+    try {
+      const html = render({ todayPct: 0.8, costTrend: [5, 6], eurNetTrend: [7, 7] })
+      for (const importe of ['1.200', '1.000', '200,00', '800,00', '100,00']) expect(html).not.toContain(importe)
+      expect(html).toMatch(/\+20,00\s?%/)
+    } finally { setAmountsHidden(false) }
   })
 })

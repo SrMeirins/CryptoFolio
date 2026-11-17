@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pnlSparkline, returnSparkline, sparklineChange, sparklinePoints, valueSparkline } from './sparkline'
+import { fieldSparkline, returnSparkline, sparklineChange, sparklinePoints, unrealizedSparkline, valueSparkline } from './sparkline'
 
 // Mini-gráfico de la tarjeta «Valor» (#251).
 const day = (i: number, value: number, live = false) => ({ date: `2026-01-${String(i).padStart(2, '0')}`, value, live })
@@ -35,17 +35,19 @@ describe('sparklineChange', () => {
 })
 
 describe('mini gráficas de P&L y rentabilidad (#412)', () => {
-  it('P&L: se reconstruye hacia atrás y la punta es la cifra actual', () => {
-    expect(pnlSparkline([{ pnl: 10 }, { pnl: -5 }, { pnl: 20 }], 100)).toEqual([85, 80, 100])
+  it('P&L no realizado (#507): valor menos coste de cada día y la punta es la cifra actual', () => {
+    const d = (value: number, cost: number, live = false) => ({ value, cost, live })
+    expect(unrealizedSparkline([d(100, 80), d(90, 80), d(120, 100, true)], 25)).toEqual([20, 10, 25])
+    expect(unrealizedSparkline([d(100, 80), d(90, 80)], 25)).toEqual([20, 10])
+    // Sin coste en la respuesta (API antigua), sin serie.
+    expect(unrealizedSparkline([{ value: 1, live: false }, { value: 2, live: false }], 0)).toEqual([])
   })
 
-  it('P&L: solo los últimos días y nada sin cifra actual', () => {
-    const series = Array.from({ length: 40 }, () => ({ pnl: 1 }))
-    const out = pnlSparkline(series, 50)
-    expect(out).toHaveLength(30)
-    expect(out[29]).toBe(50)
-    expect(out[0]).toBe(21)
-    expect(pnlSparkline(series, null)).toEqual([])
+  it('coste y EUR neto (#507): la serie de la API y la punta en vivo', () => {
+    const series = [{ cost: 10, eurNet: 5, live: false }, { cost: 12, eurNet: 5, live: false }, { cost: 15, eurNet: 7, live: true }]
+    expect(fieldSparkline(series, 'cost', 16)).toEqual([10, 12, 16])
+    expect(fieldSparkline(series, 'eurNet', null)).toEqual([5, 5, 7])
+    expect(fieldSparkline(series, 'cost', 1, 2)).toEqual([12, 1])
   })
 
   it('rentabilidad: la acumulada de los últimos días', () => {

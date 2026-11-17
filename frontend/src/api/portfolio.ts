@@ -51,6 +51,9 @@ export interface DailyPnlDay {
   cumulativePeakCapitalPct: number
   complete: boolean
   live: boolean
+  /** Coste de lo abierto y EUR neto acumulado al cierre (#507), en la moneda de la serie. */
+  cost?: number
+  eurNet?: number
 }
 
 export interface DailyPnlResponse {
