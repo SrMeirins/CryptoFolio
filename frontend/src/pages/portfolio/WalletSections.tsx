@@ -22,7 +22,7 @@ export function WalletSections({ sections, total, compact, onSimulate, onOpen }:
   compact: boolean
   onSimulate: (asset: string, qty: number, price: number) => void
   /** Abre el detalle del activo (#460), como en la vista «Por activo». */
-  onOpen: (asset: string) => void
+  onOpen: (asset: string, order: readonly string[]) => void
 }) {
   const currency = useCurrency()
   return (

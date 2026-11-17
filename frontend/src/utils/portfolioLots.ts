@@ -8,6 +8,11 @@ import { zonedFormat } from './zonedFormat'
 // cualquier wallet (FIFO global, #476; el backend los da en ese orden).
 
 export interface LotView {
+  lotId: string
+  /** Ids de los lotes que agrupa: más de uno si son trozos de la misma compra (#528). */
+  lotIds: string[]
+  /** Número de trozos unidos; 1 si es un lote tal cual. */
+  trozos: number
   walletId: string
   walletName: string
   walletColor: string
@@ -23,6 +28,9 @@ export interface LotView {
   ageDays: number
   next: boolean             // el primero que se vendería (FIFO global)
   source: string
+  /** Wallet de la que llegó el lote si es un traspaso o una reubicación (#528). */
+  sourceWalletName: string | null
+  sourceWalletColor: string | null
 }
 
 /**
@@ -44,6 +52,9 @@ export function lotsView(lots: readonly OpenLot[], price: number, currency: Curr
     const pnl = price > 0 ? value - cost : null
     const next = i === 0
     return {
+      lotId: l.lot_id,
+      lotIds: [l.lot_id],
+      trozos: 1,
       walletId: l.wallet_id,
       walletName: l.wallet_name,
       walletColor: l.wallet_color,
@@ -59,6 +70,8 @@ export function lotsView(lots: readonly OpenLot[], price: number, currency: Curr
       ageDays: Math.max(0, Math.floor((now.getTime() - Date.parse(l.opened_at)) / 86_400_000)),
       next,
       source: l.source_type,
+      sourceWalletName: l.source_wallet_name ?? null,
+      sourceWalletColor: l.source_wallet_color ?? null,
     }
   })
 }
@@ -105,8 +118,58 @@ export function lotDateDetail(iso: string, days: number): string {
  * operación de origen es la transferencia: se muestra como traspaso, no como
  * «Retirada».
  */
-export function lotSourceLabel(source: string, labels: Readonly<Record<string, { label: string }>>): string {
+export function lotSourceLabel(source: string, labels: Readonly<Record<string, { label: string }>>, fromWallet: string | null = null): string {
+  const prefix = lotOriginPrefix(source)
+  if (prefix && fromWallet) return `${prefix} ${fromWallet}`
   if (source === 'WITHDRAW' || source === 'TRANSFER_INTERNAL') return 'Traspaso desde otra wallet'
   if (source === 'REUBICACION') return 'Reubicado por el FIFO global'
   return labels[source]?.label ?? source
+}
+
+/** Inicio del texto de origen de un lote llegado de otra wallet (#528): «Traspaso desde», «Reubicado desde». */
+export function lotOriginPrefix(source: string): string | null {
+  if (source === 'WITHDRAW' || source === 'TRANSFER_INTERNAL') return 'Traspaso desde'
+  if (source === 'REUBICACION') return 'Reubicado desde'
+  return null
+}
+
+/**
+ * Une los trozos de una misma compra (#528): lotes de la misma wallet, con la
+ * misma fecha de apertura y el mismo precio de compra. Aparecen, por ejemplo,
+ * al retirar a otra wallet pagando la comisión de red en el propio activo: el
+ * FIFO global cobra la comisión del lote más antiguo y, para que cada wallet
+ * conserve su saldo, reubica esa cantidad desde la compra del día; la compra
+ * llega al destino en dos lotes. Es correcto para el cálculo; en la vista se
+ * muestran como uno. Conserva el orden FIFO (el del primer trozo).
+ */
+export function unirTrozos(lots: readonly LotView[]): LotView[] {
+  const out: LotView[] = []
+  const byKey = new Map<string, LotView>()
+  for (const l of lots) {
+    const key = `${l.walletId}|${l.openedAt}|${l.unitCost.toPrecision(10)}`
+    const g = byKey.get(key)
+    if (!g) {
+      const copia = { ...l, lotIds: [...l.lotIds] }
+      byKey.set(key, copia)
+      out.push(copia)
+      continue
+    }
+    g.lotIds.push(...l.lotIds)
+    g.trozos += l.trozos
+    g.quantity += l.quantity
+    g.quantityOriginal += l.quantityOriginal
+    g.cost += l.cost
+    g.value += l.value
+    g.pnl = g.pnl === null || l.pnl === null ? null : g.pnl + l.pnl
+    g.pnlPct = g.pnl !== null && g.cost > 0 ? (g.pnl / g.cost) * 100 : null
+    g.partial = g.quantity < g.quantityOriginal - 1e-9
+    g.next ||= l.next
+    // El origen con wallet (traspaso) es más informativo que una reubicación sin ella.
+    if (!g.sourceWalletName && l.sourceWalletName) {
+      g.sourceWalletName = l.sourceWalletName
+      g.sourceWalletColor = l.sourceWalletColor
+      g.source = l.source
+    }
+  }
+  return out
 }

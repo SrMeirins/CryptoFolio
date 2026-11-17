@@ -10,6 +10,8 @@ import { sendInternalError } from '../../middleware/errorHandler';
 // por activo, #476: el más antiguo primero, esté en la wallet que esté) y con
 // el mismo umbral de polvo. Un lote reubicado por una transmisión en otra
 // wallet se marca como tal en lugar de mostrar el tipo de esa operación.
+// Un lote que llegó de otra wallet (traspaso o reubicación) trae la wallet de
+// origen (#528): la del lote que se consumió sin efecto fiscal al abrirlo.
 const router = Router();
 
 // GET /api/v1/fifo/lots/:asset
@@ -22,6 +24,7 @@ router.get('/lots/:asset', async (req, res) => {
   try {
     const result = await db.query(
       `SELECT
+         fl.id AS lot_id,
          fl.wallet_id,
          w.name  AS wallet_name,
          w.color AS wallet_color,
@@ -40,10 +43,22 @@ router.get('/lots/:asset', async (req, res) => {
                AND sl.asset = fl.asset AND sl.opened_at = fl.opened_at AND sl.wallet_id <> fl.wallet_id
            ) THEN 'REUBICACION'
            ELSE t.operation_type::text
-         END AS source_type
+         END AS source_type,
+         src.name  AS source_wallet_name,
+         src.color AS source_wallet_color
        FROM fifo_lots fl
        JOIN wallets w      ON w.id = fl.wallet_id
        JOIN transactions t ON t.id = fl.open_transaction_id
+       LEFT JOIN LATERAL (
+         SELECT sw.name, sw.color
+         FROM fifo_lot_consumptions c
+         JOIN fifo_lots sl ON sl.id = c.lot_id
+         JOIN wallets sw   ON sw.id = sl.wallet_id
+         WHERE c.consuming_transaction_id = fl.open_transaction_id AND c.fiscal_event_type = 'NONE'
+           AND sl.asset = fl.asset AND sl.opened_at = fl.opened_at AND sl.wallet_id <> fl.wallet_id
+         ORDER BY c.quantity_consumed DESC
+         LIMIT 1
+       ) src ON TRUE
        WHERE fl.asset = $1
          AND fl.is_closed = FALSE
          AND fl.quantity_remaining > $2

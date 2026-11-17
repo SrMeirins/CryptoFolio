@@ -16,6 +16,10 @@ export const WALLETS_OTRAS_KEY = 'wallets_otras_pct';
 export const PORTFOLIO_COLUMNAS_KEY = 'portfolio_columnas';
 export const PORTFOLIO_COLUMNAS = ['cantidad', 'precio', 'tendencia', 'coste', 'pnl', 'resultado', 'breakeven', 'antiguedad', 'peso', 'maximo90', 'ingresos'] as const;
 
+/** Cómo se marcan compras y ventas en el gráfico de precio del detalle del activo (#528). */
+export const GRAFICO_MARCAS_KEY = 'grafico_marcas';
+export const GRAFICO_MARCAS = ['puntos', 'banderas-arriba', 'banderas-abajo'] as const;
+
 /** Páginas que se pueden elegir como inicio. */
 export const START_PAGES = ['/', '/portfolio', '/fiscal', '/history'] as const;
 
@@ -37,6 +41,7 @@ export const preferenceSchemas: Record<string, z.ZodType<string>> = {
       return z.array(z.enum(PORTFOLIO_COLUMNAS)).max(PORTFOLIO_COLUMNAS.length).safeParse(lista).success && new Set(lista).size === lista.length;
     } catch { return false; }
   }, `${PORTFOLIO_COLUMNAS_KEY}: lista JSON de columnas conocidas sin repetir`),
+  [GRAFICO_MARCAS_KEY]: z.enum(GRAFICO_MARCAS, { error: `${GRAFICO_MARCAS_KEY} debe ser puntos, banderas-arriba o banderas-abajo` }),
   [WALLETS_OTRAS_KEY]: z.string().regex(/^\d{1,2}$/, `${WALLETS_OTRAS_KEY} debe ser un porcentaje entero`)
     .refine(v => Number(v) <= 20, `${WALLETS_OTRAS_KEY} va de 0 a 20`),
   [CONCENTRACION_KEY]: z.string().regex(/^\d{2,3}$/, `${CONCENTRACION_KEY} debe ser un porcentaje entero`)

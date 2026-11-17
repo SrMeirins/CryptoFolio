@@ -18,7 +18,7 @@ export function DustSection({ rows, value, total, threshold, compact, open, onTo
   onToggle: () => void
   index: number
   /** Abre el detalle del activo (#460): el polvo también tiene su panel. */
-  onOpen: (asset: string) => void
+  onOpen: (asset: string, order: readonly string[]) => void
 }) {
   const currency = useCurrency()
   if (rows.length === 0) return null

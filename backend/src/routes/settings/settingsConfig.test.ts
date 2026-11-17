@@ -127,6 +127,12 @@ describe('routes/settings — config y stats', () => {
       for (const value of ['["otra"]', '["coste","coste"]', 'coste', '{}', '']) expect((await put('portfolio_columnas', value)).status).toBe(400);
     });
 
+    it('marcas del gráfico del detalle (#528): puntos o banderas arriba o abajo', async () => {
+      for (const value of ['puntos', 'banderas-arriba', 'banderas-abajo']) expect((await put('grafico_marcas', value)).status).toBe(200);
+      for (const value of ['banderas', 'PUNTOS', '', 1]) expect((await put('grafico_marcas', value)).status).toBe(400);
+      expect((await request(app).get('/api/settings/config')).body.grafico_marcas).toBe('banderas-abajo');
+    });
+
     it('wallets en «Otras» (#526): porcentaje entero de 0 a 20', async () => {
       for (const value of ['0', '2', '20']) expect((await put('wallets_otras_pct', value)).status).toBe(200);
       for (const value of ['21', '2.5', '-1', 'abc', '', 2]) expect((await put('wallets_otras_pct', value)).status).toBe(400);

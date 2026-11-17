@@ -93,7 +93,10 @@ export function Portfolio() {
   const [search, setSearch] = useState('')
   const [detailAsset, setDetailAsset] = useState<string | null>(() => params.get('activo')?.toUpperCase() ?? null)
   const searchRef = useRef<HTMLInputElement>(null)
-  const [simulator, setSimulator] = useState<{ asset: string; qty: number; price: number } | null>(null)
+  const [simulator, setSimulator] = useState<{ asset: string; qty: number; price: number; walletId?: string; initialQty?: number } | null>(null)
+  // Orden de la tabla desde la que se abrió el detalle, para navegar con [ y ] (#528).
+  const [detailOrder, setDetailOrder] = useState<readonly string[] | null>(null)
+  const openDetail = (asset: string, order?: readonly string[]) => { setDetailAsset(asset); setDetailOrder(order ?? null) }
   const [density, setDensity] = useState<Density>(readDensity)
   const [dustOpen, setDustOpen] = useState(readDustOpen)
   // Wallet elegida en las tarjetas (#270, #525): el único filtro por wallet,
@@ -157,6 +160,12 @@ export function Portfolio() {
     const row = [...v.rows, ...v.dust].find(r => r.asset === detailAsset)
     return row && row.kind === 'crypto' ? row : null
   }, [detailAsset, displayLots, market.prices, fiatPrice, market.dustThreshold])
+  // Orden por defecto del detalle abierto desde fuera de una tabla (tarjetas,
+  // cabecera o ?activo=): el de la tabla principal por valor (#528).
+  const defaultDetailOrder = useMemo(
+    () => assetRows.filter(r => r.kind === 'crypto').map(r => r.asset),
+    [assetRows],
+  )
   // Inventario de toda la cartera: custodia, posiciones, bloqueado y wallets (#270).
   const inventory = useMemo(
     () => portfolioInventory(displayLots, market.prices, fiatBalances, fiatPrice, lockedAmounts, market.dustThreshold),
@@ -330,8 +339,8 @@ export function Portfolio() {
       {hasPrices && !isLoading && inventory.wallets.length > 0 && (
         <>
           <CabeceraPortfolio lots={lots} fiatBalances={fiatBalances} inventory={inventory} pnlFilter={pnlFilter} onPnlFilter={setPnlFilter}
-            onDetalle={setDetailAsset} umbralConcentracion={concentracionAvisoPct(configQ.data)} />
-          <WalletCards wallets={inventory.wallets} selected={walletFilter} onSelect={setWalletFilter} onDetalle={setDetailAsset}
+            onDetalle={openDetail} umbralConcentracion={concentracionAvisoPct(configQ.data)} />
+          <WalletCards wallets={inventory.wallets} selected={walletFilter} onSelect={setWalletFilter} onDetalle={openDetail}
             colores={coloresActivos} umbralOtras={walletsOtrasPct(configQ.data)} />
         </>
       )}
@@ -364,7 +373,7 @@ export function Portfolio() {
           {view === 'asset' ? (
             <section aria-label="Posiciones" className={panelClasses(panelSurface('none', 'overflow-clip'))} style={panelEnterStyle(1)}>
               <AssetTable rows={assetRows} portfolioTotal={all.total} compact={compact} parcial={!!walletFilter}
-                onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} onOpen={setDetailAsset} exportName="posiciones"
+                onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} onOpen={openDetail} exportName="posiciones"
                 header={<>
                   <h2 className="text-sm font-semibold text-fg">Posiciones</h2>
                   <span className="text-xs text-fg-subtle">{assetRows.length} {assetRows.length === 1 ? 'activo' : 'activos'}</span>
@@ -372,11 +381,11 @@ export function Portfolio() {
             </section>
           ) : (
             <WalletSections sections={walletSections} total={all.total} compact={compact}
-              onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} onOpen={setDetailAsset} />
+              onSimulate={(asset, qty, price) => setSimulator({ asset, qty, price })} onOpen={openDetail} />
           )}
           <DustSection rows={dust.rows} value={dust.value} total={all.total} threshold={market.dustThreshold}
             compact={compact} open={dustOpen || (mainCount === 0 && dust.rows.length > 0)} onToggle={toggleDust}
-            index={mainCount + 1} onOpen={setDetailAsset} />
+            index={mainCount + 1} onOpen={openDetail} />
         </>
       )}
 
@@ -396,12 +405,14 @@ export function Portfolio() {
           currency={market.currency}
           rate={market.rate}
           locked={lockedAmounts.filter(l => l.asset === detailRow.asset)}
+          order={detailOrder ?? defaultDetailOrder}
+          onNavigate={setDetailAsset}
           onClose={() => setDetailAsset(null)}
-          onSimulate={() => {
+          onSimulate={(qty, walletId) => {
             // El simulador es fiscal y trabaja en EUR; se cierra el panel para
             // no apilar dos diálogos con el foco atrapado.
             setDetailAsset(null)
-            setSimulator({ asset: detailRow.asset, qty: detailRow.totalQuantity, price: usePricesStore.getState().prices[detailRow.asset] ?? 0 })
+            setSimulator({ asset: detailRow.asset, qty: detailRow.totalQuantity, price: usePricesStore.getState().prices[detailRow.asset] ?? 0, walletId, initialQty: qty })
           }}
         />
       )
@@ -412,6 +423,8 @@ export function Portfolio() {
         asset={simulator.asset}
         totalQty={simulator.qty}
         currentPrice={simulator.price}
+        initialWalletId={simulator.walletId}
+        initialQty={simulator.initialQty}
         onClose={() => setSimulator(null)}
       />
     )}

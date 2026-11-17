@@ -84,6 +84,27 @@ describe('GET /api/v1/fifo/sales/:asset (#284)', () => {
     expect(none.body.firstAcquiredAt).toBeNull();
   });
 
+  it('devuelve las compras ya vendidas del todo, una por fecha de apertura (#528)', async () => {
+    const res = await request(app).get('/api/v1/fifo/sales/XRP');
+    expect(res.body.closedBuys).toEqual([
+      { openedAt: '2024-01-01T10:00:00.000Z', quantity: 100, priceEur: 0.5 },
+      { openedAt: '2024-02-01T10:00:00.000Z', quantity: 100, priceEur: 0.7 },
+    ]);
+    expect(res.body.sales[0].txId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('una compra con un lote aún abierto (p. ej. traspasado) no es una compra vendida (#528)', async () => {
+    const at = '2024-06-01T10:00:00Z';
+    await lot('SOL', at, 5, 20);
+    const open = await tx('WITHDRAW', at, 'SOL', 5);
+    await pool.query(
+      `INSERT INTO fifo_lots (asset, quantity_original, quantity_remaining, cost_basis_eur, price_per_unit_eur, open_transaction_id, opened_at, wallet_id)
+       VALUES ('SOL', 5, 5, 100, 20, $1, $2, $3)`, [open, at, await wallet()],
+    );
+    const res = await request(app).get('/api/v1/fifo/sales/SOL');
+    expect(res.body.closedBuys).toEqual([]);
+  });
+
   it('el realizado coincide con /api/fifo/realized-pnl', async () => {
     const sales = (await request(app).get('/api/v1/fifo/sales/XRP')).body;
     const agg = (await request(app).get('/api/fifo/realized-pnl')).body.byAsset.find((r: { asset: string }) => r.asset === 'XRP');
@@ -94,6 +115,6 @@ describe('GET /api/v1/fifo/sales/:asset (#284)', () => {
     expect((await request(app).get('/api/v1/fifo/sales/..%2Fetc')).status).toBe(400);
     const none = await request(app).get('/api/v1/fifo/sales/ADA');
     expect(none.status).toBe(200);
-    expect(none.body).toMatchObject({ count: 0, realizedEur: 0, otherRealizedEur: 0, lastSaleAt: null, sales: [] });
+    expect(none.body).toMatchObject({ count: 0, realizedEur: 0, otherRealizedEur: 0, lastSaleAt: null, sales: [], closedBuys: [] });
   });
 });

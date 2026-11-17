@@ -38,6 +38,14 @@ describe('priceSeries y rangeStats', () => {
 })
 
 describe('chartMarkers', () => {
+  it('compras ya vendidas como marca propia, en EUR al cambio en vivo, y su día no se pierde al muestrear (#528)', () => {
+    const from = Date.parse('2026-01-01T00:00:00Z')
+    const m = chartMarkers([{ openedAt: '2026-01-15T08:00:00Z', quantity: 10, unitCost: 1 }], [], from, 2,
+      [{ openedAt: '2026-01-05T08:00:00Z', quantity: 4, priceEur: 0.5 }])
+    expect(m.map(x => [x.kind, x.day, x.price])).toEqual([['compra-vendida', '2026-01-05', 1], ['compra', '2026-01-15', 1]])
+    expect(operationDays([], [], [{ openedAt: '2026-01-05T08:00:00Z' }]).has('2026-01-05')).toBe(true)
+  })
+
   const sale = (soldAt: string, quantity: number, priceEur: number): AssetSale =>
     ({ soldAt, kind: 'venta', quantity, priceEur, proceedsEur: quantity * priceEur, gainLossEur: 0 })
   it('agrupa por día y tipo con precio medio ponderado, y filtra fuera del rango', () => {
