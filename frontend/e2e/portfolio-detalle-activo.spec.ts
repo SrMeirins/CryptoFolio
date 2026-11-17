@@ -193,6 +193,15 @@ test('regla de precios, lotes por mes, trozos unidos y el origen de los traspaso
 })
 
 test('«Si vendo X» usa el simulador y resalta los lotes que saldrían', async ({ page }) => {
+  // Sin mercado en vivo (CI), precio sintético para los activos que no lo tengan:
+  // el cálculo se lanza con el precio en vivo en EUR, como el simulador.
+  const posiciones = await (await page.request.get('/api/fifo/lots')).json() as Array<{ asset: string }>
+  await page.route('**/api/prices/live', async route => {
+    let real: Record<string, number> = {}
+    try { real = await (await route.fetch()).json() as Record<string, number> } catch { /* sin precios */ }
+    const sinteticos = Object.fromEntries(posiciones.map(p => [p.asset, real[p.asset] ?? 2]))
+    await route.fulfill({ json: { ...sinteticos, ...real } })
+  })
   const asset = await abrir(page)
   let body: Record<string, unknown> | null = null
   await page.route('**/api/fiscal/simulate-sale', async route => {
