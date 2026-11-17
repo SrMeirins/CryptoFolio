@@ -177,10 +177,13 @@
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
-/* Sin transiciones ni animaciones si el sistema pide reducir el movimiento (#197). */
+/* Sin transiciones ni animaciones si el sistema pide reducir el movimiento (#197).
+   Tampoco retardos: una entrada escalonada dejaba el elemento desplazado
+   mientras esperaba su turno (#507). */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;

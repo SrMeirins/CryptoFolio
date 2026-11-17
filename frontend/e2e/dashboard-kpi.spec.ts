@@ -18,17 +18,23 @@ async function tarjetas(page: Page) {
   // La quinta (EUR neto) llega con el flujo de euros: se espera antes de decidir.
   const cinco = await expect(cards).toHaveCount(5, { timeout: 15_000 }).then(() => true, () => false)
   test.skip(!cinco, 'Sin flujo de euros en estos datos: solo cuatro tarjetas')
-  // Esperar a que terminen de cargar (sin esqueletos).
+  // Esperar a que terminen de cargar (sin esqueletos) y de entrar (sin animaciones en curso).
   await expect(grupo.locator('.skeleton')).toHaveCount(0, { timeout: 15_000 })
+  await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => undefined))))
   return { grupo, cards }
 }
 
 /** Filas de la rejilla: tarjetas agrupadas por su posición vertical. */
 async function filas(cards: ReturnType<Page['locator']>) {
   const cajas = await cards.evaluateAll(els => els.map(e => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), left: r.left, right: r.right, height: r.height } }))
-  const porFila = new Map<number, typeof cajas>()
-  for (const c of cajas) porFila.set(c.top, [...(porFila.get(c.top) ?? []), c])
-  return [...porFila.values()]
+  // Misma fila si su borde superior está a menos de 4 px (sin depender de subpíxeles).
+  const porFila: (typeof cajas)[] = []
+  for (const c of [...cajas].sort((a, b) => a.top - b.top)) {
+    const fila = porFila.find(f => Math.abs(f[0].top - c.top) < 4)
+    if (fila) fila.push(c)
+    else porFila.push([c])
+  }
+  return porFila
 }
 
 for (const [ancho, esperado] of [[1920, [5]], [1280, [3, 2]], [700, [2, 2, 1]]] as const) {
@@ -52,6 +58,18 @@ for (const [ancho, esperado] of [[1920, [5]], [1280, [3, 2]], [700, [2, 2, 1]]] 
     expect(new Set(relativos).size).toBe(1)
   })
 }
+
+test('en cualquier ancho, la rejilla es 5, 3 + 2 o 2 + 2 + 1 (sin saltos por redondeo)', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1000 })
+  const { cards } = await tarjetas(page)
+  const validas = ['5', '3,2', '2,2,1']
+  // Barrido con anchos pares e impares a ambos lados de los cambios de columnas.
+  for (let ancho = 600; ancho <= 1960; ancho += 37) {
+    await page.setViewportSize({ width: ancho, height: 1000 })
+    await expect.poll(async () => (await filas(cards)).map(x => x.length).join(','), { message: `ancho ${ancho}` })
+      .toMatch(new RegExp(`^(${validas.join('|')})$`))
+  }
+})
 
 test('con la privacidad, ningún importe visible en tarjetas ni chips', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cryptofolio.privacy', '1'))
