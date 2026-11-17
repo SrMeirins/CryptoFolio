@@ -39,12 +39,12 @@ describe('saleBreakEven', () => {
 })
 
 describe('priceScenarios', () => {
-  it('actual, break-even de la venta, +10 % y +25 %', () => {
+  it('actual, -10 %, +10 % y break-even de la venta (#529)', () => {
     const s = priceScenarios(2, 1.5)
-    expect(s.map(x => x.key)).toEqual(['actual', 'breakeven', 'p10', 'p25'])
-    expect(s[1].price).toBe(1.5)
+    expect(s.map(x => x.key)).toEqual(['actual', 'm10', 'p10', 'breakeven'])
+    expect(s[1].price).toBeCloseTo(1.8, 10)
     expect(s[2].price).toBeCloseTo(2.2, 10)
-    expect(s[3].price).toBeCloseTo(2.5, 10)
+    expect(s[3].price).toBe(1.5)
   })
   it('sin precio actual, solo el break-even', () => {
     expect(priceScenarios(0, 1.5).map(x => x.key)).toEqual(['breakeven'])
