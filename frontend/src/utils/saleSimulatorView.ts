@@ -39,17 +39,18 @@ export function saleBreakEven(costBasisConsumed: number, quantity: number, feePc
 export interface PriceScenario { key: string; label: string; price: number }
 
 /**
- * Escenarios de precio: actual, break-even de la venta (ver saleBreakEven),
- * +10 % y +25 % sobre el actual. Sin precio actual, solo el break-even.
+ * Escenarios de precio (#529): actual, -10 % y +10 % sobre el actual y el
+ * break-even de la venta (ver saleBreakEven). Sin precio actual, solo el
+ * break-even.
  */
 export function priceScenarios(current: number, breakEven: number | null): PriceScenario[] {
   const out: PriceScenario[] = []
-  if (current > 0) out.push({ key: 'actual', label: 'Actual', price: current })
-  if (breakEven !== null && breakEven > 0) out.push({ key: 'breakeven', label: 'Break-even', price: breakEven })
   if (current > 0) {
+    out.push({ key: 'actual', label: 'Actual', price: current })
+    out.push({ key: 'm10', label: '-10 %', price: current * 0.9 })
     out.push({ key: 'p10', label: '+10 %', price: current * 1.1 })
-    out.push({ key: 'p25', label: '+25 %', price: current * 1.25 })
   }
+  if (breakEven !== null && breakEven > 0) out.push({ key: 'breakeven', label: 'Break-even', price: breakEven })
   return out
 }
 
