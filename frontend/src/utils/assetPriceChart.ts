@@ -1,4 +1,4 @@
-import type { AssetSale } from '../api/portfolio'
+import type { AssetSale, ClosedBuy } from '../api/portfolio'
 
 // Gráfico de precio y rentabilidad total del panel de detalle (#284).
 // Funciones puras: serie, rango «Todo», máximo/mínimo, variación, marcas de
@@ -17,7 +17,8 @@ const RANGE_DAYS: Record<Exclude<ChartRange, 'all'>, number> = { '30d': 30, '90d
 const DAY_MS = 86_400_000
 
 export interface ChartPoint { t: number; price: number }
-export interface ChartMarker { t: number; price: number; quantity: number; kind: 'compra' | 'venta' }
+/** compra: lote aún abierto (punto lleno); compra-vendida: ya vendido del todo (hueco, #528); venta: marca propia. */
+export interface ChartMarker { t: number; day: string; price: number; quantity: number; kind: 'compra' | 'compra-vendida' | 'venta' }
 
 /** Días a pedir para un rango; «Todo» va desde la primera compra del activo, también de lo ya vendido (#523). */
 export function rangeDays(range: ChartRange, firstOpenedAt: string | null, now: Date = new Date()): number {
@@ -57,7 +58,7 @@ export function rangeStats(points: readonly ChartPoint[]): RangeStats | null {
   return { max, min, changePct: first > 0 ? ((last - first) / first) * 100 : null }
 }
 
-const dayKey = (iso: string) => iso.slice(0, 10)
+export const dayKey = (iso: string) => iso.slice(0, 10)
 
 /**
  * Reduce una serie larga a unos `max` puntos repartidos por igual (#523), sin
@@ -74,20 +75,22 @@ export function samplePoints(points: readonly ChartPoint[], keepDays: ReadonlySe
 }
 
 /** Días con compras o ventas, para no perderlos al muestrear. */
-export function operationDays(buys: ReadonlyArray<{ openedAt: string }>, sales: readonly AssetSale[]): Set<string> {
-  return new Set([...buys.map(b => dayKey(b.openedAt)), ...sales.map(s => dayKey(s.soldAt))])
+export function operationDays(buys: ReadonlyArray<{ openedAt: string }>, sales: readonly AssetSale[], closedBuys: ReadonlyArray<{ openedAt: string }> = []): Set<string> {
+  return new Set([...buys.map(b => dayKey(b.openedAt)), ...closedBuys.map(b => dayKey(b.openedAt)), ...sales.map(s => dayKey(s.soldAt))])
 }
 
 /**
  * Marcas del gráfico dentro del rango, una por día y tipo: cantidad sumada y
  * precio medio ponderado. Las compras usan el coste unitario del lote ya en la
- * moneda elegida; las ventas, su precio en EUR al cambio en vivo.
+ * moneda elegida; las ventas y las compras ya vendidas (#528), su precio en
+ * EUR al cambio en vivo.
  */
 export function chartMarkers(
   buys: ReadonlyArray<{ openedAt: string; quantity: number; unitCost: number }>,
   sales: readonly AssetSale[],
   fromT: number,
   eurToDisplay: number,
+  closedBuys: readonly ClosedBuy[] = [],
 ): ChartMarker[] {
   const groups = new Map<string, { kind: ChartMarker['kind']; day: string; qty: number; amount: number }>()
   const add = (kind: ChartMarker['kind'], iso: string, qty: number, price: number) => {
@@ -99,9 +102,10 @@ export function chartMarkers(
     groups.set(key, g)
   }
   for (const b of buys) add('compra', b.openedAt, b.quantity, b.unitCost)
+  for (const b of closedBuys) add('compra-vendida', b.openedAt, b.quantity, b.priceEur * eurToDisplay)
   for (const s of sales) add('venta', s.soldAt, s.quantity, s.priceEur * eurToDisplay)
   return [...groups.values()]
-    .map(g => ({ t: dayT(g.day), price: g.amount / g.qty, quantity: g.qty, kind: g.kind }))
+    .map(g => ({ t: dayT(g.day), day: g.day, price: g.amount / g.qty, quantity: g.qty, kind: g.kind }))
     .filter(m => m.t >= fromT - DAY_MS / 2)
     .sort((a, b) => a.t - b.t)
 }

@@ -128,6 +128,8 @@ export interface FifoLot {
 
 /** Lote FIFO abierto de un activo (#272), para el panel de detalle de Portfolio. */
 export interface OpenLot {
+  /** Id del lote: el mismo que `lotId` en el simulador (#528). */
+  lot_id: string
   wallet_id: string
   wallet_name: string
   wallet_color: string
@@ -140,10 +142,15 @@ export interface OpenLot {
   /** Tipo USD por EUR de la fecha de apertura (#174); null si no lo hubo. */
   usd_per_eur: string | null
   source_type: string
+  /** Wallet de la que llegó un lote traspasado o reubicado (#528); null si no. */
+  source_wallet_name?: string | null
+  source_wallet_color?: string | null
 }
 
 /** Venta o permuta de un activo, con sus consumos FIFO agrupados (#284). */
 export interface AssetSale {
+  /** Operación que consumió los lotes (#528), para enlazarla en Historial. */
+  txId?: string
   soldAt: string
   kind: 'venta' | 'permuta'
   quantity: number
@@ -164,7 +171,11 @@ export interface AssetSales {
   /** Primera adquisición del activo, con lotes ya cerrados (#523). */
   firstAcquiredAt?: string | null
   sales: AssetSale[]
+  /** Compras ya vendidas del todo (#528): huecas en el gráfico. */
+  closedBuys?: ClosedBuy[]
 }
+
+export interface ClosedBuy { openedAt: string; quantity: number; priceEur: number }
 
 /** Marca del estado de la declaración de un ejercicio (#311, #542): revisado, Renta o 721 presentados. */
 export interface Declaracion {

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { db } from '../../db/client';
+import { FIFO_DUST_EPSILON } from '../../modules/fifo/constants';
 import { validateSymbol } from '../settings/settingsShared';
 import { sendInternalError } from '../../middleware/errorHandler';
 
@@ -50,6 +51,19 @@ router.get('/sales/:asset', async (req, res) => {
     // Primera adquisición del activo, con lotes ya cerrados incluidos (#523): el
     // rango «Todo» del gráfico empieza ahí y muestra todas sus ventas.
     const first = await db.query<{ first: Date | null }>(`SELECT MIN(opened_at) AS first FROM fifo_lots WHERE asset = $1`, [asset]);
+    // Compras ya vendidas del todo (#528), para dibujarlas huecas en el gráfico.
+    // Un traspaso abre en destino un lote con la misma fecha que el original, así
+    // que se agrupa por fecha de apertura: la compra está cerrada si ninguno de
+    // sus lotes sigue abierto (con el mismo umbral de polvo que /lots/:asset).
+    const closed = await db.query<{ opened_at: Date; quantity: string; price_eur: string }>(
+      `SELECT opened_at, MAX(quantity_original) AS quantity, MAX(price_per_unit_eur) AS price_eur
+       FROM fifo_lots
+       WHERE asset = $1
+       GROUP BY opened_at
+       HAVING BOOL_AND(is_closed OR quantity_remaining <= $2)
+       ORDER BY opened_at ASC`,
+      [asset, FIFO_DUST_EPSILON],
+    );
     const round2 = (n: number) => Math.round(n * 100) / 100;
     let realized = 0;
     let other = 0;
@@ -62,6 +76,7 @@ router.get('/sales/:asset', async (req, res) => {
       const quantity = parseFloat(r.quantity);
       const proceeds = parseFloat(r.proceeds_eur);
       sales.push({
+        txId: r.transaction_id,
         soldAt: new Date(r.sold_at).toISOString(),
         kind,
         quantity,
@@ -78,6 +93,11 @@ router.get('/sales/:asset', async (req, res) => {
       lastSaleAt: sales.at(-1)?.soldAt ?? null,
       firstAcquiredAt: first.rows[0]?.first ? new Date(first.rows[0].first).toISOString() : null,
       sales,
+      closedBuys: closed.rows.map(r => ({
+        openedAt: new Date(r.opened_at).toISOString(),
+        quantity: parseFloat(r.quantity),
+        priceEur: parseFloat(r.price_eur),
+      })),
     });
   } catch (e) {
     sendInternalError(res, e, 'GET /api/v1/fifo/sales/:asset');

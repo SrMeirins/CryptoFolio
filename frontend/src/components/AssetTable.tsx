@@ -38,7 +38,8 @@ interface AssetTableProps {
   keyByWallet?: boolean
   onSimulate?: (asset: string, qty: number, price: number) => void
   /** Abre el panel de detalle de un activo (#272). */
-  onOpen?: (asset: string) => void
+  /** Abre el detalle; con el orden de activos de la tabla para navegar con [ y ] (#528). */
+  onOpen?: (asset: string, order: readonly string[]) => void
   /** Contenido de la barra superior, a la izquierda del botón de restablecer orden. */
   header?: ReactNode
   /** Muestra el botón de exportar a CSV con este prefijo de fichero (#282). */
@@ -141,6 +142,12 @@ export function AssetTable({ rows, portfolioTotal, compact = false, hideWalletCh
     [rows, sortKey, sortDir, prices, portfolioTotal, metrics],
   )
   const defaultOrder = sortKey === 'value' && sortDir === 'desc'
+  // El detalle recibe el orden visible de la tabla (#528).
+  const openDetail = useMemo(() => {
+    if (!onOpen) return undefined
+    const order = sorted.filter(r => r.kind === 'crypto').map(r => r.asset)
+    return (asset: string) => onOpen(asset, order)
+  }, [onOpen, sorted])
   const totals = useMemo(() => tableTotals(rows, prices, portfolioTotal), [rows, prices, portfolioTotal])
 
   // Solo se anima la reordenación provocada por el usuario: orden o conjunto de filas.
@@ -215,7 +222,7 @@ export function AssetTable({ rows, portfolioTotal, compact = false, hideWalletCh
         <QueryError what="los ingresos por activo" error={incomeQ.error} onRetry={() => void incomeQ.refetch()} className="py-4 border-b border-border" />
       )}
       {movil ? (
-        <PositionCards rows={sorted} prices={prices} metrics={metrics} onOpen={onOpen} keyOf={rowKey} />
+        <PositionCards rows={sorted} prices={prices} metrics={metrics} onOpen={openDetail} keyOf={rowKey} />
       ) : (<>
       {ocultas.length > 0 && (
         <p role="status" className="px-4 py-2 border-b border-border bg-overlay/3 text-xs text-fg-muted flex items-center gap-2 flex-wrap">
@@ -245,7 +252,7 @@ export function AssetTable({ rows, portfolioTotal, compact = false, hideWalletCh
               ? <FiatRowComponent key={rowKey(row)} rowKey={rowKey(row)} row={row} columns={columns} showQty={showQty} totalPortfolioValue={portfolioTotal} compact={compact} />
               : <CryptoRowComponent key={rowKey(row)} rowKey={rowKey(row)} spark={spark(row.asset)} row={row} columns={columns} showQty={showQty} metrics={metrics.get(row.asset)}
                   prices={prices} yesterdayPrices={yesterdayPrices}
-                  totalPortfolioValue={portfolioTotal} compact={compact} onSimulate={simulate} hideWalletChips={hideWalletChips} onOpen={onOpen}
+                  totalPortfolioValue={portfolioTotal} compact={compact} onSimulate={simulate} hideWalletChips={hideWalletChips} onOpen={openDetail}
                   lockedAmounts={lockedAmounts.filter(l => l.asset === row.asset && row.wallets.some(w => w.wallet_id === l.wallet_id))} />)}
           </tbody>
           {/* Totales de las filas visibles (#282) */}

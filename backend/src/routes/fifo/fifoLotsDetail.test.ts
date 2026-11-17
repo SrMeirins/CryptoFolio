@@ -45,6 +45,8 @@ describe('GET /api/v1/fifo/lots/:asset (#272)', () => {
     expect(res.body.lots.map((l: { wallet_name: string; quantity_remaining: string }) => `${l.wallet_name}:${parseFloat(l.quantity_remaining)}`))
       .toEqual(['Binance Spot:50', 'Binance Funding:10', 'Binance Spot:40']);
     expect(res.body.lots[0]).toMatchObject({ source_type: 'BUY', wallet_kind: 'exchange' });
+    // Id del lote (#528): el mismo que devuelve el simulador en lotsConsumed.
+    expect(res.body.lots[0].lot_id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it('un lote reubicado por una venta en otra wallet se marca como REUBICACION, no como la venta', async () => {
@@ -68,6 +70,39 @@ describe('GET /api/v1/fifo/lots/:asset (#272)', () => {
 
     const lots = (await request(app).get('/api/v1/fifo/lots/DOT')).body.lots as Array<{ wallet_name: string; source_type: string }>;
     expect(lots.map(l => `${l.wallet_name}:${l.source_type}`)).toEqual(['Binance Spot:BUY', 'Bitvavo:REUBICACION']);
+    // Origen de la reubicación (#528): la wallet del lote consumido sin efecto fiscal.
+    const full = (await request(app).get('/api/v1/fifo/lots/DOT')).body.lots as Array<{ source_wallet_name: string | null; source_wallet_color: string | null }>;
+    expect(full.map(l => l.source_wallet_name)).toEqual([null, 'Binance Spot']);
+    expect(full[1].source_wallet_color).toEqual(expect.any(String));
+  });
+
+  it('un lote traspasado desde otra wallet trae la wallet de origen (#528)', async () => {
+    const ids = Object.fromEntries((await pool.query(`SELECT id, name FROM wallets WHERE name IN ('Binance Spot', 'Bitvavo')`)).rows.map(r => [r.name, r.id]));
+    const openedAt = '2023-03-01T10:00:00Z';
+    const buy = await pool.query(
+      `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id) VALUES ('BUY', $1, 'ATOM', 3, 3, $2) RETURNING id`,
+      [openedAt, ids['Bitvavo']]);
+    const wd = await pool.query(
+      `INSERT INTO transactions (operation_type, timestamp, asset, amount, amount_net, wallet_id, destination_wallet_id)
+       VALUES ('WITHDRAW', '2023-04-01T10:00:00Z', 'ATOM', 3, 3, $1, $2) RETURNING id`, [ids['Bitvavo'], ids['Binance Spot']]);
+    const origen = await pool.query(
+      `INSERT INTO fifo_lots (asset, quantity_original, quantity_remaining, cost_basis_eur, price_per_unit_eur, open_transaction_id, opened_at, wallet_id, is_closed)
+       VALUES ('ATOM', 3, 0, 0, 8, $1, $2, $3, TRUE) RETURNING id`, [buy.rows[0].id, openedAt, ids['Bitvavo']]);
+    await pool.query(
+      `INSERT INTO fifo_lot_consumptions (lot_id, consuming_transaction_id, quantity_consumed, cost_basis_consumed_eur, proceeds_eur, gain_loss_eur, fiscal_event_type, consumed_at)
+       VALUES ($1, $2, 3, 24, 0, 0, 'NONE', '2023-04-01T10:00:00Z')`, [origen.rows[0].id, wd.rows[0].id]);
+    await pool.query(
+      `INSERT INTO fifo_lots (asset, quantity_original, quantity_remaining, cost_basis_eur, price_per_unit_eur, open_transaction_id, opened_at, wallet_id)
+       VALUES ('ATOM', 3, 3, 24, 8, $1, $2, $3)`, [wd.rows[0].id, openedAt, ids['Binance Spot']]);
+
+    const lots = (await request(app).get('/api/v1/fifo/lots/ATOM')).body.lots as Array<{ wallet_name: string; source_type: string; source_wallet_name: string | null }>;
+    expect(lots).toHaveLength(1);
+    expect(lots[0]).toMatchObject({ wallet_name: 'Binance Spot', source_type: 'WITHDRAW', source_wallet_name: 'Bitvavo' });
+  });
+
+  it('un lote de compra directa no trae wallet de origen (#528)', async () => {
+    const lots = (await request(app).get('/api/v1/fifo/lots/XRP')).body.lots as Array<{ source_wallet_name: string | null }>;
+    expect(lots.every(l => l.source_wallet_name === null)).toBe(true);
   });
 
   it('la suma de los lotes coincide con la fila agregada de /api/fifo/lots', async () => {

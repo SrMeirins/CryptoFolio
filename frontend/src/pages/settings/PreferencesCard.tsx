@@ -14,6 +14,7 @@ import {
 import { SettingsCard } from './SettingsCard'
 import { ColumnasSelector } from '../../components/ColumnasSelector'
 import { PORTFOLIO_COLUMNAS_KEY, portfolioColumnas, serializarColumnas } from '../../utils/portfolioColumns'
+import { GRAFICO_MARCAS_KEY, MARCAS_OPCIONES, marcasGrafico, marcasLabel, type MarcasGrafico } from '../../utils/graficoMarcas'
 import { SavedMark } from './SavedMark'
 import { failure } from '../../utils/queryFailure'
 
@@ -98,6 +99,8 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
 
   // Columnas de la tabla de posiciones (#527), las mismas que se eligen en Portfolio.
   const columnas = portfolioColumnas(config)
+  // Marcas del gráfico del detalle del activo (#528), las mismas que se eligen en el gráfico.
+  const marcas = marcasGrafico(config)
 
   const privacy = privacyOnStart(config)
   const page = startPage(config)
@@ -107,7 +110,7 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
   const fallo = failure(configQ)
   return (
     <SettingsCard index={index} icon={SlidersHorizontal} title="Preferencias"
-      status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /><SavedMark stamp={saved} id={CONCENTRACION_KEY} /><SavedMark stamp={saved} id={WALLETS_OTRAS_KEY} /><SavedMark stamp={saved} id={PORTFOLIO_COLUMNAS_KEY} /></>}
+      status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /><SavedMark stamp={saved} id={CONCENTRACION_KEY} /><SavedMark stamp={saved} id={WALLETS_OTRAS_KEY} /><SavedMark stamp={saved} id={PORTFOLIO_COLUMNAS_KEY} /><SavedMark stamp={saved} id={GRAFICO_MARCAS_KEY} /></>}
       description="Cómo se comporta la app al abrirla, qué posiciones cuentan como polvo y cuándo avisar de una cartera concentrada.">
       {fallo && <QueryError what="tus preferencias" error={fallo.error} onRetry={fallo.retry} className="mb-3 rounded-xl border border-border" />}
       <div>
@@ -176,6 +179,17 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
               const next = serializarColumnas(cols)
               if (next === previous) return
               void save(PORTFOLIO_COLUMNAS_KEY, next, `Tabla de posiciones con ${cols.length} ${cols.length === 1 ? 'columna' : 'columnas'} opcionales`, previous)
+            }} />
+        </Row>
+
+        <Row label="Marcas del gráfico de un activo"
+          hint="Cómo se señalan las compras y ventas en el gráfico de precio del detalle de un activo en Portfolio: puntos sobre la línea o banderas arriba o abajo, sin tapar la línea.">
+          <Dropdown label="Marcas del gráfico de un activo" value={marcas} className="w-44"
+            options={MARCAS_OPCIONES.map(o => ({ value: o.value, label: o.label }))}
+            onChange={v => {
+              const previous = marcasGrafico(current())
+              if (v === previous) return
+              void save(GRAFICO_MARCAS_KEY, v, `Operaciones del gráfico marcadas con ${marcasLabel(v as MarcasGrafico).toLowerCase()}`, previous)
             }} />
         </Row>
 

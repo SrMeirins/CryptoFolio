@@ -5,10 +5,14 @@ import { useModalA11y } from '../../hooks/useModalA11y'
 // Panel lateral (#272): se abre a la derecha sin perder la página de fondo.
 // Mismo comportamiento accesible que los modales (useModalA11y): Esc cierra,
 // el foco queda atrapado dentro y vuelve al elemento que lo abrió al cerrar.
-export function Drawer({ onClose, labelledBy, initialFocusRef, children }: {
+// Anchos del panel: «lg» para el detalle del activo (#528), con más contenido.
+const WIDTHS = { md: 'max-w-xl', lg: 'max-w-[720px]' } as const
+
+export function Drawer({ onClose, labelledBy, initialFocusRef, size = 'md', children }: {
   onClose: () => void
   labelledBy: string
   initialFocusRef?: RefObject<HTMLElement | null>
+  size?: keyof typeof WIDTHS
   children: ReactNode
 }) {
   const panelRef = useModalA11y<HTMLDivElement>(onClose, initialFocusRef)
@@ -24,7 +28,7 @@ export function Drawer({ onClose, labelledBy, initialFocusRef, children }: {
     <div className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-[2px] animate-page-in"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={labelledBy}
-        className="drawer-in h-full w-full max-w-xl bg-background-card border-l border-border shadow-2xl flex flex-col overflow-hidden">
+        className={`drawer-in h-full w-full ${WIDTHS[size]} bg-background-card border-l border-border shadow-2xl flex flex-col overflow-hidden`}>
         {children}
       </div>
     </div>,

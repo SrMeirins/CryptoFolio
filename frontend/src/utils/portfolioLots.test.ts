@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { OpenLot } from '../api/portfolio'
-import { daysSince, formatAge, formatLotDate, lotDateDetail, lotSourceLabel, lotsView } from './portfolioLots'
+import { daysSince, formatAge, formatLotDate, lotDateDetail, lotOriginPrefix, lotSourceLabel, lotsView, unirTrozos } from './portfolioLots'
 
 // Lotes FIFO del panel de detalle (#272).
 const lot = (wallet: string, openedAt: string, original: number, remaining: number, unit: number, usdPerEur: string | null = null): OpenLot => ({
+  lot_id: `lote-${wallet}`,
   wallet_id: wallet, wallet_name: `W ${wallet}`, wallet_color: '#123456', wallet_kind: 'exchange', opened_at: openedAt,
   quantity_original: String(original), quantity_remaining: String(remaining), price_per_unit_eur: String(unit),
   cost_basis_eur: String(remaining * unit), usd_per_eur: usdPerEur, source_type: 'BUY',
@@ -74,6 +75,21 @@ describe('fecha del lote', () => {
   })
 })
 
+describe('origen de los traspasos (#528)', () => {
+  it('lotsView lleva el id y la wallet de origen del lote', () => {
+    const v = lotsView([{ ...lot('spot', '2024-01-01T00:00:00Z', 1, 1, 1), source_type: 'WITHDRAW', source_wallet_name: 'W origen', source_wallet_color: '#abcdef' }], 2, 'EUR', null, now)
+    expect(v[0]).toMatchObject({ lotId: 'lote-spot', sourceWalletName: 'W origen', sourceWalletColor: '#abcdef' })
+    expect(lotsView([lot('spot', '2024-01-01T00:00:00Z', 1, 1, 1)], 2, 'EUR', null, now)[0].sourceWalletName).toBeNull()
+  })
+  it('con la wallet de origen, el texto la nombra', () => {
+    expect(lotSourceLabel('WITHDRAW', {}, 'W origen')).toBe('Traspaso desde W origen')
+    expect(lotSourceLabel('REUBICACION', {}, 'W origen')).toBe('Reubicado desde W origen')
+    expect(lotSourceLabel('BUY', { BUY: { label: 'Compra' } }, 'W origen')).toBe('Compra')
+    expect(lotOriginPrefix('TRANSFER_INTERNAL')).toBe('Traspaso desde')
+    expect(lotOriginPrefix('BUY')).toBeNull()
+  })
+})
+
 describe('lotSourceLabel', () => {
   const labels = { BUY: { label: 'Compra' }, WITHDRAW: { label: 'Retirada' } }
   it('un lote reubicado por el FIFO global (#476) no se muestra como la venta que lo reubicó', () => {
@@ -95,5 +111,27 @@ describe('daysSince (#283)', () => {
     expect(daysSince(Date.parse('2026-01-01T10:00:00Z'), now)).toBe(30)
     expect(daysSince(Date.parse('2026-02-01T10:00:00Z'), now)).toBe(0)
     expect(daysSince(null, now)).toBeNull()
+  })
+})
+
+describe('unirTrozos (#528)', () => {
+  it('une los trozos de una misma compra (misma wallet, fecha y precio) y conserva el orden FIFO', () => {
+    const base = lot('hw', '2026-06-01T18:08:12Z', 100, 100, 0.5)
+    const trozo = { ...lot('hw', '2026-06-01T18:08:12Z', 0.2, 0.2, 0.5), lot_id: 'lote-trozo', source_type: 'WITHDRAW', source_wallet_name: 'W origen', source_wallet_color: '#abcdef' }
+    const otro = lot('hw', '2026-07-01T00:00:00Z', 5, 5, 0.6)
+    const v = unirTrozos(lotsView([base, trozo, otro], 1, 'EUR', null, now))
+    expect(v).toHaveLength(2)
+    expect(v[0]).toMatchObject({ trozos: 2, lotIds: ['lote-hw', 'lote-trozo'], quantity: 100.2, next: true, sourceWalletName: 'W origen' })
+    expect(v[0].cost).toBeCloseTo(50.1, 9)
+    expect(v[0].pnl).toBeCloseTo(50.1, 9)
+    expect(v[1].trozos).toBe(1)
+  })
+  it('no une lotes de otra wallet ni con otro precio', () => {
+    const v = unirTrozos(lotsView([
+      lot('hw', '2026-06-01T18:08:12Z', 1, 1, 0.5),
+      lot('spot', '2026-06-01T18:08:12Z', 1, 1, 0.5),
+      { ...lot('hw', '2026-06-01T18:08:12Z', 1, 1, 0.7), lot_id: 'lote-caro' },
+    ], 1, 'EUR', null, now))
+    expect(v.map(l => l.trozos)).toEqual([1, 1, 1])
   })
 })

@@ -4,6 +4,7 @@ import { curvePrices, pctOfWallet, priceScenarios, qtyForPct, saleBreakEven, wal
 
 // Simulador rediseñado (#280).
 const lot = (wallet: string, qty: number, unit: number): OpenLot => ({
+  lot_id: `lote-${wallet}`,
   wallet_id: wallet, wallet_name: wallet, wallet_color: '#123456', wallet_kind: 'exchange', opened_at: '2024-01-01T00:00:00Z',
   quantity_original: String(qty), quantity_remaining: String(qty), price_per_unit_eur: String(unit), cost_basis_eur: String(qty * unit),
   usd_per_eur: null, source_type: 'BUY',
