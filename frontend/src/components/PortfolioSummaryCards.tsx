@@ -3,7 +3,8 @@ import { Wallet, Receipt, TrendingUp, TrendingDown, Percent, Landmark } from 'lu
 import { StatCard } from './ui'
 import { Change24hChip, type Change24h } from './Change24hChip'
 import { formatMoney, type Currency, formatPercent } from '../utils/format'
-import { costChip, costSecondary, pnlPctChip, returnSecondary, todayPctChip, withdrawnChip } from '../utils/summaryCards'
+import { costChip, costSecondary, returnSecondary, todayPctChip, withdrawnChip } from '../utils/summaryCards'
+import { todayChip } from '../utils/windowChip'
 import { T } from '../utils/colors'
 import { PreparandoHistoricos } from './PreparandoHistoricos'
 import { WindowChip } from './WindowChip'
@@ -58,7 +59,7 @@ export function PortfolioSummaryCards({
   totalValue, totalCost, pnl, pnlPct, hasPrices, loading,
   valueTooltip, costTooltip, pnlTooltip, pnlPctTooltip,
   eurFlow, eurFlowTooltip,
-  change24h, currency = 'EUR', assetCount, todayPct = null, todayPending = false,
+  change24h, currency = 'EUR', assetCount, todayPnl = null, todayPct = null, todayPending = false,
   valueTrend = [], costTrend = [], pnlTrend = [], returnTrend = [], eurNetTrend = [], targets,
 }: {
   totalValue: number
@@ -78,6 +79,8 @@ export function PortfolioSummaryCards({
   assetCount: number
   /** Rentabilidad de hoy en vivo (#213, #507), en %; null mientras no hay dato. */
   todayPct?: number | null
+  /** P&L de hoy en vivo (#213), el del día en curso del calendario: chip «Hoy» de P&L no realizado. */
+  todayPnl?: number | null
   /** Aún se preparan los históricos: «Calculando…» en lugar del P&L de hoy (#334). */
   todayPending?: boolean
   /** Últimos 30 días de la serie diaria para las mini gráficas (#251, #412). */
@@ -97,7 +100,8 @@ export function PortfolioSummaryCards({
   const flowCurrency = eurFlow?.currency ?? currency
   const flowMoney = (v: number) => formatMoney(v, flowCurrency)
   const today = todayPctChip(todayPct)
-  const pnlChip = hasPrices ? pnlPctChip(pnlPct) : null
+  // P&L no realizado: el resultado de hoy en vivo, como el día en curso del P&L diario (no el %, que ya da Rentabilidad).
+  const todayMoney = todayChip(todayPnl, currency)
   const pnlColor = hasPrices ? (pnl >= 0 ? T.positive : T.negative) : T.muted
   const pctColor = hasPrices ? (pnlPct >= 0 ? T.positive : T.negative) : T.muted
   const trend = (s: readonly number[]) => (hasPrices && s.length > 1 ? s : undefined)
@@ -133,7 +137,9 @@ export function PortfolioSummaryCards({
         key={`pnl-${currency}`}
         title="P&L no realizado" icon={hasPrices && pnl < 0 ? TrendingDown : TrendingUp} color={pnlColor}
         value={hasPrices ? pnl : '—'} format={signedMoney} tone={hasPrices ? sign(pnl) : undefined} flash loading={loading} reserveSlots className={CARD_WIDTH}
-        chip={pnlChip && <KpiChip tone={pnlChip.tone}>{pnlChip.text}</KpiChip>}
+        chip={todayPending ? <PreparandoHistoricos datos={undefined} compacto /> : todayMoney && (
+          <WindowChip window="today" tone={todayMoney.tone} triggerLabel={todayMoney.aria}>{todayMoney.text}</WindowChip>
+        )}
         series={trend(pnlTrend)}
         help={pnlTooltip}
         onSelect={targets.portfolio} actionLabel="Ver el inventario en Portfolio" delay={120}

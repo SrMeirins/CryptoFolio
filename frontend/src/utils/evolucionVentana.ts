@@ -19,6 +19,8 @@ const round4 = (n: number) => Math.round(n * 10_000) / 10_000
 /** Punto de la ventana con el capital neto aportado acumulado (línea de aportado). */
 export interface PuntoVentana extends EvolutionPoint {
   aportado: number
+  /** Máximo capital neto aportado hasta este punto: el denominador del % (#510 lo usa para la referencia). */
+  capital: number
   /** Sin posiciones ese día: la curva no se dibuja y no cuenta en las métricas. */
   vacio: boolean
 }
@@ -49,7 +51,7 @@ export function rebasarVentana(points: readonly EvolutionPoint[], from: number, 
     netCapital += p.deposit - p.withdrawal
     peak = Math.max(peak, netCapital)
     if (peak >= threshold) pct = (pnl / peak) * 100
-    return { ...p, pnl: round2(pnl), pct: round4(pct), aportado: round2(netCapital), vacio: p.value < SIN_POSICIONES }
+    return { ...p, pnl: round2(pnl), pct: round4(pct), aportado: round2(netCapital), capital: peak, vacio: p.value < SIN_POSICIONES }
   })
 }
 

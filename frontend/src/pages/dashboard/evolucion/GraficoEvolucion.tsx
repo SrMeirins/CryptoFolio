@@ -6,7 +6,9 @@ import {
 import { formatMoney, formatMoneyCompact, formatPercent, type Currency } from '../../../utils/format'
 import { flowBuckets } from '../../../utils/evolutionSummary'
 import { formatPointDateShort } from '../../../utils/evolutionSeries'
-import { tramosSinPosiciones, type PuntoVentana } from '../../../utils/evolucionVentana'
+import { tramosSinPosiciones } from '../../../utils/evolucionVentana'
+import { reducirPuntos } from '../../../utils/reducirPuntos'
+import type { PuntoConReferencia, Referencia } from '../../../utils/evolucionReferencia'
 import { formatTick, niceTicks, tickDecimals, timeAxis } from '../../../utils/chartAxes'
 import { zeroSplit } from '../../../utils/zeroSplit'
 import { useChartColors } from '../../../hooks/useChartColors'
@@ -28,10 +30,12 @@ import { CruzExchange, EtiquetaUltimo } from './CruzExchange'
 export type ModoEvolucion = 'pct' | 'pnl' | 'value'
 
 /** Fila del gráfico: el valor de la serie es null en los días sin posiciones (sin curva). */
-type Fila = PuntoVentana & { serie: number | null; gana: [number, number] | null; pierde: [number, number] | null }
+type Fila = PuntoConReferencia & { serie: number | null; gana: [number, number] | null; pierde: [number, number] | null; refSerie: number | null }
 
-export function GraficoEvolucion({ puntos, modo, currency, intraday, animationKey, conAportado = true }: {
-  puntos: readonly PuntoVentana[]
+export function GraficoEvolucion({ puntos, modo, currency, intraday, animationKey, conAportado = true, referencia = null }: {
+  puntos: readonly PuntoConReferencia[]
+  /** Referencia con la que se compara (#510), en la misma base que la cartera. */
+  referencia?: Referencia | null
   modo: ModoEvolucion
   currency: Currency
   intraday: boolean
@@ -47,7 +51,7 @@ export function GraficoEvolucion({ puntos, modo, currency, intraday, animationKe
   const [activeMarker, setActiveMarker] = useState<ActiveMarker | null>(null)
   const key: 'pct' | 'pnl' | 'value' = modo
 
-  const filas: Fila[] = useMemo(() => puntos.map(p => {
+  const todas: Fila[] = useMemo(() => puntos.map(p => {
     const v = p.vacio ? null : p[key]
     const aportado = modo === 'value' && conAportado && !p.vacio
     return {
@@ -55,17 +59,26 @@ export function GraficoEvolucion({ puntos, modo, currency, intraday, animationKe
       serie: v,
       gana: aportado && p.value >= p.aportado ? [p.aportado, p.value] : null,
       pierde: aportado && p.value < p.aportado ? [p.value, p.aportado] : null,
+      refSerie: referencia && p.ref ? p.ref[key] : null,
     }
-  }), [puntos, key, modo, conAportado])
+  }), [puntos, key, modo, conAportado, referencia])
+  // Para dibujar, como mucho ~700 puntos: con miles el zoom va a trompicones (#510).
+  const filas = useMemo(
+    () => reducirPuntos(todas, 700, f => f.serie, f => f.deposit >= 0.01 || f.withdrawal >= 0.01 || f.vacio || f.live),
+    [todas],
+  )
 
   const xAxis = useMemo(() => timeAxis(filas.map(p => p.x), intraday), [filas, intraday])
   const yTicks = useMemo(() => {
-    const vals = filas.flatMap(p => (p.serie === null ? [] : modo === 'value' && conAportado ? [p.serie, p.aportado] : [p.serie]))
+    const vals = filas.flatMap(p => [
+      ...(p.serie === null ? [] : modo === 'value' && conAportado ? [p.serie, p.aportado] : [p.serie]),
+      ...(p.refSerie === null ? [] : [p.refSerie]),
+    ])
     return vals.length ? niceTicks(Math.min(...vals), Math.max(...vals), 5, modo !== 'value') : []
   }, [filas, modo, conAportado])
   const yDecimals = tickDecimals(yTicks)
   const split = useMemo(() => zeroSplit(filas.map(p => p.serie ?? 0)), [filas])
-  const buckets = useMemo(() => flowBuckets(puntos as PuntoVentana[], intraday), [puntos, intraday])
+  const buckets = useMemo(() => flowBuckets([...puntos], intraday), [puntos, intraday])
   const huecos = useMemo(() => tramosSinPosiciones(puntos), [puntos])
 
   const last = [...filas].reverse().find(p => p.serie !== null)
@@ -80,7 +93,7 @@ export function GraficoEvolucion({ puntos, modo, currency, intraday, animationKe
   return (
     <>
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={filas} margin={{ top: 12, right: 76, left: 0, bottom: 4 }}
+        <AreaChart data={filas} margin={{ top: 12, right: 76, left: 0, bottom: 26 }}
           onMouseMove={(s: { activeTooltipIndex?: number }) => setHover(typeof s?.activeTooltipIndex === 'number' ? s.activeTooltipIndex : null)}
           onMouseLeave={() => setHover(null)}>
           <defs>
@@ -113,7 +126,7 @@ export function GraficoEvolucion({ puntos, modo, currency, intraday, animationKe
               label={{ value: 'Sin posiciones', position: 'insideTop', fill: c.axis, fontSize: 10 }} />
           ))}
           <RechartsTooltip active={activeMarker ? false : undefined} cursor={false}
-            content={<EvolutionTooltip currency={currency} intraday={intraday} primary={modo} />} />
+            content={<EvolutionTooltip currency={currency} intraday={intraday} primary={modo} referencia={referencia} />} />
           {modo === 'value' && conAportado && (
             <>
               <Area type="monotone" dataKey="gana" stroke="none" fill={c.up} fillOpacity={0.1} isAnimationActive={false} connectNulls={false} />
@@ -125,9 +138,13 @@ export function GraficoEvolucion({ puntos, modo, currency, intraday, animationKe
           <Area type="monotone" dataKey="serie" baseValue={modo === 'value' ? 'dataMin' : 0} connectNulls={false}
             stroke={modo === 'value' ? color : split.stroke === null ? (split.solid === 'up' ? c.up : c.down) : `url(#${id}-stroke)`}
             strokeWidth={2} fill={`url(#${id}-fill)`} dot={false} activeDot={{ r: 4, fill: color, strokeWidth: 0 }}
-            isAnimationActive={!reduceMotion && animating} animationDuration={600} animationEasing="ease-in-out" />
+            isAnimationActive={!reduceMotion && animating} animationDuration={450} animationEasing="ease-out" />
+          {referencia && (
+            <Area type="monotone" dataKey="refSerie" stroke={c.warn} strokeWidth={1.75} fill="none" dot={false} activeDot={{ r: 3, fill: c.warn, strokeWidth: 0 }}
+              connectNulls isAnimationActive={false} name={referencia} />
+          )}
           <Customized component={
-            <FlowMarkerLayer buckets={buckets} yKey={key} active={activeMarker} onActivate={setActiveMarker}
+            <FlowMarkerLayer buckets={buckets} yKey={key} active={activeMarker} onActivate={setActiveMarker} franja
               colors={{ up: c.up, down: c.down, ring: c.axis, bg: c.tooltipBg }} intraday={intraday} currency={currency} />
           } />
           {last?.live && last.serie !== null && (

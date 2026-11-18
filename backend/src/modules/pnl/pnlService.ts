@@ -2,6 +2,7 @@ import { loadPositionEvents, holdingsAtInstants } from './positions';
 import { loadCapitalFlows } from './capitalFlows';
 import { computeDailyPnl, valueHoldings, type DayPnl, type DayValuation } from './dailyPnl';
 import { costeYNetoEn } from './costeYNeto';
+import { asegurarCierresReferencia } from '../prices/referenciasCierres';
 import {
   closeInstant, daysBetween, getCachedCloses, localDateOf, prefetchCloseRange,
 } from '../prices/closePrices';
@@ -68,6 +69,8 @@ export async function getDailyPnl(
   const to = query.to ?? today;
   const firstActivity = events.length > 0 ? localDateOf(tz, events.reduce((min, e) => Math.min(min, e.at), Infinity)) : to;
   const from = !query.from || query.from < firstActivity ? (firstActivity <= to ? firstActivity : to) : query.from;
+  // Referencias de «Comparar con» (#510): al día desde la primera actividad, en segundo plano.
+  if (events.length > 0) asegurarCierresReferencia(firstActivity, tz);
   const empty: PnlResponse = { currency, from, to, timezone: tz, refreshing: false, totalPnl: 0, twrPct: 0, dietzPct: 0, peakCapitalPct: 0, days: [], today: null, progreso: { listos: 0, total: 0 } };
   if (events.length === 0 || from > to) return empty;
 

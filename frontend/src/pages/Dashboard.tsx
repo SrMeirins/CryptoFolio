@@ -181,6 +181,7 @@ export function Dashboard() {
         currency={currency}
         assetCount={assetCount}
         todayPct={preparacion.listo ? liveToday?.pct ?? null : null}
+        todayPnl={preparacion.listo ? liveToday?.pnl ?? null : null}
         todayPending={!preparacion.listo}
         valueTrend={valueTrend}
         costTrend={costTrend}

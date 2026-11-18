@@ -29,7 +29,10 @@ test('zoom con teclado: + acerca, Retroceso deshace y Escape vuelve a todo', asy
   await page.keyboard.press('+')
   await expect(page).toHaveURL(/evolucion=\d{4}-\d{2}-\d{2}_(\d{4}-\d{2}-\d{2}|hoy)/)
   await expect(todo(page)).toBeEnabled()
+  // La URL se escribe al parar el zoom: se espera a que cambie antes de seguir.
+  const unaVez = page.url()
   await page.keyboard.press('+')
+  await expect.poll(() => page.url()).not.toBe(unaVez)
   const dosVeces = page.url()
   await page.keyboard.press('Backspace')
   await expect.poll(() => page.url()).not.toBe(dosVeces)

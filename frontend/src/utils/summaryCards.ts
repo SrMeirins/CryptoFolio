@@ -20,13 +20,6 @@ export function costChip(assetCount: number): string {
   return `${assetCount} ${assetCount === 1 ? 'activo' : 'activos'}`
 }
 
-/** P&L no realizado: su porcentaje sobre el coste, con signo. */
-export function pnlPctChip(pct: number): { text: string; tone: 'positive' | 'negative' | 'neutral' } {
-  const r = Math.round(pct * 100) / 100
-  const tone = r > 0 ? 'positive' : r < 0 ? 'negative' : 'neutral'
-  return { text: formatPercent(r, 2, true), tone }
-}
-
 /**
  * Rentabilidad: la del día en vivo para el chip «Hoy» (la ventana la pone el
  * chip); `aria` es el nombre completo, «Hoy: +0,80 %». Null sin dato.
