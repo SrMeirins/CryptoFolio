@@ -24,9 +24,16 @@ test('cabecera, tira y barras del periodo; el rango va a la URL', async ({ page 
     await expect(page.getByRole('list', { name: 'Métricas del periodo del P&L diario' }).getByText(label, { exact: true })).toBeVisible()
   }
   await expect(page.getByTestId('barras-pnl-periodo')).toHaveAttribute('aria-label', /^P&L por día: \d+ barras; acumulado del periodo /)
+  // La media por día de la semana dice sobre qué periodo se calcula y cuántos días entran (#512).
+  const patron = page.getByTestId('patron-semanal')
+  if (await patron.count()) {
+    await expect(patron).toContainText('Media por día de la semana, últimos 30 días')
+    await expect(patron).toContainText(/\d+ lunes/)
+  }
   // Por defecto, 30 días; con «Todo», la agrupación se adapta a la duración.
   await page.getByRole('group', { name: 'Rango del P&L diario' }).getByRole('radio', { name: 'Toda la historia' }).click()
   await expect(page).toHaveURL(/[?&]pnl-diario=todo/)
+  if (await patron.count()) await expect(patron).toContainText('Media por día de la semana, toda la historia')
 })
 
 test('la agrupación de las barras se elige a mano y vuelve a la automática al cambiar de rango', async ({ page }) => {

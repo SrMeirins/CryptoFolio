@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { NotApplicable, SegmentedControl, Skeleton, SkeletonGroup } from '../../../components/ui'
+import { Download } from 'lucide-react'
+import { Hint, iconButtonClasses, NotApplicable, SegmentedControl, Skeleton, SkeletonGroup } from '../../../components/ui'
 import { useCurrencyQuery } from '../../../hooks/useCurrencyQuery'
 import { useLiveDayPnl } from '../../../hooks/useLiveDayPnl'
 import { usePrivacyStore } from '../../../store/privacyStore'
@@ -11,7 +12,11 @@ import { metricFor } from '../../../utils/pnlChart'
 import { dayMs } from '../../../utils/chartAxes'
 import { diasEntre, resolverRango, serializarRango, type RangoValor } from '../../../utils/rangoGrafico'
 import { agrupacionAuto, barrasPeriodo, diasDelPeriodo, resumenPeriodo, type Agrupacion, type BarraPnl } from '../../../utils/pnlPeriodo'
-import { nombreAgrupacion } from '../../../utils/pnlPeriodoTexto'
+import { nombreAgrupacion, textoPeriodo } from '../../../utils/pnlPeriodoTexto'
+import { patronSemanal } from '../../../utils/calendarioDia'
+import { csvPnlDiario } from '../../../utils/pnlPeriodoCsv'
+import { descargarBlob } from '../../../utils/exportarGrafico'
+import { PatronSemanal } from './PatronSemanal'
 import { CabeceraPeriodo } from './CabeceraPeriodo'
 import { TiraPeriodo } from './TiraPeriodo'
 import { BarrasPnl } from './BarrasPnl'
@@ -21,6 +26,8 @@ import { BarrasPnl } from './BarrasPnl'
 // selector común. Usa toda la historia diaria (la misma caché que Evolución y
 // las tarjetas) con hoy en vivo, así que cambiar de rango es inmediato. El %
 // del periodo se recalcula con las reglas de Evolución para que coincidan.
+// Desde #512: media por día de la semana y exportar los días a CSV (no con
+// los importes ocultos).
 
 const AGRUPACIONES: { value: Agrupacion; label: string }[] = [
   { value: 'dia', label: 'Día' },
@@ -69,6 +76,12 @@ export function ResumenPeriodo({ rango, today, onHover, onOpenDay, onOpenMonth }
   const barras = useMemo(() => barrasPeriodo(enPeriodo, agrupacion), [enPeriodo, agrupacion])
   const conHoy = enPeriodo.some(d => d.live)
 
+  const patron = useMemo(() => patronSemanal(enPeriodo), [enPeriodo])
+  const exportarCsv = () => {
+    const csv = csvPnlDiario(enPeriodo, currency)
+    descargarBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `pnl-diario_${enPeriodo[0]?.date ?? desde}_${enPeriodo[enPeriodo.length - 1]?.date ?? r.to}.csv`)
+  }
+
   const abrir = (b: BarraPnl) => (agrupacion === 'dia' ? onOpenDay(b.desde) : onOpenMonth(b.desde))
 
   if (!data) {
@@ -93,11 +106,21 @@ export function ResumenPeriodo({ rango, today, onHover, onOpenDay, onOpenMonth }
             <span className="flex items-center gap-1.5"><span aria-hidden="true" className="inline-block w-2.5 h-2.5 rounded-sm bg-positive" /><span aria-hidden="true" className="inline-block w-2.5 h-2.5 rounded-sm bg-negative -ml-1" />P&L por {nombreAgrupacion(agrupacion)}</span>
             <span className="flex items-center gap-1.5"><span aria-hidden="true" className="inline-block w-3.5 h-0.5 rounded-full bg-brand" />Acumulado (eje derecho)</span>
           </p>
-          <SegmentedControl label="Agrupar las barras por" value={agrupacion} onChange={a => setManual({ rango: claveRango, a })} options={AGRUPACIONES} />
+          <div className="flex items-center gap-1.5">
+            <SegmentedControl label="Agrupar las barras por" value={agrupacion} onChange={a => setManual({ rango: claveRango, a })} options={AGRUPACIONES} />
+            <Hint label={oculto ? 'Con los importes ocultos no se exportan datos: muéstralos para descargar el CSV' : 'Descargar los días del periodo en CSV para hoja de cálculo'}>
+              <button type="button" onClick={exportarCsv} disabled={oculto}
+                className={`${iconButtonClasses('sm')} gap-1 px-2 w-auto text-[11px]`}
+                aria-label={oculto ? 'Exportar los días a CSV (no disponible con los importes ocultos)' : 'Exportar los días del periodo a CSV'}>
+                <Download size={13} aria-hidden="true" /> CSV
+              </button>
+            </Hint>
+          </div>
         </div>
         <BarrasPnl barras={barras} agrupacion={agrupacion} currency={currency} oculto={oculto}
           animationKey={`${claveRango}-${agrupacion}`} onHover={onHover} onAbrir={abrir} />
       </div>
+      <PatronSemanal patron={patron} currency={currency} periodo={textoPeriodo(rango, today)} />
     </div>
   )
 }

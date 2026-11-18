@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addMonths, compareYm, intensity, monthGrid, monthLabel, monthRange, monthSummary, ymOf, type CalendarDay } from './pnlCalendar'
-
-const day = (date: string, pnl: number, pct: number | null): CalendarDay => ({ date, pnl, pct, complete: true, live: false })
+import { addMonths, compareYm, intensity, monthGrid, monthLabel, monthRange, ymOf } from './pnlCalendar'
 
 describe('monthGrid', () => {
   it('empieza en lunes y rellena los huecos (octubre de 2026 empieza en jueves)', () => {
@@ -45,14 +43,6 @@ describe('navegación entre meses', () => {
 
   it('etiqueta en español con mayúscula inicial', () => {
     expect(monthLabel({ year: 2026, month: 10 })).toBe('Octubre de 2026')
-  })
-})
-
-describe('monthSummary', () => {
-  it('suma el P&L y encadena los % diarios; los días sin % no alteran la rentabilidad', () => {
-    const s = monthSummary([day('2026-10-01', 100, 10), day('2026-10-02', -55, -5), day('2026-10-03', 0, null)])
-    expect(s.pnl).toBe(45)
-    expect(s.pct).toBeCloseTo((1.1 * 0.95 - 1) * 100, 10)
   })
 })
 

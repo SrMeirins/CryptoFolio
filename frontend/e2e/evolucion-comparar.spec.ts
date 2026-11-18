@@ -60,7 +60,7 @@ test('exportar a CSV para hoja de cálculo en castellano y a PNG', async ({ page
 test('con los importes ocultos no se ofrece el CSV', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cryptofolio.privacy', '1'))
   await grafico(page)
-  await expect(page.getByRole('button', { name: 'Exportar a CSV (no disponible con los importes ocultos)' })).toBeDisabled()
+  await expect(page.getByRole('region', { name: 'Evolución de la cartera' }).getByRole('button', { name: 'Exportar a CSV (no disponible con los importes ocultos)' })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Exportar el gráfico a PNG' })).toBeEnabled()
 })
 

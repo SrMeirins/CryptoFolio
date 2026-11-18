@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { etiquetaEje, fechasRacha, textoDias, tituloBarra } from './pnlPeriodoTexto'
+import { etiquetaEje, fechasRacha, textoDias, textoPeriodo, tituloBarra } from './pnlPeriodoTexto'
 
 describe('textos del periodo del P&L diario (#511)', () => {
   it('recuentos de días con y sin planos', () => {
@@ -16,5 +16,11 @@ describe('textos del periodo del P&L diario (#511)', () => {
     expect(tituloBarra({ key: '2026-11-18', desde: '2026-11-18', hasta: '2026-11-18' }, 'dia')).toBe('miércoles, 18 de noviembre de 2026')
     expect(tituloBarra({ key: '2026-11-16', desde: '2026-11-16', hasta: '2026-11-18' }, 'semana')).toBe('Semana del 16 nov 2026 al 18 nov 2026')
     expect(tituloBarra({ key: '2026-11-01', desde: '2026-11-02', hasta: '2026-11-18' }, 'mes')).toMatch(/^[Nn]oviembre de 2026$/)
+  })
+  it('periodo en minúsculas para el título del patrón semanal', () => {
+    expect(textoPeriodo({ tipo: 'preset', preset: '30d' }, '2026-11-18')).toBe('últimos 30 días')
+    expect(textoPeriodo({ tipo: 'preset', preset: 'todo' }, '2026-11-18')).toBe('toda la historia')
+    expect(textoPeriodo({ tipo: 'preset', preset: 'anio' }, '2026-11-18')).toBe('este año')
+    expect(textoPeriodo({ tipo: 'rango', from: '2026-01-01', to: '2026-02-03', hastaHoy: false }, '2026-11-18')).toBe('del 1 ene 2026 al 3 feb 2026')
   })
 })
