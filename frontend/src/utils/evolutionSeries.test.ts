@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DailyPnlDay } from '../api/portfolio'
-import { formatPointDate, fromDaily, fromIntraday } from './evolutionSeries'
+import { formatPointDate, formatPointDateShort, fromDaily, fromIntraday } from './evolutionSeries'
 
 // Series del gráfico de evolución (#215; los periodos, en rangoGrafico, #508).
 
@@ -29,5 +29,12 @@ describe('formatPointDate', () => {
   it('fecha larga en la serie diaria y día con hora de Madrid en 24H', () => {
     expect(formatPointDate(Date.UTC(2026, 9, 15), false)).toBe('15 de octubre de 2026')
     expect(formatPointDate(Date.UTC(2026, 9, 15, 12, 30), true)).toMatch(/^15 oct\.?, 14:30$/)
+  })
+})
+
+describe('formatPointDateShort (#509)', () => {
+  it('día corto en UTC y, en 24 h, día y hora', () => {
+    expect(formatPointDateShort(Date.UTC(2025, 0, 26), false)).toBe('26 ene 2025')
+    expect(formatPointDateShort(Date.UTC(2025, 0, 26, 13, 15), true)).toMatch(/^26 ene, \d{2}:15$/)
   })
 })

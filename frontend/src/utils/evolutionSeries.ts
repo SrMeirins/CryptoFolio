@@ -41,6 +41,16 @@ const LONG_DATE = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'lon
 const DATE_TIME = () => zonedFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 
 /** Fecha del punto bajo el cursor: «15 de octubre de 2026» o, en 24H, «15 oct, 14:30» (hora de la zona de la aplicación). */
+// Los días son medianoche UTC de su fecha: se formatean en UTC (no en la zona de la app).
+const SHORT_DATE_FMT = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+const SHORT_DATE = () => SHORT_DATE_FMT
+const SHORT_DATE_TIME = () => zonedFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+/** Fecha corta del punto (#509): «26 ene 2025» o, en 24 h, «17 nov, 14:15». */
+export function formatPointDateShort(x: number, intraday: boolean): string {
+  return (intraday ? SHORT_DATE_TIME() : SHORT_DATE()).format(new Date(x)).replace('.', '')
+}
+
 export function formatPointDate(x: number, intraday: boolean): string {
   return (intraday ? DATE_TIME() : LONG_DATE).format(new Date(x))
 }
