@@ -1,40 +1,7 @@
 import { monthSummary, type CalendarDay, type YearMonth } from './pnlCalendar'
 
-// Calendario de P&L (#216): estadísticas del mes, totales por semana, escala de
-// color continua, resumen anual y navegación con teclado. Funciones puras.
-
-export interface MonthStats {
-  positive: number
-  negative: number
-  best: CalendarDay | null
-  worst: CalendarDay | null
-  average: number              // P&L medio por día con dato
-  streak: { sign: 'up' | 'down'; days: number } | null  // racha que termina en el último día con dato
-}
-
-/** Estadísticas de los días completos del mes (en orden cronológico). */
-export function monthStats(days: readonly CalendarDay[]): MonthStats {
-  const done = days.filter(d => d.complete)
-  const best = done.reduce<CalendarDay | null>((b, d) => (d.pnl > 0 && (!b || d.pnl > b.pnl) ? d : b), null)
-  const worst = done.reduce<CalendarDay | null>((w, d) => (d.pnl < 0 && (!w || d.pnl < w.pnl) ? d : w), null)
-  let streakSign: 'up' | 'down' | null = null
-  let streakDays = 0
-  for (let i = done.length - 1; i >= 0; i--) {
-    const sign = done[i].pnl > 0 ? 'up' : done[i].pnl < 0 ? 'down' : null
-    if (!sign || (streakSign && streakSign !== sign)) break
-    streakSign = sign
-    streakDays++
-  }
-  const streak = streakSign ? { sign: streakSign, days: streakDays } : null
-  const total = done.reduce((s, d) => s + d.pnl, 0)
-  return {
-    positive: done.filter(d => d.pnl > 0).length,
-    negative: done.filter(d => d.pnl < 0).length,
-    best, worst,
-    average: done.length ? Math.round((total / done.length) * 100) / 100 : 0,
-    streak,
-  }
-}
+// Calendario de P&L (#216): totales por semana, escala de color continua,
+// resumen anual y navegación con teclado. Funciones puras.
 
 /** P&L de cada semana de la cuadrícula (días completos); null si la semana no tiene datos. */
 export function weekTotals(weeks: ReadonlyArray<ReadonlyArray<string | null>>, byDate: ReadonlyMap<string, CalendarDay>): Array<number | null> {
@@ -80,13 +47,4 @@ export function gridMove(date: string, key: string): string | null {
   const next = new Date(Date.UTC(y, m - 1, d + delta[key]))
   if (next.getUTCMonth() !== m - 1) return null
   return next.toISOString().slice(0, 10)
-}
-
-/** P&L acumulado día a día del mes (días completos), para el gráfico del mes (#234). */
-export function monthCumulative(days: readonly CalendarDay[]): Array<{ date: string; day: number; pnl: number; cum: number }> {
-  let cum = 0
-  return days.filter(d => d.complete).map(d => {
-    cum += d.pnl
-    return { date: d.date, day: Number(d.date.slice(8)), pnl: d.pnl, cum: Math.round(cum * 100) / 100 }
-  })
 }

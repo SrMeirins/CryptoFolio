@@ -37,7 +37,9 @@ test('interacciones principales sin errores ni avisos', async ({ page }) => {
   await page.goto('/')
   await settle(page)
   await page.getByRole('radio', { name: /USD/ }).first().click()
-  await page.getByRole('radio', { name: 'Últimos 7 días' }).click()
+  // Dos selectores de rango en el Dashboard (Evolución y P&L diario, #511): cada uno por su grupo.
+  await page.getByRole('group', { name: 'Rango del gráfico de evolución' }).getByRole('radio', { name: 'Últimos 7 días' }).click()
+  await page.getByRole('group', { name: 'Rango del P&L diario' }).getByRole('radio', { name: 'Toda la historia' }).click()
   await page.getByRole('radio', { name: 'Valor' }).click()
   await settle(page)
   await page.getByRole('radio', { name: /EUR/ }).first().click()
