@@ -2,17 +2,19 @@ import type { ReactNode } from 'react'
 import { Skeleton, SkeletonGroup, NotApplicable, Button } from '../../components/ui'
 
 // Estados comunes del área del gráfico de evolución (cargando, error, vacío).
-export function ChartFrame({ loading, error, empty, errorText, onRetry, children }: {
+export function ChartFrame({ loading, error, empty, errorText, onRetry, alto = 'h-[300px]', children }: {
   loading: boolean
   error: boolean
   empty: boolean
   errorText: string
   /** Reintentar la consulta (#498). */
   onRetry?: () => void
+  /** Altura del área (más alta en pantalla completa, #510). */
+  alto?: string
   children: ReactNode
 }) {
   return (
-    <div className="h-[300px] relative">
+    <div className={`${alto} relative`}>
       {loading && (
         <SkeletonGroup label="Cargando el gráfico" className="absolute inset-0 flex flex-col justify-end gap-2 pb-6">
           <Skeleton className="h-full w-full rounded-xl opacity-60" />

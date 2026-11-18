@@ -115,4 +115,21 @@ describe('getIntradayPnl', () => {
     expect(r.approximate).toEqual(['XYZ']);
     expect(r.to).toBe(new Date(NOW).toISOString());
   });
+
+  it('incluye BTC y ETH como referencias en cada punto, aunque no estén en cartera (#510)', async () => {
+    const instants = intradayInstants(NOW);
+    eventsMock.mockResolvedValue([{ asset: 'XYZ', at: NOW - 48 * 3_600_000, delta: 10 }]);
+    flowsMock.mockResolvedValue([]);
+    liveMock.mockReturnValue(new Map([['XYZ', 2], ['BTC', 110]]));
+    seriesMock.mockImplementation(async (asset: string) =>
+      asset === 'BTC' ? new Map(instants.map(t => [t, 100])) : asset === 'XYZ' ? new Map(instants.map(t => [t, 2])) : null);
+
+    const r = await getIntradayPnl('EUR', NOW);
+    expect(r.referencias.BTC).toHaveLength(r.points.length);
+    expect(r.referencias.BTC[0]).toBe(100);
+    expect(r.referencias.BTC.at(-1)).toBe(110);
+    // ETH sin serie ni precio en vivo: sin dato, y no cuenta como activo aproximado (no está en cartera).
+    expect(r.referencias.ETH.every(p => p === null)).toBe(true);
+    expect(r.approximate).toEqual([]);
+  });
 });

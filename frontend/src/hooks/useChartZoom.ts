@@ -39,6 +39,7 @@ export function useChartZoom(
     setPila(prev => (prev.length > 0 && mismaVentana(prev[prev.length - 1], ventana) ? prev : [...prev.slice(-29), ventana]))
   }, [ventana])
   const ultimaRueda = useRef(0)
+  const rueda = useRef<{ delta: number; ancla: number; frame: number | null }>({ delta: 0, ancla: 0, frame: null })
 
   // Valores actuales para los manejadores nativos sin volver a registrarlos.
   const actual = useRef({ v, extent, inset, setVentana, guardar })
@@ -60,6 +61,7 @@ export function useChartZoom(
   useEffect(() => {
     const el = contenedor
     if (!el) return
+    const estadoRueda = rueda.current
     const onWheel = (e: WheelEvent) => {
       const { v: cur, extent: ext } = actual.current
       if (!cur || !ext || e.ctrlKey) return
@@ -70,18 +72,35 @@ export function useChartZoom(
         actual.current.setVentana(desplazarVentana(cur, ext, (e.deltaX / Math.max(1, rect.width)) * (cur.to - cur.from)))
         return
       }
-      const anchor = instanteEn(e.clientX) ?? (cur.from + cur.to) / 2
       // Una racha de rueda es un solo paso del historial.
       if (e.timeStamp - ultimaRueda.current > 600) actual.current.guardar()
       ultimaRueda.current = e.timeStamp
-      actual.current.setVentana(zoomVentana(cur, ext, e.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP, anchor))
+      // Zoom continuo (#510): proporcional al giro (líneas a píxeles) y agrupado
+      // por fotograma, para que la rueda y el trackpad vayan suaves.
+      rueda.current.delta += e.deltaY * (e.deltaMode === 1 ? 16 : 1)
+      rueda.current.ancla = instanteEn(e.clientX) ?? (cur.from + cur.to) / 2
+      if (rueda.current.frame !== null) return
+      rueda.current.frame = requestAnimationFrame(() => {
+        const r = rueda.current
+        r.frame = null
+        const base = actual.current.v
+        const extNow = actual.current.extent
+        if (!base || !extNow) { r.delta = 0; return }
+        const factor = Math.min(2, Math.max(0.5, Math.exp(r.delta * 0.0015)))
+        r.delta = 0
+        actual.current.setVentana(zoomVentana(base, extNow, factor, r.ancla))
+      })
     }
     el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      if (estadoRueda.frame !== null) cancelAnimationFrame(estadoRueda.frame)
+    }
   }, [instanteEn, contenedor])
 
   // Arrastrar para desplazar (ratón, lápiz o dedo); con Mayús, elegir un tramo.
   const inicio = useRef<{ x: number; v: Ventana } | null>(null)
+  const arrastre = useRef<{ destino: Ventana | null; frame: number | null }>({ destino: null, frame: null })
   // Tramo que se elige: x en pantalla y el borde izquierdo del contenedor al empezar.
   const [seleccion, setSeleccion] = useState<{ x0: number; x1: number; left: number } | null>(null)
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -103,7 +122,15 @@ export function useChartZoom(
     if (!arrastrando && Math.abs(dx) < 3) return
     if (!arrastrando) setArrastrando(true)
     const width = el.getBoundingClientRect().width - inset.left - inset.right
-    setVentana(desplazarVentana(s.v, extent, (-dx / Math.max(1, width)) * (s.v.to - s.v.from)))
+    const destino = desplazarVentana(s.v, extent, (-dx / Math.max(1, width)) * (s.v.to - s.v.from))
+    // Un repintado por fotograma al arrastrar.
+    arrastre.current.destino = destino
+    if (arrastre.current.frame === null) {
+      arrastre.current.frame = requestAnimationFrame(() => {
+        arrastre.current.frame = null
+        if (arrastre.current.destino) setVentana(arrastre.current.destino)
+      })
+    }
   }
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (seleccion && extent && Math.abs(seleccion.x1 - seleccion.x0) > 6) {

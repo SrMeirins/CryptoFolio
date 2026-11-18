@@ -102,6 +102,8 @@ export interface IntradayPnlResponse {
   peakCapitalPct: number  // P&L sobre el máximo capital aportado: el % que se muestra (#353)
   approximate: string[]   // activos valorados con el precio en vivo en toda la ventana
   points: Array<{ at: string; value: number; pnl: number; pct: number; stepPct: number | null; flow: number; capitalIn: number; capitalOut: number; live: boolean }>
+  /** Precio de BTC y ETH en cada punto, en la moneda pedida (#510). */
+  referencias?: Record<'BTC' | 'ETH', Array<number | null>>
 }
 
 export interface LiveDayBase {

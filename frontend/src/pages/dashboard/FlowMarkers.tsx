@@ -9,6 +9,9 @@ import { zonedFormat } from '../../utils/zonedFormat'
 // - Se pueden enfocar con Tab; al pasar o enfocar se abre su propio tooltip.
 // - Con entradas y salidas en el mismo grupo se dibujan dos puntos (verde
 //   arriba, rojo abajo) en vez de compensarlas.
+// - Con `franja` (#510) van en una franja bajo el gráfico, fuera de la curva:
+//   triángulo hacia arriba para depósitos y hacia abajo para retiradas (la
+//   forma distingue el tipo, no solo el color).
 
 export interface ActiveMarker { bucket: FlowBucket; cx: number; cy: number; chartWidth: number }
 
@@ -35,9 +38,12 @@ function describe(b: FlowBucket, intraday: boolean, currency: Currency): string 
 }
 
 /** Capa SVG de marcadores; se monta con <Customized>, que inyecta los ejes del gráfico. */
-export function FlowMarkerLayer({ xAxisMap, yAxisMap, width = 0, buckets, yKey, colors, active, onActivate, intraday, currency }: {
+export function FlowMarkerLayer({ xAxisMap, yAxisMap, offset, width = 0, buckets, yKey, colors, active, onActivate, intraday, currency, franja = false }: {
   xAxisMap?: AxisMap
   yAxisMap?: AxisMap
+  offset?: { top: number; left: number; width: number; height: number }
+  /** En una franja bajo el gráfico en lugar de sobre la curva (#510). */
+  franja?: boolean
   width?: number   // ancho del gráfico (lo inyecta recharts), para acotar el tooltip
   buckets: FlowBucket[]
   yKey: 'pct' | 'pnl' | 'value'
@@ -50,21 +56,33 @@ export function FlowMarkerLayer({ xAxisMap, yAxisMap, width = 0, buckets, yKey, 
   const xScale = xAxisMap ? Object.values(xAxisMap)[0]?.scale : undefined
   const yScale = yAxisMap ? Object.values(yAxisMap)[0]?.scale : undefined
   if (!xScale || !yScale) return null
+  // Franja: a media altura del margen inferior, bajo las fechas del eje.
+  const yFranja = offset ? offset.top + offset.height + 34 : 0
   return (
     <g className="flow-markers">
+      {franja && offset && (
+        <line x1={offset.left} x2={offset.left + offset.width} y1={yFranja} y2={yFranja} stroke={colors.ring} strokeOpacity={0.25} />
+      )}
       {buckets.map(b => {
         const cx = xScale(b.anchor.x)
-        const cy = yScale(b.anchor[yKey])
+        const cy = franja ? yFranja : yScale(b.anchor[yKey])
         if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null
+        if (franja && offset && (cx < offset.left - 1 || cx > offset.left + offset.width + 1)) return null
         const both = b.deposits >= 0.01 && b.withdrawals >= 0.01
         const isActive = active?.bucket.start === b.start
         const r = isActive ? 5.5 : 4
         const activate = () => onActivate({ bucket: b, cx, cy, chartWidth: width })
+        const tri = (dir: 1 | -1, dx: number) => `M ${cx + dx - r} ${cy + dir * r * 0.6} L ${cx + dx + r} ${cy + dir * r * 0.6} L ${cx + dx} ${cy - dir * r} Z`
         return (
           <g key={b.start}>
             {isActive && <circle cx={cx} cy={cy} r={HIT_RADIUS - 2} fill="none" stroke={colors.ring} strokeWidth={1.5} />}
-            {b.deposits >= 0.01 && <circle cx={cx} cy={both ? cy - 4 : cy} r={r} fill={colors.up} stroke={colors.bg} strokeWidth={2} />}
-            {b.withdrawals >= 0.01 && <circle cx={cx} cy={both ? cy + 4 : cy} r={r} fill={colors.down} stroke={colors.bg} strokeWidth={2} />}
+            {franja ? <>
+              {b.deposits >= 0.01 && <path d={tri(1, both ? -4 : 0)} fill={colors.up} />}
+              {b.withdrawals >= 0.01 && <path d={tri(-1, both ? 4 : 0)} fill={colors.down} />}
+            </> : <>
+              {b.deposits >= 0.01 && <circle cx={cx} cy={both ? cy - 4 : cy} r={r} fill={colors.up} stroke={colors.bg} strokeWidth={2} />}
+              {b.withdrawals >= 0.01 && <circle cx={cx} cy={both ? cy + 4 : cy} r={r} fill={colors.down} stroke={colors.bg} strokeWidth={2} />}
+            </>}
             <circle
               cx={cx} cy={cy} r={HIT_RADIUS} fill="transparent" tabIndex={0} role="img"
               aria-label={describe(b, intraday, currency)}
@@ -89,7 +107,7 @@ export function FlowMarkerTooltip({ marker, intraday, currency }: { marker: Acti
   const x = cx < EDGE ? '-16px' : chartWidth && cx > chartWidth - EDGE ? 'calc(-100% + 16px)' : '-50%'
   return (
     <div role="tooltip"
-      className="absolute z-10 pointer-events-none glass-tooltip rounded-xl px-3 py-2 text-xs whitespace-nowrap"
+      className="absolute z-10 pointer-events-none rounded-lg border border-border bg-background-card shadow-xl px-3 py-2 text-xs whitespace-nowrap"
       style={{ left: cx, top: cy, transform: `translate(${x}, ${below ? '16px' : 'calc(-100% - 16px)'})` }}>
       <p className="text-fg-muted mb-1 first-letter:uppercase">{bucketLabel(b, intraday)}</p>
       {b.deposits >= 0.01 && <p className="mono text-positive">Depósitos +{formatMoney(b.deposits, currency)}</p>}

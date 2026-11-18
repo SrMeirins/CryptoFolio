@@ -53,11 +53,12 @@ describe('PortfolioSummaryCards (#412)', () => {
     expect(html.match(/data-slot="serie"/g)).toHaveLength(5)
   })
 
-  it('chips de contexto: activos, % del P&L, Hoy en Rentabilidad y retirado (#507)', () => {
-    const html = render({ todayPct: 0.8 })
+  it('chips de contexto: activos, Hoy en euros en P&L, Hoy en % en Rentabilidad y retirado (#507)', () => {
+    const html = render({ todayPct: 0.8, todayPnl: 12.3 })
     expect(html).toContain('3 activos')
-    expect(html).toMatch(/\+20,00\s?%/)
-    expect(html).toContain('Hoy')
+    // P&L no realizado: el resultado de hoy en vivo (no el %, que ya da Rentabilidad).
+    expect(html).toMatch(/\+12,30\s€/)
+    expect(html.match(/>Hoy</g)).toHaveLength(2)
     expect(html).toMatch(/Retirado 100,00\s€/)
     expect(render()).not.toContain('>Hoy<')
   })
@@ -65,8 +66,8 @@ describe('PortfolioSummaryCards (#412)', () => {
   it('con la privacidad, ningún importe en tarjetas ni chips; los porcentajes, sí (#507)', () => {
     setAmountsHidden(true)
     try {
-      const html = render({ todayPct: 0.8, costTrend: [5, 6], eurNetTrend: [7, 7] })
-      for (const importe of ['1.200', '1.000', '200,00', '800,00', '100,00']) expect(html).not.toContain(importe)
+      const html = render({ todayPct: 0.8, todayPnl: 12.3, costTrend: [5, 6], eurNetTrend: [7, 7] })
+      for (const importe of ['1.200', '1.000', '200,00', '800,00', '100,00', '12,30']) expect(html).not.toContain(importe)
       expect(html).toMatch(/\+20,00\s?%/)
     } finally { setAmountsHidden(false) }
   })

@@ -13,7 +13,8 @@ import { useMarcasGrafico } from '../../hooks/useMarcasGrafico'
 import { formatAmount, formatPercent, formatPrice, type Currency } from '../../utils/format'
 import { zeroSplit } from '../../utils/zeroSplit'
 import { axisPrice, chartMarkers, labelSide, operationDays, priceSeries, rangeDays, rangeStats, samplePoints, type ChartMarker, type ChartPoint } from '../../utils/assetPriceChart'
-import { esCompleta, puntosEnVentana, rangoAVentana, ventanaARango } from '../../utils/chartZoom'
+import { esCompleta, puntosEnVentana, ventanaARango } from '../../utils/chartZoom'
+import { useVentanaUrl } from '../../hooks/useVentanaUrl'
 import { RangeSelector } from '../../components/RangeSelector'
 import { useRangoUrl } from '../../hooks/useRangoUrl'
 import { hoyApp, textoRango, type RangoPreset, type RangoValor } from '../../utils/rangoGrafico'
@@ -140,11 +141,10 @@ export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice,
   const [rango, setRango] = useRangoUrl('rango-activo', PRESETS, TODO)
   const today = hoyApp()
   const panelRef = useRef<HTMLDivElement>(null)
-  const { v, containerRef, arrastrando, setVentana, reset, acercar, alejar, handlers } = useChartZoom(extent, INSET, {
-    ventana: rangoAVentana(rango, today),
-    set: w => { if (extent) setRango(ventanaARango(w, extent)) },
-  })
-  const textoTramo = textoRango(rango, today)
+  // Ventana local mientras se hace zoom; la URL se escribe al parar (#510).
+  const ventanaUrl = useVentanaUrl(rango, setRango, extent, today)
+  const { v, containerRef, arrastrando, setVentana, reset, acercar, alejar, handlers } = useChartZoom(extent, INSET, ventanaUrl)
+  const textoTramo = textoRango(ventanaUrl.enZoom && v && extent ? ventanaARango(v, extent) : rango, today)
   // Límites de la ventana como primitivas: las dependencias de los useMemo no cambian por identidad.
   const vf = v?.from ?? 0
   const vt = v?.to ?? 0
@@ -284,7 +284,7 @@ export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice,
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      <NavegadorPrecio points={overview} extent={extent} v={v} onChange={setVentana} color={c.axis} />
+      <NavegadorPrecio points={overview} extent={extent} v={v} onChange={setVentana} color={c.brand} etiqueta={fmtDayYear} />
       <Leyenda markers={markers} hasAvg={hasAvg} live={liveVisible} marcas={marcas} />
       <p className="text-[11px] text-fg-subtle">Rueda para acercar o alejar, arrastra para desplazarte y doble clic para volver a la vista inicial.</p>
     </div>

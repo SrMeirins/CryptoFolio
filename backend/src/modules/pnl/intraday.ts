@@ -39,7 +39,16 @@ export interface IntradayResponse {
   // se valoran con el precio en vivo en toda la ventana.
   approximate: string[];
   points: IntradayPoint[];
+  /**
+   * Precio de BTC y ETH en la moneda pedida en cada punto (#510), para
+   * comparar la cartera con una referencia en 24 h; null sin dato.
+   */
+  referencias: Record<ReferenciaIntradia, Array<number | null>>;
 }
+
+/** Activos de referencia con los que se compara la evolución (#510). */
+export const REFERENCIAS = ['BTC', 'ETH'] as const;
+export type ReferenciaIntradia = typeof REFERENCIAS[number];
 
 const priceAsset = (asset: string) => PRICE_ALIASES[asset] ?? asset;
 
@@ -136,6 +145,9 @@ export async function getIntradayPnl(currency: DisplayCurrency = 'EUR', now = Da
   for (const h of holdings) for (const a of h.keys()) if (a !== 'EUR') assets.add(priceAsset(a));
   for (const f of flows) if (f.asset !== 'EUR') assets.add(priceAsset(f.asset));
   if (currency === 'USD') assets.add('USDT');
+  // Activos en cartera (o con flujos): los únicos que cuentan como aproximados.
+  const enCartera = new Set(assets);
+  for (const r of REFERENCIAS) assets.add(r);
 
   const live = getAllLivePrices();
   const list = [...assets];
@@ -143,7 +155,7 @@ export async function getIntradayPnl(currency: DisplayCurrency = 'EUR', now = Da
   const table = new Map<string, Array<number | null>>();
   const approximate: string[] = [];
   list.forEach((asset, k) => {
-    if (!series[k] || series[k]!.size === 0) approximate.push(asset);
+    if ((!series[k] || series[k]!.size === 0) && enCartera.has(asset)) approximate.push(asset);
     table.set(asset, pricesAtInstants(instants, series[k], live.get(asset)));
   });
 
@@ -159,8 +171,14 @@ export async function getIntradayPnl(currency: DisplayCurrency = 'EUR', now = Da
   };
 
   const { points, totalPnl, twrPct, peakCapitalPct } = buildIntradaySeries({ instants, holdings, flows, priceOf, fxAt });
+  const precio = (asset: string, i: number) => {
+    const p = priceOf(asset, i);
+    return p === null || !(p > 0) ? null : Math.round(p * 1e6) / 1e6;
+  };
+  const referencias = Object.fromEntries(REFERENCIAS.map(r => [r, instants.map((_, i) => precio(r, i))])) as IntradayResponse['referencias'];
   return {
     currency, from: new Date(instants[0]).toISOString(), to: new Date(now).toISOString(), stepMinutes: 15,
     totalPnl, twrPct, peakCapitalPct, approximate: approximate.filter(a => a !== 'USDT' || currency === 'USD').sort(), points,
+    referencias,
   };
 }
