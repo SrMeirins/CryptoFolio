@@ -70,7 +70,7 @@ export function conReferencia(puntos: readonly PuntoVentana[], precios: Readonly
 // ── CSV ──────────────────────────────────────────────────────────────────────
 
 /** Coma decimal y sin «-0,00» (lo que redondea a cero sale como 0). */
-const num = (n: number, dec: number) => (Math.abs(n) < 0.5 * 10 ** -dec ? 0 : n).toFixed(dec).replace('.', ',')
+export const num = (n: number, dec: number) => (Math.abs(n) < 0.5 * 10 ** -dec ? 0 : n).toFixed(dec).replace('.', ',')
 const fecha = (x: number, intraday: boolean) => (intraday ? new Date(x).toISOString() : new Date(x).toISOString().slice(0, 10))
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { legendScale, legendSteps, stepLabel } from './calendarLegend'
+import { legendScale, legendSteps, posicionLeyenda, stepLabel } from './calendarLegend'
 
 // Leyenda del calendario (#248).
 const clean = (s: string) => s.replace(/\s/g, ' ')
@@ -21,5 +21,15 @@ describe('calendarLegend', () => {
     expect(clean(stepLabel(80, 'EUR'))).toMatch(/^Ganancia de ~80/)
     expect(stepLabel(0, 'EUR')).toBe('Sin variación (0)')
     expect(legendScale(400, 'USD')).toContain('$')
+  })
+})
+
+describe('posicionLeyenda (#512)', () => {
+  it('0 en el centro, extremos en los bordes y raíz cuadrada entre medias', () => {
+    expect(posicionLeyenda(0, 100)).toBe(0.5)
+    expect(posicionLeyenda(100, 100)).toBe(1)
+    expect(posicionLeyenda(-400, 100)).toBe(0)
+    expect(posicionLeyenda(25, 100)).toBe(0.75)
+    expect(posicionLeyenda(5, 0)).toBe(0.5)
   })
 })

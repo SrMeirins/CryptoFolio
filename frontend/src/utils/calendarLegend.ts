@@ -25,3 +25,12 @@ export function stepLabel(value: number, currency: Currency): string {
   const amount = formatMoneyCompact(Math.abs(value), currency)
   return value > 0 ? `Ganancia de ~${amount}` : `Pérdida de ~${amount}`
 }
+
+/**
+ * Posición (0 a 1) de un importe en la barra degradada de la leyenda (#512):
+ * 0,5 es el 0; la escala es la raíz cuadrada, como la intensidad de las celdas.
+ */
+export function posicionLeyenda(value: number, maxAbs: number): number {
+  if (maxAbs <= 0 || value === 0) return 0.5
+  return 0.5 + Math.sign(value) * 0.5 * Math.sqrt(Math.min(1, Math.abs(value) / maxAbs))
+}

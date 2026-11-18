@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CalendarDay } from './pnlCalendar'
-import { colorAlpha, gridMove, weekTotals, yearMonths } from './calendarStats'
+import { colorAlpha, gridMove, weekTotals } from './calendarStats'
 
 // Calendario de P&L (#216).
 const day = (date: string, pnl: number, pct: number | null = pnl, complete = true): CalendarDay => ({ date, pnl, pct, complete, live: false })
@@ -25,25 +25,15 @@ describe('colorAlpha', () => {
   })
 })
 
-describe('yearMonths', () => {
-  it('12 meses con total y rentabilidad encadenada; null en los meses sin datos', () => {
-    const r = yearMonths([day('2026-01-05', 10, 10), day('2026-01-06', -5, -10), day('2026-03-01', 2, 1), day('2025-12-31', 50)], 2026)
-    expect(r).toHaveLength(12)
-    expect(r[0]).toMatchObject({ pnl: 5, days: 2 })
-    expect(r[0]?.pct).toBeCloseTo(-1, 6)        // 1,10 × 0,90 − 1
-    expect(r[1]).toBeNull()
-    expect(r[2]).toMatchObject({ ym: { year: 2026, month: 3 }, pnl: 2 })
-  })
-})
-
 describe('gridMove', () => {
-  it('flechas por días y semanas, Inicio y Fin de la semana, sin salir del mes', () => {
+  it('flechas por días y semanas, Inicio y Fin de la semana; cruzan de mes (#512)', () => {
     expect(gridMove('2026-10-15', 'ArrowRight')).toBe('2026-10-16')
     expect(gridMove('2026-10-15', 'ArrowUp')).toBe('2026-10-08')
     expect(gridMove('2026-10-15', 'Home')).toBe('2026-10-12')   // jueves → lunes
     expect(gridMove('2026-10-15', 'End')).toBe('2026-10-18')
-    expect(gridMove('2026-10-01', 'ArrowLeft')).toBeNull()
-    expect(gridMove('2026-10-29', 'ArrowDown')).toBeNull()
+    expect(gridMove('2026-10-01', 'ArrowLeft')).toBe('2026-09-30')
+    expect(gridMove('2026-10-29', 'ArrowDown')).toBe('2026-11-05')
+    expect(gridMove('2026-12-31', 'ArrowRight')).toBe('2027-01-01')
     expect(gridMove('2026-10-15', 'Enter')).toBeNull()
   })
 })

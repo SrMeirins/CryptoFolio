@@ -57,17 +57,6 @@ export function monthRange(ym: YearMonth, today: string): { from: string; to: st
   return { from, to: last < today ? last : today }
 }
 
-/** Total del mes en EUR y rentabilidad encadenada (TWR) de sus días. */
-export function monthSummary(days: readonly CalendarDay[]): { pnl: number; pct: number } {
-  let pnl = 0
-  let growth = 1
-  for (const d of days) {
-    pnl += d.pnl
-    if (d.pct !== null) growth *= 1 + d.pct / 100
-  }
-  return { pnl: Math.round(pnl * 100) / 100, pct: (growth - 1) * 100 }
-}
-
 /**
  * Intensidad del color de un día (1-4) según su |P&L| respecto al mayor |P&L|
  * del mes; 0 si el P&L es 0.

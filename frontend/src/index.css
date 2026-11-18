@@ -396,6 +396,13 @@
   background-image: radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--card) calc(var(--heat, 1) * 22%), transparent), transparent 70%);
 }
 
+/* Tesela opaca del calendario (#512): el fondo de intensidad de heat-body con
+   un borde sólido del color del signo, sin el marco degradado translúcido. */
+.tesela {
+  background-color: color-mix(in srgb, var(--card) calc(var(--heat, 1) * 20%), var(--cf-bg-card));
+  border: 1px solid color-mix(in srgb, var(--card) calc(18% + var(--heat, 1) * 52%), var(--cf-bg-card));
+}
+
 /* Entrada escalonada de los paneles (#232); el retraso lo da panelEnterStyle(). */
 @keyframes panelIn {
   from { opacity: 0; transform: translateY(8px); }

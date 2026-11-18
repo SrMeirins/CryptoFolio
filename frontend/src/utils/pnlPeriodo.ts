@@ -52,7 +52,7 @@ const ms = (d: string) => Date.parse(`${d}T00:00:00Z`)
 const iso = (t: number) => new Date(t).toISOString().slice(0, 10)
 
 /** Días de [from, to] (from vacío: desde el principio) con dato: cerrados o en curso. */
-export function diasDelPeriodo(days: readonly CalendarDay[], from: string | undefined, to: string): CalendarDay[] {
+export function diasDelPeriodo<T extends CalendarDay>(days: readonly T[], from: string | undefined, to: string): T[] {
   return days.filter(d => (from === undefined || d.date >= from) && d.date <= to && (d.complete || d.live))
 }
 

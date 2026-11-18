@@ -1,6 +1,6 @@
 import type { Agrupacion, BarraPnl, Racha, ResumenPeriodo } from './pnlPeriodo'
 import { monthLabel } from './pnlCalendar'
-import { fechaCorta } from './rangoGrafico'
+import { fechaCorta, textoRango, type RangoValor } from './rangoGrafico'
 
 // Textos del resumen del periodo del panel P&L diario (#511): recuentos de
 // días, fechas de una racha, etiquetas del eje y título de cada barra.
@@ -41,3 +41,11 @@ export function tituloBarra(b: Pick<BarraPnl, 'key' | 'desde' | 'hasta'>, a: Agr
 }
 
 export const nombreAgrupacion = (a: Agrupacion) => (a === 'dia' ? 'día' : a)
+
+/** Periodo en minúsculas para insertarlo en una frase: «últimos 30 días», «toda la historia», «del 1 ene 2026 al 3 feb 2026». */
+export function textoPeriodo(rango: RangoValor, today: string): string {
+  if (rango.tipo === 'preset' && rango.preset === 'todo') return 'toda la historia'
+  if (rango.tipo === 'preset' && rango.preset === 'anio') return 'este año'
+  const t = textoRango(rango, today)
+  return t.charAt(0).toLowerCase() + t.slice(1)
+}
