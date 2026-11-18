@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { axeEstable } from './axe'
 
 // Tarjetas del Dashboard con StatCard (#412): cada KPI lleva a su destino y
-// Mejor día del P&L diario despliega su detalle. Solo lectura.
+// Mejor día del P&L diario abre su detalle. Solo lectura.
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 
@@ -32,16 +32,17 @@ test('EUR neto abre el Historial con la tarjeta Retirado', async ({ page }) => {
 })
 
 for (const theme of ['dark', 'light'] as const) {
-  test(`Mejor día despliega su detalle, sin violaciones de axe (tema ${theme})`, async ({ page }) => {
+  test(`Mejor día del periodo abre su detalle en el calendario, sin violaciones de axe (tema ${theme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })
-    await page.goto('/')
+    await page.goto('/?pnl-diario=todo')
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
-    // El del calendario del mes: su nombre lleva «día N».
-    const best = page.getByRole('button', { name: /^Mejor día: .*día \d+\. Ver el detalle del día$/ })
-    await best.first().waitFor({ timeout: 15_000 }).catch(() => {})
-    test.skip(await best.count() === 0, 'Sin días cerrados en el mes con estos datos')
-    await best.first().click()
-    await expect(page.getByRole('button', { name: /^Mejor día: .*día \d+\. Ocultar el detalle del día$/ })).toHaveAttribute('aria-expanded', 'true')
+    // Desde #511, la tira del periodo del P&L diario: lleva al día en el calendario.
+    const best = page.getByRole('button', { name: 'Ver Mejor día en el calendario' })
+    await best.waitFor({ timeout: 15_000 }).catch(() => {})
+    test.skip(await best.count() === 0, 'Sin días cerrados en verde con estos datos')
+    await best.click()
+    await expect(page.getByRole('region', { name: /^Detalle del / })).toBeVisible()
+    await page.mouse.move(0, 0)
     await page.waitForTimeout(300)
     const { violations } = await (await axeEstable(page)).withTags(WCAG).analyze()
     expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
