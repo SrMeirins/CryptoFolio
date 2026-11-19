@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { CalendarClock, Scale } from 'lucide-react'
 import type { Modelo721 } from '../../fiscal/types'
-import { badgeClasses, TextTooltip } from '../../../components/ui'
+import { badgeClasses } from '../../../components/ui'
 import { formatEur, formatPercent } from '../../../utils/format'
 import { MODELO721_LABELS, modelo721Status, pendingPricesText } from '../../../utils/modelo721Status'
 import type { deadlineFromHito } from '../../../utils/fiscalPanel'
@@ -44,17 +44,19 @@ export function Tira721({ modelo721, plazo, urgencia, enlace721 }: {
     <div className="flex flex-col rounded-xl border border-border bg-overlay/2 divide-y divide-border" data-testid="tira-721">
       {modelo721 && status ? (
         <Link to={enlace721} className={zona}
-          aria-label={`Modelo 721: ${MODELO721_LABELS[status]}. ${modelo721.incompleto ? 'Al menos ' : ''}${formatPercent(Math.min(pct, 999), 0)} del umbral de ${formatEur(modelo721.umbral)}. Ver el Modelo 721 en Fiscal`}>
+          aria-label={`Modelo 721: ${MODELO721_LABELS[status]}. ${modelo721.incompleto ? 'Al menos ' : ''}${formatPercent(Math.min(pct, 999), 0)} del umbral de ${formatEur(modelo721.umbral)}.${modelo721.incompleto ? ` ${pendingPricesText(modelo721.preciosPendientes)}.` : ''} Ver el Modelo 721 en Fiscal`}>
           <span className="relative">
             <Anillo pct={pct} tono={tonoAnillo} />
             <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center text-[10px] mono font-semibold text-fg">{Math.round(Math.min(pct, 999))}%</span>
           </span>
           <span className="min-w-0 space-y-1">
             <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-fg-subtle"><Scale size={12} aria-hidden="true" /> Modelo 721</span>
+            {/* Sin globo dentro del enlace (sería un control anidado): los precios pendientes, en su línea. */}
             <span className={badgeClasses(status === 'obligatorio' ? 'negative' : status === 'incompleto' ? 'warning' : 'positive')}>
-              <TextTooltip label="Precios pendientes" tip={pendingPricesText(modelo721.preciosPendientes)}>{MODELO721_LABELS[status]}</TextTooltip>
+              {MODELO721_LABELS[status]}
             </span>
             <span aria-hidden="true" className="block text-[11px] text-fg-subtle">del umbral de {formatEur(modelo721.umbral)}</span>
+            {modelo721.incompleto && <span className="block text-[11px] text-warning-ink">{pendingPricesText(modelo721.preciosPendientes)}</span>}
           </span>
         </Link>
       ) : <div className={zona}><span className="text-xs text-fg-subtle">Modelo 721: calculando</span></div>}

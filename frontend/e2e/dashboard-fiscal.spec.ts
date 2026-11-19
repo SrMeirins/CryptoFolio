@@ -84,3 +84,19 @@ for (const theme of ['dark', 'light'] as const) {
     expect(violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([])
   })
 }
+
+test('Modelo 721 incompleto: sin controles anidados en la tira y con los precios pendientes', async ({ page }) => {
+  // Se toma la respuesta real y se marca como incompleta con un activo sintético sin precio.
+  await page.route('**/api/fiscal/*/modelo721', async route => {
+    const res = await route.fetch()
+    const json = await res.json()
+    await route.fulfill({ response: res, json: { ...json, incompleto: true, preciosPendientes: ['ZZZ'] } })
+  })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await panel(page)
+  const tira = page.getByTestId('tira-721')
+  await expect(tira.getByRole('link', { name: /^Modelo 721: .+ZZZ.+Ver el Modelo 721 en Fiscal$/ })).toBeVisible()
+  await expect(tira.getByRole('link').first().locator('button, [tabindex="0"]')).toHaveCount(0)
+  const { violations } = await (await axeEstable(page)).include('[data-testid="tira-721"]').withTags(WCAG).analyze()
+  expect(violations.map(v => v.id)).toEqual([])
+})
