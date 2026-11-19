@@ -70,10 +70,13 @@ export function PnlCalendar() {
       refetchInterval: (query) => (query.state.data?.refreshing ? 5_000 : compareYm(ym, current) === 0 ? 60_000 : false),
     },
   )
-  const { data: monthData, isLoading, isError, currency: requested } = monthQ
+  const { data: monthData, isError, currency: requested } = monthQ
+  // Al cambiar de mes, la consulta conserva los datos del anterior mientras carga
+  // (useCurrencyQuery): no se muestran con el nombre del mes nuevo, sino el esqueleto.
+  const isLoading = monthQ.isLoading || monthQ.isPlaceholderData
 
   // Un mes futuro (sin rango) compartiría clave con "Todo": se descarta.
-  const data = range ? monthData : undefined
+  const data = range && !monthQ.isPlaceholderData ? monthData : undefined
   const currency = (view === 'year' ? all?.currency : data?.currency) ?? requested
 
   // Sin todos los cierres, ni calendario ni mejor/peor día: progreso (#334).

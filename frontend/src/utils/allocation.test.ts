@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { FifoLot, FiatBalance } from '../api/portfolio'
 import type { AssetValuation } from './portfolioValuation'
-import { ALLOCATION_PALETTE, NEUTRAL_COLOR, allocationByAsset, allocationByWallet, assetColors, concentration } from './allocation'
+import { ALLOCATION_PALETTE, NEUTRAL_COLOR, allocationByAsset, allocationByWallet, assetColors, concentration, costesPorActivo, costesPorWallet, numeroEfectivo, pesoFrenteACoste } from './allocation'
 import { valuePortfolio } from './portfolioValuation'
 import { contrastRatio } from './contrast'
 
@@ -97,5 +97,60 @@ describe('paleta', () => {
       expect(contrastRatio(c, '#1e2130')).toBeGreaterThanOrEqual(3)
       expect(contrastRatio(c, '#ffffff')).toBeGreaterThanOrEqual(3)
     }
+  })
+})
+
+// Peso frente a coste y diversificación (#514), con datos sintéticos.
+describe('numeroEfectivo', () => {
+  it('N elementos de igual peso valen N; uno solo, 1', () => {
+    const iguales = allocationByAsset([asset('A', 10), asset('B', 10), asset('C', 10), asset('D', 10)], {})
+    expect(numeroEfectivo(iguales)).toEqual({ efectivo: 4, total: 4 })
+    expect(numeroEfectivo(allocationByAsset([asset('A', 10)], {})).efectivo).toBe(1)
+  })
+  it('referencia: pesos 0,5, 0,3 y 0,2 dan 1 / 0,38', () => {
+    const r = numeroEfectivo(allocationByAsset([asset('A', 50), asset('B', 30), asset('C', 20)], {}))
+    expect(r.efectivo).toBeCloseTo(1 / 0.38, 9)
+  })
+  it('los miembros de «Otros» cuentan uno a uno', () => {
+    const many = Array.from({ length: 12 }, (_, i) => asset(`A${i}`, 10))
+    expect(numeroEfectivo(allocationByAsset(many, {}))).toEqual({ efectivo: expect.closeTo(12, 9), total: 12 })
+  })
+  it('sin valor, 0', () => expect(numeroEfectivo([])).toEqual({ efectivo: 0, total: 0 }))
+})
+
+describe('pesoFrenteACoste', () => {
+  const lote = (a: string, w: string, coste: string) => ({ asset: a, wallet_id: w, cost_basis_eur: coste }) as FifoLot
+  const efectivo = { wallet_id: 'w2', asset: 'EUR', balance: '100' } as FiatBalance
+  it('peso en lo invertido y diferencia en puntos con el peso en valor', () => {
+    // A vale 300 y costó 100; B vale 100 y costó 300.
+    const items = allocationByAsset([asset('A', 300), asset('B', 100)], {})
+    const p = pesoFrenteACoste(items, costesPorActivo([lote('A', 'w1', '100'), lote('B', 'w1', '300')], []))
+    expect(p.get('A')).toEqual({ costPct: 25, puntos: 50 })
+    expect(p.get('B')).toEqual({ costPct: 75, puntos: -50 })
+  })
+  it('el efectivo cuesta lo que vale; por wallet suma lotes y efectivo', () => {
+    expect([...costesPorActivo([lote('A', 'w1', '40')], [efectivo])]).toEqual([['A', 40], ['EUR', 100]])
+    expect([...costesPorWallet([lote('A', 'w1', '40'), lote('B', 'w2', '10')], [efectivo])]).toEqual([['w1', 40], ['w2', 110]])
+  })
+  it('«Otros» suma el coste de sus miembros; sin coste, sin datos', () => {
+    const many = Array.from({ length: 10 }, (_, i) => asset(`A${i}`, 10))
+    const items = allocationByAsset(many, {})
+    const costes = new Map(many.map(a => [a.asset, 10]))
+    expect(pesoFrenteACoste(items, costes).get('__otros')).toEqual({ costPct: 20, puntos: expect.closeTo(0, 9) })
+    expect(pesoFrenteACoste(items, new Map()).size).toBe(0)
+  })
+})
+
+describe('allocationByWallet: 24 h ponderada (#514)', () => {
+  it('media de la variación de sus activos ponderada por valor; sin precio de hace 24 h, null', () => {
+    const lots = [
+      { asset: 'A', quantity: '1', wallet_id: 'w1', wallet_name: 'W1', wallet_color: '#111111' },
+      { asset: 'B', quantity: '3', wallet_id: 'w1', wallet_name: 'W1', wallet_color: '#111111' },
+      { asset: 'C', quantity: '1', wallet_id: 'w2', wallet_name: 'W2', wallet_color: '#222222' },
+    ] as FifoLot[]
+    // A: 100 (+10 %); B: 300 (−10 %); media ponderada −5 %.
+    const items = allocationByWallet(lots, [], { A: 100, B: 100, C: 50 }, 1, 8, 0, new Map(), { A: 100 / 1.1, B: 100 / 0.9 })
+    expect(items.find(i => i.key === 'w1')?.change24h).toBeCloseTo(-5, 9)
+    expect(items.find(i => i.key === 'w2')?.change24h).toBeNull()
   })
 })
