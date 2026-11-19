@@ -20,7 +20,7 @@ export interface AllocationItem {
   color: string
   kind: 'crypto' | 'fiat' | 'wallet' | 'other'
   change24h: number | null          // variación 24 h (solo activos cripto con precio de hace 24 h)
-  members: Array<{ label: string; value: number; pct: number }>  // contenido de «Otros»
+  members: Array<{ key: string; label: string; value: number; pct: number }>  // contenido de «Otros»
   /** Por wallet (#506): su composición por activo, los 5 mayores y «Otros», con los colores de la vista por activo. */
   breakdown: AllocationPart[]
 }
@@ -48,7 +48,7 @@ function withOthers(items: AllocationItem[], total: number, max: number, forceRe
   const value = rest.reduce((s, i) => s + i.value, 0)
   return [...shown, {
     key: '__otros', label: 'Otros', value, pct: (value / total) * 100, color: NEUTRAL_COLOR, kind: 'other', change24h: null,
-    members: rest.map(i => ({ label: i.label, value: i.value, pct: i.pct })), breakdown: [],
+    members: rest.map(i => ({ key: i.key, label: i.label, value: i.value, pct: i.pct })), breakdown: [],
   }]
 }
 
@@ -101,12 +101,20 @@ export function allocationByWallet(
   max = MAX_ITEMS,
   minValue = 0,
   colors: ReadonlyMap<string, string> = new Map(),
+  open24: Readonly<Record<string, number>> = {},
 ): AllocationItem[] {
-  const wallets = new Map<string, { label: string; color: string; value: number; byAsset: Map<string, number> }>()
+  const wallets = new Map<string, { label: string; color: string; value: number; byAsset: Map<string, number>; con24: number; delta24: number }>()
   const add = (id: string, label: string, color: string, asset: string, value: number) => {
-    const w = wallets.get(id) ?? { label, color, value: 0, byAsset: new Map<string, number>() }
+    const w = wallets.get(id) ?? { label, color, value: 0, byAsset: new Map<string, number>(), con24: 0, delta24: 0 }
     w.value += value
     w.byAsset.set(asset, (w.byAsset.get(asset) ?? 0) + value)
+    // Variación 24 h de la wallet (#514): ponderada por el valor de sus activos cripto con precio de hace 24 h.
+    const price = prices[asset]
+    const ref = open24[asset]
+    if (price && price > 0 && ref && ref > 0) {
+      w.con24 += value
+      w.delta24 += value * ((price - ref) / ref) * 100
+    }
     wallets.set(id, w)
   }
   for (const l of lots) {
@@ -119,7 +127,7 @@ export function allocationByWallet(
   if (total <= 0) return []
   const items: AllocationItem[] = list.map(([id, w]) => ({
     key: id, label: w.label, value: w.value, pct: (w.value / total) * 100, color: w.color || NEUTRAL_COLOR,
-    kind: 'wallet', change24h: null, members: [], breakdown: walletBreakdown(w.byAsset, w.value, colors),
+    kind: 'wallet', change24h: w.con24 > 0 ? w.delta24 / w.con24 : null, members: [], breakdown: walletBreakdown(w.byAsset, w.value, colors),
   }))
   return withOthers(items, total, max, i => i.value < minValue)
 }
@@ -139,4 +147,63 @@ function walletBreakdown(byAsset: ReadonlyMap<string, number>, walletValue: numb
 export function concentration(items: readonly AllocationItem[], threshold = CONCENTRATION_THRESHOLD): AllocationItem | null {
   const top = items.filter(i => i.kind !== 'other' && i.kind !== 'fiat').sort((a, b) => b.pct - a.pct)[0]
   return top && top.pct / 100 >= threshold ? top : null
+}
+
+// ── Peso frente a coste y diversificación (#514) ─────────────────────────────
+
+/** Coste invertido (EUR) por activo: el de sus lotes abiertos; el efectivo cuesta lo que vale. */
+export function costesPorActivo(lots: readonly FifoLot[], fiat: readonly FiatBalance[]): Map<string, number> {
+  const out = new Map<string, number>()
+  const add = (k: string, v: number) => { if (v > 0) out.set(k, (out.get(k) ?? 0) + v) }
+  for (const l of lots) add(l.asset, parseFloat(l.cost_basis_eur))
+  for (const f of fiat) add(f.asset, parseFloat(f.balance))
+  return out
+}
+
+/** Coste invertido (EUR) por wallet, con las mismas reglas. */
+export function costesPorWallet(lots: readonly FifoLot[], fiat: readonly FiatBalance[]): Map<string, number> {
+  const out = new Map<string, number>()
+  const add = (k: string, v: number) => { if (v > 0) out.set(k, (out.get(k) ?? 0) + v) }
+  for (const l of lots) add(l.wallet_id, parseFloat(l.cost_basis_eur))
+  for (const f of fiat) add(f.wallet_id, parseFloat(f.balance))
+  return out
+}
+
+export interface PesoCoste {
+  /** Peso en lo invertido (%). */
+  costPct: number
+  /** Peso en valor menos peso en lo invertido, en puntos porcentuales. */
+  puntos: number
+}
+
+/**
+ * Peso de cada elemento en lo invertido y su diferencia con el peso en valor:
+ * positivo si pesa más de lo que se puso (se ha revalorizado más que el resto),
+ * negativo si pesa menos. «Otros» suma el coste de lo que agrupa. El coste
+ * total es el de los elementos con valor (los mismos que reparte el anillo).
+ */
+export function pesoFrenteACoste(items: readonly AllocationItem[], costes: ReadonlyMap<string, number>): Map<string, PesoCoste> {
+  const coste = (i: AllocationItem) => (i.kind === 'other' ? i.members.reduce((s, m) => s + (costes.get(m.key) ?? 0), 0) : costes.get(i.key) ?? 0)
+  const total = items.reduce((s, i) => s + coste(i), 0)
+  const out = new Map<string, PesoCoste>()
+  if (total <= 0) return out
+  for (const i of items) {
+    const costPct = (coste(i) / total) * 100
+    out.set(i.key, { costPct, puntos: i.pct - costPct })
+  }
+  return out
+}
+
+/**
+ * Número efectivo de elementos (#514): 1 / Σ pesos², la inversa del índice de
+ * Herfindahl. Con N elementos de igual peso vale N; cuanto más concentrada la
+ * cartera, más se acerca a 1. Se calcula sobre todos los elementos, sin agrupar
+ * en «Otros» (sus miembros cuentan uno a uno).
+ */
+export function numeroEfectivo(items: readonly AllocationItem[]): { efectivo: number; total: number } {
+  const valores = items.flatMap(i => (i.kind === 'other' ? i.members.map(m => m.value) : [i.value])).filter(v => v > 0)
+  const suma = valores.reduce((s, v) => s + v, 0)
+  if (suma <= 0) return { efectivo: 0, total: 0 }
+  const herfindahl = valores.reduce((s, v) => s + (v / suma) ** 2, 0)
+  return { efectivo: 1 / herfindahl, total: valores.length }
 }

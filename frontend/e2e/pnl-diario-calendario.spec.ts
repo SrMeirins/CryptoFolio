@@ -63,7 +63,11 @@ test('detalle del día: día anterior y siguiente, puesto y activos con enlace a
 
 test('el % del mes es el Dietz modificado de la API', async ({ page }) => {
   await calendario(page)
-  await page.getByRole('button', { name: 'Mes anterior' }).click()
+  // Se espera a la respuesta del mes nuevo: hasta entonces no hay total (ni el del mes anterior).
+  await Promise.all([
+    page.waitForResponse(r => /\/pnl\/daily\?.*from=\d{4}-\d{2}-01/.test(r.url()) && r.ok()),
+    page.getByRole('button', { name: 'Mes anterior' }).click(),
+  ])
   const total = page.getByTestId('total-mes')
   await total.waitFor({ timeout: 10_000 }).catch(() => {})
   test.skip(await total.count() === 0, 'Sin días cerrados en el mes anterior')
