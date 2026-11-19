@@ -73,6 +73,9 @@ for (const theme of ['dark', 'light'] as const) {
   test(`panel Fiscal sin violaciones de axe (tema ${theme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' })
     const heroe = await panel(page)
+    // Un ejercicio completo (12 meses) si lo hay: es el caso más apretado de los enlaces de mes.
+    const anterior = page.getByRole('button', { name: /^Ejercicio anterior/ })
+    if (await anterior.isEnabled()) await anterior.click()
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
     await page.mouse.move(0, 0)
     await page.waitForTimeout(300)

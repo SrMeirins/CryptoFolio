@@ -68,9 +68,11 @@ export function FiscalMonthly({ meses, year, enlaceMes }: {
         </ResponsiveContainer>
       </div>
       {/* Meses como enlaces: el mismo destino que pulsar su barra, también con teclado. */}
-      <ol aria-label={`Resultado por mes de ${year}`} className="flex mt-1">
+      {/* Rejilla que se adapta: si caben, una fila alineada con las barras; si no, pasa a dos filas
+          y cada enlace conserva sus 24 px y su separación (WCAG 2.2, tamaño del objetivo). */}
+      <ol aria-label={`Resultado por mes de ${year}`} className="grid grid-cols-[repeat(auto-fit,minmax(1.625rem,1fr))] gap-y-1 mt-1">
         {meses.map(m => (
-          <li key={m.mes} className="flex-1 min-w-0 text-center">
+          <li key={m.mes} className="min-w-0 text-center">
             <Link to={enlaceMes(m.mes)}
               aria-label={`${nombreMes(m)} de ${year}: ${signed(m.netoMes)}, ${m.operacionesMes} ${m.operacionesMes === 1 ? 'operación' : 'operaciones'}. Ver sus operaciones en Fiscal`}
               className="inline-flex items-center justify-center h-6 min-w-6 px-0.5 rounded text-[10px] text-fg-subtle capitalize hover:text-fg hover:bg-overlay/5 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
