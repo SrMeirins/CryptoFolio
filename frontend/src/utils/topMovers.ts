@@ -6,7 +6,8 @@ import type { AssetValuation } from './portfolioValuation'
 // activos los agrupa aparte y el ranking los excluye.
 export const DUST_THRESHOLD_EUR = 1
 
-export type MoversMode = '24h' | 'total'
+/** «hoy» compara con el cierre de ayer (#513), «24h» con hace 24 horas y «total» con el precio medio de compra. */
+export type MoversMode = 'hoy' | '24h' | 'total'
 
 export interface MoverItem {
   asset: string
@@ -133,7 +134,7 @@ export function heatmapCells(items: readonly MoverData[], minShare = 0.01): Heat
 }
 
 /** Tope de la escala de color: a partir de esta variación el color ya es el más intenso. */
-export const HEAT_CAP: Record<MoversMode, number> = { '24h': 5, total: 50 }
+export const HEAT_CAP: Record<MoversMode, number> = { hoy: 5, '24h': 5, total: 50 }
 
 /**
  * Intensidad del color de una celda (0–1): 0 sin variación; de 0,12 a 1 con

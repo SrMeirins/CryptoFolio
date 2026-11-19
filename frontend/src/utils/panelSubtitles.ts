@@ -59,9 +59,10 @@ export function activitySubtitle(count: number): string {
   return count === 0 ? 'Sin operaciones todavía' : count === 1 ? 'Última operación' : `Últimas ${count} operaciones`
 }
 
-/** «13 activos · precios en vivo» o, en Total, «13 activos · sobre el precio medio de compra». */
-export function moversSubtitle(mode: '24h' | 'total', assetCount: number): string {
-  return `${plural(assetCount, 'activo', 'activos')} · ${mode === '24h' ? 'variación en 24 h, en vivo' : 'sobre el precio medio de compra'}`
+/** «13 activos · desde las 00:00, en vivo», «… variación en 24 h, en vivo» o «… sobre el precio medio de compra». */
+export function moversSubtitle(mode: 'hoy' | '24h' | 'total', assetCount: number): string {
+  const que = mode === 'hoy' ? 'desde las 00:00, en vivo' : mode === '24h' ? 'variación en 24 h, en vivo' : 'sobre el precio medio de compra'
+  return `${plural(assetCount, 'activo', 'activos')} · ${que}`
 }
 
 /** «Octubre de 2026 · hora de Madrid» o, en la vista anual, «2026 · 12 meses». */
