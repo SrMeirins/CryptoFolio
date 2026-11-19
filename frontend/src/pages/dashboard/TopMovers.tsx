@@ -19,7 +19,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { escalaImpacto, PERIODO_METRICA, referenciasHoy, resumenMovimiento, textoContadores, type ResumenMovimiento } from '../../utils/variacionMapa'
 import { MoversHeatmap } from './MoversHeatmap'
 
-const signed = (n: number, currency: ReturnType<typeof useCurrency>) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${formatMoney(Math.abs(n), currency)}`
+// Sin signo lo que redondea a cero: nunca «−0,00 €».
+const signed = (n: number, currency: ReturnType<typeof useCurrency>) => `${n >= 0.005 ? '+' : n <= -0.005 ? '−' : ''}${formatMoney(Math.abs(n), currency)}`
 
 // Fila del ranking (#513): toda la fila enlaza al activo en Portfolio. La barra
 // mide su impacto en euros frente al mayor de la cartera y el texto lo pone en

@@ -7,7 +7,8 @@ import { formatEur } from '../../../utils/format'
 // (lleva a Fiscal) e IRPF estimado (lleva a Planificar o, en un ejercicio
 // cerrado, a su Resumen), cada una con su desglose en la ayuda.
 
-const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${formatEur(Math.abs(n))}`
+// Sin signo lo que redondea a cero: nunca «−0,00 €».
+const signed = (n: number) => `${n >= 0.005 ? '+' : n <= -0.005 ? '−' : ''}${formatEur(Math.abs(n))}`
 const fila = (k: string, v: string) => <div className="flex justify-between gap-4"><dt className="text-fg-subtle">{k}</dt><dd className="mono">{v}</dd></div>
 
 export function HeroeFiscal({ year, enCurso, gainLoss, gains, losses, ops, rendimientos, base, compensado, tax, enlaces }: {
@@ -33,8 +34,8 @@ export function HeroeFiscal({ year, enCurso, gainLoss, gains, losses, ops, rendi
           Ganancia o pérdida {year}
           <InfoTooltip label="Desglose de la ganancia o pérdida">
             <dl className="space-y-0.5 min-w-52">
-              {fila('Ganancias', `+${formatEur(gains)}`)}
-              {fila('Pérdidas', `−${formatEur(Math.abs(losses))}`)}
+              {fila('Ganancias', signed(gains))}
+              {fila('Pérdidas', signed(-Math.abs(losses)))}
               {fila('Operaciones', String(ops))}
             </dl>
             <p className="mt-1.5 text-fg-subtle">Ganancias y pérdidas patrimoniales realizadas (ventas y permutas) del ejercicio, sin rendimientos del staking ni compensación de años anteriores.</p>

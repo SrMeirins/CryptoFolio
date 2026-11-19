@@ -73,7 +73,7 @@ export function FiscalMonthly({ meses, year, enlaceMes }: {
           <li key={m.mes} className="flex-1 min-w-0 text-center">
             <Link to={enlaceMes(m.mes)}
               aria-label={`${nombreMes(m)} de ${year}: ${signed(m.netoMes)}, ${m.operacionesMes} ${m.operacionesMes === 1 ? 'operación' : 'operaciones'}. Ver sus operaciones en Fiscal`}
-              className="inline-block min-w-6 px-0.5 rounded text-[10px] text-fg-subtle capitalize hover:text-fg hover:bg-overlay/5 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
+              className="inline-flex items-center justify-center h-6 min-w-6 px-0.5 rounded text-[10px] text-fg-subtle capitalize hover:text-fg hover:bg-overlay/5 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand">
               {m.label}
             </Link>
           </li>
