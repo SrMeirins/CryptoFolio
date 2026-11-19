@@ -250,7 +250,7 @@ export function Dashboard() {
 
       {/* Paneles con entrada escalonada y elevación al pasar el cursor (#232) */}
       <div className={panelClasses('rounded-xl')} style={panelEnterStyle(1)}>
-        <TopMovers lots={lots} />
+        <TopMovers lots={lots} pnlHoy={preparacion.listo ? liveToday?.pnl ?? null : null} />
       </div>
 
       <div ref={evolutionRef} id="evolucion" tabIndex={-1} role="region" aria-label="Evolución de la cartera"

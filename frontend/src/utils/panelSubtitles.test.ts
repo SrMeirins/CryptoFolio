@@ -38,6 +38,7 @@ describe('subtítulos de página y panel', () => {
     expect(activitySubtitle(0)).toBe('Sin operaciones todavía')
     expect(moversSubtitle('24h', 13)).toBe('13 activos · variación en 24 h, en vivo')
     expect(moversSubtitle('total', 1)).toBe('1 activo · sobre el precio medio de compra')
+    expect(moversSubtitle('hoy', 2)).toBe('2 activos · desde las 00:00, en vivo')
     expect(calendarSubtitle('month', 'Octubre de 2026', 2026)).toBe('Octubre de 2026 · día natural, hora de Madrid')
     expect(calendarSubtitle('year', '', 2026)).toBe('2026 · resumen por meses')
   })
