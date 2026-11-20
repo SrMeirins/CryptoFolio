@@ -83,6 +83,15 @@ export const historyExportSchema = z.strictObject(filtersShape)
   .refine(datesInOrder, datesMessage).refine(amountsInOrder, amountsMessage);
 export type HistoryFilters = z.infer<typeof historyExportSchema>;
 
+// Estadísticas (#516): los mismos filtros más la granularidad del gráfico; «dia»
+// lo agrupa por días de la zona de la app (mapa de actividad del Dashboard).
+export const HISTORY_STATS_GRANULARITIES = ['dia'] as const;
+export const historyStatsSchema = z.strictObject({
+  ...filtersShape,
+  granularidad: z.enum(HISTORY_STATS_GRANULARITIES, { error: `granularidad debe ser: ${HISTORY_STATS_GRANULARITIES.join(', ')}` }).optional(),
+}).refine(datesInOrder, datesMessage).refine(amountsInOrder, amountsMessage);
+export type HistoryStatsQuery = z.infer<typeof historyStatsSchema>;
+
 /** ¿Hay algún filtro aplicado (no cuentan orden ni moneda)? */
 export function hasFilters(f: HistoryFilters): boolean {
   return !!(f.asset?.length || f.type?.length || f.wallet_id || f.import_id || f.account || f.date_from || f.date_to

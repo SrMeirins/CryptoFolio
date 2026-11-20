@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ByCategory, HistoryStats } from '../../../api/portfolio'
-import { activePeriod, chartPeriodText, chartRows, periodBreakdown, periodRange, statsParams } from './statsChart'
+import { activePeriod, chartPeriodText, chartRows, periodBreakdown, periodLabel, periodRange, statsParams } from './statsChart'
 
 const cats = (over: Partial<ByCategory> = {}): ByCategory => ({
   compras: 0, ventas: 0, otras_salidas: 0, ingresos: 0, transferencias: 0, otros: 0, ...over,
@@ -87,5 +87,12 @@ describe('periodRange, activePeriod y periodBreakdown (#413)', () => {
     const porValor = periodBreakdown(chart.buckets[0], 'valor', 'EUR')
     expect(porValor.items[0].category).toBe('ventas')
     expect(periodBreakdown(chart.buckets[1], 'ops', 'EUR').items).toEqual([])
+  })
+})
+
+describe('granularidad diaria (#516)', () => {
+  it('etiqueta y rango de un día', () => {
+    expect(periodLabel('2026-11-03', 'day')).toBe('3 nov')
+    expect(periodRange('2026-11-03', 'day')).toEqual({ from: '2026-11-03', to: '2026-11-03' })
   })
 })

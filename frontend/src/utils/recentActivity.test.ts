@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dayLabel, filterActivity, groupByDay, localDay, localTimeOf, selectRecent } from './recentActivity'
+import { agruparRafagas, dayLabel, diasDesde, filterActivity, groupByDay, limitarFilas, localDay, localTimeOf, selectRecent } from './recentActivity'
 
 // Actividad reciente (#237).
 const TODAY = '2026-10-15'
@@ -15,14 +15,14 @@ describe('hora de Madrid', () => {
 })
 
 describe('selectRecent', () => {
-  it('últimos 7 días, como máximo 12', () => {
+  it('últimos 7 días, todas (el tope de filas va tras agrupar ráfagas, #516)', () => {
     const txs = [...Array.from({ length: 15 }, () => tx('2026-10-14T10:00:00Z')), tx('2026-10-01T10:00:00Z')]
-    expect(selectRecent(txs, TODAY)).toHaveLength(12)
+    expect(selectRecent(txs, TODAY)).toHaveLength(15)
     expect(selectRecent([tx('2026-10-09T10:00:00Z'), tx('2026-10-08T10:00:00Z')], TODAY)).toHaveLength(1)
   })
-  it('sin operaciones en 7 días: las 8 más recientes', () => {
-    const old = Array.from({ length: 10 }, (_, i) => tx(`2026-09-${String(20 - i).padStart(2, '0')}T10:00:00Z`))
-    expect(selectRecent(old, TODAY)).toHaveLength(8)
+  it('sin operaciones en 7 días: las 10 más recientes', () => {
+    const old = Array.from({ length: 12 }, (_, i) => tx(`2026-09-${String(20 - i).padStart(2, '0')}T10:00:00Z`))
+    expect(selectRecent(old, TODAY)).toHaveLength(10)
     expect(selectRecent([], TODAY)).toEqual([])
   })
 })
@@ -43,5 +43,36 @@ describe('agrupación por día', () => {
     expect(dayLabel('2026-09-03', TODAY)).toBe('Jueves, 3 sept')
     const groups = groupByDay([tx('2026-10-15T10:00:00Z'), tx('2026-10-15T08:00:00Z'), tx('2026-10-13T10:00:00Z')], TODAY)
     expect(groups.map(g => [g.label, g.items.length])).toEqual([['Hoy', 2], ['Martes, 13 oct', 1]])
+  })
+})
+
+describe('agruparRafagas y diasDesde (#516)', () => {
+  const op = (id: string, operation_type: string, asset: string, timestamp: string) => ({ tx: { id, operation_type, asset, timestamp } })
+  it('agrupa seguidas del mismo tipo, activo y minuto; el resto, solas', () => {
+    const r = agruparRafagas([
+      op('a', 'BUY', 'XRP', '2026-10-14T10:00:05Z'),
+      op('b', 'BUY', 'XRP', '2026-10-14T10:00:40Z'),
+      op('c', 'BUY', 'XRP', '2026-10-14T10:00:59Z'),
+      op('d', 'BUY', 'XRP', '2026-10-14T10:01:00Z'),
+      op('e', 'SELL', 'XRP', '2026-10-14T10:01:10Z'),
+      op('f', 'BUY', 'ADA', '2026-10-14T10:01:20Z'),
+    ])
+    expect(r.map(g => [g.key, g.items.length])).toEqual([['a', 3], ['d', 1], ['e', 1], ['f', 1]])
+  })
+  it('el minuto es el de la zona de la app y la agrupación cruza bien la medianoche UTC', () => {
+    // 23:00:10 y 23:00:50 UTC son las 00:00 del día siguiente en Madrid: misma ráfaga.
+    const r = agruparRafagas([op('a', 'STAKING_REWARD', 'ADA', '2026-10-14T23:00:10Z'), op('b', 'STAKING_REWARD', 'ADA', '2026-10-14T23:00:50Z')])
+    expect(r).toHaveLength(1)
+  })
+  it('días desde una operación en la zona de la app', () => {
+    expect(diasDesde('2026-10-14T10:00:00Z', '2026-10-14')).toBe(0)
+    expect(diasDesde('2026-09-13T22:30:00Z', '2026-10-14')).toBe(30)
+  })
+})
+
+describe('limitarFilas (#516)', () => {
+  it('como mucho N filas en total, sin días vacíos', () => {
+    const r = limitarFilas([{ day: 'a', filas: [1, 2, 3] }, { day: 'b', filas: [4, 5] }, { day: 'c', filas: [6] }], 4)
+    expect(r).toEqual([{ day: 'a', filas: [1, 2, 3] }, { day: 'b', filas: [4] }])
   })
 })

@@ -536,7 +536,7 @@ export interface HistoryStats {
     fees_in_price_ops: number
   }
   chart: {
-    granularity: 'month' | 'year'; from: string; to: string
+    granularity: 'day' | 'month' | 'year'; from: string; to: string
     buckets: { periodo: string; ops: ByCategory; valor: { EUR: ByCategory; USD: ByCategory } }[]
   }
   /** Rankings: sobre lo filtrado con fechas; sin ellas, el último año. */

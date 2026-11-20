@@ -33,3 +33,19 @@ describe('todayIn (#376)', () => {
     expect(todayIn('UTC', new Date('2026-10-21T22:30:00Z'))).toBe('2026-10-21');
   });
 });
+
+describe('dailyPeriod (#516)', () => {
+  it('sin fechas: las 26 semanas (182 días) hasta hoy', () => {
+    expect(chartPeriod({}, '2026-11-20', 'dia')).toEqual({ granularity: 'day', from: '2026-05-23', to: '2026-11-20' });
+  });
+  it('con rango: sus días; sin final, hasta hoy', () => {
+    expect(chartPeriod({ date_from: '2026-11-01', date_to: '2026-11-07' }, '2026-11-20', 'dia')).toEqual({ granularity: 'day', from: '2026-11-01', to: '2026-11-07' });
+    expect(chartPeriod({ date_from: '2026-11-15' }, '2026-11-20', 'dia')).toEqual({ granularity: 'day', from: '2026-11-15', to: '2026-11-20' });
+  });
+  it('como mucho 400 días: se recorta el inicio', () => {
+    expect(chartPeriod({ date_from: '2020-01-01', date_to: '2026-11-20' }, '2026-11-20', 'dia').from).toBe('2025-10-17');
+  });
+  it('sin granularidad, como siempre: por meses', () => {
+    expect(chartPeriod({}, '2026-11-20').granularity).toBe('month');
+  });
+});
