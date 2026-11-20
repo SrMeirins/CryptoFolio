@@ -15,7 +15,10 @@ export const CATEGORY_LABELS: Record<StatsCategory, string> = {
 export interface ChartRow extends Record<StatsCategory, number> { periodo: string; label: string; total: number }
 
 /** Etiqueta de un periodo: «mar 25» por meses, «2025» por años. */
-export function periodLabel(periodo: string, granularity: 'month' | 'year'): string {
+const DIA_CORTO = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+
+export function periodLabel(periodo: string, granularity: 'day' | 'month' | 'year'): string {
+  if (granularity === 'day') return DIA_CORTO.format(new Date(`${periodo}T00:00:00Z`)).replace('.', '')
   return granularity === 'year' ? periodo : fmtMonthLabel(periodo)
 }
 
@@ -49,7 +52,9 @@ export function statsParams(listParams: Record<string, string>): Record<string, 
 }
 
 /** Rango de fechas (AAAA-MM-DD) de un periodo del gráfico (#413): el mes o el año completo. */
-export function periodRange(periodo: string, granularity: 'month' | 'year'): { from: string; to: string } {
+export function periodRange(periodo: string, granularity: 'day' | 'month' | 'year'): { from: string; to: string } {
+  // Por días (#516): el propio día.
+  if (granularity === 'day') return { from: periodo, to: periodo }
   if (granularity === 'year') return { from: `${periodo}-01-01`, to: `${periodo}-12-31` }
   const [y, m] = periodo.split('-').map(Number)
   const last = new Date(Date.UTC(y, m, 0)).getUTCDate()

@@ -9,7 +9,7 @@ import { feeInPriceSql } from './feeInPrice';
 import { chartPeriod, todayIn, type ChartPeriod } from './statsPeriod';
 
 // Estadísticas del Historial sobre lo filtrado (#376): tarjetas, gráfico de
-// actividad por mes o año (número y valor por categoría) y rankings de
+// actividad por día (#516), mes o año (número y valor por categoría) y rankings de
 // activos y comisiones. Los mismos CTEs que la lista: «Operaciones» cuenta las
 // filas visibles (#371) y las comisiones, todas las cobradas en lo filtrado.
 // Importes en EUR y USD (con el tipo de su fecha; 0 si no hay tipo, como
@@ -89,11 +89,11 @@ const money = (eur: unknown, usd: unknown): Money => ({ EUR: num(eur), USD: num(
 const emptyCategories = (): ByCategory => ({ compras: 0, ventas: 0, otras_salidas: 0, ingresos: 0, transferencias: 0, otros: 0 });
 
 export async function getHistoryStats(
-  db: Queryable, f: HistoryFilters, tz: string, now = new Date(), includeMargin = true,
+  db: Queryable, f: HistoryFilters, tz: string, now = new Date(), includeMargin = true, granularidad?: 'dia',
 ): Promise<HistoryStats> {
   const grouped = groupingEnabled(f);
   const { ctes, params } = filteredValuedCtes(f, tz, grouped);
-  const period = chartPeriod(f, todayIn(tz, now));
+  const period = chartPeriod(f, todayIn(tz, now), granularidad);
   const datesFiltered = !!(f.date_from || f.date_to);
   const all = [...params, tz, period.from, period.to];
   const [tzP, fromP, toP] = [all.length - 2, all.length - 1, all.length].map(i => `$${i}`);
@@ -106,7 +106,7 @@ export async function getHistoryStats(
   const marginAccountsP = `$${all.length}::text[]`;
   const notMargin = includeMargin ? 'TRUE' : 'NOT is_margin';
   const unit = period.granularity;
-  const fmt = unit === 'year' ? 'YYYY' : 'YYYY-MM';
+  const fmt = unit === 'year' ? 'YYYY' : unit === 'day' ? 'YYYY-MM-DD' : 'YYYY-MM';
   const recent = datesFiltered ? 'TRUE' : `timestamp >= NOW() - INTERVAL '1 year'`;
 
   const { rows } = await db.query(
