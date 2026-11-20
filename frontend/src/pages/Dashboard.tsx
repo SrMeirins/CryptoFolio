@@ -13,6 +13,7 @@ import { dailyPnlQuery, eurFlowQuery } from '../queries/currencyQueries'
 import { computeChange24h } from '../utils/change24h'
 import { TopMovers } from './dashboard/TopMovers'
 import { RecentActivity } from './dashboard/RecentActivity'
+import { IngresosPasivos } from './dashboard/IngresosPasivos'
 import { EvolutionCard } from './dashboard/EvolutionCard'
 import { PnlCalendar } from './dashboard/PnlCalendar'
 import { RendimientoCard } from './dashboard/RendimientoCard'
@@ -281,6 +282,11 @@ export function Dashboard() {
 
       <div className={panelClasses('rounded-xl')} style={panelEnterStyle(6)}>
         <RecentActivity />
+      </div>
+
+      {/* Ingresos pasivos (#518), bajo Actividad reciente. */}
+      <div className={panelClasses('rounded-xl min-w-0')} style={panelEnterStyle(6)}>
+        <IngresosPasivos />
       </div>
 
     </div>
