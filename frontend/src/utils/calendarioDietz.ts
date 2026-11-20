@@ -24,13 +24,32 @@ export interface DiaValorado extends CalendarDay {
 const round2 = (n: number) => Math.round(n * 100) / 100
 const round4 = (n: number) => Math.round(n * 10_000) / 10_000
 
-/** Dietz modificado de los días dados (consecutivos) con el valor previo; 0 si la base es ínfima. */
-export function dietzModificado(previousValue: number, days: readonly DiaValorado[]): number {
-  const threshold = Math.max(MIN_BASE_ABS, days.reduce((m, d) => Math.max(m, d.value), previousValue) * MIN_BASE_SHARE)
+/** Base media por debajo de esta fracción del valor máximo del periodo: el % es poco representativo (#517). */
+export const BASE_REPRESENTATIVA = 0.1
+/** Por encima de este |%|, el Dietz de un periodo se considera poco representativo (#517). */
+export const PCT_REPRESENTATIVO = 100
+
+export interface DietzDetalle {
+  pct: number
+  /** La base nunca llegó al umbral de capital ínfimo: no hay %. */
+  sinBase: boolean
+  /** El % es comparable: hay base suficiente frente al valor del periodo y no pasa de ±100 %. */
+  fiable: boolean
+}
+
+/**
+ * Dietz modificado con su fiabilidad (#517). Con poco capital al inicio y
+ * depósitos grandes, la base media (el denominador) es diminuta y el % se
+ * dispara (puede pasar de −100 %): se marca como poco representativo.
+ */
+export function dietzDetalle(previousValue: number, days: readonly DiaValorado[]): DietzDetalle {
+  const maxValor = days.reduce((m, d) => Math.max(m, d.value), previousValue)
+  const threshold = Math.max(MIN_BASE_ABS, maxValor * MIN_BASE_SHARE)
   let total = 0
   let sumFlows = 0
   let sumIndexed = 0
   let dietz = 0
+  let baseUsada: number | null = null
   days.forEach((d, i) => {
     const m = i + 1
     const flow = d.inflow - d.outflow
@@ -38,15 +57,26 @@ export function dietzModificado(previousValue: number, days: readonly DiaValorad
     sumFlows += flow
     sumIndexed += m * flow
     const base = previousValue + (m * sumFlows - sumIndexed) / m
-    if (base >= threshold) dietz = (total / base) * 100
+    if (base >= threshold) { dietz = (total / base) * 100; baseUsada = base }
   })
-  return round4(dietz)
+  const pct = round4(dietz)
+  if (baseUsada === null) return { pct: 0, sinBase: true, fiable: false }
+  return { pct, sinBase: false, fiable: Math.abs(pct) <= PCT_REPRESENTATIVO && baseUsada >= maxValor * BASE_REPRESENTATIVA }
+}
+
+/** Dietz modificado de los días dados (consecutivos) con el valor previo; 0 si la base es ínfima. */
+export function dietzModificado(previousValue: number, days: readonly DiaValorado[]): number {
+  return dietzDetalle(previousValue, days).pct
 }
 
 export interface TotalTramo {
   pnl: number
   /** Dietz modificado del tramo. */
   pct: number
+  /** Sin capital invertido en todo el tramo: no hay % (#517). */
+  sinBase: boolean
+  /** % comparable (ver dietzDetalle); si no, se muestra atenuado y no cuenta para extremos (#517). */
+  fiable: boolean
   /** Días con dato (cerrados o en curso). */
   dias: number
   /** Incluye el día en curso. */
@@ -62,9 +92,12 @@ export function totalTramo(historia: readonly DiaValorado[], from: string, to: s
   const conDato = tramo.filter(d => d.complete || d.live)
   if (conDato.length === 0) return null
   const previo = i0 > 0 ? historia[i0 - 1].value : 0
+  const dz = dietzDetalle(previo, tramo)
   return {
     pnl: round2(conDato.reduce((s, d) => s + d.pnl, 0)),
-    pct: dietzModificado(previo, tramo),
+    pct: dz.pct,
+    sinBase: dz.sinBase,
+    fiable: dz.fiable,
     dias: conDato.length,
     enCurso: conDato.some(d => d.live),
   }

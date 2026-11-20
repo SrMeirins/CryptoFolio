@@ -44,9 +44,10 @@ export function minBase(points: readonly EvolutionPoint[]): number {
 
 /**
  * Rentabilidad y P&L de cada día o tramo. El % se anula si el capital de
- * partida (valor anterior más depósitos) no llega al umbral.
+ * partida (valor anterior más depósitos) no llega al umbral. Lo usan la «Máx.
+ * caída» de Evolución y el panel Rendimiento (#517), para que coincidan.
  */
-function steps(points: readonly EvolutionPoint[]): Step[] {
+export function steps(points: readonly EvolutionPoint[]): Step[] {
   const threshold = minBase(points)
   return points.map((p, i) => {
     const pnl = p.pnl - (i > 0 ? points[i - 1].pnl : 0)

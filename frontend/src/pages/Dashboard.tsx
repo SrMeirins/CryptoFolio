@@ -15,6 +15,7 @@ import { TopMovers } from './dashboard/TopMovers'
 import { RecentActivity } from './dashboard/RecentActivity'
 import { EvolutionCard } from './dashboard/EvolutionCard'
 import { PnlCalendar } from './dashboard/PnlCalendar'
+import { RendimientoCard } from './dashboard/RendimientoCard'
 import { AllocationChart } from './dashboard/AllocationChart'
 import { FiscalCard } from './dashboard/FiscalCard'
 import { localToday } from '../utils/pnlChart'
@@ -256,6 +257,11 @@ export function Dashboard() {
       <div ref={evolutionRef} id="evolucion" tabIndex={-1} role="region" aria-label="Evolución de la cartera"
         className={panelClasses('rounded-xl scroll-mt-4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60')} style={panelEnterStyle(2)}>
         <EvolutionCard />
+      </div>
+
+      {/* Rendimiento por periodos y riesgo (#517), bajo Evolución. */}
+      <div className={panelClasses('rounded-xl min-w-0')} style={panelEnterStyle(3)}>
+        <RendimientoCard />
       </div>
 
       <div className={panelClasses('rounded-xl')} style={panelEnterStyle(3)}>
