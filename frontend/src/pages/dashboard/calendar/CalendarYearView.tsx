@@ -16,6 +16,15 @@ import { signedMoney, signedPct } from './format'
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 const inkOf = (n: number) => (n > 0 ? 'text-positive-ink' : n < 0 ? 'text-negative-ink' : 'text-fg-muted')
 
+/** % del mes o del año (#517): «—» sin capital; atenuado y en cursiva si es poco representativo. */
+function PctTramo({ t, className = '' }: { t: Pick<TotalTramo, 'pct' | 'sinBase' | 'fiable'>; className?: string }) {
+  if (t.sinBase) return <span className={`mono text-fg-subtle ${className}`}>—</span>
+  if (!t.fiable) return <span className={`mono italic text-fg-muted underline decoration-dotted ${className}`}>{signedPct(t.pct)}</span>
+  return <span className={`mono font-semibold ${inkOf(t.pct)} ${className}`}>{signedPct(t.pct)}</span>
+}
+const pctLector = (t: Pick<TotalTramo, 'pct' | 'sinBase' | 'fiable'>) =>
+  t.sinBase ? 'sin capital invertido' : `${signedPct(t.pct)}${t.fiable ? '' : ', poco representativo por el poco capital invertido'}`
+
 /** Mini tira de barras de los días del mes, decorativa (las cifras van en el nombre accesible). */
 function MiniBarras({ diarios }: { diarios: ReadonlyArray<number | null> }) {
   const max = diarios.reduce<number>((m, v) => Math.max(m, Math.abs(v ?? 0)), 0)
@@ -54,7 +63,7 @@ export function CalendarYearView({ year, months, total, current, currency, onOpe
         <p className="mb-3 flex items-baseline gap-2 flex-wrap" data-testid="total-anio">
           <span className="text-[10.5px] uppercase tracking-widest text-fg-subtle">Total de {year}{total.enCurso ? ', con hoy en vivo' : ''}</span>
           <span className={`text-lg mono font-bold tabular-nums ${inkOf(total.pnl)}`}>{signedMoney(total.pnl, currency)}</span>
-          <span className={`text-xs mono font-semibold ${inkOf(total.pct)}`}>{signedPct(total.pct)}</span>
+          <PctTramo t={total} className="text-xs" />
         </p>
       )}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
@@ -69,7 +78,7 @@ export function CalendarYearView({ year, months, total, current, currency, onOpe
             <button key={name} type="button" disabled={future} onClick={() => onOpen(ym)}
               onMouseEnter={() => setEnfocado(i)} onMouseLeave={() => setEnfocado(null)}
               onFocus={() => setEnfocado(i)} onBlur={() => setEnfocado(null)}
-              aria-label={`${name} de ${year}${t ? `: ${signedMoney(t.pnl, currency)}, ${signedPct(t.pct)}${marca ? `, ${marca.toLowerCase()}` : ''}${t.enCurso ? ', en curso' : ''}` : future ? ': mes futuro' : ': sin datos'}`}
+              aria-label={`${name} de ${year}${t ? `: ${signedMoney(t.pnl, currency)}, ${pctLector(t)}${marca ? `, ${marca.toLowerCase()}` : ''}${t.enCurso ? ', en curso' : ''}` : future ? ': mes futuro' : ': sin datos'}`}
               style={t ? heatVars(t.pnl, maxAbs) as CSSProperties : undefined}
               className={`relative min-h-24 rounded-xl text-left p-3 transition-[transform,box-shadow] duration-150 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand
                 disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:-translate-y-0.5 motion-reduce:transition-none
@@ -86,7 +95,7 @@ export function CalendarYearView({ year, months, total, current, currency, onOpe
                 <span aria-hidden="true" className="block mt-1">
                   <span className="flex items-baseline justify-between gap-2 flex-wrap">
                     <span className={`text-[15px] mono font-bold tabular-nums ${inkOf(t.pnl)}`}>{signedMoney(t.pnl, currency)}</span>
-                    <span className={`text-[11px] mono font-semibold ${inkOf(t.pct)}`}>{signedPct(t.pct)}</span>
+                    <PctTramo t={t} className="text-[11px]" />
                   </span>
                   <span className="block mt-1.5"><MiniBarras diarios={t.diarios} /></span>
                 </span>
@@ -95,6 +104,9 @@ export function CalendarYearView({ year, months, total, current, currency, onOpe
           )
         })}
       </div>
+      {months.some(m => m && !m.sinBase && !m.fiable) && (
+        <p className="mt-2 text-[11px] text-fg-subtle"><span className="italic underline decoration-dotted text-fg-muted">% en cursiva</span>: poco capital invertido ese mes, el porcentaje no es representativo.</p>
+      )}
       <CalendarLegend maxAbs={maxAbs} currency={currency} unidad="mes" marcador={enfocado !== null ? months[enfocado]?.pnl ?? null : null} />
     </div>
   )

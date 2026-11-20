@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dietzModificado, extremosAnio, totalMes, totalTramo, totalesAnio, type DiaValorado } from './calendarioDietz'
+import { dietzDetalle, dietzModificado, extremosAnio, totalMes, totalTramo, totalesAnio, type DiaValorado } from './calendarioDietz'
 
 // Datos sintéticos.
 const dia = (date: string, value: number, pnl: number, flujo = 0, extra: Partial<DiaValorado> = {}): DiaValorado => ({
@@ -56,5 +56,24 @@ describe('totalesAnio y extremosAnio', () => {
   it('mejor y peor mes por importe', () => {
     expect(extremosAnio(totalesAnio(historia, 2026))).toEqual({ mejor: 0, peor: 2 })
     expect(extremosAnio([null, null])).toEqual({ mejor: null, peor: null })
+  })
+})
+
+describe('dietzDetalle: fiabilidad (#517)', () => {
+  // Datos sintéticos.
+  const v = (date: string, value: number, pnl: number, flujo = 0): DiaValorado => ({
+    date, value, pnl, pct: null, complete: true, live: false, inflow: Math.max(0, flujo), outflow: Math.max(0, -flujo),
+  })
+  it('sin capital en todo el tramo: sin base', () => {
+    expect(dietzDetalle(0, [v('2026-01-01', 0, 0), v('2026-01-02', 0, 0)])).toEqual({ pct: 0, sinBase: true, fiable: false })
+  })
+  it('poco capital al inicio y un depósito grande al final: % disparado y poco representativo', () => {
+    // Empieza con 10; el último día entran 1.000 y se pierden 100.
+    const d = dietzDetalle(10, [v('2026-01-01', 10, 0), v('2026-01-02', 910, -100, 1000)])
+    expect(d.pct).toBeLessThan(-100)
+    expect(d).toMatchObject({ sinBase: false, fiable: false })
+  })
+  it('con base suficiente y % moderado, fiable', () => {
+    expect(dietzDetalle(1000, [v('2026-01-01', 1050, 50)])).toEqual({ pct: 5, sinBase: false, fiable: true })
   })
 })
