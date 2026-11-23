@@ -4,6 +4,7 @@ import { ThemeSelector } from '../../components/ThemeSelector'
 import { TimezoneSetting } from './TimezoneSetting'
 import { PreferencesCard } from './PreferencesCard'
 import { NotificationsCard } from './NotificationsCard'
+import { MetasCard } from './MetasCard'
 import { AboutCard } from './AboutCard'
 import { SettingsCard } from './SettingsCard'
 import { SavedMark } from './SavedMark'
@@ -37,11 +38,14 @@ export function GeneralSection() {
       {/* Preferencias (#446) */}
       <PreferencesCard index={3} />
 
+      {/* Metas de inversión (#520): las mismas que la franja del Dashboard */}
+      <MetasCard index={4} />
+
       {/* Notificaciones (#447): interruptores por categoría; la lista, en la campana */}
-      <NotificationsCard index={4} />
+      <NotificationsCard index={5} />
 
       {/* Acerca de (#447) */}
-      <AboutCard index={5} />
+      <AboutCard index={6} />
 
     </div>
   )

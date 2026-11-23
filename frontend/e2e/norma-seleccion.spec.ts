@@ -38,8 +38,15 @@ test('nivel 2, Fiscal: pestañas con URL y teclado', async ({ page }) => {
  * espera a que pasen `ms` sin ninguna en vuelo ni nueva (como mucho `max`):
  * al responder, una consulta lenta dispara otras que dependen de ella.
  */
+/**
+ * Petición de datos de la API. Los iconos de activo (/api/assets/X/icon) son
+ * imágenes con carga diferida: llegan cuando entran en pantalla, no por el
+ * cambio de opción, así que no cuentan.
+ */
+const esConsulta = (url: string) => url.includes('/api/') && !/\/api\/assets\/[^/]+\/icon/.test(url)
+
 function vigilarRed(page: Page) {
-  const api = (r: { url(): string }) => r.url().includes('/api/')
+  const api = (r: { url(): string }) => esConsulta(r.url())
   let enVuelo = 0
   let ultima = Date.now()
   page.on('request', r => { if (api(r)) { enVuelo++; ultima = Date.now() } })
@@ -66,7 +73,7 @@ test('nivel 3, Evolución: opción del panel sin URL y sin peticiones nuevas', a
   await curva.scrollIntoViewIfNeeded()
   await red.quieta()
   const peticiones: string[] = []
-  page.on('request', r => { if (r.url().includes('/api/')) peticiones.push(r.url()) })
+  page.on('request', r => { if (esConsulta(r.url())) peticiones.push(r.url()) })
   const url = page.url()
   await curva.getByRole('radio', { name: 'P&L' }).focus()
   await page.keyboard.press('ArrowRight')

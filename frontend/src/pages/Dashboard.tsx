@@ -19,6 +19,7 @@ import { PnlCalendar } from './dashboard/PnlCalendar'
 import { RendimientoCard } from './dashboard/RendimientoCard'
 import { AllocationChart } from './dashboard/AllocationChart'
 import { FiscalCard } from './dashboard/FiscalCard'
+import { FranjaMetas } from './dashboard/metas/FranjaMetas'
 import { localToday } from '../utils/pnlChart'
 import { monthRange, ymOf } from '../utils/pnlCalendar'
 import { useLiveDayPnl } from '../hooks/useLiveDayPnl'
@@ -249,6 +250,9 @@ export function Dashboard() {
           </>
         )}
       />
+
+      {/* Metas de inversión (#520): opcionales, con el progreso en vivo */}
+      <FranjaMetas valorTotal={hasPrices ? totalValue : null} assets={assets} />
 
       {/* Paneles con entrada escalonada y elevación al pasar el cursor (#232) */}
       <div className={panelClasses('rounded-xl')} style={panelEnterStyle(1)}>
