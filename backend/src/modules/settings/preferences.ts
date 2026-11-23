@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { MUTED_KEY, mutedSchema } from '../notifications/preferences';
 import { autoBackupSchemas } from '../backup/autoBackupSettings';
 import { METAS_KEY, metasSchema } from './metas';
+import { DASHBOARD_DISENO_KEY, dashboardDisenoSchema } from './dashboardDiseno';
 
 // Preferencias de General (#446): claves de app_config con un conjunto cerrado
 // de valores. El PUT genérico las valida antes de guardarlas.
@@ -53,4 +54,6 @@ export const preferenceSchemas: Record<string, z.ZodType<string>> = {
   ...autoBackupSchemas,
   // Metas de inversión (#520): lista JSON validada.
   [METAS_KEY]: metasSchema,
+  // Diseño del Dashboard (#521): orden, ocultos y contraídos.
+  [DASHBOARD_DISENO_KEY]: dashboardDisenoSchema,
 };

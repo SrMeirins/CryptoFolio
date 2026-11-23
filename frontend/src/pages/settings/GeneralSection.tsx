@@ -5,6 +5,7 @@ import { TimezoneSetting } from './TimezoneSetting'
 import { PreferencesCard } from './PreferencesCard'
 import { NotificationsCard } from './NotificationsCard'
 import { MetasCard } from './MetasCard'
+import { DisenoDashboardCard } from './DisenoDashboardCard'
 import { AboutCard } from './AboutCard'
 import { SettingsCard } from './SettingsCard'
 import { SavedMark } from './SavedMark'
@@ -41,11 +42,14 @@ export function GeneralSection() {
       {/* Metas de inversión (#520): las mismas que la franja del Dashboard */}
       <MetasCard index={4} />
 
+      {/* Diseño del Dashboard (#521): el mismo editor que el modo Personalizar */}
+      <DisenoDashboardCard index={5} />
+
       {/* Notificaciones (#447): interruptores por categoría; la lista, en la campana */}
-      <NotificationsCard index={5} />
+      <NotificationsCard index={6} />
 
       {/* Acerca de (#447) */}
-      <AboutCard index={6} />
+      <AboutCard index={7} />
 
     </div>
   )

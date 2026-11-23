@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Plus, Target } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { ApiError } from '../../../api/client'
@@ -18,10 +18,12 @@ import { TarjetaMeta } from './TarjetaMeta'
 
 const mensaje = (e: unknown) => (e instanceof ApiError ? (e.body as { error?: string } | null)?.error ?? e.message : e ? 'No se pudo guardar la meta' : null)
 
-export function FranjaMetas({ valorTotal, assets }: {
+export function FranjaMetas({ valorTotal, assets, accion }: {
   /** Valor total en vivo en la moneda de visualización; null sin precios. */
   valorTotal: number | null
   assets: readonly AssetValuation[]
+  /** Control a la derecha de la cabecera (el de contraer del Dashboard personalizable, #521). */
+  accion?: ReactNode
 }) {
   const { metas, cargando, guardar, guardarMeta, borrarMeta } = useMetas()
   const { currency, rate } = useDisplayMarket()
@@ -77,6 +79,7 @@ export function FranjaMetas({ valorTotal, assets }: {
         </span>
         <h2 id="metas-titulo" className="text-sm font-semibold text-fg">Metas</h2>
         <span className="text-xs text-fg-subtle">{metas.length} de {MAX_METAS}</span>
+        {accion && <span className="ml-auto">{accion}</span>}
       </div>
       <ul className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
         {metas.map((m, i) => editando === m.id ? (

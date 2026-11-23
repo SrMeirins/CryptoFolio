@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { portfolioApi } from '../api/portfolio'
@@ -20,6 +20,12 @@ import { RendimientoCard } from './dashboard/RendimientoCard'
 import { AllocationChart } from './dashboard/AllocationChart'
 import { FiscalCard } from './dashboard/FiscalCard'
 import { FranjaMetas } from './dashboard/metas/FranjaMetas'
+import { BarraContraida, BotonContraer, PanelAbierto } from './dashboard/PanelDashboard'
+import { ModoPersonalizar } from './dashboard/ModoPersonalizar'
+import { useDashboardDiseno } from '../hooks/useDashboardDiseno'
+import { alternar, filasDashboard, type PanelId } from '../utils/dashboardDiseno'
+import { LayoutDashboard } from 'lucide-react'
+import { Button } from '../components/ui'
 import { localToday } from '../utils/pnlChart'
 import { monthRange, ymOf } from '../utils/pnlCalendar'
 import { useLiveDayPnl } from '../hooks/useLiveDayPnl'
@@ -110,13 +116,36 @@ export function Dashboard() {
   // y le pasa el foco, para que el teclado y el lector sigan el salto.
   const navigate = useNavigate()
   const evolutionRef = useRef<HTMLDivElement>(null)
+  // Dashboard personalizable (#521): orden, ocultos y contraídos, y el modo Personalizar.
+  const { diseno, guardar: guardarDiseno } = useDashboardDiseno()
+  const [personalizando, setPersonalizando] = useState(false)
+  // Las métricas fijas quedan inertes mientras se personaliza (sin foco ni clic).
+  const kpiRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { kpiRef.current?.toggleAttribute('inert', personalizando) }, [personalizando])
+  // Si Evolución está oculta o contraída, la tarjeta Rentabilidad la abre y
+  // baja a ella cuando ya está montada.
+  const irAEvolucion = useRef(false)
+  const irAlGrafico = () => {
+    const el = evolutionRef.current
+    if (!el) return
+    el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+    el.focus({ preventScroll: true })
+  }
+  useEffect(() => {
+    if (!irAEvolucion.current || !evolutionRef.current) return
+    irAEvolucion.current = false
+    irAlGrafico()
+  }, [diseno])
   const targets = {
     portfolio: () => navigate('/portfolio'),
     evolution: () => {
-      const el = evolutionRef.current
-      if (!el) return
-      el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
-      el.focus({ preventScroll: true })
+      if (personalizando || diseno.ocultos.includes('evolucion') || diseno.contraidos.includes('evolucion')) {
+        setPersonalizando(false)
+        void guardarDiseno({ ...diseno, ocultos: alternar(diseno.ocultos, 'evolucion', false), contraidos: alternar(diseno.contraidos, 'evolucion', false) })
+        irAEvolucion.current = true
+        return
+      }
+      irAlGrafico()
     },
     withdrawn: () => navigate('/history?tarjeta=retirado'),
   }
@@ -151,6 +180,50 @@ export function Dashboard() {
     }
   })()
 
+  const contraer = (id: PanelId, si: boolean) => void guardarDiseno({ ...diseno, contraidos: alternar(diseno.contraidos, id, si) })
+
+  /** Contenido de cada panel; cada uno lleva su superficie (panelSurface) dentro. */
+  const contenido: Record<PanelId, () => ReactNode> = {
+    metas: () => null,
+    variacion: () => <TopMovers lots={lots} pnlHoy={preparacion.listo ? liveToday?.pnl ?? null : null} />,
+    evolucion: () => <EvolutionCard />,
+    rendimiento: () => <RendimientoCard />,
+    'pnl-diario': () => <PnlCalendar />,
+    distribucion: () => <AllocationChart lots={lots} fiatBalances={fiatBalances} />,
+    fiscal: () => <FiscalCard data={fiscal} dataQuery={fiscalQ} />,
+    actividad: () => <RecentActivity />,
+    ingresos: () => <IngresosPasivos />,
+  }
+
+  /** Un panel en su fila: contraído, la barra; abierto, con entrada escalonada y botón de contraer. */
+  function panel(id: PanelId, fila: number, extra = ''): ReactNode {
+    const estilo: CSSProperties = panelEnterStyle(fila + 1)
+    if (diseno.contraidos.includes(id)) return <BarraContraida key={id} id={id} className={extra} onExpandir={() => contraer(id, false)} />
+    if (id === 'metas') {
+      return (
+        <div key={id} data-panel={id}>
+          <FranjaMetas valorTotal={hasPrices ? totalValue : null} assets={assets}
+            accion={<BotonContraer id="metas" flotante={false} onContraer={() => contraer('metas', true)} />} />
+        </div>
+      )
+    }
+    if (id === 'evolucion') {
+      return (
+        <PanelAbierto key={id} id={id} className={extra} onContraer={() => contraer(id, true)}>
+          <div ref={evolutionRef} id="evolucion" tabIndex={-1} role="region" aria-label="Evolución de la cartera"
+            className={panelClasses('rounded-xl scroll-mt-4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60')} style={estilo}>
+            {contenido.evolucion()}
+          </div>
+        </PanelAbierto>
+      )
+    }
+    return (
+      <PanelAbierto key={id} id={id} className={extra} onContraer={() => contraer(id, true)}>
+        <div className={panelClasses('rounded-xl min-w-0 h-full')} style={estilo}>{contenido[id]()}</div>
+      </PanelAbierto>
+    )
+  }
+
   // Sin ninguna operación (#496): un único vacío de primer uso en lugar de los paneles en blanco.
   if (firstUse.empty) {
     return (
@@ -165,7 +238,10 @@ export function Dashboard() {
     <div className="p-6 space-y-6 max-w-[1920px] mx-auto">
       {/* Header */}
       {/* El estado de los precios vive solo en la barra superior (#200) */}
-      <PageHeader icon={navIcon('/')} title="Dashboard" subtitle={dashboardSubtitle(assetCount, new Date(now))} />
+      <PageHeader icon={navIcon('/')} title="Dashboard" subtitle={dashboardSubtitle(assetCount, new Date(now))}
+        actions={!personalizando && (
+          <Button size="sm" variant="ghost" icon={<LayoutDashboard size={14} aria-hidden="true" />} onClick={() => setPersonalizando(true)}>Personalizar</Button>
+        )} />
 
       {falloPosiciones && <QueryError what="las posiciones" error={falloPosiciones.error} onRetry={falloPosiciones.retry}
         className="rounded-xl border border-border" />}
@@ -173,6 +249,8 @@ export function Dashboard() {
         className="rounded-xl border border-border" />}
 
       {/* Métricas principales */}
+      {/* En el modo Personalizar las métricas fijas se atenúan e inactivan (#521). */}
+      <div ref={kpiRef} className={`transition-[opacity,filter] duration-300 ${personalizando ? 'opacity-50 saturate-50' : ''}`}>
       <PortfolioSummaryCards
         totalValue={totalValue}
         totalCost={totalCost}
@@ -250,49 +328,21 @@ export function Dashboard() {
           </>
         )}
       />
-
-      {/* Metas de inversión (#520): opcionales, con el progreso en vivo */}
-      <FranjaMetas valorTotal={hasPrices ? totalValue : null} assets={assets} />
-
-      {/* Paneles con entrada escalonada y elevación al pasar el cursor (#232) */}
-      <div className={panelClasses('rounded-xl')} style={panelEnterStyle(1)}>
-        <TopMovers lots={lots} pnlHoy={preparacion.listo ? liveToday?.pnl ?? null : null} />
       </div>
 
-      <div ref={evolutionRef} id="evolucion" tabIndex={-1} role="region" aria-label="Evolución de la cartera"
-        className={panelClasses('rounded-xl scroll-mt-4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand/60')} style={panelEnterStyle(2)}>
-        <EvolutionCard />
-      </div>
-
-      {/* Rendimiento por periodos y riesgo (#517), bajo Evolución. */}
-      <div className={panelClasses('rounded-xl min-w-0')} style={panelEnterStyle(3)}>
-        <RendimientoCard />
-      </div>
-
-      <div className={panelClasses('rounded-xl')} style={panelEnterStyle(3)}>
-        <PnlCalendar />
-      </div>
-
-      {/* Distribución + Fiscal */}
-      {/* Distribución y Fiscal con la misma altura; el fiscal la llena con su gráfico mensual (#236) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className={panelClasses('rounded-xl lg:col-span-2 h-full')} style={panelEnterStyle(4)}>
-          <AllocationChart lots={lots} fiatBalances={fiatBalances} />
+      {/* Paneles personalizables (#521): en el modo Personalizar, la lista del
+          diseño en su lugar; si no, las filas en su orden, sin los ocultos y con
+          los contraídos como barra (no se montan: no piden datos). */}
+      {personalizando ? (
+        <ModoPersonalizar diseno={diseno} onCambiar={d => void guardarDiseno(d)}
+          onRestaurar={d => void guardarDiseno(d, { mensaje: 'Diseño por defecto del Dashboard', deshacer: true })}
+          onListo={() => setPersonalizando(false)} />
+      ) : filasDashboard(diseno).map((fila, i) => fila.tipo === 'pareja' ? (
+        // Distribución y Fiscal juntos: misma altura, el primero en 2/3 (#236).
+        <div key={fila.ids.join()} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {fila.ids.map(id => panel(id, i, id === 'distribucion' ? 'lg:col-span-2 h-full' : 'h-full'))}
         </div>
-        <div className={panelClasses('rounded-xl h-full')} style={panelEnterStyle(5)}>
-          <FiscalCard data={fiscal} dataQuery={fiscalQ} />
-        </div>
-      </div>
-
-      <div className={panelClasses('rounded-xl')} style={panelEnterStyle(6)}>
-        <RecentActivity />
-      </div>
-
-      {/* Ingresos pasivos (#518), bajo Actividad reciente. */}
-      <div className={panelClasses('rounded-xl min-w-0')} style={panelEnterStyle(6)}>
-        <IngresosPasivos />
-      </div>
-
+      ) : panel(fila.id, i))}
     </div>
   )
 }
