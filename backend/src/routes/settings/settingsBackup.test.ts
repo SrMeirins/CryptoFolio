@@ -65,7 +65,7 @@ describe('routes/settings — copias de seguridad (#453)', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ format: 'cryptofolio-backup', encrypted: false });
     expect(Object.keys(res.body.data).sort()).toEqual([
-      'app_config', 'asset_metadata', 'cobertura_revisiones', 'csv_imports', 'fiscal_declaraciones', 'irpf_escalas',
+      'alertas', 'app_config', 'asset_metadata', 'cobertura_revisiones', 'csv_imports', 'fiscal_declaraciones', 'irpf_escalas',
       'network_assets', 'networks', 'plan_ventas', 'raw_transactions', 'transactions', 'wallet_addresses', 'wallet_custodia', 'wallets',
     ]);
     expect(res.body.counts).toMatchObject({ transactions: 2, raw_transactions: 1, wallet_addresses: 1, irpf_escalas: 1 });
@@ -118,6 +118,23 @@ describe('routes/settings — copias de seguridad (#453)', () => {
     expect(w).toEqual([{ entidad_nombre: 'Entidad sintética', desde: '2024-03-01' }]);
     // Deja la base como estaba para los siguientes casos (la restauración guardó una copia previa).
     await pool.query('DELETE FROM wallet_custodia');
+    await pool.query('DELETE FROM backup_snapshots');
+  });
+
+  it('las alertas viajan en la copia y se restauran (#519)', async () => {
+    await pool.query(`INSERT INTO alertas (tipo, activo, sentido, precio, moneda, repeticion) VALUES ('precio', 'BTC', 'por_encima', 123.45, 'USD', 'cada_vez')`);
+    await pool.query(`INSERT INTO alertas (tipo, umbral_pct) VALUES ('cartera', 7.5)`);
+    const file = (await request(app).post('/api/settings/backup').send({})).body;
+    expect(file.counts.alertas).toBe(2);
+    await pool.query('DELETE FROM alertas');
+    const res = await request(app).post('/api/settings/backup/restore').send({ backup: file, confirm: true });
+    expect(res.status).toBe(200);
+    const filas = (await pool.query(`SELECT tipo, activo, sentido, precio::float AS precio, moneda, repeticion, umbral_pct::float AS umbral FROM alertas ORDER BY tipo`)).rows;
+    expect(filas).toEqual([
+      { tipo: 'cartera', activo: null, sentido: null, precio: null, moneda: 'EUR', repeticion: 'una_vez', umbral: 7.5 },
+      { tipo: 'precio', activo: 'BTC', sentido: 'por_encima', precio: 123.45, moneda: 'USD', repeticion: 'cada_vez', umbral: null },
+    ]);
+    await pool.query('DELETE FROM alertas');
     await pool.query('DELETE FROM backup_snapshots');
   });
 

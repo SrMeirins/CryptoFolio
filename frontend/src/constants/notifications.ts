@@ -23,6 +23,16 @@ export const NOTIFICATION_ROUTES: Record<string, string> = {
   'backup-unavailable':   '/settings?tab=datos',
 }
 
+/** Destino de un aviso por su id; las alertas disparadas (#519, «alerta-<id>») llevan a Ajustes › Alertas. */
+export function rutaAviso(id: string): string | undefined {
+  return NOTIFICATION_ROUTES[id] ?? (id.startsWith('alerta-') ? '/settings?tab=alertas' : undefined)
+}
+
+/** Texto de la acción de un aviso por su id (#447, #519). */
+export function accionAviso(id: string): string {
+  return NOTIFICATION_ACTIONS[id] ?? (id.startsWith('alerta-') ? 'Ir a Alertas' : 'Ver')
+}
+
 /** Texto del botón que lleva al sitio donde se resuelve cada aviso (#447). */
 export const NOTIFICATION_ACTIONS: Record<string, string> = {
   'no-price': 'Ir a Activos',
@@ -59,6 +69,7 @@ export const NOTIFICATION_CATEGORIES = [
   { key: 'importar', label: 'Importar', hint: 'Exchanges sin importar o con huecos' },
   { key: 'fiscal', label: 'Fiscal', hint: 'Plazos de la Renta y del Modelo 721' },
   { key: 'copias', label: 'Copias', hint: 'Copias automáticas fallidas o sin hacer' },
+  { key: 'alertas', label: 'Alertas', hint: 'Alertas de precio y de cartera disparadas' },
 ] as const
 export type NotificationCategory = typeof NOTIFICATION_CATEGORIES[number]['key']
 

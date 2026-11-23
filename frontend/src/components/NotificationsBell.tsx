@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, BellOff, X, Wrench, ArrowRight } from 'lucide-react'
 import { portfolioApi, type Notification } from '../api/portfolio'
-import { NOTIFICATION_ACTIONS, NOTIFICATION_ROUTES, NOTIFICATION_TYPE_META } from '../constants/notifications'
+import {NOTIFICATION_TYPE_META, rutaAviso, accionAviso } from '../constants/notifications'
 import { useClickOutside } from '../hooks/useClickOutside'
 import { useToast } from '../hooks/useToast'
 import { useBellStore } from '../store/bellStore'
@@ -104,7 +104,7 @@ export function NotificationsBell() {
               <ul className="divide-y divide-border/50">
                 {notifications.map(n => {
                   const { icon: Icon, color, label } = NOTIFICATION_TYPE_META[n.type]
-                  const dest = NOTIFICATION_ROUTES[n.id]
+                  const dest = rutaAviso(n.id)
                   return (
                     <li key={n.id} className="flex gap-3 px-4 py-3.5" style={{ backgroundColor: alpha(color, 3) }}>
                       <Icon size={15} aria-hidden="true" className="shrink-0 mt-0.5" style={{ color }} />
@@ -119,7 +119,7 @@ export function NotificationsBell() {
                             <button type="button" onClick={() => { navigate(dest); setOpen(false) }}
                               className="inline-flex items-center gap-1 text-xs font-medium rounded-md hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand"
                               style={{ color: ink(color) }}>
-                              {NOTIFICATION_ACTIONS[n.id] ?? 'Ver'} <ArrowRight size={11} aria-hidden="true" />
+                              {accionAviso(n.id)} <ArrowRight size={11} aria-hidden="true" />
                             </button>
                           )}
                           {n.id === 'pending-withdrawals' && (

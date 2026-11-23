@@ -19,6 +19,8 @@ export const BACKUP_TABLES = [
   { name: 'transactions',         order: 'timestamp, id' },
   { name: 'raw_transactions',     order: 'time, id' },
   { name: 'asset_metadata',       order: 'symbol' },
+  // Después de asset_metadata: cada alerta de precio apunta a su activo (#519).
+  { name: 'alertas',              order: 'created_at, id' },
   { name: 'app_config',           order: 'key' },
   { name: 'cobertura_revisiones', order: 'revisado_en, id' },
   { name: 'fiscal_declaraciones', order: 'ejercicio, tipo' },

@@ -9,6 +9,8 @@ import { avisosCobertura } from '../csv/coberturaAvisos';
 import { avisosVerificacion } from '../walletSync/avisos';
 import { getLivePrice } from '../prices/liveFeed';
 import { avisosCopias } from '../backup/autoBackupNotices';
+import { listarAlertas } from '../alertas/alertasRepo';
+import { avisosAlertas } from '../alertas/avisos';
 
 // Avisos del sistema (#447): se reúnen aquí y la ruta solo los filtra según las
 // preferencias (categorías silenciadas y avisos descartados) y los devuelve.
@@ -144,6 +146,9 @@ export async function collectNotifications(): Promise<SystemNotification[]> {
 
   // Copias automáticas (#454): la última falló, o no se pueden hacer.
   notifications.push(...await avisosCopias());
+
+  // Alertas de precio y de cartera disparadas (#519).
+  notifications.push(...avisosAlertas(await listarAlertas(), await getAppTimezone(db)));
 
   return notifications;
 }
