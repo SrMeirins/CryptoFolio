@@ -4,6 +4,8 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, R
 import { Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
 import { pricesApi } from '../../api/prices'
 import type { AssetSale, ClosedBuy } from '../../api/portfolio'
+import type { Alerta } from '../../api/alertas'
+import { precioEnMoneda } from '../../utils/alertas'
 import { LiveDot } from '../dashboard/LiveDot'
 import { Dropdown, Hint, iconButtonClasses, Skeleton, QueryError } from '../../components/ui'
 import { useChartColors } from '../../hooks/useChartColors'
@@ -50,6 +52,7 @@ const fmtDayYear = (t: number) => DAY_YEAR().format(t).replace('.', '')
 const fmtMonth = (t: number) => MONTH_YEAR().format(t).replace('.', '')
 
 const NO_CLOSED: readonly ClosedBuy[] = []
+const NO_ALERTAS: readonly Alerta[] = []
 const NO_DAYS: ReadonlySet<string> = new Set()
 const MARKER_LABEL: Record<ChartMarker['kind'], string> = { compra: 'Compra abierta', 'compra-vendida': 'Compra ya vendida', venta: 'Venta o permuta' }
 
@@ -102,7 +105,7 @@ function Leyenda({ markers, hasAvg, live, marcas }: { markers: readonly ChartMar
   )
 }
 
-export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice, buys, sales, closedBuys = NO_CLOSED, firstOpenedAt, highlightDay = null }: {
+export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice, buys, sales, closedBuys = NO_CLOSED, firstOpenedAt, highlightDay = null, alertas = NO_ALERTAS }: {
   asset: string
   currency: Currency
   /** Unidades de la moneda por EUR en vivo; null en USD sin USDT aún. */
@@ -118,6 +121,8 @@ export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice,
   firstOpenedAt: string | null
   /** Día (AAAA-MM-DD) de la venta señalada en la lista (#528). */
   highlightDay?: string | null
+  /** Alertas de precio del activo (#519): una línea discontinua por cada una activa. */
+  alertas?: readonly Alerta[]
 }) {
   const id = useId().replace(/:/g, '')
   const c = useChartColors()
@@ -252,6 +257,13 @@ export function AssetPriceChart({ asset, currency, rate, livePriceEur, avgPrice,
               <ReferenceLine y={avgPrice} stroke={c.axis} strokeDasharray="4 4" ifOverflow="extendDomain"
                 label={{ value: `Precio medio ${formatPrice(avgPrice, currency)}`, position: 'insideBottomLeft', fill: c.axis, fontSize: 10 }} />
             )}
+            {alertas.filter(a => a.activa && a.precio !== null).map(a => {
+              const y = precioEnMoneda(a.precio!, a.moneda, currency, rate)
+              return y === null ? null : (
+                <ReferenceLine key={a.id} y={y} stroke={c.warn} strokeDasharray="6 4" strokeWidth={1.25} ifOverflow="extendDomain"
+                  label={{ value: `Alerta ${a.sentido === 'por_encima' ? 'por encima de' : 'por debajo de'} ${formatPrice(y, currency)}`, position: 'insideTopRight', fill: c.warn, fontSize: 10 }} />
+              )
+            })}
             <Tooltip content={<PriceTooltip currency={currency} />} cursor={{ stroke: c.cursorLine, strokeDasharray: '4 4' }}
               isAnimationActive={false} />
             <Area type="monotone" dataKey="price" baseValue={hasAvg ? avgPrice : 'dataMin'}

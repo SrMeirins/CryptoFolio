@@ -645,3 +645,29 @@ CREATE TRIGGER trg_prevent_system_wallet_delete
   BEFORE DELETE ON wallets
   FOR EACH ROW
   EXECUTE FUNCTION prevent_system_wallet_delete();
+
+-- ============================================================
+-- TABLA: alertas (#519): de precio (un activo por encima o por debajo de un
+-- precio, una vez o cada vez) y de cartera (cambio del valor en 24 h).
+-- ============================================================
+CREATE TABLE alertas (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tipo              TEXT NOT NULL CHECK (tipo IN ('precio', 'cartera')),
+  activo            TEXT REFERENCES asset_metadata(symbol) ON DELETE CASCADE,
+  sentido           TEXT CHECK (sentido IN ('por_encima', 'por_debajo')),
+  precio            NUMERIC(38, 10) CHECK (precio IS NULL OR precio > 0),
+  moneda            TEXT NOT NULL DEFAULT 'EUR' CHECK (moneda IN ('EUR', 'USD')),
+  repeticion        TEXT NOT NULL DEFAULT 'una_vez' CHECK (repeticion IN ('una_vez', 'cada_vez')),
+  umbral_pct        NUMERIC(10, 4) CHECK (umbral_pct IS NULL OR (umbral_pct > 0 AND umbral_pct <= 1000)),
+  activa            BOOLEAN NOT NULL DEFAULT TRUE,
+  armada            BOOLEAN NOT NULL DEFAULT TRUE,
+  ultimo_disparo_at TIMESTAMPTZ,
+  ultimo_valor      NUMERIC(38, 10),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT alertas_campos_tipo CHECK (
+    (tipo = 'precio' AND activo IS NOT NULL AND sentido IS NOT NULL AND precio IS NOT NULL AND umbral_pct IS NULL)
+    OR (tipo = 'cartera' AND activo IS NULL AND sentido IS NULL AND precio IS NULL AND umbral_pct IS NOT NULL)
+  )
+);
+CREATE UNIQUE INDEX alertas_una_cartera ON alertas (tipo) WHERE tipo = 'cartera';
+CREATE INDEX alertas_activo_idx ON alertas (activo) WHERE activo IS NOT NULL;

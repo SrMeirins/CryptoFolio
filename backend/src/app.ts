@@ -14,6 +14,7 @@ import fifoLotsDetailRouter from './routes/fifo/fifoLotsDetail';
 import fifoSalesDetailRouter from './routes/fifo/fifoSalesDetail';
 import pricesRouter from './routes/prices';
 import pricesClosesRouter from './routes/pricesCloses';
+import alertasRouter from './routes/alertas';
 import pnlRouter from './routes/pnl';
 import historialVistasRouter from './routes/historial/vistas';
 import historialEstadisticasRouter from './routes/historial/estadisticas';
@@ -62,6 +63,7 @@ app.use('/api/v1/transactions', conversionRestosRouter);
 app.use('/api/v1/fifo', fifoLotsDetailRouter);
 app.use('/api/v1/fifo', fifoSalesDetailRouter);
 app.use('/api/v1/prices', pricesClosesRouter);
+app.use('/api/v1/alertas', alertasRouter);
 app.use('/api/assets', assetIconsRouter);
 
 // ── Frontend estático (solo en modo Electron) ──────────────────────────────

@@ -35,9 +35,10 @@ test('el menú cambia de sección por clic, teclado y URL', async ({ page }) => 
   await menu.getByRole('tab', { name: /Fiscal/ }).click()
   await expect(page).toHaveURL(/tab=fiscal/)
   await expect(page.getByRole('region', { name: 'Umbral Modelo 721' })).toBeVisible()
+  // Tras Fiscal va Alertas (#519).
   await page.keyboard.press('ArrowDown')
-  await expect(menu.getByRole('tab', { name: /Datos/ })).toBeFocused()
-  await expect(page).toHaveURL(/tab=datos/)
+  await expect(menu.getByRole('tab', { name: /Alertas/ })).toBeFocused()
+  await expect(page).toHaveURL(/tab=alertas/)
 })
 
 test('el tema se guarda al momento y Deshacer lo devuelve', async ({ page }) => {

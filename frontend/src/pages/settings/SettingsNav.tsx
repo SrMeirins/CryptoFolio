@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Wallet, Coins, Landmark, Database, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import { Wallet, Coins, Landmark, BellRing, Database, SlidersHorizontal, type LucideIcon } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
 import { Badge, SectionNav } from '../../components/ui'
 import { VALID_TABS } from './validTabs'
@@ -13,6 +13,7 @@ const META: Record<Section, { label: string; icon: LucideIcon; hint: string }> =
   wallets: { label: 'Wallets', icon: Wallet, hint: 'Wallets y direcciones' },
   assets:  { label: 'Activos', icon: Coins, hint: 'Pares y precios' },
   fiscal:  { label: 'Fiscal', icon: Landmark, hint: 'Modelo 721 y tramos IRPF' },
+  alertas: { label: 'Alertas', icon: BellRing, hint: 'Precio y cartera' },
   datos:   { label: 'Datos', icon: Database, hint: 'Copias y mantenimiento' },
   general: { label: 'General', icon: SlidersHorizontal, hint: 'Tema, zona y moneda' },
 }

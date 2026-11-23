@@ -13,6 +13,8 @@ import { DetalleResumen } from './detalle/DetalleResumen'
 import { RepartoWallets } from './detalle/RepartoWallets'
 import { ReglaPrecios } from './detalle/ReglaPrecios'
 import { SiVendo } from './detalle/SiVendo'
+import { AlertasActivo } from './detalle/AlertasActivo'
+import { useAlertas } from '../../hooks/useAlertas'
 import { LotesPorMes } from './detalle/LotesPorMes'
 import { VentasLista } from './detalle/VentasLista'
 
@@ -93,6 +95,9 @@ function Contenido({ row, price, currency, rate, locked, onSimulate, titleId }: 
   const onLots = useCallback((ids: ReadonlySet<string>) => setSaldrian(prev => (prev.size === 0 && ids.size === 0 ? prev : ids)), [])
   const [ventaDia, setVentaDia] = useState<string | null>(null)
   const nVentas = sales?.sales.length ?? 0
+  // Alertas de precio de este activo (#519): en su sección y como líneas en el gráfico.
+  const { alertas } = useAlertas()
+  const alertasActivo = useMemo(() => alertas.filter(a => a.tipo === 'precio' && a.activo === row.asset), [alertas, row.asset])
 
   return (
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
@@ -100,8 +105,12 @@ function Contenido({ row, price, currency, rate, locked, onSimulate, titleId }: 
         <section aria-label="Evolución del precio">
           <AssetPriceChart asset={row.asset} currency={currency} rate={rate} livePriceEur={livePriceEur}
             avgPrice={avg} buys={lots} sales={sales?.sales ?? []} closedBuys={sales?.closedBuys}
-            firstOpenedAt={firstOpenedAt} highlightDay={ventaDia} />
+            firstOpenedAt={firstOpenedAt} highlightDay={ventaDia} alertas={alertasActivo} />
         </section>
+
+        <Seccion id={`${titleId}-alertas`} title={`Alertas de precio${alertasActivo.length ? ` (${alertasActivo.length})` : ''}`}>
+          <AlertasActivo asset={row.asset} price={price} currency={currency} alertas={alertasActivo} />
+        </Seccion>
 
         <Seccion id={`${titleId}-resumen`} title="Resumen">
           <DetalleResumen row={row} price={price} currency={currency} rate={rate} sales={sales} onSimulate={() => onSimulate()} />

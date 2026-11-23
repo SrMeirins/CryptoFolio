@@ -6,6 +6,7 @@ import { db, pool } from './db/client';
 import { runMigrations } from './db/run-migrations';
 import { setupPricesWebSocket } from './routes/prices';
 import { startLivePrices } from './modules/prices/binance';
+import { iniciarAlertas } from './modules/alertas/servicio';
 import { syncAssetIcons } from './modules/assets/assetIcons';
 import { startPairCompletion } from './modules/prices/pairCompletion';
 import { repairMissingCoinGeckoIds } from './modules/prices/coingecko';
@@ -48,6 +49,8 @@ async function bootstrap() {
     server.listen(PORT, host, () => {
       console.log(`[SERVER] Listening on ${host}:${PORT}`);
       startLivePrices();
+      // Alertas de precio y de cartera (#519): se evalúan con los precios en vivo.
+      iniciarAlertas();
       // Logos de los activos (#201): en segundo plano, sin retrasar el arranque.
       void syncAssetIcons({ force: true });
       // Pares de Binance que falten (EUR, USDT, BTC, ETH) para el feed en vivo (#277).

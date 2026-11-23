@@ -20,7 +20,8 @@ export const SNAPSHOTS_KEPT = 3;
 const CLEAR_ORDER = [
   'fifo_lot_consumptions', 'fifo_lots', 'fifo_shortfalls', 'balance_sync_log',
   'raw_transactions', 'transactions', 'csv_imports', 'wallet_addresses',
-  'cobertura_revisiones', 'fiscal_declaraciones', 'irpf_escalas', 'asset_metadata', 'app_config',
+  // Las alertas (#519) antes que asset_metadata, al que apuntan.
+  'cobertura_revisiones', 'fiscal_declaraciones', 'irpf_escalas', 'alertas', 'asset_metadata', 'app_config',
   // Custodia de las wallets (#545) y plan de ventas (#546), que apuntan a ellas.
   'wallet_custodia', 'plan_ventas',
 ] as const;
@@ -28,7 +29,7 @@ const CLEAR_ORDER = [
 // Tablas que se insertan tal cual (tras traducir ids), en orden de dependencias.
 const INSERT_ORDER: readonly BackupTable[] = [
   'csv_imports', 'transactions', 'raw_transactions', 'wallet_addresses', 'wallet_custodia', 'plan_ventas',
-  'asset_metadata', 'app_config', 'cobertura_revisiones', 'fiscal_declaraciones', 'irpf_escalas',
+  'asset_metadata', 'alertas', 'app_config', 'cobertura_revisiones', 'fiscal_declaraciones', 'irpf_escalas',
 ];
 
 type IdMap = Map<string, string>;
