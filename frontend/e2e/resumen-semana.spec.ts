@@ -19,6 +19,11 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
+// Sin desvíos en vuelo al terminar: si no, el error cae en la siguiente prueba del worker.
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
+})
+
 const celda = (page: import('@playwright/test').Page, etiqueta: RegExp) =>
   page.getByTestId('resumen-semana').getByTestId('celda-resumen').filter({ hasText: etiqueta })
 
