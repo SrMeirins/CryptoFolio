@@ -344,7 +344,7 @@ export function Dashboard() {
           diseño en su lugar; si no, las filas en su orden, sin los ocultos y con
           los contraídos como barra (no se montan: no piden datos). */}
       {personalizando ? (
-        <ModoPersonalizar diseno={diseno} onCambiar={d => void guardarDiseno(d)}
+        <ModoPersonalizar diseno={diseno} onCambiar={d => guardarDiseno(d)}
           onRestaurar={d => void guardarDiseno(d, { mensaje: 'Diseño por defecto del Dashboard', deshacer: true })}
           onListo={() => setPersonalizando(false)} />
       ) : filasDashboard(diseno).map((fila, i) => fila.tipo === 'pareja' ? (
