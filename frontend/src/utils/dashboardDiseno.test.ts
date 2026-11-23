@@ -16,9 +16,9 @@ describe('leerDiseno', () => {
     const d = leerDiseno({ dashboard_diseno: JSON.stringify({ orden: ['fiscal', 'otro', 'fiscal', 'metas'], ocultos: ['ingresos', 'x'], contraidos: ['evolucion', 'evolucion'] }) })
     expect(d.orden).toHaveLength(PANELES.length)
     // Se respeta el orden guardado; los que faltan van tras su anterior por defecto.
-    expect(d.orden[0]).toBe('fiscal')
+    // Resumen (#522) no tiene anterior por defecto: va el primero.
+    expect(d.orden.slice(0, 3)).toEqual(['resumen', 'fiscal', 'actividad'])
     expect(d.orden.indexOf('fiscal')).toBeLessThan(d.orden.indexOf('metas'))
-    expect(d.orden[1]).toBe('actividad')
     expect(d.ocultos).toEqual(['ingresos'])
     expect(d.contraidos).toEqual(['evolucion'])
   })
@@ -30,25 +30,30 @@ describe('leerDiseno', () => {
 })
 
 describe('completarOrden', () => {
+  it('un diseño guardado antes del resumen (#522) lo recibe el primero', () => {
+    const antiguo = PANELES.filter(p => p !== 'resumen')
+    expect(completarOrden(antiguo)).toEqual([...PANELES])
+  })
+
   it('coloca el que falta tras el que lo precede por defecto', () => {
     const sinRendimiento = PANELES.filter(p => p !== 'rendimiento')
     expect(completarOrden(sinRendimiento)).toEqual([...PANELES])
-    expect(completarOrden(['ingresos', 'evolucion'])).toEqual(['metas', 'variacion', 'ingresos', 'evolucion', 'rendimiento', 'pnl-diario', 'distribucion', 'fiscal', 'actividad'])
+    expect(completarOrden(['ingresos', 'evolucion'])).toEqual(['resumen', 'metas', 'variacion', 'ingresos', 'evolucion', 'rendimiento', 'pnl-diario', 'distribucion', 'fiscal', 'actividad'])
   })
 })
 
 describe('mover y moverA', () => {
   it('sube, baja y se queda en los extremos', () => {
-    expect(mover(PANELES, 'variacion', -1).slice(0, 2)).toEqual(['variacion', 'metas'])
-    expect(mover(PANELES, 'metas', -1)).toEqual([...PANELES])
+    expect(mover(PANELES, 'variacion', -1).slice(1, 3)).toEqual(['variacion', 'metas'])
+    expect(mover(PANELES, 'resumen', -1)).toEqual([...PANELES])
     expect(mover(PANELES, 'ingresos', 1)).toEqual([...PANELES])
-    expect(mover(PANELES, 'metas', 1).slice(0, 2)).toEqual(['variacion', 'metas'])
+    expect(mover(PANELES, 'metas', 1).slice(1, 3)).toEqual(['variacion', 'metas'])
   })
 
   it('lleva a cualquier posición acotada y no muta', () => {
     const orden = [...PANELES]
-    expect(moverA(orden, 0, 99).at(-1)).toBe('metas')
-    expect(moverA(orden, 8, -5)[0]).toBe('ingresos')
+    expect(moverA(orden, 0, 99).at(-1)).toBe('resumen')
+    expect(moverA(orden, PANELES.length - 1, -5)[0]).toBe('ingresos')
     expect(orden).toEqual([...PANELES])
   })
 })

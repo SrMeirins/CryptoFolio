@@ -7,6 +7,14 @@ import type { PanelId } from '../../utils/dashboardDiseno'
 // de un vistazo en el modo Personalizar. Decorativa: el nombre va al lado.
 
 const FORMAS: Record<PanelId, ReactNode> = {
+  resumen: (
+    <>
+      {[0, 1, 2, 3, 4].map(i => (
+        <rect key={i} x={3 + i * 15.2} y="10" width="13" height="28" rx="2.5" stroke="none" fill="currentColor" opacity={[0.85, 0.5, 0.35, 0.5, 0.3][i]} />
+      ))}
+      <path d="M5 30 L8 27 L11 28 L14 22" fill="none" strokeWidth="1.6" stroke="var(--cf-bg-card)" strokeLinecap="round" />
+    </>
+  ),
   metas: (
     <>
       {[14, 40, 66].map((cx, i) => (

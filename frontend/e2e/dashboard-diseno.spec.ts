@@ -42,7 +42,7 @@ test('mover un panel solo con teclado y recargar', async ({ page }) => {
   await page.getByRole('button', { name: 'Personalizar' }).click()
   await expect(page.getByRole('heading', { name: 'Personalizar el Dashboard' })).toBeFocused()
   const antes = await ordenEditor(page)
-  expect(antes.slice(0, 3)).toEqual(['metas', 'variacion', 'evolucion'])
+  expect(antes.slice(0, 4)).toEqual(['resumen', 'metas', 'variacion', 'evolucion'])
 
   // Bajar Variación dos veces con Enter: el foco se queda en el botón.
   const bajar = page.getByRole('button', { name: 'Bajar Variación' })
@@ -50,12 +50,12 @@ test('mover un panel solo con teclado y recargar', async ({ page }) => {
   await page.keyboard.press('Enter')
   await expect(bajar).toBeFocused()
   await page.keyboard.press('Enter')
-  await expect.poll(() => ordenEditor(page)).toEqual(['metas', 'evolucion', 'rendimiento', 'variacion', ...antes.slice(4)])
-  await expect(page.getByRole('status').filter({ hasText: 'Variación, posición 4 de 9' })).toHaveCount(1)
+  await expect.poll(() => ordenEditor(page)).toEqual(['resumen', 'metas', 'evolucion', 'rendimiento', 'variacion', ...antes.slice(5)])
+  await expect(page.getByRole('status').filter({ hasText: 'Variación, posición 5 de 10' })).toHaveCount(1)
   // Subir de nuevo con Espacio.
   await page.getByRole('button', { name: 'Subir Variación' }).focus()
   await page.keyboard.press('Space')
-  await expect.poll(() => ordenEditor(page)).toEqual(['metas', 'evolucion', 'variacion', 'rendimiento', ...antes.slice(4)])
+  await expect.poll(() => ordenEditor(page)).toEqual(['resumen', 'metas', 'evolucion', 'variacion', 'rendimiento', ...antes.slice(5)])
 
   await page.getByRole('button', { name: 'Listo' }).click()
   await page.reload()
@@ -78,9 +78,9 @@ test('arrastrar con el ratón por el asa', async ({ page }) => {
   await page.mouse.down()
   await page.mouse.move(a.x + a.width / 2, destino.y + destino.height * 0.75, { steps: 12 })
   await page.mouse.up()
-  await expect.poll(() => ordenEditor(page)).toEqual(['variacion', 'evolucion', 'metas', 'rendimiento', 'pnl-diario', 'distribucion', 'fiscal', 'actividad', 'ingresos'])
+  await expect.poll(() => ordenEditor(page)).toEqual(['metas', 'variacion', 'resumen', 'evolucion', 'rendimiento', 'pnl-diario', 'distribucion', 'fiscal', 'actividad', 'ingresos'])
   const guardado = JSON.parse(((await (await page.request.get('/api/settings/config')).json()) as Record<string, string>).dashboard_diseno) as { orden: string[] }
-  expect(guardado.orden.slice(0, 3)).toEqual(['variacion', 'evolucion', 'metas'])
+  expect(guardado.orden.slice(0, 3)).toEqual(['metas', 'variacion', 'resumen'])
 })
 
 test('ocultar, contraer y expandir; restaurar con Deshacer', async ({ page }) => {
@@ -92,7 +92,7 @@ test('ocultar, contraer y expandir; restaurar con Deshacer', async ({ page }) =>
   await expect(estadoIngresos.getByRole('radio', { name: 'Oculto' })).toBeChecked()
   await expect(page.getByTestId('fila-panel').filter({ hasText: 'Ingresos pasivos' })).toHaveAttribute('data-estado', 'oculto')
   // El minimapa lo refleja: deja de contar ese panel.
-  await expect(page.getByTestId('minimapa')).toContainText('8 visibles')
+  await expect(page.getByTestId('minimapa')).toContainText('9 visibles')
   await page.getByRole('button', { name: 'Listo' }).click()
   await expect(page.locator('main [data-panel="ingresos"]')).toHaveCount(0)
 

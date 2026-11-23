@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 export const DASHBOARD_DISENO_KEY = 'dashboard_diseno';
 export const PANELES_DASHBOARD = [
-  'metas', 'variacion', 'evolucion', 'rendimiento', 'pnl-diario', 'distribucion', 'fiscal', 'actividad', 'ingresos',
+  'resumen', 'metas', 'variacion', 'evolucion', 'rendimiento', 'pnl-diario', 'distribucion', 'fiscal', 'actividad', 'ingresos',
 ] as const;
 
 const panel = z.enum(PANELES_DASHBOARD);
