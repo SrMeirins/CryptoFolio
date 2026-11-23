@@ -72,7 +72,7 @@ export function ResumenSemana({ valorAhora, onIrAPnl }: {
   const detallesQ = useQueries({ queries: diasSemana(hoy).map(d => dayDetailQuery(currency, d)) })
   const extremos = mejorYPeor(detallesQ.map(q => q.data))
 
-  // consulta de fondo (#498): sin el recuento, la celda dice que lo está calculando.
+  // consulta de fondo (#498): sin el recuento, la celda lo dice y lleva al Historial.
   const opsQ = useQuery({
     queryKey: ['resumen-semana-ops', desde, hoy],
     queryFn: () => portfolioApi.getHistoryStats({ granularidad: 'dia', date_from: desde, date_to: hoy }),
@@ -188,6 +188,8 @@ export function ResumenSemana({ valorAhora, onIrAPnl }: {
                     </span>
                   )}
                 </>
+              ) : opsQ.isError ? (
+                <span className="block text-xs text-fg-subtle">No se pudo cargar el recuento; ábrelo en el Historial.</span>
               ) : <span className="block h-12 w-20 skeleton rounded-lg" />}
             </CeldaResumen>
 
