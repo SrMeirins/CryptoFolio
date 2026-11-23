@@ -137,6 +137,13 @@ describe('routes/settings — config y stats', () => {
       expect((await put('metas', '[]')).status).toBe(200);
     });
 
+    it('diseño del Dashboard (#521): orden, ocultos y contraídos validados', async () => {
+      const diseno = JSON.stringify({ orden: ['fiscal', 'metas'], ocultos: ['ingresos'], contraidos: [] });
+      expect((await put('dashboard_diseno', diseno)).status).toBe(200);
+      expect((await request(app).get('/api/settings/config')).body.dashboard_diseno).toBe(diseno);
+      for (const value of ['{"orden":["otro"],"ocultos":[],"contraidos":[]}', '[]', 'x', 1]) expect((await put('dashboard_diseno', value)).status).toBe(400);
+    });
+
     it('marcas del gráfico del detalle (#528): puntos o banderas arriba o abajo', async () => {
       for (const value of ['puntos', 'banderas-arriba', 'banderas-abajo']) expect((await put('grafico_marcas', value)).status).toBe(200);
       for (const value of ['banderas', 'PUNTOS', '', 1]) expect((await put('grafico_marcas', value)).status).toBe(400);
