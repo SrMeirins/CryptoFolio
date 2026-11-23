@@ -4,7 +4,7 @@
 // comparten fila si quedan seguidos y abiertos, como antes).
 
 export const DASHBOARD_DISENO_KEY = 'dashboard_diseno'
-export const PANELES = ['metas', 'variacion', 'evolucion', 'rendimiento', 'pnl-diario', 'distribucion', 'fiscal', 'actividad', 'ingresos'] as const
+export const PANELES = ['resumen', 'metas', 'variacion', 'evolucion', 'rendimiento', 'pnl-diario', 'distribucion', 'fiscal', 'actividad', 'ingresos'] as const
 export type PanelId = typeof PANELES[number]
 
 export interface Diseno {
@@ -135,7 +135,7 @@ export function fijarEstado(d: Diseno, id: PanelId, estado: EstadoPanel): Diseno
 
 /** Alto relativo de cada panel abierto en el minimapa (aprox. al real). */
 export const ALTO_PANEL: Record<PanelId, number> = {
-  metas: 3, variacion: 6, evolucion: 9, rendimiento: 6, 'pnl-diario': 8, distribucion: 7, fiscal: 7, actividad: 6, ingresos: 6,
+  resumen: 4, metas: 3, variacion: 6, evolucion: 9, rendimiento: 6, 'pnl-diario': 8, distribucion: 7, fiscal: 7, actividad: 6, ingresos: 6,
 }
 const ALTO_TITULO = 1.4
 const HUECO = 0.8

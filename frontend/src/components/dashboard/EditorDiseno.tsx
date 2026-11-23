@@ -49,7 +49,10 @@ export function EditorDiseno({ diseno, onCambiar, onResaltar, onOrdenVivo }: {
   onOrdenVivo?: (orden: PanelId[] | null) => void
 }) {
   const [arrastre, setArrastre] = useState<Arrastre | null>(null)
-  // Orden aplicado mientras llega el guardado, para no ver un fotograma con el anterior.
+  // Orden aplicado hasta que termina el guardado (`onCambiar` debe devolver su
+  // promesa): si se quitara antes de que la caché avise del cambio, la lista
+  // volvería un instante al orden anterior y otro movimiento seguido se
+  // calcularía sobre él.
   const [pendiente, setPendiente] = useState<PanelId[] | null>(null)
   const [anuncio, setAnuncio] = useState('')
   const lista = useRef<HTMLOListElement>(null)

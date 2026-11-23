@@ -22,7 +22,7 @@ export function DisenoDashboardCard({ index }: { index: number }) {
         </Button>
       }>
       <div data-testid="ajustes-diseno">
-        <EditorDiseno diseno={diseno} onCambiar={d => void guardar(d)} />
+        <EditorDiseno diseno={diseno} onCambiar={d => guardar(d)} />
       </div>
     </SettingsCard>
   )

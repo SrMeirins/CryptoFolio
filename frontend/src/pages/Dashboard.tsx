@@ -20,6 +20,7 @@ import { RendimientoCard } from './dashboard/RendimientoCard'
 import { AllocationChart } from './dashboard/AllocationChart'
 import { FiscalCard } from './dashboard/FiscalCard'
 import { FranjaMetas } from './dashboard/metas/FranjaMetas'
+import { ResumenSemana } from './dashboard/resumen/ResumenSemana'
 import { BarraContraida, BotonContraer, PanelAbierto } from './dashboard/PanelDashboard'
 import { ModoPersonalizar } from './dashboard/ModoPersonalizar'
 import { useDashboardDiseno } from '../hooks/useDashboardDiseno'
@@ -124,29 +125,34 @@ export function Dashboard() {
   useEffect(() => { kpiRef.current?.toggleAttribute('inert', personalizando) }, [personalizando])
   // Si Evolución está oculta o contraída, la tarjeta Rentabilidad la abre y
   // baja a ella cuando ya está montada.
-  const irAEvolucion = useRef(false)
-  const irAlGrafico = () => {
-    const el = evolutionRef.current
-    if (!el) return
+  // Ir a un panel (Rentabilidad a Evolución, #412; el resumen de 7 días a P&L
+  // diario, #522): si está oculto o minimizado se muestra, y se baja a él con
+  // el foco cuando ya está montado.
+  const irA = useRef<PanelId | null>(null)
+  const bajarA = (id: PanelId) => {
+    const el = id === 'evolucion' ? evolutionRef.current : document.querySelector<HTMLElement>(`main [data-panel="${id}"]`)
+    if (!el) return false
     el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
-    el.focus({ preventScroll: true })
+    const foco = id === 'evolucion' ? el : el.querySelector<HTMLElement>('section, [role="region"]') ?? el
+    if (!foco.hasAttribute('tabindex') && !foco.matches('a, button')) foco.setAttribute('tabindex', '-1')
+    foco.focus({ preventScroll: true })
+    return true
   }
   useEffect(() => {
-    if (!irAEvolucion.current || !evolutionRef.current) return
-    irAEvolucion.current = false
-    irAlGrafico()
+    if (irA.current && bajarA(irA.current)) irA.current = null
   }, [diseno])
+  const irAPanel = (id: PanelId) => {
+    if (personalizando || diseno.ocultos.includes(id) || diseno.contraidos.includes(id)) {
+      setPersonalizando(false)
+      irA.current = id
+      void guardarDiseno({ ...diseno, ocultos: alternar(diseno.ocultos, id, false), contraidos: alternar(diseno.contraidos, id, false) })
+      return
+    }
+    bajarA(id)
+  }
   const targets = {
     portfolio: () => navigate('/portfolio'),
-    evolution: () => {
-      if (personalizando || diseno.ocultos.includes('evolucion') || diseno.contraidos.includes('evolucion')) {
-        setPersonalizando(false)
-        void guardarDiseno({ ...diseno, ocultos: alternar(diseno.ocultos, 'evolucion', false), contraidos: alternar(diseno.contraidos, 'evolucion', false) })
-        irAEvolucion.current = true
-        return
-      }
-      irAlGrafico()
-    },
+    evolution: () => irAPanel('evolucion'),
     withdrawn: () => navigate('/history?tarjeta=retirado'),
   }
 
@@ -184,6 +190,10 @@ export function Dashboard() {
 
   /** Contenido de cada panel; cada uno lleva su superficie (panelSurface) dentro. */
   const contenido: Record<PanelId, () => ReactNode> = {
+    resumen: () => (
+      <ResumenSemana valorAhora={hasPrices ? totalValue : null}
+        onIrAPnl={() => { navigate({ search: '?pnl-diario=7d' }, { replace: true }); irAPanel('pnl-diario') }} />
+    ),
     metas: () => null,
     variacion: () => <TopMovers lots={lots} pnlHoy={preparacion.listo ? liveToday?.pnl ?? null : null} />,
     evolucion: () => <EvolutionCard />,
@@ -334,7 +344,7 @@ export function Dashboard() {
           diseño en su lugar; si no, las filas en su orden, sin los ocultos y con
           los contraídos como barra (no se montan: no piden datos). */}
       {personalizando ? (
-        <ModoPersonalizar diseno={diseno} onCambiar={d => void guardarDiseno(d)}
+        <ModoPersonalizar diseno={diseno} onCambiar={d => guardarDiseno(d)}
           onRestaurar={d => void guardarDiseno(d, { mensaje: 'Diseño por defecto del Dashboard', deshacer: true })}
           onListo={() => setPersonalizando(false)} />
       ) : filasDashboard(diseno).map((fila, i) => fila.tipo === 'pareja' ? (

@@ -78,7 +78,10 @@ test('cambiar de métrica no hace peticiones y mantiene contadores y distintivos
   await mapa(page)
   await expect(page.getByText(/^(\d+ (suben|sube|en ganancia)|Todos (suben|bajan|en ganancia|en pérdida) \(\d+\))$/).first()).toBeVisible()
   const peticiones: string[] = []
-  page.on('request', r => { if (r.url().includes('/api/')) peticiones.push(r.url()) })
+  // Los iconos de activo (/api/assets/X/icon) son imágenes con carga diferida
+  // que llegan al entrar en pantalla, no por el cambio de métrica: no cuentan.
+  const esConsulta = (url: string) => url.includes('/api/') && !/\/api\/assets\/[^/]+\/icon/.test(url)
+  page.on('request', r => { if (esConsulta(r.url())) peticiones.push(r.url()) })
   const grupo = page.getByRole('radiogroup', { name: 'Métrica de mejores y peores' })
   const actual = await grupo.getByRole('radio', { checked: true }).textContent()
   await grupo.getByRole('radio', { name: actual?.trim() === 'Total' ? '24h' : 'Total' }).click()
