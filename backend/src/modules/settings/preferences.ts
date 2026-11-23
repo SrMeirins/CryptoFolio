@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { MUTED_KEY, mutedSchema } from '../notifications/preferences';
 import { autoBackupSchemas } from '../backup/autoBackupSettings';
+import { METAS_KEY, metasSchema } from './metas';
 
 // Preferencias de General (#446): claves de app_config con un conjunto cerrado
 // de valores. El PUT genérico las valida antes de guardarlas.
@@ -50,4 +51,6 @@ export const preferenceSchemas: Record<string, z.ZodType<string>> = {
   [MUTED_KEY]: mutedSchema,
   // Copias automáticas (#454).
   ...autoBackupSchemas,
+  // Metas de inversión (#520): lista JSON validada.
+  [METAS_KEY]: metasSchema,
 };

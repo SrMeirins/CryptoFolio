@@ -127,6 +127,16 @@ describe('routes/settings — config y stats', () => {
       for (const value of ['["otra"]', '["coste","coste"]', 'coste', '{}', '']) expect((await put('portfolio_columnas', value)).status).toBe(400);
     });
 
+    it('metas de inversión (#520): lista JSON validada que se guarda tal cual', async () => {
+      const metas = JSON.stringify([{ id: 'meta-0001', nombre: 'Cartera', tipo: 'valor', objetivo: 10000, moneda: 'EUR' }]);
+      expect((await put('metas', metas)).status).toBe(200);
+      expect((await request(app).get('/api/settings/config')).body.metas).toBe(metas);
+      for (const value of ['[{"id":"meta-0001","nombre":"x","tipo":"valor","objetivo":-1,"moneda":"EUR"}]', '{}', 'metas', 3]) {
+        expect((await put('metas', value)).status).toBe(400);
+      }
+      expect((await put('metas', '[]')).status).toBe(200);
+    });
+
     it('marcas del gráfico del detalle (#528): puntos o banderas arriba o abajo', async () => {
       for (const value of ['puntos', 'banderas-arriba', 'banderas-abajo']) expect((await put('grafico_marcas', value)).status).toBe(200);
       for (const value of ['banderas', 'PUNTOS', '', 1]) expect((await put('grafico_marcas', value)).status).toBe(400);

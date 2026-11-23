@@ -949,7 +949,8 @@ export const portfolioApi = {
       last_sale:      string
     }[]
   }>('/fifo/realized-pnl'),
-  getEurFlow: (currency: Currency = 'EUR') => api.get<{
+  // year (#520): solo los movimientos de ese año natural, para las metas de «aportado».
+  getEurFlow: (currency: Currency = 'EUR', year?: number) => api.get<{
     currency?: Currency
     deposited: number
     withdrawn: number
@@ -957,7 +958,7 @@ export const portfolioApi = {
     eurSpentBuying: number
     eurReceivedSelling: number
     netInvested: number
-  }>(`/fifo/eur-flow?currency=${currency}`),
+  }>(`/fifo/eur-flow?currency=${currency}${year === undefined ? '' : `&year=${year}`}`),
   getNotifications: () => api.get<Notification[]>('/settings/notifications'),
   // Escala del ahorro por ejercicio (#452): la oficial del año y los tipos cambiados a mano.
   getEscala: (year: number) => api.get<EscalaAhorro>(`/fiscal/escalas/${year}`),

@@ -1,11 +1,15 @@
 import { OPS_RENTA_ESPECIE } from '../../modules/fiscal/clasificacionRentas';
 import { Router } from 'express';
+import { z } from 'zod';
 import { db } from '../../db/client';
 import { EUR_MOVEMENTS_SQL } from '../../modules/fiat/eurMovements';
 import { currencySchema, fxSql } from '../../modules/fiat/displayCurrency';
 import { getAppTimezone } from '../../modules/time/appTimezone';
 
 const router = Router();
+
+/** Año opcional de /eur-flow (#520), como texto de la query. */
+const yearSchema = z.coerce.number().int().min(2000).max(2100).optional();
 
 // GET /api/fifo/summary: resumen fiscal por año, en la zona de la aplicación
 // (#388). Mismas columnas que la vista v_fiscal_year (fija en Madrid), que se
@@ -63,17 +67,27 @@ router.get('/eur-flow', async (req, res) => {
   // Movimientos de EUR: EUR_MOVEMENTS_SQL. Comprar cripto con EUR incluye las
   // ventas cuyo activo es EUR; recibir EUR incluye las compras de EUR.
   // ?currency=USD convierte cada movimiento con el tipo de su fecha (#175).
+  // ?year=AAAA limita a ese año natural en la zona de la aplicación (#520:
+  // metas de «aportado en el año»).
   const currency = currencySchema.safeParse(req.query.currency);
   if (!currency.success) { res.status(400).json({ error: 'currency debe ser EUR o USD' }); return; }
+  const year = yearSchema.safeParse(req.query.year);
+  if (!year.success) { res.status(400).json({ error: 'year debe ser un año entre 2000 y 2100' }); return; }
   const fx = fxSql(currency.data, 'timestamp');
+  const params: unknown[] = [];
+  let filtro = '';
+  if (year.data !== undefined) {
+    params.push(await getAppTimezone(db), year.data);
+    filtro = 'WHERE EXTRACT(YEAR FROM m.timestamp AT TIME ZONE $1) = $2';
+  }
   const result = await db.query(`
     SELECT
       COALESCE(SUM(CASE WHEN kind = 'deposit'                       THEN  amount * fx ELSE 0 END), 0) AS deposited,
       COALESCE(SUM(CASE WHEN kind = 'withdraw'                      THEN -amount * fx ELSE 0 END), 0) AS withdrawn,
       COALESCE(SUM(CASE WHEN kind IN ('buy', 'eur_to_crypto')       THEN -amount * fx ELSE 0 END), 0) AS eur_spent_buying,
       COALESCE(SUM(CASE WHEN kind IN ('sell', 'crypto_to_eur')      THEN  amount * fx ELSE 0 END), 0) AS eur_received_selling
-    FROM (SELECT m.*, ${fx} AS fx FROM (${EUR_MOVEMENTS_SQL}) m) movements
-  `);
+    FROM (SELECT m.*, ${fx} AS fx FROM (${EUR_MOVEMENTS_SQL}) m ${filtro}) movements
+  `, params);
   const row = result.rows[0];
   const deposited          = parseFloat(row.deposited);
   const withdrawn          = parseFloat(row.withdrawn);

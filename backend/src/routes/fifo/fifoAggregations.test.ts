@@ -105,6 +105,22 @@ describe('routes/fifo — endpoints de agregación', () => {
     expect(res.body.netInvested).toBe(40);
   });
 
+  it('GET /eur-flow?year= limita al año natural (#520)', async () => {
+    const y2023 = await request(app).get('/api/fifo/eur-flow?year=2023');
+    expect(y2023.status).toBe(200);
+    expect(y2023.body.deposited).toBe(200);
+    expect(y2023.body.eurSpentBuying).toBe(0);
+    const y2024 = await request(app).get('/api/fifo/eur-flow?year=2024');
+    expect(y2024.body.deposited).toBe(0);
+    expect(y2024.body.netFromBank).toBe(0);
+    expect(y2024.body.eurSpentBuying).toBe(100);
+  });
+
+  it.each(['abc', '1999', '2024.5', "2024' OR 1=1"])('GET /eur-flow?year=%s responde 400', async (year) => {
+    const res = await request(app).get(`/api/fifo/eur-flow?year=${encodeURIComponent(year)}`);
+    expect(res.status).toBe(400);
+  });
+
   it('GET /realized-pnl agrega la ganancia realizada de BTC (compra 100€ por 1, venta 60€ por 0.4 = coste 40€, ganancia 20€)', async () => {
     const res = await request(app).get('/api/fifo/realized-pnl');
     expect(res.status).toBe(200);
