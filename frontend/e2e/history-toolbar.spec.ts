@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { abrirMasFiltros } from './historyHelpers'
 
-// Barra de filtros por niveles (#414). Solo lectura.
+// Barra de filtros por niveles (#414) con el panel agrupado (#552). Solo lectura.
 
 test('el buscador sugiere activos y, al elegir con el teclado, añade su filtro', async ({ page }) => {
   await page.goto('/history')
@@ -20,23 +20,34 @@ test('el buscador sugiere activos y, al elegir con el teclado, añade su filtro'
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(new RegExp(`[?&]activo=${activo}`))
   await expect(buscador).toHaveValue('')
-  await expect(page.getByRole('button', { name: `Quitar filtro Activo: ${activo}` })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Filtrar por activo/ })).toHaveAccessibleName(`Filtrar por activo: ${activo}`)
+  await expect(page.getByRole('button', { name: 'Quitar el filtro de activos' })).toBeVisible()
 })
 
-test('«Más filtros» se despliega, cuenta sus filtros activos y no muestra «Cuenta»', async ({ page }) => {
-  await page.goto('/history?manuales=1&desde=2024-01-01&hasta=2024-12-31')
-  const mas = page.getByRole('button', { name: /^Más filtros/ })
-  await expect(mas).toHaveAccessibleName('Más filtros, 2 activos')
+test('«Filtros» se despliega en cuatro grupos y cuenta sus filtros; el año completo no cuenta', async ({ page }) => {
+  await page.goto('/history?manuales=1&desde=2024-02-01&hasta=2024-03-31')
+  const filtros = page.getByRole('button', { name: /^Filtros(,|$)/ })
+  await expect(filtros).toHaveAccessibleName('Filtros, 2 activos')
   await abrirMasFiltros(page)
-  await expect(mas).toHaveAttribute('aria-expanded', 'true')
-  await expect(page.getByRole('group', { name: 'Más filtros' }).getByRole('button', { name: 'Manuales' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(filtros).toHaveAttribute('aria-expanded', 'true')
+  const panel = page.getByRole('group', { name: 'Filtros', exact: true })
+  for (const g of ['Qué', 'Dónde', 'Cuándo', 'Importes']) await expect(panel.getByRole('group', { name: g, exact: true })).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Manuales' })).toHaveAttribute('aria-pressed', 'true')
+  // Las fechas usan el botón de quitar del propio selector (sin duplicarlo).
+  await expect(panel.getByRole('button', { name: 'Quitar filtro de fechas' })).toHaveCount(1)
   await expect(page.getByRole('button', { name: /Filtrar por cuenta/ })).toHaveCount(0)
+
+  // Un año completo se elige y se ve en la barra: no cuenta en «Filtros».
+  await page.goto('/history?desde=2024-01-01&hasta=2024-12-31')
+  await expect(page.getByRole('button', { name: /^Filtros(,|$)/ })).toHaveAccessibleName('Filtros')
+  await expect(page.getByRole('button', { name: 'Quitar el filtro de año' })).toBeVisible()
 })
 
-test('un enlace antiguo con «cuenta» sigue filtrando y su chip se quita', async ({ page }) => {
+test('un enlace antiguo con «cuenta» sigue filtrando y se quita desde el panel', async ({ page }) => {
   await page.goto('/history?cuenta=Spot')
-  const chip = page.getByRole('button', { name: 'Quitar filtro Cuenta: Spot' })
-  await expect(chip).toBeVisible()
-  await chip.click()
+  await abrirMasFiltros(page)
+  const quitar = page.getByRole('button', { name: 'Quitar el filtro de cuenta' })
+  await expect(quitar).toBeVisible()
+  await quitar.click()
   await expect(page).not.toHaveURL(/cuenta=/)
 })

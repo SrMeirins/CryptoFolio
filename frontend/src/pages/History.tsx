@@ -6,9 +6,11 @@ import { useHistoryStats } from './history/stats/useHistoryStats'
 import { useWalletsQuery } from '../hooks/useWallets'
 import { exportCsvUrl } from './history/sorting'
 import { activeChips } from './history/filterChips'
-import { ActiveFilterChips } from './history/ActiveFilterChips'
 import { useToast } from '../hooks/useToast'
-import { HistorySavedViews } from './history/HistorySavedViews'
+import { PestanasVistas, ID_PESTANAS } from './history/vistas/PestanasVistas'
+import { MenuMas } from './history/MenuMas'
+import { useHistorialDensidad } from '../hooks/useHistorialDensidad'
+import { tabPanelId } from '../components/ui'
 import { resultAnnouncement } from './history/announce'
 import { PAGE_SIZE, useHistoryFilters } from './history/useHistoryFilters'
 import { useHistoryData } from './history/useHistoryData'
@@ -36,6 +38,7 @@ export function History() {
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [showNewTx, setShowNewTx] = useState(false)
   const openShortcuts = useShortcutsStore(s => s.setOpen)
+  const { densidad } = useHistorialDensidad()
 
   const f = useHistoryFilters()
   const d = useHistoryData(f.queryParams, f.offset, f.filters.import_id)
@@ -117,21 +120,24 @@ export function History() {
 
       <div className="shrink-0 px-6 pt-6 pb-4 space-y-4 border-b border-border">
         <HistoryHeader loaded={!!d.data} total={total} filtered={f.hasActiveFilters} flows={flows} currency={currency}
-          views={<HistorySavedViews filters={f.filters} sort={f.sort} applyState={f.applyState} startedEmpty={f.startedEmpty} />}
+          menu={<MenuMas onCopiarEnlace={() => { void copyLink() }} onAtajos={() => openShortcuts(true)} />}
           onExport={exportCsv} onNew={() => setShowNewTx(true)}
           currentBalance={balance?.data ? { amount: balance.data.current, asset: balance.asset, wallet: balance.walletFiltered } : null} />
+        <PestanasVistas filters={f.filters} sort={f.sort} applyState={f.applyState} clearFilters={f.clearFilters}
+          hayFiltros={f.hasActiveFilters} startedEmpty={f.startedEmpty} />
         <HistoryToolbar ref={searchRef} filters={f.filters} searchInput={f.searchInput} wallets={wallets}
           assets={d.assets} presentTypes={d.presentTypes} imports={d.imports}
           currencySymbol={currencySymbol}
           setSearchInput={f.setSearchInput} setFilter={f.setFilter} patchFilters={f.patchFilters}
-          setDateRange={f.setDateRange} onCopyLink={() => { void copyLink() }}
+          setDateRange={f.setDateRange} activos={chips.length} total={total} onClearAll={f.clearFilters}
           year={{ years: d.years, value: year, onChange: goYear, onStep: stepTo, canPrev: prevYear !== null, canNext: nextYear !== null }} />
-        <ActiveFilterChips chips={chips} onRemove={f.patchFilters} onClearAll={f.clearFilters} />
       </div>
 
       {/* Recarga (#494): los datos siguen visibles y una barra fina lo indica. */}
       <div className="relative shrink-0"><RefreshBar active={refreshing} /></div>
-      <div className="flex-1 overflow-y-auto" aria-busy={refreshing || undefined}>
+      {/* Panel de las pestañas de vistas (#552): lo que muestra la vista elegida. */}
+      <div className="flex-1 overflow-y-auto" aria-busy={refreshing || undefined}
+        id={tabPanelId(ID_PESTANAS)} role="tabpanel" aria-label="Operaciones de la vista">
         <div className="px-6 pt-4 pb-4 space-y-4">
           {stats && (
             <>
@@ -165,7 +171,7 @@ export function History() {
             <HistoryTable transactions={d.transactions} sort={f.sort} onSort={f.toggleSort} currency={currency}
               searchTerm={f.filters.search} selectedId={f.focusTx} deletingId={d.deletingId}
               onOpen={f.openTx} onPrefetch={nav.prefetch} onDelete={id => { void d.deleteTx(id) }} onEdit={setEditingTx}
-              balance={balance} walletId={f.filters.wallet_id || undefined}
+              balance={balance} walletId={f.filters.wallet_id || undefined} densidad={densidad}
               skipLink={total > PAGE_SIZE ? { href: `#${PAGINATION_ID}`, onActivate: () => paginationRef.current?.focus() } : undefined} />
           )}
         </div>

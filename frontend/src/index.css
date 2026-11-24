@@ -461,6 +461,9 @@
 /* ── Panel lateral (#272): entra desde la derecha ─────────────────────────── */
 @keyframes drawerIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 .drawer-in { animation: drawerIn 0.22s ease-out both; }
+/* Hoja inferior (#552): sube desde abajo. */
+@keyframes sheetIn { from { transform: translateY(32px); opacity: 0; } to { transform: none; opacity: 1; } }
+.sheet-in { animation: sheetIn 0.24s ease-out both; }
 
 /* ── Tarjetas de métricas (#407, #410) ─────────────────────────────────────
    StatCard (components/ui): borde degradado del color de la tarjeta (--card),
@@ -492,3 +495,7 @@
   to   { opacity: 1; transform: none; }
 }
 .stat-card-in { animation: statCardIn 0.35s ease-out both; }
+
+/* Densidad compacta del Historial (#552): filas más bajas. Fuera de las capas
+   de Tailwind para que gane a los py-* de las celdas. */
+table[data-densidad='compacta'] > tbody > tr > td { padding-top: 0.3rem; padding-bottom: 0.3rem; }

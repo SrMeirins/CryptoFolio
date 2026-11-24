@@ -19,7 +19,7 @@ export function useSavedViews() {
     onSuccess: done,
   })
   const update = useMutation({
-    mutationFn: ({ id, ...body }: { id: string; nombre?: string; predeterminada?: boolean }) => portfolioApi.updateSavedView(id, body),
+    mutationFn: ({ id, ...body }: { id: string; nombre?: string; predeterminada?: boolean; filtros?: Record<string, string> }) => portfolioApi.updateSavedView(id, body),
     onSuccess: done,
   })
   const remove = useMutation({ mutationFn: (id: string) => portfolioApi.deleteSavedView(id), onSuccess: done })

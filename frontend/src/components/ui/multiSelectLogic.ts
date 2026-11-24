@@ -46,6 +46,22 @@ export function buildRows<T extends string>(visible: readonly MultiOption<T>[], 
  * Texto del disparador: el marcador de posición, la única opción elegida o el
  * recuento con su sustantivo («2 tipos»); sin sustantivo, «N seleccionados».
  */
+/**
+ * Resumen con los valores a la vista (#552): hasta `ver` etiquetas y «+n» con
+ * el resto («Compra, Venta +2»); sin valores, el texto de vacío.
+ */
+export function resumenValores<T extends string>(values: readonly T[], options: readonly MultiOption<T>[], placeholder: string, ver: number): string {
+  if (values.length === 0) return placeholder
+  const etiquetas = values.map(v => options.find(o => o.value === v)?.label ?? v)
+  const resto = etiquetas.length - ver
+  return resto > 0 ? `${etiquetas.slice(0, ver).join(', ')} +${resto}` : etiquetas.join(', ')
+}
+
+/** Todas las etiquetas elegidas, para el nombre accesible. */
+export function etiquetasElegidas<T extends string>(values: readonly T[], options: readonly MultiOption<T>[]): string {
+  return values.map(v => options.find(o => o.value === v)?.label ?? v).join(', ')
+}
+
 export function summaryLabel<T extends string>(values: readonly T[], options: readonly MultiOption<T>[], placeholder: string, plural?: string): string {
   if (values.length === 0) return placeholder
   if (values.length === 1) return options.find(o => o.value === values[0])?.label ?? values[0]

@@ -14,8 +14,8 @@ export const ATAJOS_GENERALES: GrupoAtajos = {
   ],
 }
 
-/** Atajos propios de cada pantalla, por ruta. */
-export const ATAJOS_PANTALLA: Readonly<Record<string, GrupoAtajos>> = {
+/** Atajos propios de cada pantalla, por ruta: un grupo o varios (Historial, #552). */
+export const ATAJOS_PANTALLA: Readonly<Record<string, GrupoAtajos | readonly GrupoAtajos[]>> = {
   '/portfolio': {
     titulo: 'Portfolio',
     atajos: [
@@ -36,20 +36,37 @@ export const ATAJOS_PANTALLA: Readonly<Record<string, GrupoAtajos>> = {
       [['P'], 'En Planificar, abrir o cerrar el plan'],
     ],
   },
-  '/history': {
-    titulo: 'Historial',
-    atajos: [
-      [['/'], 'Ir a la búsqueda'],
-      [['Flecha izquierda', 'Flecha derecha'], 'Año anterior o siguiente; con el detalle abierto, transacción anterior o siguiente'],
-      [['Flecha arriba', 'Flecha abajo'], 'Moverse entre filas de la tabla'],
-      [['Inicio', 'Fin'], 'Primera o última fila de la página'],
-      [['Intro'], 'Abrir el detalle de la fila'],
-    ],
-  },
+  // Historial (#552): agrupados por tarea.
+  '/history': [
+    {
+      titulo: 'Historial: buscar y filtrar',
+      atajos: [
+        [['/'], 'Ir a la búsqueda'],
+        [['Flecha izquierda', 'Flecha derecha'], 'Año anterior o siguiente'],
+      ],
+    },
+    {
+      titulo: 'Historial: vistas guardadas',
+      atajos: [
+        [['Flecha izquierda', 'Flecha derecha'], 'Con el foco en las pestañas, ir a la vista anterior o siguiente y aplicarla'],
+        [['Inicio', 'Fin'], 'Primera vista («Todas») o última'],
+      ],
+    },
+    {
+      titulo: 'Historial: tabla y detalle',
+      atajos: [
+        [['Flecha arriba', 'Flecha abajo'], 'Moverse entre filas de la tabla'],
+        [['Inicio', 'Fin'], 'Primera o última fila de la página'],
+        [['Intro'], 'Abrir el detalle de la fila'],
+        [['Flecha izquierda', 'Flecha derecha'], 'Con el detalle abierto, transacción anterior o siguiente'],
+      ],
+    },
+  ],
 }
 
 /** Grupos que se muestran en una ruta: los de la pantalla, si los hay, y los generales. */
 export function atajosDe(pathname: string): GrupoAtajos[] {
   const propio = ATAJOS_PANTALLA[pathname]
-  return propio ? [propio, ATAJOS_GENERALES] : [ATAJOS_GENERALES]
+  if (!propio) return [ATAJOS_GENERALES]
+  return [...(Array.isArray(propio) ? propio : [propio as GrupoAtajos]), ATAJOS_GENERALES]
 }

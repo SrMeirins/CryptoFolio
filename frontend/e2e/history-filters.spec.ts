@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { abrirMasFiltros } from './historyHelpers'
+import { abrirOpcionesVista } from './historyHelpers'
 
-// Filtros avanzados del Historial (#366): multiselección con teclado, chips,
-// búsqueda con debounce y URL que restaura la vista. Solo lee: no modifica datos.
+// Filtros avanzados del Historial (#366, #552): multiselección con teclado,
+// cada filtro una sola vez (en su control, con su X), búsqueda con debounce y
+// URL que restaura la vista. Solo lee: no modifica datos.
 
-test('multiselección y chips con teclado; la URL restaura la vista', async ({ page }) => {
+test('multiselección con teclado; el filtro se ve una vez y se quita desde el control', async ({ page }) => {
   await page.goto('/history')
   await expect(page.getByRole('table')).toBeVisible()
 
@@ -27,20 +28,35 @@ test('multiselección y chips con teclado; la URL restaura la vista', async ({ p
   await page.keyboard.press('Escape')
   await expect(trigger).toBeFocused()
 
-  // Chip del filtro y URL.
-  const chip = page.getByRole('button', { name: 'Quitar filtro Tipo: Compra' })
-  await expect(chip).toBeVisible()
+  // El valor se ve en el propio control, con su X, y no hay chips aparte.
+  await expect(trigger).toHaveAccessibleName('Filtrar por tipo: Compra')
+  const quitar = page.getByRole('button', { name: 'Quitar el filtro de tipos' })
+  await expect(quitar).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Filtros activos' })).toHaveCount(0)
+  await expect(page.getByText('Tipo: Compra', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Limpiar filtros (1)' })).toBeVisible()
   await expect(page).toHaveURL(/[?&]tipo=BUY/)
 
   // Recargar restaura la vista.
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Quitar filtro Tipo: Compra' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Quitar el filtro de tipos' })).toBeVisible()
 
-  // Quitar el chip con el teclado.
-  await page.getByRole('button', { name: 'Quitar filtro Tipo: Compra' }).focus()
+  // Quitarlo desde su control con el teclado.
+  await page.getByRole('button', { name: 'Quitar el filtro de tipos' }).focus()
   await page.keyboard.press('Enter')
-  await expect(page.getByRole('region', { name: 'Filtros activos' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Filtrar por tipo/ })).toHaveAccessibleName('Filtrar por tipo: Todos los tipos')
+  await expect(page.getByRole('button', { name: /^Limpiar filtros/ })).toHaveCount(0)
   await expect(page).not.toHaveURL(/tipo=/)
+})
+
+test('«Limpiar filtros» quita todos los filtros de una vez', async ({ page }) => {
+  await page.goto('/history?tipo=BUY&desde=2024-01-01&hasta=2024-12-31&manuales=1')
+  await expect(page.getByRole('table').or(page.getByText(/Sin resultados/)).first()).toBeVisible()
+  const limpiar = page.getByRole('button', { name: /^Limpiar filtros \(\d+\)$/ })
+  await expect(limpiar).toBeVisible()
+  await limpiar.click()
+  await expect(page).not.toHaveURL(/tipo=|desde=|manuales=/)
+  await expect(page.getByRole('button', { name: /^Limpiar filtros/ })).toHaveCount(0)
 })
 
 test('la búsqueda espera a que dejes de teclear: una sola petición', async ({ page }) => {
@@ -58,16 +74,18 @@ test('la búsqueda espera a que dejes de teclear: una sola petición', async ({ 
   expect(searches.filter(s => s === 'BTC').length).toBeGreaterThanOrEqual(1)
 })
 
-test('agrupar comisiones: conmutador con teclado y estado en la URL (#371)', async ({ page }) => {
+test('agrupar comisiones: en las opciones de vista, con teclado y estado en la URL (#371, #552)', async ({ page }) => {
   await page.goto('/history')
   await expect(page.getByRole('table')).toBeVisible()
-  await abrirMasFiltros(page)
-  const toggle = page.getByRole('button', { name: 'Agrupar comisiones' })
-  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  await abrirOpcionesVista(page)
+  const opciones = page.getByRole('dialog', { name: 'Opciones de vista' })
+  const toggle = opciones.getByRole('switch', { name: 'Agrupar comisiones' })
+  await expect(toggle).toBeChecked()
   await toggle.focus()
-  await page.keyboard.press('Enter')
-  await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+  await page.keyboard.press('Space')
+  await expect(toggle).not.toBeChecked()
   await expect(page).toHaveURL(/[?&]comisiones=sueltas/)
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Agrupar comisiones' })).toHaveAttribute('aria-pressed', 'false')
+  await abrirOpcionesVista(page)
+  await expect(page.getByRole('dialog', { name: 'Opciones de vista' }).getByRole('switch', { name: 'Agrupar comisiones' })).not.toBeChecked()
 })

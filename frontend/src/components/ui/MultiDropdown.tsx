@@ -3,7 +3,7 @@ import { Check, ChevronDown, Minus, Search } from 'lucide-react'
 import { Popover } from './Popover'
 import { fieldClasses, type FieldSize } from './classes'
 import { filterOptions } from './dropdownNav'
-import { buildRows, groupState, summaryLabel, toggleGroup, toggleValue, type MultiOption } from './multiSelectLogic'
+import { buildRows, etiquetasElegidas, groupState, resumenValores, summaryLabel, toggleGroup, toggleValue, type MultiOption } from './multiSelectLogic'
 
 // Desplegable de selección múltiple (#366), variante del Dropdown (#240):
 // casillas, buscador, cabeceras de grupo que marcan el grupo entero y
@@ -26,6 +26,8 @@ export interface MultiDropdownProps<T extends string> {
   groupSelectable?: boolean
   /** Sustantivo del recuento en el disparador («tipos» → «3 tipos»). */
   plural?: string
+  /** Mostrar hasta este número de valores en el botón («Compra, Venta +2») en vez de «n plural» (#552). */
+  verValores?: number
   align?: 'start' | 'end'
 }
 
@@ -41,7 +43,7 @@ function Box({ state }: { state: 'all' | 'some' | 'none' }) {
 }
 
 export function MultiDropdown<T extends string>({
-  label, values, options, onChange, placeholder, size = 'md', className = '', searchable, groupSelectable = false, align = 'start', plural,
+  label, values, options, onChange, placeholder, size = 'md', className = '', searchable, groupSelectable = false, align = 'start', plural, verValores,
 }: MultiDropdownProps<T>) {
   const baseId = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -97,13 +99,15 @@ export function MultiDropdown<T extends string>({
   }
 
   const listId = `${baseId}-list`
-  const summary = summaryLabel(values, options, placeholder, plural)
+  const summary = verValores ? resumenValores(values, options, placeholder, verValores) : summaryLabel(values, options, placeholder, plural)
+  // El nombre accesible lista todos los elegidos aunque el botón resuma.
+  const nombre = values.length > 1 && verValores ? etiquetasElegidas(values, options) : summary
   return (
     <>
       <button
         ref={triggerRef}
         type="button"
-        aria-label={`${label}: ${summary}`}
+        aria-label={`${label}: ${nombre}`}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}

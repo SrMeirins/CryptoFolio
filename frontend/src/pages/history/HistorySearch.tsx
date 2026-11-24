@@ -64,7 +64,7 @@ export const HistorySearch = forwardRef<HTMLInputElement, {
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}
-        className="w-full bg-background-tertiary border border-border rounded-xl pl-9 pr-16 py-2 text-sm text-fg placeholder-fg-subtle transition-colors hover:border-brand/30 focus:outline-hidden focus:border-brand/50 focus-visible:ring-2 focus-visible:ring-brand/30 [&::-webkit-search-cancel-button]:hidden"
+        className="w-full bg-background-tertiary border border-border rounded-lg pl-9 pr-16 py-1.5 text-xs text-fg placeholder-fg-subtle transition-colors hover:border-brand/30 focus:outline-hidden focus:border-brand/50 focus-visible:ring-2 focus-visible:ring-brand/30 [&::-webkit-search-cancel-button]:hidden"
       />
       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
         {value && (

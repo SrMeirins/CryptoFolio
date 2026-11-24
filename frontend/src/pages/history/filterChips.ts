@@ -4,8 +4,10 @@ import type { MultiOption } from '../../components/ui'
 import { fmtShort } from '../../utils/date'
 import type { HistoryFilterState } from './urlState'
 
-// Chips de filtros activos y opciones de tipo agrupadas del Historial (#366).
-// Funciones puras: el componente solo las pinta.
+// Filtros activos y opciones de tipo agrupadas del Historial (#366). Desde
+// #552 no se pintan como chips: cada control muestra su valor. La lista sirve
+// para el recuento de «Limpiar filtros», el resumen del vacío por filtros y el
+// texto de cada control. Funciones puras.
 
 export interface FilterChip {
   id: string
@@ -44,20 +46,30 @@ export function activeChips(
   if (f.wallet_id) chips.push({ id: 'wallet', label: `Wallet: ${names.wallet(f.wallet_id) ?? '…'}`, clear: { wallet_id: '' } })
   if (f.account) chips.push({ id: 'cuenta', label: `Cuenta: ${f.account}`, clear: { account: '' } })
   if (f.date_from || f.date_to) {
-    const label = f.date_from && f.date_to
-      ? (f.date_from === f.date_to ? fmtShort(f.date_from) : `${fmtShort(f.date_from)} – ${fmtShort(f.date_to)}`)
-      : f.date_from ? `desde ${fmtShort(f.date_from)}` : `hasta ${fmtShort(f.date_to)}`
-    chips.push({ id: 'fechas', label: `Fechas: ${label}`, clear: { date_from: '', date_to: '' } })
+    chips.push({ id: 'fechas', label: `Fechas: ${textoFechas(f.date_from, f.date_to)}`, clear: { date_from: '', date_to: '' } })
   }
   if (f.value_min || f.value_max) {
-    const s = names.currencySymbol
-    const label = f.value_min && f.value_max ? `${f.value_min}–${f.value_max} ${s}`
-      : f.value_min ? `≥ ${f.value_min} ${s}` : `≤ ${f.value_max} ${s}`
-    chips.push({ id: 'importe', label: `Importe: ${label}`, clear: { value_min: '', value_max: '' } })
+    chips.push({ id: 'importe', label: `Importe: ${textoImporte(f.value_min, f.value_max, names.currencySymbol)}`, clear: { value_min: '', value_max: '' } })
   }
   if (f.manualOnly) chips.push({ id: 'manuales', label: 'Solo manuales', clear: { manualOnly: false } })
   if (f.editedOnly) chips.push({ id: 'editadas', label: 'Solo editadas', clear: { editedOnly: false } })
   if (f.card) chips.push({ id: 'tarjeta', label: `Tarjeta: ${CARD_TITLES[f.card]}${f.includeMargin ? ' (con margen)' : ''}`, clear: { card: '' } })
   if (f.import_id) chips.push({ id: 'importacion', label: `Archivo: ${names.importFile(f.import_id) ?? '…'}`, clear: { import_id: '' } })
   return chips
+}
+
+/** Texto de un rango de fechas: «1 ene 2025 – 31 mar 2025», «desde …» o «hasta …»; vacío sin fechas. */
+export function textoFechas(from: string, to: string): string {
+  if (from && to) return from === to ? fmtShort(from) : `${fmtShort(from)} – ${fmtShort(to)}`
+  if (from) return `desde ${fmtShort(from)}`
+  if (to) return `hasta ${fmtShort(to)}`
+  return ''
+}
+
+/** Texto de un rango de importes con su símbolo; vacío sin importes. */
+export function textoImporte(min: string, max: string, simbolo: string): string {
+  if (min && max) return `${min}–${max} ${simbolo}`
+  if (min) return `≥ ${min} ${simbolo}`
+  if (max) return `≤ ${max} ${simbolo}`
+  return ''
 }

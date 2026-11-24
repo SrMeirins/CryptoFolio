@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EMPTY_FILTERS } from './urlState'
-import { searchSuggestions, secondaryFilterCount } from './toolbarLogic'
+import { quitarDelPanel, searchSuggestions, secondaryFilterCount } from './toolbarLogic'
 
 // Barra de filtros por niveles (#414). Datos sintéticos.
 const wallets = [{ id: 'w1', name: 'Exchange principal' }, { id: 'w2', name: 'Fría' }]
@@ -30,14 +30,33 @@ describe('searchSuggestions (#414)', () => {
   })
 })
 
-describe('secondaryFilterCount (#414)', () => {
-  it('cuenta fechas e importe como un filtro cada uno', () => {
+describe('secondaryFilterCount (#552)', () => {
+  it('cuenta wallet, fechas exactas, importe, archivo, manuales, editadas y cuenta', () => {
     expect(secondaryFilterCount(EMPTY_FILTERS)).toBe(0)
-    expect(secondaryFilterCount({ ...EMPTY_FILTERS, date_from: '2025-01-01', date_to: '2025-12-31', value_min: '5' })).toBe(2)
-    expect(secondaryFilterCount({ ...EMPTY_FILTERS, manualOnly: true, editedOnly: true, import_id: 'x', account: 'Spot' })).toBe(4)
+    expect(secondaryFilterCount({ ...EMPTY_FILTERS, date_from: '2025-02-01', date_to: '2025-03-31', value_min: '5' })).toBe(2)
+    expect(secondaryFilterCount({ ...EMPTY_FILTERS, manualOnly: true, editedOnly: true, import_id: 'x', account: 'Spot', wallet_id: 'w1' })).toBe(5)
   })
 
-  it('los filtros del primer nivel no cuentan', () => {
-    expect(secondaryFilterCount({ ...EMPTY_FILTERS, types: ['BUY'], assets: ['BTC'], wallet_id: 'w1', search: 'x' })).toBe(0)
+  it('un año completo no cuenta: se ve en el selector de la barra', () => {
+    expect(secondaryFilterCount({ ...EMPTY_FILTERS, date_from: '2025-01-01', date_to: '2025-12-31' })).toBe(0)
+  })
+
+  it('los filtros de la barra no cuentan', () => {
+    expect(secondaryFilterCount({ ...EMPTY_FILTERS, types: ['BUY'], assets: ['BTC'], search: 'x' })).toBe(0)
   })
 })
+
+describe('quitarDelPanel (#552)', () => {
+  it('quita los del panel y conserva los de la barra y el año completo', () => {
+    const f = { ...EMPTY_FILTERS, types: ['BUY'], wallet_id: 'w1', manualOnly: true, date_from: '2025-01-01', date_to: '2025-12-31', value_min: '5' }
+    const r = { ...f, ...quitarDelPanel(f) }
+    expect(secondaryFilterCount(r)).toBe(0)
+    expect(r.types).toEqual(['BUY'])
+    expect(r.date_from).toBe('2025-01-01')
+  })
+  it('las fechas exactas sí se quitan', () => {
+    const f = { ...EMPTY_FILTERS, date_from: '2025-02-01', date_to: '2025-03-31' }
+    expect({ ...f, ...quitarDelPanel(f) }.date_from).toBe('')
+  })
+})
+
