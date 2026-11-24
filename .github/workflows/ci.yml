@@ -153,7 +153,14 @@ jobs:
     # Prueba de humo (#201): backend real con datos sintéticos + frontend en
     # modo desarrollo (React solo emite sus avisos ahí) + Playwright, que abre
     # cada vista y falla ante cualquier error o aviso en la consola.
+    # Corre en la imagen oficial de Playwright (#602): Chromium y sus librerías
+    # del sistema ya vienen instalados, así que el job no depende de apt ni de
+    # los repositorios de Ubuntu. La etiqueta, con versión exacta, debe
+    # coincidir con @playwright/test (lo comprueba el primer paso).
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001
     services:
       postgres:
         image: postgres:16-alpine
@@ -161,19 +168,23 @@ jobs:
           POSTGRES_USER: cryptotracker
           POSTGRES_PASSWORD: ci_test_password
           POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://cryptotracker:ci_test_password@localhost:5432/postgres
+      # Dentro del contenedor, Postgres se alcanza por el nombre del servicio.
+      DATABASE_URL: postgresql://cryptotracker:ci_test_password@postgres:5432/postgres
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Comprobar la versión de la imagen de Playwright
+        run: |
+          node --test scripts/ci/check-playwright-image.test.mjs scripts/ci/run-sql.test.mjs
+          node scripts/ci/check-playwright-image.mjs
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -185,16 +196,23 @@ jobs:
             frontend/package-lock.json
 
       - name: Install
+        # Red de seguridad (#602): tres intentos con espera creciente ante un
+        # fallo de red del registro de npm.
         run: |
-          npm ci --prefix backend
-          npm ci --prefix frontend
+          for intento in 1 2 3; do
+            npm ci --prefix backend && npm ci --prefix frontend && exit 0
+            echo "npm ci falló (intento $intento de 3)"
+            [ "$intento" -lt 3 ] && sleep $((intento * 20))
+          done
+          exit 1
 
       - name: Start backend
         # El backend aplica schema.sql y las migraciones sobre la base vacía al
         # arrancar. Modo sin red (#359): no consulta APIs de precios (los
         # cierres sintéticos vienen en el seed) y la prueba no depende de
         # terceros. tsx es la devDependency pinada (antes `npx ts-node`, que se
-        # descargaba sin versión fija).
+        # descargaba sin versión fija). La espera usa fetch de Node: la imagen
+        # no garantiza curl.
         working-directory: backend
         env:
           BACKEND_PORT: '3001'
@@ -204,17 +222,17 @@ jobs:
           RATE_LIMIT_MAX: '50000'
         run: |
           nohup npx tsx src/index.ts > backend.log 2>&1 &
-          for i in $(seq 1 60); do curl -sf http://127.0.0.1:3001/health && exit 0; sleep 2; done
+          for i in $(seq 1 60); do
+            node -e "fetch('http://127.0.0.1:3001/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))" && exit 0
+            sleep 2
+          done
           cat backend.log; exit 1
 
       - name: Seed synthetic data
+        # seed.sql con el paquete pg del backend: la imagen no trae psql.
         run: |
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f frontend/e2e/seed.sql
-          curl -sf -X POST -m 300 http://127.0.0.1:3001/api/fifo/run
-
-      - name: Install Playwright browser
-        working-directory: frontend
-        run: npx playwright install --with-deps chromium
+          node scripts/ci/run-sql.mjs frontend/e2e/seed.sql
+          node -e "fetch('http://127.0.0.1:3001/api/fifo/run', { method: 'POST', signal: AbortSignal.timeout(300000) }).then(r => { console.log('FIFO:', r.status); process.exit(r.ok ? 0 : 1) }, e => { console.error(e.message); process.exit(1) })"
 
       - name: Console smoke test
         working-directory: frontend
