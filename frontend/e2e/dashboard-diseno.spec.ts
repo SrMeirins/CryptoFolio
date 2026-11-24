@@ -58,6 +58,12 @@ test('mover un panel solo con teclado y recargar', async ({ page }) => {
   await expect.poll(() => ordenEditor(page)).toEqual(['resumen', 'metas', 'evolucion', 'variacion', 'rendimiento', ...antes.slice(5)])
 
   await page.getByRole('button', { name: 'Listo' }).click()
+  // El guardado va en segundo plano: se espera a que el servidor tenga el orden antes de recargar.
+  await expect.poll(async () => {
+    const raw = ((await (await page.request.get('/api/settings/config')).json()) as Record<string, string>).dashboard_diseno ?? '{}'
+    const orden = (JSON.parse(raw) as { orden?: string[] }).orden ?? []
+    return orden.indexOf('evolucion') < orden.indexOf('variacion') && orden.indexOf('variacion') < orden.indexOf('rendimiento')
+  }).toBe(true)
   await page.reload()
   await expect(page.locator('main [data-panel="variacion"]')).toBeVisible()
   const pagina = await ordenPagina(page)
