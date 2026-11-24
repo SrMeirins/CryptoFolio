@@ -1,9 +1,1 @@
-[
-  {
-    "id": "GHSA-fc5q-39xc-vjpf",
-    "paquete": "picomatch",
-    "motivo": "Sin versión corregida publicada (afecta hasta la 4.0.7, la última). Solo en dependencias de desarrollo y test (Vite, Vitest, ESLint), con patrones de la configuración, no de datos de usuario; la auditoría de producción pasa.",
-    "caduca": "2026-12-18",
-    "issue": "#623"
-  }
-]
+[]
