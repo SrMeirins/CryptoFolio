@@ -26,7 +26,7 @@ import { ModoPersonalizar } from './dashboard/ModoPersonalizar'
 import { useDashboardDiseno } from '../hooks/useDashboardDiseno'
 import { alternar, filasDashboard, type PanelId } from '../utils/dashboardDiseno'
 import { LayoutDashboard } from 'lucide-react'
-import { Button } from '../components/ui'
+import { Button, Skeleton, SkeletonGroup } from '../components/ui'
 import { localToday } from '../utils/pnlChart'
 import { monthRange, ymOf } from '../utils/pnlCalendar'
 import { useLiveDayPnl } from '../hooks/useLiveDayPnl'
@@ -118,7 +118,7 @@ export function Dashboard() {
   const navigate = useNavigate()
   const evolutionRef = useRef<HTMLDivElement>(null)
   // Dashboard personalizable (#521): orden, ocultos y contraídos, y el modo Personalizar.
-  const { diseno, guardar: guardarDiseno } = useDashboardDiseno()
+  const { diseno, guardar: guardarDiseno, cargado: disenoCargado } = useDashboardDiseno()
   const [personalizando, setPersonalizando] = useState(false)
   // Las métricas fijas quedan inertes mientras se personaliza (sin foco ni clic).
   const kpiRef = useRef<HTMLDivElement>(null)
@@ -343,7 +343,12 @@ export function Dashboard() {
       {/* Paneles personalizables (#521): en el modo Personalizar, la lista del
           diseño en su lugar; si no, las filas en su orden, sin los ocultos y con
           los contraídos como barra (no se montan: no piden datos). */}
-      {personalizando ? (
+      {!disenoCargado ? (
+        // Hasta que llega el diseño, un esqueleto: pintar el orden por defecto haría saltar los paneles.
+        <SkeletonGroup label="Cargando los paneles del Dashboard" className="space-y-4">
+          <Skeleton className="h-48 w-full" /><Skeleton className="h-72 w-full" />
+        </SkeletonGroup>
+      ) : personalizando ? (
         <ModoPersonalizar diseno={diseno} onCambiar={d => guardarDiseno(d)}
           onRestaurar={d => void guardarDiseno(d, { mensaje: 'Diseño por defecto del Dashboard', deshacer: true })}
           onListo={() => setPersonalizando(false)} />
