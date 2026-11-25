@@ -135,7 +135,7 @@ test('importada (#378): el modal avisa del archivo, tiene nombre y cancelar no g
   expect(escrituras).toEqual([])
 })
 
-test('filtro «Editadas» (#378): conmutador accesible, en la URL y con su chip', async ({ page }) => {
+test('filtro «Editadas» (#378, #552): conmutador accesible, en la URL y contado en «Filtros»', async ({ page }) => {
   await openHistory(page, 'dark')
   await abrirMasFiltros(page)
   const boton = page.getByRole('button', { name: 'Editadas', exact: true })
@@ -143,7 +143,9 @@ test('filtro «Editadas» (#378): conmutador accesible, en la URL y con su chip'
   await boton.click()
   await expect(boton).toHaveAttribute('aria-pressed', 'true')
   await expect(page).toHaveURL(/[?&]editadas=1/)
-  await expect(page.getByText('Solo editadas', { exact: true })).toBeVisible()
+  // Sin chip aparte (#552): el filtro se ve en su conmutador y cuenta en «Filtros».
+  await expect(page.getByRole('button', { name: /^Filtros(,|$)/ })).toHaveAccessibleName('Filtros, 1 activo')
+  await expect(page.getByText('Solo editadas', { exact: true })).toHaveCount(0)
 })
 
 test('panel de una importada editada (#378): cambios, restaurar con confirmación cancelable y axe', async ({ page }) => {

@@ -8,11 +8,13 @@ import { useModalA11y } from '../../hooks/useModalA11y'
 // Anchos del panel: «lg» para el detalle del activo (#528), con más contenido.
 const WIDTHS = { md: 'max-w-xl', lg: 'max-w-[720px]' } as const
 
-export function Drawer({ onClose, labelledBy, initialFocusRef, size = 'md', children }: {
+export function Drawer({ onClose, labelledBy, initialFocusRef, size = 'md', lado = 'derecha', children }: {
   onClose: () => void
   labelledBy: string
   initialFocusRef?: RefObject<HTMLElement | null>
   size?: keyof typeof WIDTHS
+  /** «abajo»: hoja inferior a todo el ancho (filtros del Historial en móvil, #552). */
+  lado?: 'derecha' | 'abajo'
   children: ReactNode
 }) {
   const panelRef = useModalA11y<HTMLDivElement>(onClose, initialFocusRef)
@@ -25,10 +27,12 @@ export function Drawer({ onClose, labelledBy, initialFocusRef, size = 'md', chil
   }, [])
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-[2px] animate-page-in"
+    <div className={`fixed inset-0 z-50 flex ${lado === 'abajo' ? 'items-end' : 'justify-end'} bg-black/45 backdrop-blur-[2px] animate-page-in`}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={labelledBy}
-        className={`drawer-in h-full w-full ${WIDTHS[size]} bg-background-card border-l border-border shadow-2xl flex flex-col overflow-hidden`}>
+        className={lado === 'abajo'
+          ? 'sheet-in w-full max-h-[88vh] rounded-t-2xl bg-background-card border-t border-border shadow-2xl flex flex-col overflow-hidden'
+          : `drawer-in h-full w-full ${WIDTHS[size]} bg-background-card border-l border-border shadow-2xl flex flex-col overflow-hidden`}>
         {children}
       </div>
     </div>,

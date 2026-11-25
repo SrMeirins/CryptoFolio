@@ -13,6 +13,12 @@ describe('atajos por pantalla (#535)', () => {
     expect(atajosDe('/settings')).toEqual([ATAJOS_GENERALES])
   })
 
+  it('en el Historial, sus atajos agrupados por tarea (#552) y los generales', () => {
+    const g = atajosDe('/history')
+    expect(g.map(x => x.titulo)).toEqual(['Historial: buscar y filtrar', 'Historial: vistas guardadas', 'Historial: tabla y detalle', 'En toda la aplicación'])
+    expect(g.every(x => x.atajos.length > 0)).toBe(true)
+  })
+
   it('la tecla «?» abre la ayuda en toda la app', () => {
     expect(ATAJOS_GENERALES.atajos.some(([t]) => t.includes('?'))).toBe(true)
   })

@@ -144,6 +144,12 @@ describe('routes/settings — config y stats', () => {
       for (const value of ['{"orden":["otro"],"ocultos":[],"contraidos":[]}', '[]', 'x', 1]) expect((await put('dashboard_diseno', value)).status).toBe(400);
     });
 
+    it('densidad del Historial (#552): cómoda o compacta', async () => {
+      for (const value of ['comoda', 'compacta']) expect((await put('historial_densidad', value)).status).toBe(200);
+      for (const value of ['Compacta', 'densa', '', 1]) expect((await put('historial_densidad', value)).status).toBe(400);
+      expect((await request(app).get('/api/settings/config')).body.historial_densidad).toBe('compacta');
+    });
+
     it('marcas del gráfico del detalle (#528): puntos o banderas arriba o abajo', async () => {
       for (const value of ['puntos', 'banderas-arriba', 'banderas-abajo']) expect((await put('grafico_marcas', value)).status).toBe(200);
       for (const value of ['banderas', 'PUNTOS', '', 1]) expect((await put('grafico_marcas', value)).status).toBe(400);

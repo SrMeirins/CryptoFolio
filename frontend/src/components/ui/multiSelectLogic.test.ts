@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRows, groupState, summaryLabel, toggleGroup, toggleValue } from './multiSelectLogic'
+import { buildRows, etiquetasElegidas, groupState, resumenValores, summaryLabel, toggleGroup, toggleValue } from './multiSelectLogic'
 
 const OPTS = [
   { value: 'BUY', label: 'Compra', group: 'Compras' },
@@ -33,3 +33,17 @@ describe('selección múltiple (#366)', () => {
     expect(summaryLabel(['SELL', 'BUY'], OPTS, 'Todos', 'tipos')).toBe('2 tipos')
   })
 })
+
+describe('resumenValores y etiquetasElegidas (#552)', () => {
+  const opts = [{ value: 'a', label: 'Compra' }, { value: 'b', label: 'Venta' }, { value: 'c', label: 'Permuta' }, { value: 'd', label: 'Staking' }]
+  it('hasta n etiquetas y «+resto»; sin valores, el vacío', () => {
+    expect(resumenValores([], opts, 'Todos', 2)).toBe('Todos')
+    expect(resumenValores(['a'], opts, 'Todos', 2)).toBe('Compra')
+    expect(resumenValores(['a', 'b'], opts, 'Todos', 2)).toBe('Compra, Venta')
+    expect(resumenValores(['a', 'b', 'c', 'd'], opts, 'Todos', 2)).toBe('Compra, Venta +2')
+  })
+  it('el nombre accesible lista todas', () => {
+    expect(etiquetasElegidas(['a', 'b', 'c'], opts)).toBe('Compra, Venta, Permuta')
+  })
+})
+

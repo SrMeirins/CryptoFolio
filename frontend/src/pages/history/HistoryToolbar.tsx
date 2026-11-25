@@ -1,37 +1,29 @@
-import { forwardRef, useState, type ReactNode } from 'react'
+import { forwardRef, useId, useState } from 'react'
+import { ChevronDown, FilterX, SlidersHorizontal, X } from 'lucide-react'
 import { YearSelector } from './keyboard/YearSelector'
-import { PenLine, Link2, Layers, FilePen, SlidersHorizontal, ChevronDown } from 'lucide-react'
-import { DateRangePicker } from '../../components/DateRangePicker'
-import { Dropdown, MultiDropdown, iconButtonClasses, Hint } from '../../components/ui'
-import { fmtShort } from '../../utils/date'
+import { Drawer, MultiDropdown, buttonClasses, iconButtonClasses } from '../../components/ui'
+import { useMediaQuery } from '../../hooks/useMediaQuery'
+import { formatNumber } from '../../utils/format'
 import { typeOptions } from './filterChips'
-import { AmountRange } from './AmountRange'
 import { HistorySearch } from './HistorySearch'
-import { secondaryFilterCount, type Suggestion } from './toolbarLogic'
+import { quitarDelPanel, secondaryFilterCount, type Suggestion } from './toolbarLogic'
 import { readMoreFiltersOpen, saveMoreFiltersOpen } from './stats/analyticsPrefs'
 import type { HistoryFilterState } from './urlState'
+import { ConQuitar } from './filtros/ConQuitar'
+import { PanelFiltros } from './filtros/PanelFiltros'
+import { OpcionesVista } from './filtros/OpcionesVista'
 
-// Barra de filtros del Historial por niveles (#414). Primer nivel: buscador
-// con sugerencias, tipos, activos, wallet y «Más filtros» con el número de los
-// activos dentro. «Más filtros» se despliega en el sitio (no flotante, porque
-// el selector de fechas ya es un desplegable): año y fechas, importe, archivo,
-// manuales, editadas y agrupar comisiones. «Cuenta» sale de la interfaz: duplica
-// a la wallet; los enlaces antiguos siguen funcionando y su chip se quita.
+// Barra de filtros del Historial (#414, #552). En la barra, los filtros
+// rápidos: buscador con sugerencias, tipos, activos y año, todos a la misma
+// altura. «Filtros» despliega en el sitio el panel agrupado (qué, dónde,
+// cuándo, importes) con el número de los activos dentro; en móvil se abre
+// como hoja inferior con «Ver N resultados». Cada filtro aplicado se ve una
+// sola vez: en su control (los multiselect muestran sus valores), con su X, y
+// «Limpiar filtros (n)» los quita todos. En móvil, los filtros rápidos van en
+// una fila que se desliza. Las opciones de vista (agrupar comisiones y
+// densidad) van en su propio menú, porque no filtran.
 
-function Toggle({ pressed, onClick, icon, children, title, tone = 'brand' }: {
-  pressed: boolean; onClick: () => void; icon: ReactNode; children: ReactNode; title?: string; tone?: 'brand' | 'warning'
-}) {
-  const on = tone === 'warning' ? 'bg-warning/10 border-warning/40 text-warning-ink' : 'bg-brand/10 border-brand/40 text-brand-ink'
-  const hover = tone === 'warning' ? 'hover:border-warning/30' : 'hover:border-brand/30'
-  const button = (
-    <button type="button" onClick={onClick} aria-pressed={pressed}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
-        pressed ? on : `bg-background-tertiary border-border text-fg-muted ${hover}`}`}>
-      {icon} {children}
-    </button>
-  )
-  return title ? <Hint label={title}>{button}</Hint> : button
-}
+const MOVIL = '(max-width: 639px)'
 
 export const HistoryToolbar = forwardRef<HTMLInputElement, {
   filters: HistoryFilterState
@@ -41,22 +33,31 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
   presentTypes: string[]
   imports: { id: string; filename: string; imported_at: string }[]
   currencySymbol: string
+  /** Filtros activos en total (todos los controles), para «Limpiar filtros». */
+  activos: number
+  /** Operaciones que cumplen los filtros, para «Ver N resultados» en móvil. */
+  total: number
   setSearchInput: (v: string) => void
   setFilter: <K extends keyof HistoryFilterState>(key: K, value: HistoryFilterState[K]) => void
   patchFilters: (patch: Partial<HistoryFilterState>) => void
   setDateRange: (from: string, to: string) => void
-  onCopyLink: () => void
+  onClearAll: () => void
   /** Selector «Año» (#382). */
   year: { years: readonly number[]; value: number | null; onChange: (y: number | null) => void; onStep: (s: -1 | 1) => void; canPrev: boolean; canNext: boolean }
 }>(function HistoryToolbar({
-  filters, searchInput, wallets, assets, presentTypes, imports, currencySymbol,
-  setSearchInput, setFilter, patchFilters, setDateRange, onCopyLink, year,
+  filters, searchInput, wallets, assets, presentTypes, imports, currencySymbol, activos, total,
+  setSearchInput, setFilter, patchFilters, setDateRange, onClearAll, year,
 }, searchRef) {
-  const [moreOpen, setMoreOpen] = useState(readMoreFiltersOpen)
-  const moreCount = secondaryFilterCount(filters)
+  const movil = useMediaQuery(MOVIL)
+  const tituloHoja = useId()
+  const [abiertoEscritorio, setAbiertoEscritorio] = useState(readMoreFiltersOpen)
+  const [hoja, setHoja] = useState(false)
+  const abierto = movil ? hoja : abiertoEscritorio
+  const enPanel = secondaryFilterCount(filters)
 
-  function toggleMore() {
-    setMoreOpen(o => { saveMoreFiltersOpen(!o); return !o })
+  function alternarPanel() {
+    if (movil) { setHoja(h => !h); return }
+    setAbiertoEscritorio(o => { saveMoreFiltersOpen(!o); return !o })
   }
   /** Una sugerencia añade su filtro y limpia el texto. */
   function pick(s: Suggestion) {
@@ -64,55 +65,74 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
     else patchFilters({ wallet_id: s.value, search: '' })
   }
 
+  const panel = (enHoja: boolean) => (
+    <PanelFiltros filters={filters} wallets={wallets} imports={imports} currencySymbol={currencySymbol} anio={year.value}
+      enPanel={enPanel} onQuitarPanel={() => patchFilters(quitarDelPanel(filters))} hoja={enHoja}
+      setFilter={setFilter} patchFilters={patchFilters} setDateRange={setDateRange} />
+  )
+
   return (
     <div className="space-y-2" role="search" aria-label="Filtros del historial">
       <div className="flex items-center gap-2 flex-wrap">
         <HistorySearch ref={searchRef} value={searchInput} onChange={setSearchInput} onClear={() => setFilter('search', '')}
           assets={assets} wallets={wallets} filters={filters} onPick={pick} />
-        <MultiDropdown size="sm" label="Filtrar por tipo" placeholder="Todos los tipos" plural="tipos" groupSelectable
-          values={filters.types} options={typeOptions(presentTypes)} onChange={v => setFilter('types', v)} />
-        <MultiDropdown size="sm" label="Filtrar por activo" placeholder="Todos los activos" plural="activos" searchable
-          values={filters.assets} options={assets.map(a => ({ value: a, label: a }))} onChange={v => setFilter('assets', v)} />
-        <Dropdown size="sm" label="Filtrar por wallet" value={filters.wallet_id} onChange={v => setFilter('wallet_id', v)}
-          options={[{ value: '', label: 'Todas las wallets' }, ...wallets.map(w => ({ value: w.id, label: w.name }))]} />
-        <button type="button" onClick={toggleMore} aria-expanded={moreOpen} aria-controls="historial-mas-filtros"
-          aria-label={`Más filtros${moreCount ? `, ${moreCount} activos` : ''}`}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
-            moreOpen || moreCount ? 'bg-brand/10 border-brand/40 text-brand-ink' : 'bg-background-tertiary border-border text-fg-muted hover:border-brand/30'}`}>
-          <SlidersHorizontal size={12} aria-hidden="true" /> Más filtros
-          {moreCount > 0 && <span aria-hidden="true" className="min-w-4 h-4 px-1 rounded-full bg-brand-solid text-white text-[10px] leading-4 text-center">{moreCount}</span>}
-          <ChevronDown size={12} aria-hidden="true" className={`transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
-        </button>
+        {/* En móvil, una sola fila que se desliza; en escritorio, en línea con el buscador. */}
+        <div className="flex items-center gap-2 max-sm:w-full max-sm:overflow-x-auto max-sm:pb-1 max-sm:[scrollbar-width:none] sm:contents"
+          data-testid="filtros-rapidos">
+          <ConQuitar activo={filters.types.length > 0} nombre="tipos" onQuitar={() => setFilter('types', [])}>
+            <MultiDropdown size="sm" label="Filtrar por tipo" placeholder="Todos los tipos" plural="tipos" groupSelectable verValores={2}
+              className="max-w-[16rem]" values={filters.types} options={typeOptions(presentTypes)} onChange={v => setFilter('types', v)} />
+          </ConQuitar>
+          <ConQuitar activo={filters.assets.length > 0} nombre="activos" onQuitar={() => setFilter('assets', [])}>
+            <MultiDropdown size="sm" label="Filtrar por activo" placeholder="Todos los activos" plural="activos" searchable verValores={3}
+              className="max-w-[14rem]" values={filters.assets} options={assets.map(a => ({ value: a, label: a }))} onChange={v => setFilter('assets', v)} />
+          </ConQuitar>
+          <ConQuitar activo={year.value !== null} nombre="año" onQuitar={() => year.onChange(null)}>
+            <YearSelector years={year.years} value={year.value} onChange={year.onChange} onStep={year.onStep} canPrev={year.canPrev} canNext={year.canNext} />
+          </ConQuitar>
+          <button type="button" onClick={alternarPanel} aria-expanded={abierto} aria-controls={movil ? undefined : 'historial-filtros'}
+            aria-haspopup={movil ? 'dialog' : undefined}
+            aria-label={`Filtros${enPanel ? `, ${enPanel} ${enPanel === 1 ? 'activo' : 'activos'}` : ''}`}
+            className={`flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
+              abierto || enPanel ? 'bg-brand/10 border-brand/40 text-brand-ink' : 'bg-background-tertiary border-border text-fg-muted hover:border-brand/30'}`}>
+            <SlidersHorizontal size={12} aria-hidden="true" /> Filtros
+            {enPanel > 0 && <span aria-hidden="true" className="min-w-4 h-4 px-1 rounded-full bg-brand-solid text-white text-[10px] leading-4 text-center">{enPanel}</span>}
+            <ChevronDown size={12} aria-hidden="true" className={`transition-transform ${abierto && !movil ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
 
-        <span className="ml-auto flex items-center gap-1">
-          {/* Los atajos se abren desde la barra superior o con «?» (#535), en todas las pantallas. */}
-          <Hint label="Copiar el enlace de esta vista">
-            <button type="button" onClick={onCopyLink}
-              className={iconButtonClasses('md')} aria-label="Copiar el enlace de esta vista">
-              <Link2 size={13} aria-hidden="true" />
-            </button>
-          </Hint>
+        <span className="ml-auto flex items-center gap-1.5">
+          {activos > 0 && (
+            <>
+              <button type="button" onClick={onClearAll}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-fg-muted hover:text-fg hover:bg-overlay/6 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand whitespace-nowrap">
+                <FilterX size={12} aria-hidden="true" /> Limpiar filtros ({activos})
+              </button>
+              <span aria-hidden="true" className="h-5 w-px bg-border" />
+            </>
+          )}
+          <OpcionesVista agruparComisiones={filters.groupFees} onAgruparComisiones={v => setFilter('groupFees', v)} />
         </span>
       </div>
 
-      {moreOpen && (
-        <div id="historial-mas-filtros" role="group" aria-label="Más filtros"
-          className="flex items-center gap-2 flex-wrap rounded-xl border border-border bg-overlay/2 p-2.5">
-          <YearSelector years={year.years} value={year.value} onChange={year.onChange} onStep={year.onStep} canPrev={year.canPrev} canNext={year.canNext} />
-          <DateRangePicker from={filters.date_from} to={filters.date_to} onChange={setDateRange} />
-          <AmountRange min={filters.value_min} max={filters.value_max} symbol={currencySymbol} onChange={patchFilters} />
-          {imports.length > 0 && (
-            <Dropdown size="sm" label="Filtrar por archivo de importación" value={filters.import_id} onChange={v => setFilter('import_id', v)}
-              options={[{ value: '', label: 'Todos los archivos' },
-                ...imports.map(i => ({ value: i.id, label: i.filename, description: `Importado el ${fmtShort(i.imported_at.slice(0, 10))}` }))]} />
-          )}
-          <Toggle pressed={filters.manualOnly} onClick={() => setFilter('manualOnly', !filters.manualOnly)}
-            icon={<PenLine size={11} aria-hidden="true" />}>Manuales</Toggle>
-          <Toggle pressed={filters.editedOnly} onClick={() => setFilter('editedOnly', !filters.editedOnly)} tone="warning"
-            title="Solo transacciones importadas que has editado a mano" icon={<FilePen size={11} aria-hidden="true" />}>Editadas</Toggle>
-          <Toggle pressed={filters.groupFees} onClick={() => setFilter('groupFees', !filters.groupFees)}
-            title="Mostrar cada comisión dentro de su compra o venta" icon={<Layers size={11} aria-hidden="true" />}>Agrupar comisiones</Toggle>
-        </div>
+      {abierto && !movil && panel(false)}
+
+      {/* Móvil (#552): el panel como hoja inferior, con «Ver N resultados» para volver a la lista. */}
+      {movil && hoja && (
+        <Drawer lado="abajo" labelledBy={tituloHoja} onClose={() => setHoja(false)}>
+          <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
+            <h2 id={tituloHoja} className="text-base font-semibold text-fg">Filtros</h2>
+            <button type="button" onClick={() => setHoja(false)} aria-label="Cerrar los filtros" className={iconButtonClasses('md')}>
+              <X size={16} aria-hidden="true" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 pb-4">{panel(true)}</div>
+          <div className="border-t border-border p-3">
+            <button type="button" onClick={() => setHoja(false)} className={buttonClasses('primary', 'md', 'w-full')}>
+              Ver {formatNumber(total, 0)} {total === 1 ? 'resultado' : 'resultados'}
+            </button>
+          </div>
+        </Drawer>
       )}
     </div>
   )

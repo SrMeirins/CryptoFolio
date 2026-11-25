@@ -1,4 +1,5 @@
 import type { HistoryFilterState } from './urlState'
+import { selectedYear } from './keyboard/yearNav'
 
 // Barra de filtros por niveles del Historial (#414): sugerencias del buscador
 // y número de filtros activos dentro de «Más filtros». Funciones puras.
@@ -29,10 +30,28 @@ export function searchSuggestions(
   return [...assetHits.slice(0, MAX_SUGGESTIONS - walletSlots), ...walletHits].slice(0, MAX_SUGGESTIONS)
 }
 
-/** Filtros activos dentro de «Más filtros» (fechas, importe, archivo, manuales, editadas, cuenta antigua). */
+/**
+ * Filtros activos dentro del panel «Filtros» (#552): wallet, fechas exactas,
+ * importe, archivo, manuales, editadas y la cuenta de enlaces antiguos. Un año
+ * completo no cuenta: se elige y se ve en el selector de la barra.
+ */
 export function secondaryFilterCount(f: HistoryFilterState): number {
+  const fechas = !!(f.date_from || f.date_to) && selectedYear(f.date_from, f.date_to) === null
   return [
-    !!(f.date_from || f.date_to), !!(f.value_min || f.value_max), !!f.import_id,
+    !!f.wallet_id, fechas, !!(f.value_min || f.value_max), !!f.import_id,
     f.manualOnly, f.editedOnly, !!f.account,
   ].filter(Boolean).length
+}
+
+/**
+ * Cambio que quita solo los filtros del panel (#552): wallet, fechas exactas,
+ * importe, archivo, manuales, editadas y cuenta. Un año completo, que vive en
+ * la barra, se conserva.
+ */
+export function quitarDelPanel(f: HistoryFilterState): Partial<HistoryFilterState> {
+  const patch: Partial<HistoryFilterState> = {
+    wallet_id: '', import_id: '', value_min: '', value_max: '', manualOnly: false, editedOnly: false, account: '',
+  }
+  if (selectedYear(f.date_from, f.date_to) === null) Object.assign(patch, { date_from: '', date_to: '' })
+  return patch
 }

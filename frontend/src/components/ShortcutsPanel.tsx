@@ -16,7 +16,8 @@ export function ShortcutsPanel() {
   return (
     <Modal onClose={close} labelledBy={titleId} size="md">
       <ModalHeader titleId={titleId} title="Atajos de teclado" onClose={close} />
-      <div className="px-6 py-4 space-y-5">
+      {/* Cuerpo desplazable: con varios grupos (Historial, #552) no cabe en pantallas bajas y el pie debe seguir visible. */}
+      <div className="px-6 py-4 space-y-5 flex-1 min-h-0 overflow-y-auto" tabIndex={0} aria-label="Lista de atajos">
         {atajosDe(pathname).map(g => (
           <section key={g.titulo} aria-labelledby={`${titleId}-${g.titulo}`}>
             <h3 id={`${titleId}-${g.titulo}`} className="text-[11px] font-semibold uppercase tracking-widest text-fg-subtle mb-2">{g.titulo}</h3>
@@ -38,7 +39,7 @@ export function ShortcutsPanel() {
           </section>
         ))}
       </div>
-      <p className="px-6 pb-4 text-xs text-fg-subtle">No actúan mientras escribes en un campo.</p>
+      <p className="shrink-0 px-6 py-3 border-t border-border text-xs text-fg-subtle">No actúan mientras escribes en un campo.</p>
     </Modal>
   )
 }

@@ -11,10 +11,11 @@ const soloLectura = (page: Page) => page.route('**/api/**', r => (r.request().me
 test('Hint de un botón de icono: se abre al enfocarlo y Escape lo cierra', async ({ page }) => {
   await soloLectura(page)
   await page.goto('/history')
-  const boton = page.getByRole('button', { name: 'Copiar el enlace de esta vista' })
+  // Botón de icono de la barra del Historial (#552: el enlace pasó al menú «Más»).
+  const boton = page.getByRole('button', { name: 'Opciones de vista' })
   await boton.focus()
   const globo = page.getByRole('tooltip')
-  await expect(globo).toHaveText('Copiar el enlace de esta vista')
+  await expect(globo).toHaveText('Opciones de vista')
   await page.keyboard.press('Escape')
   await expect(globo).toHaveCount(0)
 })
@@ -55,7 +56,7 @@ for (const theme of ['dark', 'light'] as const) {
     await soloLectura(page)
     await page.emulateMedia({ colorScheme: theme })
     await page.goto('/history')
-    await page.getByRole('button', { name: 'Copiar el enlace de esta vista' }).focus()
+    await page.getByRole('button', { name: 'Opciones de vista' }).focus()
     await expect(page.getByRole('tooltip')).toBeVisible()
     const r = await (await axeEstable(page)).withTags(WCAG).include('[role="tooltip"]').analyze()
     expect(r.violations).toEqual([])

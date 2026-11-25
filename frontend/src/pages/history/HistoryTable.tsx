@@ -9,11 +9,12 @@ import { SortHeader } from './SortHeader'
 import { TxRow } from './TxRow'
 import type { RunningBalanceView } from './balance/useRunningBalance'
 import { nextRowIndex } from './keyboard/shortcutKeys'
+import type { DensidadHistorial } from '../../utils/historialDensidad'
 
 // Tabla del Historial (#351): cabeceras ordenables, grupos por día local
 // (solo ordenando por fecha) y filas de transacción.
 
-export function HistoryTable({ transactions, sort, onSort, currency, searchTerm, selectedId, deletingId, onOpen, onPrefetch, onDelete, onEdit, skipLink, balance, walletId }: {
+export function HistoryTable({ transactions, sort, onSort, currency, searchTerm, selectedId, deletingId, onOpen, onPrefetch, onDelete, onEdit, skipLink, balance, walletId, densidad = 'comoda' }: {
   transactions: Transaction[]
   sort: SortState
   onSort: (col: SortKey) => void
@@ -28,6 +29,8 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
   onEdit: (tx: Transaction) => void
   /** Enlace «Saltar a la paginación», si hay más de una página. */
   skipLink?: { href: string; onActivate: () => void }
+  /** Densidad de las filas (#552). */
+  densidad?: DensidadHistorial
   /** Saldo corrido del activo filtrado (#380): añade la columna «Saldo». */
   balance?: RunningBalanceView | null
   /** Wallet filtrada (#395), para el sentido de las operaciones entre wallets. */
@@ -70,7 +73,7 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
           Saltar a la paginación
         </a>
       )}
-      <table className="w-full">
+      <table className="w-full" data-densidad={densidad}>
         <caption className="sr-only">Transacciones del historial</caption>
         <thead>
           <tr className={tableHeadRowClasses()}>

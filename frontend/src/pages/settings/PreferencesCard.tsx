@@ -2,7 +2,7 @@ import { useState, type KeyboardEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, SlidersHorizontal } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
-import { Dropdown, QueryError } from '../../components/ui'
+import { Dropdown, QueryError, SegmentedControl } from '../../components/ui'
 import { useToast } from '../../hooks/useToast'
 import { useSettingFeedback } from '../../hooks/useSettingFeedback'
 import { formatNumber } from '../../utils/format'
@@ -15,6 +15,7 @@ import { SettingsCard } from './SettingsCard'
 import { ColumnasSelector } from '../../components/ColumnasSelector'
 import { PORTFOLIO_COLUMNAS_KEY, portfolioColumnas, serializarColumnas } from '../../utils/portfolioColumns'
 import { GRAFICO_MARCAS_KEY, MARCAS_OPCIONES, marcasGrafico, marcasLabel, type MarcasGrafico } from '../../utils/graficoMarcas'
+import { DENSIDAD_OPCIONES, HISTORIAL_DENSIDAD_KEY, densidadHistorial } from '../../utils/historialDensidad'
 import { SavedMark } from './SavedMark'
 import { failure } from '../../utils/queryFailure'
 
@@ -101,6 +102,8 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
   const columnas = portfolioColumnas(config)
   // Marcas del gráfico del detalle del activo (#528), las mismas que se eligen en el gráfico.
   const marcas = marcasGrafico(config)
+  // Densidad de la tabla del Historial (#552), la misma que en sus opciones de vista.
+  const densidad = densidadHistorial(config)
 
   const privacy = privacyOnStart(config)
   const page = startPage(config)
@@ -110,7 +113,7 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
   const fallo = failure(configQ)
   return (
     <SettingsCard index={index} icon={SlidersHorizontal} title="Preferencias"
-      status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /><SavedMark stamp={saved} id={CONCENTRACION_KEY} /><SavedMark stamp={saved} id={WALLETS_OTRAS_KEY} /><SavedMark stamp={saved} id={PORTFOLIO_COLUMNAS_KEY} /><SavedMark stamp={saved} id={GRAFICO_MARCAS_KEY} /></>}
+      status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /><SavedMark stamp={saved} id={CONCENTRACION_KEY} /><SavedMark stamp={saved} id={WALLETS_OTRAS_KEY} /><SavedMark stamp={saved} id={PORTFOLIO_COLUMNAS_KEY} /><SavedMark stamp={saved} id={GRAFICO_MARCAS_KEY} /><SavedMark stamp={saved} id={HISTORIAL_DENSIDAD_KEY} /></>}
       description="Cómo se comporta la app al abrirla, qué posiciones cuentan como saldos residuales y cuándo avisar de una cartera concentrada.">
       {fallo && <QueryError what="tus preferencias" error={fallo.error} onRetry={fallo.retry} className="mb-3 rounded-xl border border-border" />}
       <div>
@@ -190,6 +193,17 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
               const previous = marcasGrafico(current())
               if (v === previous) return
               void save(GRAFICO_MARCAS_KEY, v, `Operaciones del gráfico marcadas con ${marcasLabel(v as MarcasGrafico).toLowerCase()}`, previous)
+            }} />
+        </Row>
+
+        <Row label="Densidad del Historial"
+          hint="Altura de las filas de la tabla del Historial: cómoda o compacta, para ver más operaciones a la vez.">
+          <SegmentedControl label="Densidad del Historial" value={densidad}
+            options={DENSIDAD_OPCIONES.map(o => ({ value: o.value, label: o.label }))}
+            onChange={v => {
+              const previous = densidadHistorial(current())
+              if (v === previous) return
+              void save(HISTORIAL_DENSIDAD_KEY, v, `Historial con densidad ${v === 'compacta' ? 'compacta' : 'cómoda'}`, previous)
             }} />
         </Row>
 

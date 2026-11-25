@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeChips, typeOptions } from './filterChips'
+import { activeChips, textoFechas, textoImporte, typeOptions } from './filterChips'
 import { EMPTY_FILTERS } from './urlState'
 
 const names = { wallet: () => 'Fría', importFile: () => 'archivo.csv', currencySymbol: '€' }
@@ -42,3 +42,21 @@ describe('chip de la tarjeta del resumen (#407)', () => {
     expect(activeChips({ ...EMPTY_FILTERS, card: 'retirado', includeMargin: true }, names)[0].label).toBe('Tarjeta: Retirado (con margen)')
   })
 })
+
+describe('textos de los controles (#552)', () => {
+  it('fechas: rango, un día, desde, hasta y vacío', () => {
+    expect(textoFechas('2025-01-01', '2025-03-31')).toMatch(/2025 – .*2025/)
+    expect(textoFechas('2025-01-01', '2025-01-01')).not.toContain('–')
+    expect(textoFechas('2025-01-01', '')).toMatch(/^desde /)
+    expect(textoFechas('', '2025-01-01')).toMatch(/^hasta /)
+    expect(textoFechas('', '')).toBe('')
+  })
+
+  it('importe: rango, mínimo, máximo y vacío', () => {
+    expect(textoImporte('10', '50', '€')).toBe('10–50 €')
+    expect(textoImporte('10', '', '€')).toBe('≥ 10 €')
+    expect(textoImporte('', '50', '$')).toBe('≤ 50 $')
+    expect(textoImporte('', '', '€')).toBe('')
+  })
+})
+
