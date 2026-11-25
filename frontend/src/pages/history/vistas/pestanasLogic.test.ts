@@ -5,22 +5,32 @@ import { pestanaSeleccionada, TODAS, vistaModificada } from './pestanasLogic'
 const ids = ['v1', 'v2']
 
 describe('pestanaSeleccionada', () => {
-  it('la vista que coincide manda, venga de donde venga', () => {
-    expect(pestanaSeleccionada(ids, 'v2', 'v1')).toBe('v2')
-    expect(pestanaSeleccionada(ids, 'v1', TODAS)).toBe('v1')
+  it('desde «Todas» con filtros, la primera vista que coincide; si ninguna, «Todas»', () => {
+    expect(pestanaSeleccionada(ids, ['v1'], TODAS, true)).toBe('v1')
+    expect(pestanaSeleccionada(ids, [], TODAS, true)).toBe(TODAS)
   })
 
-  it('sin coincidencia, la de origen; si era «Todas» o ya no existe, «Todas»', () => {
-    expect(pestanaSeleccionada(ids, null, 'v1')).toBe('v1')
-    expect(pestanaSeleccionada(ids, null, TODAS)).toBe(TODAS)
-    expect(pestanaSeleccionada(ids, null, 'borrada')).toBe(TODAS)
+  it('la vista de origen se respeta: coincide o queda modificada, sin saltar a otra', () => {
+    expect(pestanaSeleccionada(ids, ['v1', 'v2'], 'v2', true)).toBe('v2')
+    expect(pestanaSeleccionada(ids, ['v2'], 'v1', false)).toBe('v1')
+    expect(pestanaSeleccionada(ids, [], 'v1', true)).toBe('v1')
+  })
+
+  it('«Todas» sin filtros se queda aunque una vista guarde lo mismo (solo el orden)', () => {
+    expect(pestanaSeleccionada(ids, ['v1'], TODAS, false)).toBe(TODAS)
+    expect(pestanaSeleccionada(ids, ['v1'], 'v1', false)).toBe('v1')
+  })
+
+  it('si la vista de origen ya no existe, la que coincida o «Todas»', () => {
+    expect(pestanaSeleccionada(ids, [], 'borrada', true)).toBe(TODAS)
+    expect(pestanaSeleccionada(ids, ['v2'], 'borrada', true)).toBe('v2')
   })
 })
 
 describe('vistaModificada', () => {
   it('solo una vista seleccionada que no coincide', () => {
-    expect(vistaModificada('v1', null)).toBe(true)
-    expect(vistaModificada('v1', 'v1')).toBe(false)
-    expect(vistaModificada(TODAS, null)).toBe(false)
+    expect(vistaModificada('v1', [])).toBe(true)
+    expect(vistaModificada('v1', ['v1'])).toBe(false)
+    expect(vistaModificada(TODAS, [])).toBe(false)
   })
 })

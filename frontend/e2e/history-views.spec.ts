@@ -7,7 +7,10 @@ import { expect, test } from '@playwright/test'
 
 const PREFIX = 'e2e-vista-'
 
-test.afterEach(async ({ request }) => {
+test.afterEach(async ({ request }, info) => {
+  // Devuelve la marca de predeterminada a la vista del usuario si una prueba se la quitó.
+  const pred = info.annotations.find(a => a.type === 'pred-previa')?.description
+  if (pred) await request.put(`/api/v1/historial/vistas/${pred}`, { data: { predeterminada: true } })
   const res = await request.get('/api/v1/historial/vistas')
   if (!res.ok()) return
   const { vistas } = await res.json() as { vistas: { id: string; nombre: string }[] }
@@ -56,3 +59,29 @@ test('guardar, navegar con flechas, actualizar una vista modificada y borrarla',
   await expect(pestanas.getByRole('tab', { name: new RegExp(nombre) })).toHaveCount(0)
   await expect(pestanas.getByRole('tab', { name: 'Todas' })).toHaveAttribute('aria-selected', 'true')
 })
+
+test('una vista predeterminada sin filtros (solo el orden) no bloquea «Todas» (#552)', async ({ page, request }) => {
+  const nombre = `${PREFIX}orden-${Date.now()}`
+  // Solo puede haber una predeterminada: se recuerda la que hubiera para devolverle la marca.
+  const previas = ((await (await request.get('/api/v1/historial/vistas')).json()).vistas as { id: string; nombre: string; predeterminada: boolean }[])
+  const predPrevia = previas.find(v => v.predeterminada && !v.nombre.startsWith(PREFIX))
+  test.info().annotations.push({ type: 'pred-previa', description: predPrevia?.id ?? '' })
+  // Guarda lo mismo que «Todas» con el orden por defecto, y se abre con ella.
+  const r = await request.post('/api/v1/historial/vistas', { data: { nombre, predeterminada: true, filtros: { sort: 'fecha', dir: 'desc' } } })
+  expect(r.ok()).toBe(true)
+  await page.goto('/history')
+  const pestanas = page.getByRole('tablist', { name: 'Vistas guardadas' })
+  const vista = pestanas.getByRole('tab', { name: new RegExp(nombre) })
+  const todas = pestanas.getByRole('tab', { name: 'Todas' })
+  await expect(vista).toHaveAttribute('aria-selected', 'true')
+  await todas.click()
+  await expect(todas).toHaveAttribute('aria-selected', 'true')
+  await expect(vista).toHaveAttribute('aria-selected', 'false')
+  await vista.click()
+  await expect(vista).toHaveAttribute('aria-selected', 'true')
+  // Con el teclado, también.
+  await vista.focus()
+  await page.keyboard.press('Home')
+  await expect(todas).toHaveAttribute('aria-selected', 'true')
+})
+
