@@ -4,13 +4,16 @@ import { Hint, iconButtonClasses, Popover, SegmentedControl, Switch } from '../.
 import { useHistorialDensidad } from '../../../hooks/useHistorialDensidad'
 import { DENSIDAD_OPCIONES } from '../../../utils/historialDensidad'
 
-// Opciones de vista del Historial (#552), aparte de los filtros porque no
-// cambian qué operaciones se ven, sino cómo: agrupar cada comisión dentro de
-// su compra o venta y la densidad de la tabla (también en Ajustes › General).
+// Opciones de vista del Historial (#552, #553), aparte de los filtros porque
+// no cambian qué operaciones se ven, sino cómo: agrupar cada comisión dentro
+// de su compra o venta, incluir el margen en el resumen y la densidad de la
+// tabla (también en Ajustes › General).
 
-export function OpcionesVista({ agruparComisiones, onAgruparComisiones }: {
+export function OpcionesVista({ agruparComisiones, onAgruparComisiones, incluirMargen, onIncluirMargen }: {
   agruparComisiones: boolean
   onAgruparComisiones: (v: boolean) => void
+  incluirMargen: boolean
+  onIncluirMargen: (v: boolean) => void
 }) {
   const id = useId()
   const boton = useRef<HTMLButtonElement>(null)
@@ -32,6 +35,13 @@ export function OpcionesVista({ agruparComisiones, onAgruparComisiones }: {
             <p id={`${id}-agrupar-ayuda`} className="text-[11px] text-fg-subtle">Cada comisión, dentro de su compra o venta.</p>
           </div>
           <Switch id={`${id}-agrupar`} checked={agruparComisiones} onChange={onAgruparComisiones} describedBy={`${id}-agrupar-ayuda`} />
+        </div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <label htmlFor={`${id}-margen`} className="block text-sm font-medium text-fg">Incluir margen en el resumen</label>
+            <p id={`${id}-margen-ayuda`} className="text-[11px] text-fg-subtle">Operaciones de margen y futuros en las tarjetas y la analítica.</p>
+          </div>
+          <Switch id={`${id}-margen`} checked={incluirMargen} onChange={onIncluirMargen} describedBy={`${id}-margen-ayuda`} />
         </div>
         <div className="space-y-1.5">
           <p className="text-sm font-medium text-fg">Densidad de la tabla</p>

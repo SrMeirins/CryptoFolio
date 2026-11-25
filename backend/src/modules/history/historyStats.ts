@@ -97,6 +97,10 @@ export async function getHistoryStats(
   const datesFiltered = !!(f.date_from || f.date_to);
   const all = [...params, tz, period.from, period.to];
   const [tzP, fromP, toP] = [all.length - 2, all.length - 1, all.length].map(i => `$${i}`);
+  // Serie de las tarjetas (#553): por meses en el mismo rango que sus cifras
+  // (lo filtrado entero), no en el del gráfico de actividad (18 meses por defecto).
+  all.push(f.date_from ?? null, f.date_to ?? null, todayIn(tz, now));
+  const [serieDesdeP, serieHastaP, hoyP] = [all.length - 2, all.length - 1, all.length].map(i => `$${i}`);
   // Con filtro de wallet (#395), solo las comisiones que pagó ella: una entrada
   // desde otra wallet propia trae la comisión pagada en origen.
   let paidHere = '';
@@ -188,18 +192,22 @@ export async function getHistoryStats(
         ) k) AS counterparts,
        (SELECT json_build_object('ops', COUNT(*), 'sells', COUNT(*) FILTER (WHERE is_sale))
         FROM vt WHERE shown AND is_margin) AS margin,
-       -- Importe de cada tarjeta por periodo (#407), en el mismo periodo que el gráfico.
+       -- Importe de cada tarjeta por mes (#407, #553), en el mismo rango que las cifras:
+       -- de la primera operación filtrada (o date_from) al mes en curso (o date_to).
        (SELECT COALESCE(json_agg(x ORDER BY x.periodo), '[]') FROM (
-          SELECT TO_CHAR(b.bucket, '${fmt}') AS periodo,
+          SELECT TO_CHAR(m.mes, 'YYYY-MM') AS periodo,
             COALESCE(SUM(s.value_eur) FILTER (WHERE s.invested), 0) AS inv_eur, COALESCE(SUM(s.value_eur * s.usd) FILTER (WHERE s.invested), 0) AS inv_usd,
             COALESCE(SUM(s.value_eur) FILTER (WHERE s.withdrawn), 0) AS ret_eur, COALESCE(SUM(s.value_eur * s.usd) FILTER (WHERE s.withdrawn), 0) AS ret_usd,
             COALESCE(SUM(s.value_eur) FILTER (WHERE s.is_sale), 0) AS ven_eur, COALESCE(SUM(s.value_eur * s.usd) FILTER (WHERE s.is_sale), 0) AS ven_usd,
             COALESCE(SUM(s.value_eur) FILTER (WHERE s.cat = 'ingresos'), 0) AS ing_eur, COALESCE(SUM(s.value_eur * s.usd) FILTER (WHERE s.cat = 'ingresos'), 0) AS ing_usd,
-            (SELECT COALESCE(SUM(f.eur), 0) FROM fee_items f WHERE f.bucket = b.bucket) AS com_eur,
-            (SELECT COALESCE(SUM(f.usd), 0) FROM fee_items f WHERE f.bucket = b.bucket) AS com_usd
-          FROM generate_series(${fromP}::date::timestamp, ${toP}::date::timestamp, INTERVAL '1 ${unit}') AS b(bucket)
-          LEFT JOIN shown s ON s.bucket = b.bucket
-          GROUP BY b.bucket
+            (SELECT COALESCE(SUM(f.eur), 0) FROM fee_items f WHERE DATE_TRUNC('month', f.timestamp AT TIME ZONE ${tzP}) = m.mes) AS com_eur,
+            (SELECT COALESCE(SUM(f.usd), 0) FROM fee_items f WHERE DATE_TRUNC('month', f.timestamp AT TIME ZONE ${tzP}) = m.mes) AS com_usd
+          FROM generate_series(
+            DATE_TRUNC('month', COALESCE(${serieDesdeP}::date::timestamp, (SELECT MIN(timestamp AT TIME ZONE ${tzP}) FROM shown), ${hoyP}::date::timestamp)),
+            DATE_TRUNC('month', COALESCE(${serieHastaP}::date::timestamp, ${hoyP}::date::timestamp)),
+            INTERVAL '1 month') AS m(mes)
+          LEFT JOIN shown s ON DATE_TRUNC('month', s.timestamp AT TIME ZONE ${tzP}) = m.mes
+          GROUP BY m.mes
         ) x) AS series,
        (SELECT COALESCE(json_agg(c ORDER BY c.periodo, c.cat), '[]') FROM (
           SELECT TO_CHAR(b.bucket, '${fmt}') AS periodo, s.cat, COUNT(s.id) AS ops,

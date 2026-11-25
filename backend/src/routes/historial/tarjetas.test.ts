@@ -65,6 +65,21 @@ describe('tarjetas del resumen y filtro «Tarjeta» (#407)', () => {
     expect(totals.deposited.EUR).toBeCloseTo(200, 8);
   });
 
+  it('sin fechas, la serie cubre desde la primera operación y suma lo mismo que cada tarjeta (#553)', async () => {
+    const { series, totals } = await stats('incluir_margen=false')
+    // La primera operación es de 2025-03: aunque quede a más de 18 meses de hoy, entra.
+    expect(series[0].periodo <= '2025-03').toBe(true)
+    const suma = (k: 'invertido' | 'retirado' | 'ventas' | 'ingresos' | 'comisiones') =>
+      series.reduce((acc: number, x: { valor: Record<string, { EUR: number }> }) => acc + x.valor[k].EUR, 0)
+    expect(suma('invertido')).toBeCloseTo(totals.invested.EUR, 6)
+    expect(suma('retirado')).toBeCloseTo(totals.withdrawn.EUR, 6)
+    expect(suma('ventas')).toBeCloseTo(totals.sold.EUR, 6)
+    expect(suma('ingresos')).toBeCloseTo(totals.income.EUR, 6)
+    expect(suma('comisiones')).toBeCloseTo(totals.fees.EUR, 6)
+    // Meses seguidos, en orden.
+    for (let i = 1; i < series.length; i++) expect(series[i].periodo > series[i - 1].periodo).toBe(true)
+  });
+
   it('series por periodo con el importe de cada tarjeta', async () => {
     const { series } = await stats('date_from=2025-01-01&date_to=2025-12-31');
     const marzo = series.find((x: { periodo: string }) => x.periodo === '2025-03');

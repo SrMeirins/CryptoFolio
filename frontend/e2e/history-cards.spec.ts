@@ -1,16 +1,23 @@
 import { expect, test } from '@playwright/test'
 
-// Tarjetas del resumen (#407): pulsar una filtra la lista con el mismo
-// recuento que suma (la tarjeta queda pulsada y cuenta en «Limpiar filtros»);
-// otra vez, quita el filtro. Solo lectura.
+// Tarjetas del resumen (#407, #553): el chip de cada una dice cuántas
+// operaciones suma y pulsarla filtra la lista con ese mismo recuento (la
+// tarjeta queda pulsada y cuenta en «Limpiar filtros»); otra vez, quita el
+// filtro. Solo lectura.
 
 const CARDS = { Invertido: 'fiat_buys', Retirado: 'withdrawn_ops', Ventas: 'sells', Ingresos: 'income_ops', Comisiones: 'fee_ops' } as const
+const NOMBRES = { Invertido: ['compra', 'compras'], Retirado: ['retirada', 'retiradas'], Ventas: ['venta', 'ventas'], Ingresos: ['ingreso', 'ingresos'], Comisiones: ['comisión', 'comisiones'] } as const
 
 test('cada tarjeta filtra la lista exactamente por lo que suma', async ({ page }) => {
   await page.goto('/history?margen=excluido')
   const totals = (await (await page.request.get('/api/v1/historial/estadisticas')).json()).totals
   for (const [title, key] of Object.entries(CARDS)) {
     const card = page.getByRole('button', { name: new RegExp(`^${title}: .*Ver sus operaciones$`) })
+    // El chip (y el nombre accesible) dicen cuántas operaciones suma.
+    const n0 = totals[key] as number
+    const [uno, varios] = NOMBRES[title as keyof typeof NOMBRES]
+    const esperado = n0 === 0 ? /Ningun[ao]/ : new RegExp(`${n0.toLocaleString('es-ES')} ${n0 === 1 ? uno : varios}`)
+    await expect(card).toHaveAccessibleName(esperado)
     await card.click()
     await expect(page.getByRole('button', { name: new RegExp(`^${title}: .*Quitar el filtro`) })).toHaveAttribute('aria-pressed', 'true')
     await expect(page).toHaveURL(new RegExp(`[?&]tarjeta=${title.toLowerCase()}`))

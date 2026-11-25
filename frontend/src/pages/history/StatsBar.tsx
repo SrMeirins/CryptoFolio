@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
-import { TrendingUp, Landmark, TrendingDown, Coins, Zap, type LucideIcon } from 'lucide-react'
+import { TrendingUp, Landmark, TrendingDown, Coins, Zap, LayoutGrid, Info, type LucideIcon } from 'lucide-react'
 import { SALE_COUNTERPARTS, type HistoryStats, type SummaryCard as Card } from '../../api/portfolio'
 import { formatNumber, type Currency } from '../../utils/format'
 import { T } from '../../utils/colors'
-import { StatCard } from '../../components/ui'
-import { CARD_TITLES, COUNTERPART_LABELS, count, marginNotice, moneyIn, netLine, signedMoney } from './stats/summaryText'
+import { StatCard, StatChip } from '../../components/ui'
+import { CARD_TITLES, COUNTERPART_LABELS, chipTarjeta, count, marginNotice, moneyIn, netLine, opsTarjeta, signedMoney } from './stats/summaryText'
 
 const CARD_META: Record<Card, { icon: LucideIcon; color: string }> = {
   invertido:  { icon: TrendingUp,   color: T.positive },
@@ -17,9 +17,12 @@ const CARD_META: Record<Card, { icon: LucideIcon; color: string }> = {
 const CLICK_HINT = 'Pulsa la tarjeta para ver sus operaciones en la lista.'
 
 /**
- * Resumen del Historial sobre lo filtrado (#346, #376): cinco tarjetas con su
- * cifra y su mini gráfica; recuentos, netos y desgloses van en la ayuda de
- * cada una (#407). Pueden excluir el margen (#403) y filtrar la lista.
+ * Resumen del Historial sobre lo filtrado (#346, #376): cinco tarjetas de tres
+ * huecos (#490, #553) con su cifra, un chip con las operaciones que la forman
+ * (las mismas que filtra la tarjeta al pulsarla) y su mini gráfica del
+ * periodo; netos y desgloses van en la ayuda de cada una (#407). El margen
+ * (#403) se incluye o excluye en Opciones de vista; aquí queda su aviso con un
+ * enlace para cambiarlo.
  */
 export function StatsBar({ totals, series, currency, filtered, margin, onIncludeMargin, card, onSelectCard }: {
   totals: HistoryStats['totals']
@@ -85,26 +88,37 @@ export function StatsBar({ totals, series, currency, filtered, margin, onInclude
 
   return (
     <section aria-labelledby="historial-resumen">
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <h2 id="historial-resumen" className="text-[11px] text-fg-subtle uppercase tracking-widest">
-          Resumen
-          <span className="normal-case tracking-normal"> · {count(totals.ops, 'operación', 'operaciones')} · {count(totals.unique_assets, 'activo', 'activos')}{filtered && ' · según los filtros'}</span>
-        </h2>
-        <label className="inline-flex items-center gap-2 text-xs text-fg-muted cursor-pointer">
-          <input type="checkbox" role="switch" checked={margin.included} onChange={e => onIncludeMargin(e.target.checked)}
-            className="peer sr-only" />
-          <span aria-hidden="true"
-            className="relative w-7 h-4 rounded-full bg-overlay/15 transition-colors peer-checked:bg-brand-solid peer-focus-visible:ring-2 peer-focus-visible:ring-brand/60 after:absolute after:top-0.5 after:left-0.5 after:w-3 after:h-3 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-3" />
-          Incluir margen
-        </label>
+      {/* Cabecera de bloque (#553): título con su icono y los recuentos como chips. */}
+      <div className="flex flex-wrap items-center gap-2 mb-2.5">
+        <span aria-hidden="true" className="flex size-6 items-center justify-center rounded-md bg-brand/10 text-brand-ink"><LayoutGrid size={13} /></span>
+        <h2 id="historial-resumen" className="text-[11px] font-semibold text-fg-muted uppercase tracking-widest">Resumen</h2>
+        <StatChip>{count(totals.ops, 'operación', 'operaciones')}</StatChip>
+        <StatChip>{count(totals.unique_assets, 'activo', 'activos')}</StatChip>
+        {filtered && <span className="text-xs text-fg-subtle">según los filtros</span>}
       </div>
-      {notice && <p className="text-xs text-fg-subtle mb-2" role="status">{notice}</p>}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+      {notice && (
+        <p className="mb-3 flex items-start gap-2 rounded-lg border border-border bg-overlay/3 px-3 py-2 text-xs text-fg-muted" role="status">
+          <Info size={13} aria-hidden="true" className="mt-px shrink-0 text-info-ink" />
+          <span>
+            {notice}{' '}
+            <button type="button" onClick={() => onIncludeMargin(!margin.included)}
+              className="font-medium text-brand-ink hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-brand rounded">
+              {margin.included ? 'Excluirlas' : 'Incluirlas'}
+            </button>
+          </span>
+        </p>
+      )}
+      {/* En móvil, la quinta tarjeta ocupa toda la fila: sin hueco al final. */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 max-md:[&>*:last-child:nth-child(odd)]:col-span-2">
         {cards.map((c, i) => (
           <StatCard key={c.id} title={CARD_TITLES[c.id]} icon={CARD_META[c.id].icon} color={CARD_META[c.id].color}
-            value={c.value[currency]} format={format} series={series.map(s => s.valor[c.id][currency])}
+            value={c.value[currency]} format={format} series={series.map(s => s.valor[c.id][currency])} reserveSlots
+            vacia={opsTarjeta(c.id, totals) === 0}
+            chip={card === c.id
+              ? <StatChip color={CARD_META[c.id].color}>Filtrando: {chipTarjeta(c.id, opsTarjeta(c.id, totals)).toLowerCase()}</StatChip>
+              : <StatChip tone={opsTarjeta(c.id, totals) === 0 ? 'muted' : 'neutral'}>{chipTarjeta(c.id, opsTarjeta(c.id, totals))}</StatChip>}
             active={card === c.id} onSelect={() => onSelectCard(card === c.id ? '' : c.id)} delay={i * 60}
-            actionLabel={card === c.id ? 'Quitar el filtro de sus operaciones' : 'Ver sus operaciones'}
+            actionLabel={`${chipTarjeta(c.id, opsTarjeta(c.id, totals))}. ${card === c.id ? 'Quitar el filtro de sus operaciones' : 'Ver sus operaciones'}`}
             helpLabel={`Qué suma ${CARD_TITLES[c.id]}`}
             help={<>{c.help}<p className="text-fg-muted">{CLICK_HINT}</p></>} />
         ))}

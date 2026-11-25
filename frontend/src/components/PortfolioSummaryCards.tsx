@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Wallet, Receipt, TrendingUp, TrendingDown, Percent, Landmark } from 'lucide-react'
-import { StatCard } from './ui'
+import { StatCard, StatChip } from './ui'
 import { Change24hChip, type Change24h } from './Change24hChip'
 import { formatMoney, type Currency, formatPercent } from '../utils/format'
 import { costChip, costSecondary, returnSecondary, todayPctChip, withdrawnChip } from '../utils/summaryCards'
@@ -28,20 +28,8 @@ export interface SummaryCardTargets {
 
 const sign = (n: number): 'positive' | 'negative' => (n >= 0 ? 'positive' : 'negative')
 
-const CHIP_TONES = {
-  positive: 'bg-positive/8 border-positive/25 text-positive-ink',
-  negative: 'bg-negative/8 border-negative/25 text-negative-ink',
-  neutral: 'border-border text-fg-muted',
-} as const
-
-/** Chip estático de contexto (#507), con el mismo aspecto que los de ventana. */
-function KpiChip({ children, tone = 'neutral' }: { children: ReactNode; tone?: keyof typeof CHIP_TONES }) {
-  return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-lg border text-xs leading-none whitespace-nowrap mono font-semibold ${CHIP_TONES[tone]}`}>
-      {children}
-    </span>
-  )
-}
+// Chip estático de contexto (#507): el común de las tarjetas de métricas (#553).
+const KpiChip = StatChip
 
 // Ancho de cada tarjeta según el ancho del contenedor (#507): 5 en fila en
 // grande, 3 y 2 en medio y 2 por fila en estrecho; con `grow`, las de la

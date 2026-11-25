@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { marginNotice, netLine, signedMoney } from './summaryText'
+import { chipTarjeta, marginNotice, netLine, opsTarjeta, signedMoney } from './summaryText'
 
 // Textos del resumen (#403). Datos sintéticos.
 const m = (EUR: number) => ({ EUR, USD: EUR * 2 })
@@ -23,3 +23,23 @@ describe('summaryText (#403)', () => {
     expect(marginNotice({ included: false, ops: 0, sells: 0 })).toBeNull()
   })
 })
+
+describe('chip de las tarjetas (#553)', () => {
+  const totals = { fiat_buys: 12, withdrawn_ops: 1, sells: 0, income_ops: 1500, fee_ops: 7 }
+  it('cada tarjeta cuenta sus operaciones, las mismas que su filtro', () => {
+    expect(opsTarjeta('invertido', totals)).toBe(12)
+    expect(opsTarjeta('retirado', totals)).toBe(1)
+    expect(opsTarjeta('ventas', totals)).toBe(0)
+    expect(opsTarjeta('ingresos', totals)).toBe(1500)
+    expect(opsTarjeta('comisiones', totals)).toBe(7)
+  })
+  it('texto con número y nombre; sin operaciones, ninguna o ninguno', () => {
+    expect(chipTarjeta('invertido', 12)).toBe('12 compras')
+    expect(chipTarjeta('retirado', 1)).toBe('1 retirada')
+    expect(chipTarjeta('ventas', 0)).toBe('Ninguna')
+    expect(chipTarjeta('ingresos', 0)).toBe('Ninguno')
+    expect(chipTarjeta('ingresos', 1500)).toBe('1.500 ingresos')
+    expect(chipTarjeta('comisiones', 1)).toBe('1 comisión')
+  })
+})
+
