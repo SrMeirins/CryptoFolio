@@ -61,3 +61,9 @@ export function activeView(views: readonly SavedView[], filters: HistoryFilterSt
   const current = canonical(viewFiltersFromState(filters, sort))
   return views.find(v => canonical(v.filtros) === current) ?? null
 }
+
+/** Ids de todas las vistas cuyos filtros y orden coinciden con el estado actual (#552). */
+export function vistasCoincidentes(views: readonly SavedView[], filters: HistoryFilterState, sort: SortState): string[] {
+  const current = canonical(viewFiltersFromState(filters, sort))
+  return views.filter(v => canonical(v.filtros) === current).map(v => v.id)
+}

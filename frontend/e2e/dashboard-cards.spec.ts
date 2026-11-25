@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { axeEstable } from './axe'
 
 // Tarjetas del Dashboard con StatCard (#412): cada KPI lleva a su destino y

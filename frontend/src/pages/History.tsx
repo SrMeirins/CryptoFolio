@@ -129,7 +129,7 @@ export function History() {
           assets={d.assets} presentTypes={d.presentTypes} imports={d.imports}
           currencySymbol={currencySymbol}
           setSearchInput={f.setSearchInput} setFilter={f.setFilter} patchFilters={f.patchFilters}
-          setDateRange={f.setDateRange} activos={chips.length} total={total} onClearAll={f.clearFilters}
+          setDateRange={f.setDateRange} activos={chips.length} total={total} onClearAll={f.clearFilters} onIncluirMargen={f.setIncludeMargin}
           year={{ years: d.years, value: year, onChange: goYear, onStep: stepTo, canPrev: prevYear !== null, canNext: nextYear !== null }} />
       </div>
 

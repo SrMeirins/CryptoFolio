@@ -36,3 +36,32 @@ export const CARD_TITLES = {
 export const COUNTERPART_LABELS = { fiat: 'A fiat', stablecoin: 'A stablecoin', cripto: 'A otra cripto' } as const
 
 export const moneyIn = (v: Money, currency: Currency) => formatMoney(v[currency], currency)
+
+/**
+ * Operaciones que forman cada tarjeta del resumen (#553): los mismos recuentos
+ * que usa el filtro de la tarjeta, así que el chip coincide con las filas que
+ * muestra la lista al pulsarla.
+ */
+export function opsTarjeta(id: keyof typeof CARD_TITLES, totals: Pick<HistoryStats['totals'], 'fiat_buys' | 'withdrawn_ops' | 'sells' | 'income_ops' | 'fee_ops'>): number {
+  switch (id) {
+    case 'invertido': return totals.fiat_buys
+    case 'retirado': return totals.withdrawn_ops
+    case 'ventas': return totals.sells
+    case 'ingresos': return totals.income_ops
+    case 'comisiones': return totals.fee_ops
+  }
+}
+
+const NOMBRES: Record<keyof typeof CARD_TITLES, { uno: string; varios: string; ninguno: string }> = {
+  invertido: { uno: 'compra', varios: 'compras', ninguno: 'Ninguna' },
+  retirado: { uno: 'retirada', varios: 'retiradas', ninguno: 'Ninguna' },
+  ventas: { uno: 'venta', varios: 'ventas', ninguno: 'Ninguna' },
+  ingresos: { uno: 'ingreso', varios: 'ingresos', ninguno: 'Ninguno' },
+  comisiones: { uno: 'comisión', varios: 'comisiones', ninguno: 'Ninguna' },
+}
+
+/** Texto del chip: «12 compras», «1 retirada»; sin operaciones, «Ninguna» o «Ninguno». */
+export function chipTarjeta(id: keyof typeof CARD_TITLES, n: number): string {
+  const nombre = NOMBRES[id]
+  return n === 0 ? nombre.ninguno : count(n, nombre.uno, nombre.varios)
+}

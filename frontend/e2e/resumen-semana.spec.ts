@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { axeEstable } from './axe'
 
 // Resumen de los últimos 7 días (#522): las cifras coinciden con las de cada

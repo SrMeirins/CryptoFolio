@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 import { axeEstable } from './axe'
 
 // Pantallas estrechas (#499): sin scroll horizontal en ninguna ruta (WCAG

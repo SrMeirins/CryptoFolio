@@ -181,7 +181,7 @@ export function DateRangePicker({ from, to, onChange, placeholder = 'Rango de fe
             type="button"
             onClick={() => onChange('', '')}
             aria-label="Quitar filtro de fechas"
-            className={iconButtonClasses('sm', false, '-ml-1 mr-1', 'brand')}
+            className={iconButtonClasses('sm', false, '-ml-1 mr-0.5 size-6', 'brand')}
           >
             <X size={10} />
           </button>

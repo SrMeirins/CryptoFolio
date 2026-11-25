@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 import { axeEstable } from './axe'
 
 // Wallets en Ajustes (#448): resumen como en Portfolio, enlaces filtrados y

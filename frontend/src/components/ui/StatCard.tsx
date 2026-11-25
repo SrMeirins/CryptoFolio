@@ -56,16 +56,18 @@ export interface StatCardProps {
   reserveSlots?: boolean
   /** Clases extra del contenedor (p. ej. su ancho en una rejilla flexible, #507). */
   className?: string
+  /** Sin datos que contar (#553): cifra atenuada y, en lugar de la mini gráfica, una línea discontinua. */
+  vacia?: boolean
 }
 
 const TONE = { positive: 'text-positive', negative: 'text-negative' } as const
 
-function Value({ value, format, tone, flash, compact }: Pick<StatCardProps, 'value' | 'format' | 'tone' | 'flash' | 'compact'>) {
+function Value({ value, format, tone, flash, compact, vacia }: Pick<StatCardProps, 'value' | 'format' | 'tone' | 'flash' | 'compact' | 'vacia'>) {
   const numeric = typeof value === 'number' && format
   const dir = useFlashOnChange(typeof value === 'number' ? value : 0)
   const flashClass = flash && dir ? (dir === 'up' ? 'flash-up' : 'flash-down') : ''
   return (
-    <span className={`block ${compact ? 'mt-2 text-[15px]' : 'mt-3 text-xl'} font-bold mono tabular-nums truncate rounded-md ${tone ? TONE[tone] : 'text-fg'} ${flashClass}`}>
+    <span className={`block ${compact ? 'mt-2 text-[15px]' : 'mt-3 text-xl'} font-bold mono tabular-nums truncate rounded-md ${vacia ? 'text-fg-muted' : tone ? TONE[tone] : 'text-fg'} ${flashClass}`}>
       {numeric ? <AnimatedNumber value={value} format={format} countUp duration={400} /> : value}
     </span>
   )
@@ -74,9 +76,9 @@ function Value({ value, format, tone, flash, compact }: Pick<StatCardProps, 'val
 export function StatCard(props: StatCardProps) {
   const {
     title, icon: Icon, visual, color, value, format, loading, chip, series, footer, help, helpLabel,
-    onSelect, active = false, expands = false, actionLabel, compact = false, delay = 0, reserveSlots = false, className = '',
+    onSelect, active = false, expands = false, actionLabel, compact = false, delay = 0, reserveSlots = false, className = '', vacia = false,
   } = props
-  const hasSeries = !footer && series !== undefined && series.length > 1
+  const hasSeries = !footer && !vacia && series !== undefined && series.length > 1
   const text = typeof value === 'number' && format ? format(value) : String(value)
   const iconSize = compact ? 'w-6 h-6' : 'w-7 h-7'
 
@@ -91,7 +93,7 @@ export function StatCard(props: StatCardProps) {
               <Icon size={compact ? 12 : 14} aria-hidden="true" style={{ color }} />
             </span>
           ))}
-          <span className={`${compact ? 'text-[10px]' : 'text-[11px]'} text-fg-subtle uppercase tracking-widest truncate`}>{title}</span>
+          <span className={`${compact ? 'text-[10px]' : 'text-[11px]'} text-fg-subtle uppercase tracking-wider sm:tracking-widest truncate`}>{title}</span>
         </span>
         {loading ? <span className={`block ${compact ? 'mt-2 h-5' : 'mt-3 h-7'} w-32 skeleton rounded-lg`} /> : <Value {...props} />}
         {/* Sobre el botón que cubre la tarjeta: el chip puede ser un control propio. */}
@@ -104,7 +106,13 @@ export function StatCard(props: StatCardProps) {
             <Sparkline values={series} days={series.length} color={color} decorative className="w-full h-7" />
           </span>
         )}
-        {reserveSlots && !footer && (!hasSeries || loading) && <span aria-hidden="true" data-slot="serie" className="block mt-2 h-7" />}
+        {/* Vacía (#553): una línea discontinua en el hueco de la gráfica, para que no parezca un dato. */}
+        {vacia && !footer && !loading && (
+          <span aria-hidden="true" data-slot="serie" className="flex items-end mt-2 h-7">
+            <span className="block w-full border-t border-dashed" style={{ borderColor: `color-mix(in srgb, ${color} 35%, transparent)` }} />
+          </span>
+        )}
+        {reserveSlots && !footer && !vacia && (!hasSeries || loading) && <span aria-hidden="true" data-slot="serie" className="block mt-2 h-7" />}
       </div>
       {onSelect && (
         <button type="button" onClick={onSelect}

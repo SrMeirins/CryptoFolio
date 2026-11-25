@@ -4,7 +4,7 @@ import { ViewTabs } from '../../../components/ui'
 import type { HistoryFilterState } from '../urlState'
 import type { SortState } from '../sorting'
 import { useSavedViews } from '../useSavedViews'
-import { activeView, stateFromView, viewFiltersFromState } from '../savedViewsLogic'
+import { stateFromView, viewFiltersFromState, vistasCoincidentes } from '../savedViewsLogic'
 import { pestanaSeleccionada, TODAS, vistaModificada } from './pestanasLogic'
 import { GuardarVista } from './GuardarVista'
 import { GestionVista } from './GestionVista'
@@ -28,20 +28,27 @@ export function PestanasVistas({ filters, sort, applyState, clearFilters, hayFil
   startedEmpty: boolean
 }) {
   const saved = useSavedViews()
-  const exacta = useMemo(() => activeView(saved.views, filters, sort), [saved.views, filters, sort])
+  const coincidentes = useMemo(() => vistasCoincidentes(saved.views, filters, sort), [saved.views, filters, sort])
   const [origen, setOrigen] = useState<string>(TODAS)
 
-  // La predeterminada, una sola vez al cargar las vistas y solo sin filtros en la URL.
+  // La predeterminada, una sola vez al cargar las vistas y solo sin filtros en
+  // la URL. Si al llegar las vistas ya se ha empezado a filtrar, se respeta lo
+  // elegido: la vista no pisa esos filtros.
   const aplicada = useRef(false)
   useEffect(() => {
     if (aplicada.current || !startedEmpty || !saved.loaded) return
     aplicada.current = true
+    if (hayFiltros) return
     const def = saved.views.find(v => v.predeterminada)
-    if (def) applyState(stateFromView(def.filtros))
-  }, [startedEmpty, saved.loaded, saved.views, applyState])
+    if (!def) return
+    // Una sola vez, al llegar las vistas: la predeterminada queda como pestaña elegida.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza con datos que llegan de la API
+    setOrigen(def.id)
+    applyState(stateFromView(def.filtros))
+  }, [startedEmpty, saved.loaded, saved.views, applyState, hayFiltros])
 
-  const seleccionada = pestanaSeleccionada(saved.views.map(v => v.id), exacta?.id ?? null, exacta?.id ?? origen)
-  const modificada = vistaModificada(seleccionada, exacta?.id ?? null)
+  const seleccionada = pestanaSeleccionada(saved.views.map(v => v.id), coincidentes, origen, hayFiltros)
+  const modificada = vistaModificada(seleccionada, coincidentes)
   const vistaSel = saved.views.find(v => v.id === seleccionada) ?? null
 
   function elegir(valor: string) {
@@ -95,7 +102,7 @@ export function PestanasVistas({ filters, sort, applyState, clearFilters, hayFil
             <RefreshCw size={12} aria-hidden="true" /> Actualizar vista
           </button>
         )}
-        {(modificada || (seleccionada === TODAS && hayFiltros)) && (
+        {(modificada || (seleccionada === TODAS && hayFiltros && coincidentes.length === 0)) && (
           <GuardarVista etiqueta={modificada ? 'Guardar como nueva' : 'Guardar vista'} onGuardar={guardar} />
         )}
         {vistaSel && (

@@ -42,11 +42,13 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
   patchFilters: (patch: Partial<HistoryFilterState>) => void
   setDateRange: (from: string, to: string) => void
   onClearAll: () => void
+  /** Incluir el margen en el resumen (#403), en Opciones de vista (#553). */
+  onIncluirMargen: (v: boolean) => void
   /** Selector «Año» (#382). */
   year: { years: readonly number[]; value: number | null; onChange: (y: number | null) => void; onStep: (s: -1 | 1) => void; canPrev: boolean; canNext: boolean }
 }>(function HistoryToolbar({
   filters, searchInput, wallets, assets, presentTypes, imports, currencySymbol, activos, total,
-  setSearchInput, setFilter, patchFilters, setDateRange, onClearAll, year,
+  setSearchInput, setFilter, patchFilters, setDateRange, onClearAll, onIncluirMargen, year,
 }, searchRef) {
   const movil = useMediaQuery(MOVIL)
   const tituloHoja = useId()
@@ -111,7 +113,8 @@ export const HistoryToolbar = forwardRef<HTMLInputElement, {
               <span aria-hidden="true" className="h-5 w-px bg-border" />
             </>
           )}
-          <OpcionesVista agruparComisiones={filters.groupFees} onAgruparComisiones={v => setFilter('groupFees', v)} />
+          <OpcionesVista agruparComisiones={filters.groupFees} onAgruparComisiones={v => setFilter('groupFees', v)}
+            incluirMargen={filters.includeMargin} onIncluirMargen={onIncluirMargen} />
         </span>
       </div>
 

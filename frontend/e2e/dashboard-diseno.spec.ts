@@ -66,6 +66,7 @@ test('mover un panel solo con teclado y recargar', async ({ page }) => {
   }).toBe(true)
   await page.reload()
   await expect(page.locator('main [data-panel="variacion"]')).toBeVisible()
+  // Los paneles salen ya en su orden guardado (sin pasar por el de por defecto).
   const pagina = await ordenPagina(page)
   expect(pagina.indexOf('evolucion')).toBeLessThan(pagina.indexOf('variacion'))
   expect(pagina.indexOf('variacion')).toBeLessThan(pagina.indexOf('rendimiento'))

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 
 // Carga unificada (#494): primera carga con esqueleto, recarga con los datos
 // visibles y barra fina, y nada en movimiento con «reducir movimiento».

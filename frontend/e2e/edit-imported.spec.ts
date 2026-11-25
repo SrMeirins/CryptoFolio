@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 
 // Editar importadas sin formulario propio (#394). Solo lectura: abre el
 // asistente y lo cierra sin guardar.

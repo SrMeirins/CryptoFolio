@@ -19,7 +19,7 @@ let fallo = false
 
 export function useDashboardDiseno() {
   // consulta de fondo (#498): sin configuración se usa el diseño por defecto; el Dashboard y Ajustes ya avisan del fallo de la configuración.
-  const { data: config } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
+  const { data: config, isError } = useQuery({ queryKey: ['config'], queryFn: portfolioApi.getConfig })
   const qc = useQueryClient()
   const toast = useToast()
   const diseno = leerDiseno(config)
@@ -62,5 +62,6 @@ export function useDashboardDiseno() {
     return paso
   }
 
-  return { diseno, guardar }
+  // Cargado cuando llega la configuración (o falla: entonces, el diseño por defecto).
+  return { diseno, guardar, cargado: config !== undefined || isError }
 }

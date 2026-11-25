@@ -27,7 +27,9 @@ describe('StatsBar (#376, #407)', () => {
   it('cinco tarjetas con su cifra; operaciones y activos en la cabecera', () => {
     const html = render()
     for (const t of TITLES) expect(html).toContain(t)
-    expect(html).toContain('12 operaciones · 3 activos')
+    // Cabecera de bloque (#553): los recuentos van como chips.
+    expect(html).toContain('>12 operaciones<')
+    expect(html).toContain('>3 activos<')
   })
 
   it('solo la cifra: recuentos, neto y G/P van en la ayuda, no bajo la cifra', () => {
@@ -51,7 +53,7 @@ describe('StatsBar (#376, #407)', () => {
   it('la tarjeta activa se marca y su botón quita el filtro', () => {
     const html = render({ card: 'ventas' })
     expect(html).toMatch(/data-active="true"/)
-    expect(html).toMatch(/aria-label="Ventas: 50,00\s€\. Quitar el filtro de sus operaciones"/)
+    expect(html).toMatch(/aria-label="Ventas: 50,00\s€\. 1 venta\. Quitar el filtro de sus operaciones"/)
   })
 
   it('mini gráfica decorativa por tarjeta', () => {
@@ -63,10 +65,29 @@ describe('StatsBar (#376, #407)', () => {
     expect(render()).not.toContain('según los filtros')
   })
 
-  it('interruptor de margen accesible y aviso de lo que queda fuera', () => {
+  it('chip con las operaciones de cada tarjeta, las mismas que su filtro (#553)', () => {
+    const html = render()
+    for (const texto of ['2 compras', '1 retirada', '1 venta', '4 ingresos', '3 comisiones']) expect(html).toContain(texto)
+    // Con los filtros cambian los totales y con ellos el chip.
+    const filtrado = render({ filtered: true, totals: { ...totals, fiat_buys: 0, sells: 3 } })
+    expect(filtrado).toContain('Ninguna')
+    expect(filtrado).toContain('3 ventas')
+  })
+
+  it('la tarjeta activa dice que está filtrando y la vacía se atenúa (#553)', () => {
+    const activa = render({ card: 'ventas' })
+    expect(activa).toContain('Filtrando: 1 venta')
+    const vacia = render({ totals: { ...totals, sells: 0, sold: m(0) } })
+    expect(vacia).toContain('Ninguna')
+    expect(vacia).toMatch(/border-dashed/)
+  })
+
+  it('el margen se cambia en Opciones de vista; aquí, su aviso con enlace (#553)', () => {
     const fuera = render({ margin: { included: false, ops: 249, sells: 48 } })
-    expect(fuera).toContain('role="switch"')
+    expect(fuera).not.toContain('role="switch"')
     expect(fuera).toContain('Sin margen: 249 operaciones quedan fuera del resumen, 48 de ellas ventas.')
-    expect(render({ margin: { included: true, ops: 249, sells: 48 } })).toContain('checked=""')
+    expect(fuera).toContain('Incluirlas')
+    expect(render({ margin: { included: true, ops: 249, sells: 48 } })).toContain('Excluirlas')
+    expect(render()).not.toContain('Incluirlas')
   })
 })

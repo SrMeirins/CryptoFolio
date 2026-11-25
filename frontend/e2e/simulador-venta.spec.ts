@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 import { axeEstable } from './axe'
 
 // Simulador de venta (#529): «Qué vendes» y «Qué recibes» con la cascada que

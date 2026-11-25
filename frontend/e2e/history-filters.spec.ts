@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { abrirOpcionesVista } from './historyHelpers'
 
 // Filtros avanzados del Historial (#366, #552): multiselección con teclado,
