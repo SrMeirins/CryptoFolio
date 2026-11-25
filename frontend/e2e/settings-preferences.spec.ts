@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 
 // Preferencias de General (#446): umbral de polvo, privacidad al abrir y
 // página de inicio. Solo lectura: /api/settings/config se intercepta con los

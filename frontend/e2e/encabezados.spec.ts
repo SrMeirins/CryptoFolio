@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 
 // Cabecera común (#491): un único h1 por ruta y un h2 de la pestaña en las
 // páginas con pestañas. Solo lectura.

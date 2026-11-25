@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 import { axeEstable } from './axe'
 
 // Cabecera de Portfolio (#525): valor grande con coste y 24 h, tira de

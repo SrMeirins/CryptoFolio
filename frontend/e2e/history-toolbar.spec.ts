@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 import { abrirMasFiltros } from './historyHelpers'
 
 // Barra de filtros por niveles (#414) con el panel agrupado (#552). Solo lectura.

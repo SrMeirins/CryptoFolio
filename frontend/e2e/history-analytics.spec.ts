@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 
 // Analítica del Historial (#413): pulsar un periodo filtra la lista por sus
 // fechas y otra vez lo quita; la tabla accesible no ocupa sitio. Solo lectura.

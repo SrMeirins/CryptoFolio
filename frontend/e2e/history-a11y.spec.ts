@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 import { axeEstable } from './axe'
 import { abrirMasFiltros } from './historyHelpers'
 
@@ -90,8 +90,8 @@ test('estadísticas (#376): siguen a los filtros y el gráfico alterna número y
   const resumen = page.getByRole('region', { name: /Resumen/ })
   await expect(resumen).toBeVisible()
   await expect(resumen).not.toContainText('según los filtros')
-  // El número de operaciones va en la cabecera del resumen (#407).
-  const cabecera = page.locator('#historial-resumen')
+  // El número de operaciones va en un chip de la cabecera del resumen (#407, #553).
+  const cabecera = resumen.getByText(/^[\d.]+ operaci(ón|ones)$/)
   const total = await cabecera.textContent()
 
   // Con un filtro, el resumen se rotula y cambia.

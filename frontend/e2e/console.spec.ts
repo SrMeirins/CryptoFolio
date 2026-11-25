@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 
 // Prueba de humo de consola (#201): ninguna vista debe escribir errores ni
 // avisos en la consola del navegador, ni lanzar excepciones no capturadas.

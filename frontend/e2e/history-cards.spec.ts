@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './base'
 
 // Tarjetas del resumen (#407, #553): el chip de cada una dice cuántas
 // operaciones suma y pulsarla filtra la lista con ese mismo recuento (la

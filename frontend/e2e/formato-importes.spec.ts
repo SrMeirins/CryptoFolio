@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 
 // Formato de importes (#489): ninguna pantalla muestra «-0,00» ni «-0 €».
 // Solo lectura: se bloquea cualquier petición que no sea GET.

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 import { axeEstable } from './axe'
 
 // Tabla de Operaciones (#543): una fila por operación con sus lotes, suma que

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 import { axeEstable } from './axe'
 
 // Zona horaria en Ajustes (#390). Solo lectura: la zona y su cambio se simulan

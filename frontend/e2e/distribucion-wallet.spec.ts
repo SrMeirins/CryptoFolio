@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 import { axeEstable } from './axe'
 
 // Distribución (#506, #514): desglose por activo de cada wallet, dos destinos

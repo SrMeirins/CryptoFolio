@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './base'
 import { axeEstable } from './axe'
 
 // Estados vacíos (#496): con la base vacía, Dashboard, Portfolio y Fiscal
