@@ -85,3 +85,27 @@ test('una vista predeterminada sin filtros (solo el orden) no bloquea «Todas» 
   await expect(todas).toHaveAttribute('aria-selected', 'true')
 })
 
+test('la predeterminada no pisa un filtro elegido antes de que lleguen las vistas (#552)', async ({ page, request }) => {
+  const nombre = `${PREFIX}tardia-${Date.now()}`
+  const previas = ((await (await request.get('/api/v1/historial/vistas')).json()).vistas as { id: string; nombre: string; predeterminada: boolean }[])
+  const predPrevia = previas.find(v => v.predeterminada && !v.nombre.startsWith(PREFIX))
+  test.info().annotations.push({ type: 'pred-previa', description: predPrevia?.id ?? '' })
+  expect((await request.post('/api/v1/historial/vistas', { data: { nombre, predeterminada: true, filtros: { sort: 'fecha', dir: 'desc' } } })).ok()).toBe(true)
+  // Las vistas tardan en llegar: da tiempo a filtrar antes.
+  await page.route('**/api/v1/historial/vistas', async r => {
+    if (r.request().method() !== 'GET') return r.continue()
+    await new Promise(res => setTimeout(res, 2500))
+    await r.continue()
+  })
+  await page.goto('/history')
+  const buscador = page.getByRole('combobox', { name: /Buscar/ })
+  await buscador.fill('BTC')
+  await expect(page).toHaveURL(/[?&]buscar=BTC/)
+  // Llegan las vistas: el filtro sigue y la vista no se aplica.
+  await expect(page.getByRole('tablist', { name: 'Vistas guardadas' }).getByRole('tab', { name: new RegExp(nombre) })).toBeVisible({ timeout: 10_000 })
+  await page.waitForTimeout(500)
+  await expect(page).toHaveURL(/[?&]buscar=BTC/)
+  await expect(buscador).toHaveValue('BTC')
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
+})
+

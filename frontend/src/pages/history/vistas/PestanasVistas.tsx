@@ -31,18 +31,21 @@ export function PestanasVistas({ filters, sort, applyState, clearFilters, hayFil
   const coincidentes = useMemo(() => vistasCoincidentes(saved.views, filters, sort), [saved.views, filters, sort])
   const [origen, setOrigen] = useState<string>(TODAS)
 
-  // La predeterminada, una sola vez al cargar las vistas y solo sin filtros en la URL.
+  // La predeterminada, una sola vez al cargar las vistas y solo sin filtros en
+  // la URL. Si al llegar las vistas ya se ha empezado a filtrar, se respeta lo
+  // elegido: la vista no pisa esos filtros.
   const aplicada = useRef(false)
   useEffect(() => {
     if (aplicada.current || !startedEmpty || !saved.loaded) return
     aplicada.current = true
+    if (hayFiltros) return
     const def = saved.views.find(v => v.predeterminada)
     if (!def) return
     // Una sola vez, al llegar las vistas: la predeterminada queda como pestaña elegida.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza con datos que llegan de la API
     setOrigen(def.id)
     applyState(stateFromView(def.filtros))
-  }, [startedEmpty, saved.loaded, saved.views, applyState])
+  }, [startedEmpty, saved.loaded, saved.views, applyState, hayFiltros])
 
   const seleccionada = pestanaSeleccionada(saved.views.map(v => v.id), coincidentes, origen, hayFiltros)
   const modificada = vistaModificada(seleccionada, coincidentes)
