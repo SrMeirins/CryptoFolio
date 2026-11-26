@@ -96,7 +96,7 @@ Primera versión estable. Resume los cambios desde la 0.0.14: más de 300 PR que
 - Los traslados entre wallets conservan su parte de la comisión de compra y la comisión de red de los retiros de Binance va aparte.
 - Duplicados al reimportar un CSV y filas repetidas dentro del mismo fichero.
 - Precios en vivo con el par más líquido, detección del feed congelado y tiempo máximo en las rutas fiscales.
-- Aplicación de escritorio: puertos dinámicos para el backend y la base de datos embebidos.
+- Aplicación de escritorio: puertos dinámicos para el backend y la base de datos embebidos, con el precio en vivo conectado a ese puerto.
 
 ### Seguridad
 

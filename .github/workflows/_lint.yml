@@ -25,7 +25,7 @@ jobs:
       # imports en Windows y macOS (versión 1.0): se detecta antes de compilar.
       - name: Rutas sin colisiones de mayúsculas y scripts del repositorio
         run: |
-          node --test scripts/check-case-collisions.test.mjs scripts/demo/cartera.test.mjs
+          node --test scripts/check-case-collisions.test.mjs scripts/demo/cartera.test.mjs scripts/ci/build-sin-origen-fijo.test.mjs
           node scripts/check-case-collisions.mjs
 
       - name: Backend — install, lint, typecheck
