@@ -2,204 +2,217 @@
 <!-- markdownlint-disable-next-line MD041 -->
 <div align="center">
 
-<img src="public/favicon.svg" width="80" alt="CryptoFolio logo" />
+<img src="public/favicon.svg" width="80" alt="Logo de CryptoFolio" />
 
 # CryptoFolio
 
 <!-- markdownlint-disable-next-line MD036 -->
-**Gestión de portfolio y fiscalidad crypto para España — 100% self-hosted**
+**Cartera de criptomonedas y fiscalidad española, en tu propio equipo**
 
-*Tus datos en tu máquina. Sin suscripciones. Sin nubes.*
+*Tus datos en tu máquina. Sin cuentas, sin suscripciones y sin nube.*
 
 <br/>
 
-[![License: AGPL-3.0](https://img.shields.io/badge/licencia-AGPL--3.0-blue?style=flat-square)](LICENSE)
-[![GitHub Release](https://img.shields.io/github/v/release/SrMeirins/CryptoFolio?style=flat-square&color=22c55e&label=release)](https://github.com/SrMeirins/CryptoFolio/releases/latest)
-[![Docker](https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docs.docker.com/get-docker/)
-[![Node](https://img.shields.io/badge/node-20+-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
-[![React](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+[![Licencia: AGPL-3.0](https://img.shields.io/badge/licencia-AGPL--3.0-blue?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/SrMeirins/CryptoFolio?style=flat-square&color=22c55e&label=release)](https://github.com/SrMeirins/CryptoFolio/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/SrMeirins/CryptoFolio/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/SrMeirins/CryptoFolio/actions/workflows/ci.yml)
+[![Docker](https://img.shields.io/badge/docker-listo-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docs.docker.com/get-docker/)
+[![React](https://img.shields.io/badge/react-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/typescript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![España](https://img.shields.io/badge/España-IRPF_FIFO-c60b1e?style=flat-square)](https://www.agenciatributaria.es)
-
-[![GitHub stars](https://img.shields.io/github/stars/SrMeirins/CryptoFolio?style=flat-square&color=f5a623)](https://github.com/SrMeirins/CryptoFolio/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/SrMeirins/CryptoFolio?style=flat-square&color=f5a623)](https://github.com/SrMeirins/CryptoFolio/forks)
-[![GitHub issues](https://img.shields.io/github/issues/SrMeirins/CryptoFolio?style=flat-square)](https://github.com/SrMeirins/CryptoFolio/issues)
-[![CI](https://img.shields.io/github/actions/workflow/status/SrMeirins/CryptoFolio/release.yml?style=flat-square&label=CI)](https://github.com/SrMeirins/CryptoFolio/actions)
+[![España](https://img.shields.io/badge/España-IRPF_FIFO-c60b1e?style=flat-square)](https://sede.agenciatributaria.gob.es)
 
 </div>
 
 ---
 
-## ¿Qué es CryptoFolio?
+## Qué es CryptoFolio
 
-CryptoFolio es una aplicación **gratuita y open source** para gestionar tu portfolio de criptomonedas y calcular tu declaración de la renta en España.
+CryptoFolio es una aplicación **gratuita y de código abierto** para seguir tu cartera de criptomonedas y preparar la declaración de la renta en España.
 
-Diseñada para inversores que quieren **control total** sobre sus datos: se instala en tu propio ordenador con un solo comando, sin crear cuentas, sin enviar tus datos a ningún servidor externo.
+Se instala en tu ordenador, como aplicación de escritorio para Windows, macOS y Linux o con Docker. No hay que crear ninguna cuenta y tu historial no sale de tu equipo.
 
-> **¿Por qué self-hosted?** Las apps de crypto tax online cuestan entre 50€ y 200€/año y tienen acceso completo a tu historial financiero. Con CryptoFolio, todo queda en tu máquina.
+> **Por qué en local:** los servicios de fiscalidad cripto en línea cuestan entre 50 y 200 € al año y guardan todo tu historial financiero. Con CryptoFolio, todo se queda en tu máquina.
 
 ---
 
-## ⚠️ Compatibilidad actual
+## Compatibilidad
 
-Es importante que sepas qué soporta la app **a día de hoy** antes de instalarla:
+Antes de instalarla, comprueba que cubre tu caso:
 
-| Funcionalidad | Soportado |
+| Función | Estado |
 | --- | --- |
-| **Exchanges para importar** | ✅ Binance y Bitvavo (CSV) |
-| **Wallets frías** | ✅ Configuración manual (Ledger, Tangem, Trezor...) — verificación de saldo on-chain automática en varias redes |
-| **Sincronización on-chain** | ✅ XRP Ledger, Hedera, Stellar, Bitcoin, Solana, Ethereum, Cardano y Polkadot Asset Hub |
-| **Método de cálculo fiscal** | ✅ FIFO |
-| **País** | ✅ España (IRPF) |
-| **Otros exchanges** | ❌ No soportados de momento |
-| **Otros países / métodos** | ❌ No disponible |
+| **Exchanges para importar** | Binance y Bitvavo (CSV) |
+| **Wallets frías** | Alta manual (Ledger, Tangem, Trezor...) |
+| **Comprobación de saldo on-chain** | XRP Ledger, Hedera, Stellar, Bitcoin, Solana, Ethereum, Cardano y Polkadot Asset Hub |
+| **Método fiscal** | FIFO global por activo |
+| **País** | España (IRPF) |
+| **Otros exchanges, países o métodos** | No disponibles por ahora |
 
-> Si usas Binance/Bitvavo y tributas en España, esta app es para ti.  
-> Para otros exchanges o países, la app no es útil aún.
+Si usas Binance o Bitvavo y tributas en España, esta aplicación es para ti.
 
 ---
 
 ## Índice
 
-- [Características](#-características)
-- [Capturas de pantalla](#-capturas-de-pantalla)
-- [Stack tecnológico](#-stack-tecnológico)
-- [Instalación con Docker (self-hosted)](#-instalación-con-docker-self-hosted)
-- [Configuración](#-configuración)
-- [Cómo usar la app](#-cómo-usar-la-app)
-- [Preguntas frecuentes](#-preguntas-frecuentes)
-- [Contribuir](#-contribuir)
-- [Licencia](#-licencia)
+- [Funciones](#funciones)
+- [Capturas](#capturas)
+- [Descarga la aplicación de escritorio](#descarga-la-aplicación-de-escritorio)
+- [Instalación con Docker](#instalación-con-docker)
+- [Configuración](#configuración)
+- [Cómo usar la aplicación](#cómo-usar-la-aplicación)
+- [Privacidad y copias de seguridad](#privacidad-y-copias-de-seguridad)
+- [Preguntas frecuentes](#preguntas-frecuentes)
+- [Stack tecnológico](#stack-tecnológico)
+- [Contribuir](#contribuir)
+- [Licencia](#licencia)
 
 ---
 
-## ✨ Características
-
-### 📊 Portfolio
-
-- Precios en **tiempo real** vía Binance WebSocket — sin delay, sin refresco manual
-- **Wallets frías** configuradas manualmente (Ledger, Tangem, Trezor...) y cuenta de **Binance** vía CSV
-- Variación **24h** por activo con indicadores visuales
-- Distribución del portfolio con gráfico interactivo
-- Detección de **posiciones de polvo** (dust)
-
-### 🧾 Fiscal — España
-
-- Cálculo **FIFO** según normativa española vigente (LIRPF)
-- Ganancias y pérdidas patrimoniales separadas por activo y año
-- Rendimientos del capital mobiliario (staking, intereses, airdrops)
-- Estimación de cuota **IRPF** por tramos configurables
-- Compensación de pérdidas de ejercicios anteriores
-- Modelo **721** (criptomonedas en el extranjero)
-- **Informe PDF profesional** listo para llevar al gestor
-
-### 📥 Importación — Binance y Bitvavo
-
-- CSV exportado desde Binance (idioma español e inglés) o Bitvavo
-- Deduplicación automática — importa el mismo CSV dos veces sin problemas
-- Preview antes de confirmar la importación
-- Asignación de coste de adquisición para depósitos externos (transfers desde wallets frías)
-- Motor FIFO que se **recalcula automáticamente** tras cada importación
-- **+40 tipos de operación soportados** (Binance): compras, ventas, staking, Launchpool, ETH 2.0, airdrops, cashback, grid bots (Strategy), transfers internos, margin…
-
-> 📖 **[Ver referencia completa de operaciones soportadas (Binance) →](docs/operaciones-soportadas.md)** · **[Bitvavo →](docs/operaciones-soportadas-bitvavo.md)**
-
-### 📋 Historial
-
-- Búsqueda y filtrado por fecha, activo, tipo de operación y wallet
-- Exportación a **Excel**
-- Vista de operaciones agrupadas por tipo
-
----
-
-## 📸 Capturas de pantalla
+## Funciones
 
 ### Dashboard
 
-![Dashboard](docs/screenshots/dashboard.png)
+- Resumen de la cartera en vivo: valor, coste, P&L no realizado, rentabilidad y euros netos aportados, con su evolución.
+- **Últimos 7 días:** P&L de la semana, mejor y peor activo, operaciones, avisos y plazos fiscales próximos.
+- **Metas** de valor de la cartera, de cantidad de un activo o de dinero aportado, con su progreso.
+- Mapa de **variación** por activo (hoy, 24 h o total).
+- **Evolución** de la cartera con zoom y marcas de depósitos y retiradas, **rendimiento** por periodos y **P&L diario** en calendario.
+- Distribución, resumen fiscal del año, actividad reciente e ingresos pasivos (staking y similares).
+- **Personalizable:** ordena, contrae u oculta cada panel.
 
 ### Portfolio
 
-![Portfolio](docs/screenshots/portfolio.png)
+- Precios en **tiempo real** por el WebSocket de Binance, con fuentes de respaldo.
+- Posiciones por activo o por wallet: precio, valor, coste, P&L, resultado total, precio de equilibrio, antigüedad y peso en la cartera, con columnas configurables y exportación a CSV.
+- Custodia: qué parte está en exchanges y qué parte en wallets propias.
+- **Detalle de cada activo:** gráfico de precio con tus compras y ventas, lotes por mes, reparto entre wallets, simulación «si vendo» y **alertas de precio**.
+- Detección de posiciones residuales (polvo).
 
-### Módulo Fiscal
+### Fiscal (España)
 
-![Fiscal](docs/screenshots/fiscal.png)
+- Cálculo **FIFO** según la normativa española (LIRPF), con ganancias y pérdidas patrimoniales por activo y año.
+- Rendimientos del capital mobiliario (staking e intereses) y la clasificación de airdrops, minería y cashback.
+- **Cuota IRPF estimada** con la escala del ahorro de cada ejercicio y compensación de pérdidas de años anteriores.
+- **Modelo 721:** cálculo de la obligación de declarar criptoactivos en el extranjero.
+- **Planificador:** simula ventas antes de hacerlas y aprovecha las pérdidas pendientes.
+- Seguimiento de la **declaración** de cada ejercicio y **calendario fiscal** exportable a tu calendario (.ics).
+- **Exportación** del ejercicio en CSV, CSV para RentaWeb, Excel y **PDF** listo para el gestor.
+
+### Importación
+
+- CSV de **Binance** (en español o en inglés) y de **Bitvavo**, con más de 60 tipos de operación de Binance: compras, ventas, conversiones, staking, Launchpool, ETH 2.0, airdrops, cashback, bots de Strategy, transferencias internas y margen, entre otros.
+- Vista previa antes de confirmar, sin duplicados al volver a importar el mismo fichero.
+- Revisión de depósitos y retiradas externos: coste de adquisición y wallet de destino.
+- Ajuste de zona horaria del fichero y comprobación de cobertura del historial.
+- El motor FIFO se **recalcula solo** tras cada importación.
+
+Referencia completa: [operaciones de Binance](docs/operaciones-soportadas.md) y [operaciones de Bitvavo](docs/operaciones-soportadas-bitvavo.md).
+
+### Historial
+
+- Búsqueda y filtros por fecha, activo, tipo, wallet e importe.
+- **Vistas guardadas** en pestañas, con una vista predeterminada.
+- Resumen de lo invertido, retirado, vendido, cobrado y pagado en comisiones, y analítica de actividad.
+- Detalle de cada operación, edición y alta manual.
+- Exportación a **CSV**.
+
+### Ajustes
+
+- Wallets y activos, con la comprobación on-chain del saldo.
+- Tramos del IRPF, umbral del Modelo 721 y preferencias de exportación.
+- Alertas de cartera y de precio, y notificaciones.
+- **Copias de seguridad** automáticas y cifradas, descarga con contraseña y restauración.
+- Tema claro u oscuro, moneda (EUR o USD), zona horaria y diseño del Dashboard.
+
+---
+
+## Capturas
+
+Todas las capturas usan la [cartera de demostración](#cartera-de-demostración): datos sintéticos con precios de mercado reales. Se muestran en tema claro u oscuro según el de tu navegador.
+
+### Dashboard
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/dashboard-claro.png">
+  <img src="docs/screenshots/dashboard.png" alt="Dashboard con el resumen de la cartera y los últimos 7 días">
+</picture>
+
+### Portfolio
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/portfolio-claro.png">
+  <img src="docs/screenshots/portfolio.png" alt="Portfolio con el valor de la cartera y las posiciones por activo">
+</picture>
+
+### Historial
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/historial-claro.png">
+  <img src="docs/screenshots/historial.png" alt="Historial con el resumen de operaciones y la tabla filtrable">
+</picture>
+
+### Fiscal
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/fiscal-claro.png">
+  <img src="docs/screenshots/fiscal.png" alt="Resumen fiscal del ejercicio con la cuota estimada">
+</picture>
 
 ### Informe PDF
 
-![PDF](docs/screenshots/pdf.png)
+![Primera página del informe fiscal en PDF](docs/screenshots/pdf.png)
 
 ---
 
-## 🛠 Stack tecnológico
+## Descarga la aplicación de escritorio
 
-<div align="center">
+La versión de escritorio lo instala todo: no necesita Docker ni configuración. Descárgala de la [última release](https://github.com/SrMeirins/CryptoFolio/releases/latest).
 
-| Capa | Tecnología |
-| :----: | :----------: |
-| Frontend | React 19 · TypeScript · Vite · Tailwind CSS · Recharts |
-| Backend | Node.js 20 · Express · TypeScript |
-| Base de datos | PostgreSQL 16 |
-| Precios | Binance WebSocket API · CoinGecko API |
-| Contenedores | Docker · Docker Compose |
-
-</div>
-
----
-
-## 💾 Descarga la app de escritorio
-
-> La versión de escritorio instala todo automáticamente — sin Docker, sin configuración.
-
-| Sistema | Descarga | Notas |
+| Sistema | Fichero | Notas |
 | --- | --- | --- |
-| **Windows** | [CryptoFolio-Setup.exe](https://github.com/SrMeirins/CryptoFolio/releases/latest) | Instalador NSIS, no requiere admin |
-| **macOS** | [CryptoFolio.dmg](https://github.com/SrMeirins/CryptoFolio/releases/latest) | Apple Silicon (M1/M2/M3). Sin notarizar — ver nota abajo |
-| **Linux** | [CryptoFolio.deb](https://github.com/SrMeirins/CryptoFolio/releases/latest) | Para Debian / Ubuntu |
+| **Windows** (x64) | `CryptoFolio-Setup-<versión>.exe` | Instalador que no pide permisos de administrador |
+| **macOS** (Apple Silicon) | `CryptoFolio-<versión>-arm64.dmg` | Sin notarizar: ver la nota de abajo |
+| **macOS** (Intel) | `CryptoFolio-<versión>.dmg` | Sin notarizar: ver la nota de abajo |
+| **Linux** (x64) | `cryptofolio-desktop_<versión>_amd64.deb` | Debian, Ubuntu y derivadas |
 
-### macOS Gatekeeper — cómo abrir la app sin notarizar
+En Linux se instala con `sudo apt install ./cryptofolio-desktop_<versión>_amd64.deb`.
 
-La app no está notarizada con una cuenta Apple Developer de pago. Para abrirla la primera vez:
+### macOS: abrir una aplicación sin notarizar
 
-1. Abre el `.dmg` y arrastra `CryptoFolio.app` a Aplicaciones
-2. Haz **clic derecho → Abrir** en el Finder (no doble clic)
-3. Acepta el aviso de "desarrollador no identificado"
+La aplicación no está notarizada con una cuenta de Apple Developer. La primera vez:
+
+1. Abre el `.dmg` y arrastra `CryptoFolio.app` a Aplicaciones.
+2. En el Finder, haz **clic derecho y Abrir** (no doble clic).
+3. Acepta el aviso de desarrollador no identificado.
 
 ---
 
-## 🚀 Instalación con Docker (self-hosted)
+## Instalación con Docker
 
-> ⏱️ **Tiempo estimado:** 5-10 minutos  
-> 🖥️ **Compatible con:** Windows, macOS y Linux
+Para tenerla en un servidor de casa o si prefieres Docker. Funciona en Windows, macOS y Linux y se instala en 5 a 10 minutos.
 
-### Paso 1 — Instala Docker
-
-Docker es el programa que permite ejecutar CryptoFolio sin instalar nada más en tu sistema.
+### Paso 1: instala Docker
 
 <details>
-<summary><b>🪟 Windows</b></summary>
+<summary><b>Windows</b></summary>
 
-1. Descarga **Docker Desktop** desde [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
-2. Ejecuta el instalador y sigue los pasos (requiere reiniciar)
-3. Abre Docker Desktop y espera a que el icono de la ballena aparezca en la barra de tareas
-4. Abre **PowerShell** o **Terminal** y verifica que funciona:
+1. Descarga **Docker Desktop** desde [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/).
+2. Ejecuta el instalador y reinicia cuando lo pida.
+3. Abre Docker Desktop y espera a que arranque.
+4. En **PowerShell**, comprueba que funciona:
 
    ```powershell
    docker --version
    ```
 
-   Deberías ver algo como `Docker version 26.x.x`
-
 </details>
 
 <details>
-<summary><b>🍎 macOS</b></summary>
+<summary><b>macOS</b></summary>
 
-1. Descarga **Docker Desktop** desde [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
-2. Arrastra Docker.app a tu carpeta de Aplicaciones
-3. Ábrelo y acepta los permisos
-4. Abre **Terminal** y verifica:
+1. Descarga **Docker Desktop** desde [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/).
+2. Arrastra Docker.app a Aplicaciones, ábrelo y acepta los permisos.
+3. En **Terminal**, comprueba que funciona:
 
    ```bash
    docker --version
@@ -208,274 +221,238 @@ Docker es el programa que permite ejecutar CryptoFolio sin instalar nada más en
 </details>
 
 <details>
-<summary><b>🐧 Linux (Ubuntu/Debian)</b></summary>
+<summary><b>Linux (Ubuntu o Debian)</b></summary>
+
+Instala Docker con el script oficial y añade tu usuario al grupo `docker` (después, cierra la sesión y vuelve a entrar):
 
 ```bash
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER
-# Cierra sesión y vuelve a entrar para aplicar el grupo
 docker --version
 ```
 
 </details>
 
----
+### Paso 2: descarga CryptoFolio
 
-### Paso 2 — Descarga CryptoFolio
-
-**Opción A — Con Git** (recomendado, te permite actualizar fácilmente):
-
-Si no tienes Git, descárgalo desde [git-scm.com](https://git-scm.com/downloads).
+Con Git (recomendado, para actualizar después con un comando):
 
 ```bash
 git clone https://github.com/SrMeirins/CryptoFolio.git
 cd CryptoFolio
 ```
 
-**Opción B — Descarga directa:**
+Sin Git: en esta página, pulsa **Code** y **Download ZIP**, descomprímelo y abre una terminal en esa carpeta.
 
-1. Haz clic en el botón verde **`Code`** de esta página
-2. Selecciona **Download ZIP**
-3. Extrae el ZIP en una carpeta de tu elección
-4. Abre una terminal en esa carpeta
+### Paso 3: crea el fichero `.env`
 
----
-
-### Paso 3 — Configura el entorno
-
-Necesitas crear un archivo `.env` con al menos la contraseña de la base de datos — **es obligatoria**: el siguiente paso falla con un mensaje claro si no la defines.
-
-**En macOS / Linux:**
+Copia la plantilla (en Windows, `Copy-Item .env.example .env`):
 
 ```bash
 cp .env.example .env
 ```
 
-**En Windows (PowerShell):**
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Abre el archivo `.env` con cualquier editor de texto (Notepad, VSCode...) y cambia el único valor obligatorio:
+Abre `.env` con un editor de texto y define la contraseña de la base de datos, el único valor obligatorio:
 
 ```env
-# Elige una contraseña para la base de datos (sin espacios ni comillas)
-POSTGRES_PASSWORD=MiContraseñaSegura123
+# Contraseña de la base de datos (sin espacios ni comillas)
+POSTGRES_PASSWORD=cambia-esta-contraseña
 ```
 
-Todo lo demás en `.env.example` es opcional (API key de CoinGecko Pro, verificación on-chain, puerto...) — el `.env` funciona perfectamente solo con esa línea.
+Si falta, el arranque se detiene con un aviso en lugar de usar una contraseña por defecto.
 
----
+### Paso 4: arranca la aplicación
 
-### Paso 4 — Arranca la aplicación
+Construye las imágenes de producción y levanta los contenedores (la primera vez tarda unos minutos):
 
 ```bash
 docker compose up -d
 ```
 
-La primera vez tardará unos minutos mientras construye las imágenes (build real de producción, no un servidor de desarrollo). Verás algo así:
+### Paso 5: ábrela en el navegador
 
-```text
-✔ Container cryptofolio-postgres-1   Started
-✔ Container cryptofolio-backend-1    Started
-✔ Container cryptofolio-frontend-1   Started
-```
+Entra en <http://localhost:8080>.
 
-> Si olvidaste definir `POSTGRES_PASSWORD` en el `.env`, el comando falla aquí mismo con un mensaje que te lo indica — no arranca con una contraseña insegura por defecto.
+### Parar, arrancar y actualizar
 
----
-
-### Paso 5 — Abre el navegador
-
-```text
-http://localhost:8080
-```
-
-¡Listo! 🎉
-
----
-
-### Parar y arrancar
+Estos comandos paran la aplicación (los datos se conservan), la vuelven a arrancar, muestran su estado y la actualizan a la última versión:
 
 ```bash
-# Parar (los datos se conservan)
 docker compose down
-
-# Volver a arrancar
 docker compose up -d
-
-# Ver si está corriendo
 docker compose ps
+git pull && docker compose up -d --build
 ```
 
 ---
 
-### Actualizar a una nueva versión
+## Configuración
 
-```bash
-git pull
-docker compose up -d --build
-```
+Las opciones van en el fichero `.env`. La lista completa, comentada, está en [`.env.example`](.env.example).
 
----
+| Variable | Para qué sirve | Por defecto |
+| --- | --- | --- |
+| `POSTGRES_PASSWORD` | Contraseña de la base de datos (**obligatoria**) | Sin valor: el arranque falla si falta |
+| `FRONTEND_HOST_PORT` | Puerto de la aplicación en tu equipo | `8080` |
+| `APP_TIMEZONE` | Zona horaria del día local, el ejercicio fiscal y el P&L (por ejemplo, `Atlantic/Canary`). La de Ajustes tiene prioridad | `Europe/Madrid` |
+| `COINGECKO_API_KEY` | Clave de CoinGecko (Demo o Pro) para importar más rápido | Vacía (acceso anónimo) |
+| `PRICE_REFRESH_INTERVAL_MS` | Cada cuánto se refrescan los precios, en milisegundos | `60000` |
+| `PRICE_SOURCES_OFFLINE` | Con `true`, no consulta ninguna fuente de precios y usa solo la caché | Sin definir |
+| `RATE_LIMIT_MAX` | Peticiones al backend por ventana de 15 minutos | `5000` |
+| `BACKUP_HOST_DIR` | Carpeta de tu equipo para las copias de la base de datos | `~/.local/share/CryptoFolio/backups` |
+| `BACKUP_RETENTION_COUNT` | Copias semanales que se conservan | `14` |
+| `HOST_UID` / `HOST_GID` | Usuario y grupo dueños de las copias (salida de `id -u` y `id -g`) | `1000` |
+| `WALLET_SYNC_ENCRYPTION_KEY` | Clave que cifra las claves de API de la comprobación on-chain | Vacía |
+| `ETHERSCAN_API_KEY`, `BLOCKFROST_API_KEY`, `SUBSCAN_API_KEY` | Claves de los proveedores on-chain de Ethereum, Cardano y Polkadot. También se pueden poner en Ajustes | Vacías |
 
-## ⚙ Configuración
+La base de datos y el backend no publican ningún puerto en tu equipo: solo se ven entre sí en la red interna de Docker. El único punto de entrada es el frontend, y solo en `127.0.0.1`.
 
-Todas las opciones se configuran en el archivo `.env` (ver `.env.example` para la lista completa, comentada):
-
-| Variable | Descripción | Obligatoria | Valor por defecto |
-| --- | --- | :---: | --- |
-| `POSTGRES_PASSWORD` | Contraseña de la base de datos | ✅ **Sí** | *(sin valor por defecto — el arranque falla si falta)* |
-| `FRONTEND_HOST_PORT` | Puerto en el que se accede a la app | No | `8080` |
-| `COINGECKO_API_KEY` | API key de CoinGecko Pro | No | vacío (usa el tier gratuito) |
-| `PRICE_REFRESH_INTERVAL_MS` | Intervalo de refresco de precios (ms) | No | `60000` (1 min) |
-| `RATE_LIMIT_MAX` | Peticiones al backend por ventana de 15 minutos (evita bucles accidentales). Un valor no válido deja el de por defecto | No | `5000` |
-| `APP_TIMEZONE` | Zona horaria IANA del día local, el ejercicio fiscal y el P&L (p. ej. `Atlantic/Canary`). La de Ajustes prevalece; en la app de escritorio, por defecto, la del sistema | No | `Europe/Madrid` |
-| `WALLET_SYNC_ENCRYPTION_KEY` | Clave que cifra las API keys de verificación on-chain | Solo si usas verificación on-chain | vacío |
-| `ETHERSCAN_API_KEY` / `BLOCKFROST_API_KEY` / `SUBSCAN_API_KEY` | API keys de proveedores on-chain (Ethereum/Cardano/Polkadot) | No — se configuran también desde Settings → Wallets | vacío |
-
-> Postgres y el backend **no exponen ningún puerto al host** — solo son alcanzables entre sí dentro de la red interna de Docker. El único punto de entrada es el frontend, en `FRONTEND_HOST_PORT`.
->
-> ⚠️ **Si cambias `WALLET_SYNC_ENCRYPTION_KEY`** una vez en uso, las API keys de verificación on-chain ya guardadas (cifradas con la clave anterior) dejan de poder descifrarse. No se pierden datos financieros ni de portfolio — solo tendrás que volver a introducir esas API keys desde Settings → Wallets.
+Si cambias `WALLET_SYNC_ENCRYPTION_KEY` después de usarla, las claves de API on-chain guardadas dejan de poder descifrarse y tendrás que volver a introducirlas en Ajustes. No se pierden operaciones ni datos de la cartera.
 
 ---
 
-## 📖 Cómo usar la app
+## Cómo usar la aplicación
 
-### 1. Exporta tu CSV desde Binance o Bitvavo
-
-Dentro de Binance: **Cartera → Historial → Generar estado de cuenta → Todos los registros → Exportar**
-
-Dentro de Bitvavo: **Cuenta → Historial de órdenes/transacciones → Exportar**
-
-Descarga el CSV y guárdalo en tu ordenador.
-
-> ⚠️ Solo se soportan los CSV de Binance y Bitvavo. Otros exchanges no son compatibles actualmente.
-
-### 2. Importa el CSV en CryptoFolio
-
-Ve a la sección **Importación**, sube el CSV y revisa el preview antes de confirmar. El motor FIFO se ejecuta automáticamente tras la importación.
-
-### 3. Configura tus wallets frías (opcional)
-
-Si tienes activos en wallets frías (Ledger, Tangem, Trezor...), ve a **Settings → Wallets** y añádelas manualmente indicando qué activos tienes y en qué cantidad.
-
-> Para las redes soportadas (XRP Ledger, Hedera, Stellar, Bitcoin, Solana, Ethereum, Cardano, Polkadot Asset Hub), puedes además añadir la dirección pública de la wallet para que CryptoFolio verifique el saldo directamente on-chain y te avise si hay una discrepancia con lo registrado manualmente.
-
-### 4. Revisa tu portfolio
-
-En **Portfolio** verás el valor actual de todos tus activos, el P&L y la distribución entre wallets y exchanges.
-
-### 5. Consulta el módulo fiscal
-
-En **Fiscal** selecciona el año fiscal y verás:
-
-- Ganancias y pérdidas patrimoniales (método FIFO)
-- Rendimientos del capital mobiliario
-- Estimación de cuota IRPF por tramos
-- Exportación del informe en PDF
+1. **Exporta tu historial.** En Binance: Cartera, Historial de transacciones, Generar estado de cuenta, todos los registros. En Bitvavo: Cuenta, Historial, Exportar.
+2. **Impórtalo** en la pestaña **Importar**: revisa la vista previa y confirma. El FIFO se recalcula solo.
+3. **Añade tus wallets frías** (opcional) en **Ajustes, Wallets**. En las redes compatibles, con la dirección pública la aplicación comprueba el saldo on-chain y avisa si no cuadra.
+4. **Revisa tu cartera** en **Dashboard** y **Portfolio**.
+5. **Prepara la renta** en **Fiscal**: elige el ejercicio, revisa ganancias, pérdidas y rendimientos, y exporta el informe.
 
 ---
 
-## ❓ Preguntas frecuentes
+## Privacidad y copias de seguridad
 
-<details>
-<summary><b>¿Es seguro? ¿Mis datos van a algún servidor?</b></summary>
+- **Tus datos no salen de tu equipo.** Las únicas conexiones externas son consultas de solo lectura: precios (Binance y CoinGecko, con CoinPaprika y OKX de respaldo), logos de los activos, banderas y, si activas la comprobación on-chain, el saldo de tus direcciones públicas en el explorador de cada red. Los detalles están en [SECURITY.md](SECURITY.md).
+- **Copias automáticas** desde Ajustes, cifradas con AES-256-GCM y una clave del propio equipo. Para llevarlas a otro equipo, descárgalas protegidas con una contraseña.
+- Con Docker, además, una copia semanal de la base de datos en `BACKUP_HOST_DIR`.
 
-No. CryptoFolio funciona completamente en tu máquina. Los únicos datos que salen son peticiones de precios a las APIs públicas de Binance y CoinGecko (sin autenticación, sin datos personales), y — solo si activas la verificación de saldos on-chain para una wallet fría — consultas de direcciones públicas a los exploradores de blockchain correspondientes (Etherscan, Blockfrost...). Tu historial de transacciones nunca sale de tu ordenador.
+---
 
-</details>
+## Preguntas frecuentes
 
 <details>
 <summary><b>¿Funciona con Kraken, Coinbase u otros exchanges?</b></summary>
 
-No. Actualmente solo se soporta la importación mediante CSV de Binance y Bitvavo. Otros exchanges requieren parsers específicos que no están implementados todavía. Si quieres contribuir añadiendo soporte para otro exchange, abre un issue.
+Todavía no: solo importa CSV de Binance y Bitvavo. Cada exchange necesita su propio intérprete. Si quieres que se añada uno, abre una [issue](https://github.com/SrMeirins/CryptoFolio/issues).
 
 </details>
 
 <details>
-<summary><b>¿Puedo usarla si no estoy en España?</b></summary>
+<summary><b>¿Puedo usarla si no tributo en España?</b></summary>
 
-El módulo de portfolio funciona para cualquier usuario. El módulo fiscal está diseñado exclusivamente para la normativa española (IRPF, método FIFO). Si tributas en otro país, los cálculos fiscales no serán válidos para ti.
+La parte de cartera sirve en cualquier país. La parte fiscal sigue exclusivamente la normativa española (IRPF y FIFO), así que sus cálculos no valen para otros países.
 
 </details>
 
 <details>
 <summary><b>¿Los cálculos fiscales son correctos?</b></summary>
 
-Los cálculos implementan el método FIFO según la normativa española vigente (LIRPF). No obstante, esta aplicación es orientativa y **no sustituye el asesoramiento de un gestor o asesor fiscal**. Contrasta siempre los resultados antes de presentar tu declaración.
+Siguen el método FIFO y la normativa española vigente, y están cubiertos por tests. Aun así, son orientativos y **no sustituyen a un asesor fiscal**: contrástalos antes de presentar la declaración.
 
 </details>
 
 <details>
-<summary><b>¿Qué pasa con mis datos si cierro el ordenador?</b></summary>
+<summary><b>¿Qué pasa con mis datos si apago el ordenador?</b></summary>
 
-Los datos se guardan en un volumen Docker que persiste aunque apagues o reinicies el ordenador. Solo se perderían si eliminas explícitamente el volumen con `docker volume rm`.
+Nada: la base de datos persiste entre reinicios. En Docker vive en un volumen que solo desaparece si lo borras a propósito (por ejemplo, con `docker compose down -v`).
 
 </details>
 
 <details>
-<summary><b>El comando docker compose up -d da error. ¿Qué hago?</b></summary>
+<summary><b><code>docker compose up -d</code> da un error. ¿Qué hago?</b></summary>
 
-Los errores más comunes:
+Los errores más habituales:
 
-- **Puerto ya en uso:** otro programa usa el puerto 8080. Puedes cambiarlo en el `.env` con `FRONTEND_HOST_PORT`.
-- **"variable is required" / falla al arrancar:** falta `POSTGRES_PASSWORD` en tu `.env` — es la única variable obligatoria.
-- **Docker no está corriendo:** abre Docker Desktop y espera a que arranque.
-- **Error de permisos en Linux:** asegúrate de haber ejecutado `sudo usermod -aG docker $USER` y haber cerrado sesión.
+- **Puerto en uso:** otro programa ocupa el 8080. Cambia `FRONTEND_HOST_PORT` en el `.env`.
+- **«variable is required»:** falta `POSTGRES_PASSWORD` en el `.env`.
+- **Docker no responde:** abre Docker Desktop y espera a que arranque.
+- **Permisos en Linux:** añade tu usuario al grupo `docker` y vuelve a iniciar sesión.
 
-Si el problema persiste, abre un [issue](https://github.com/SrMeirins/CryptoFolio/issues) con el mensaje de error completo.
+Si sigue fallando, abre una [issue](https://github.com/SrMeirins/CryptoFolio/issues) con el mensaje de error completo.
 
 </details>
 
 ---
 
-## 🤝 Contribuir
+## Stack tecnológico
 
-Las contribuciones son bienvenidas. Áreas donde ayudar:
+| Capa | Tecnología |
+| --- | --- |
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS, Recharts y TanStack Query |
+| Backend | Node.js 24, Express y TypeScript |
+| Base de datos | PostgreSQL 16 |
+| Escritorio | Electron |
+| Precios | Binance (WebSocket y REST) y CoinGecko, con CoinPaprika y OKX de respaldo |
+| Despliegue | Docker y Docker Compose |
 
-- 🏦 **Parsers para otros exchanges** (Kraken, Coinbase, KuCoin...)
-- 🌍 **Soporte para otros países** (Portugal, Francia, Alemania...)
-- 🐛 **Reporte de bugs** — abre un [issue](https://github.com/SrMeirins/CryptoFolio/issues)
-- 💡 **Sugerencias** — también via issues
+---
 
-Para cambios grandes, abre primero un issue para discutirlo antes de ponerte a programar.
+## Contribuir
 
-Los textos de la interfaz siguen la [guía de estilo de textos](docs/guia-estilo-textos.md): tono, puntuación, cifras y cuándo usar cada tipo de aviso.
+Las contribuciones son bienvenidas, sobre todo:
 
-### Prueba de humo de la consola del navegador
+- **Nuevos exchanges** (Kraken, Coinbase, KuCoin...).
+- **Fiscalidad de otros países.**
+- **Errores y sugerencias:** abre una [issue](https://github.com/SrMeirins/CryptoFolio/issues). Para cambios grandes, coméntalo antes en una issue.
+- **Vulnerabilidades:** nunca en una issue pública; sigue [SECURITY.md](SECURITY.md).
 
-El CI abre cada vista con datos sintéticos y falla ante cualquier error o aviso en la consola del navegador (`frontend/e2e/`). Para ejecutarla en local, con un backend en marcha sobre una base de datos de prueba cargada con `frontend/e2e/seed.sql`:
+Los textos de la interfaz siguen la [guía de estilo de textos](docs/guia-estilo-textos.md).
+
+### Entorno de desarrollo
+
+El `Makefile` gestiona un entorno con recarga en caliente (`make help` lista todos los comandos). Este comando genera `.env.dev` con secretos y puertos libres, levanta los contenedores y muestra las URL:
+
+```bash
+make dev
+```
+
+Para pasar los tests de backend, frontend y Electron, el lint y la comprobación de tipos:
+
+```bash
+make test
+make lint
+make typecheck
+```
+
+### Cartera de demostración
+
+Para probar la aplicación sin tus datos hay un entorno aparte, con su propia base de datos y sus propios puertos, y una cartera **sintética**: de enero de 2023 a octubre de 2026, con compras periódicas, staking y ventas de siete activos a precios de cierre reales de Binance. No usa nada del entorno de desarrollo. Los tres comandos levantan la demo, cargan la cartera y la borran:
+
+```bash
+make demo
+make demo-datos
+make demo-down
+```
+
+### Prueba de humo del navegador
+
+El CI abre cada vista con datos sintéticos y falla ante cualquier error o aviso en la consola del navegador (`frontend/e2e/`). Para lanzarla en local, con un backend en marcha sobre una base cargada con `frontend/e2e/seed.sql`:
 
 ```bash
 cd frontend
-npx playwright install chromium          # solo la primera vez
+npx playwright install chromium
 BACKEND_PROXY_HOST=127.0.0.1:3001 npm run test:e2e
 ```
 
-En el entorno de desarrollo es normal ver durante unos segundos «no puede establecer una conexión con ws://…/ws/prices» mientras el backend se reinicia (recarga en caliente o `make rebuild`): la app se reconecta sola en cuanto vuelve.
+En desarrollo es normal ver unos segundos el aviso de que no se puede conectar con `ws://.../ws/prices` mientras el backend se reinicia: la aplicación se reconecta sola.
 
 ---
 
-## 📄 Licencia
+## Licencia
 
-CryptoFolio es **gratuito para uso personal self-hosted** bajo la licencia [AGPL-3.0](LICENSE).
+CryptoFolio es **gratuito para uso personal** bajo la licencia [AGPL-3.0](LICENSE).
 
-El uso comercial — ofrecer el software como servicio o integrarlo en un producto de pago — requiere una [licencia comercial](COMMERCIAL_LICENSE.md). Contacto: <marincaserojorge@gmail.com>
-
----
-
-## ⚠️ Aviso legal
-
-Este software tiene carácter orientativo y no constituye asesoramiento fiscal. Los cálculos se basan en el método FIFO según la normativa española vigente. Consulta con un asesor fiscal colegiado antes de presentar tu declaración de la renta.
+El uso comercial (ofrecerlo como servicio o integrarlo en un producto de pago) requiere una [licencia comercial](COMMERCIAL_LICENSE.md). Contacto: <marincaserojorge@gmail.com>
 
 ---
+
+## Aviso legal
+
+Este software es orientativo y no constituye asesoramiento fiscal. Los cálculos siguen el método FIFO y la normativa española vigente. Consulta con un asesor fiscal antes de presentar tu declaración.
 
 <div align="center">
 
-Hecho con ☕ en España
-
-⭐ Si te resulta útil, dale una estrella al repo — ayuda mucho
+Hecho en España. Si te resulta útil, dale una estrella al repositorio.
 
 </div>

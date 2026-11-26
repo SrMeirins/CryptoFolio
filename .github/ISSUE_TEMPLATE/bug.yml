@@ -22,7 +22,7 @@ body:
     attributes:
       label: Versión
       description: Versión publicada (Ajustes → General) o commit si es desarrollo.
-      placeholder: v0.0.14 / main@c9aed6a
+      placeholder: v1.0.0 / main@44f8220
     validations:
       required: true
 
