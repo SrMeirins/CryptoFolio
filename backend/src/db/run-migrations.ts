@@ -90,11 +90,28 @@ async function applyBaseSchemaIfNeeded(client: PoolClient, dbDir: string): Promi
 // ignorarlo en silencio.
 const MIGRATION_FILENAME = /^\d{3}_.+\.sql$/;
 
-/** Aplica, en orden, las migraciones de `dbDir/migrations` aún no registradas. */
-async function applyPendingMigrations(client: PoolClient, dbDir: string): Promise<void> {
-  const migrationsDir = path.join(dbDir, 'migrations');
+/**
+ * Puente para bases anteriores al squash de #116 (releases v0.0.1 a v0.0.14):
+ * si la base existe y no tiene el dominio `eur_amount` (creado justo antes del
+ * squash, #115), aplica antes las migraciones de `migrations/legado` aún no
+ * registradas. La última crea el dominio, así que no se repite. Ver
+ * migrations/legado/README.md.
+ */
+async function applyLegacyBridgeIfNeeded(client: PoolClient, dbDir: string): Promise<void> {
+  const { rows } = await client.query(`
+    SELECT to_regclass('public.transactions') IS NOT NULL AS hay_esquema,
+           EXISTS (SELECT 1 FROM pg_type WHERE typname = 'eur_amount' AND typtype = 'd') AS hay_dominio
+  `);
+  if (!rows[0].hay_esquema || rows[0].hay_dominio) return;
+  console.log('[migrations] Base anterior a la versión 1.0: aplicando el puente de migraciones (legado).');
+  await applyPendingMigrations(client, dbDir, path.join('migrations', 'legado'));
+}
+
+/** Aplica, en orden, las migraciones de `dbDir/<subdir>` aún no registradas. */
+async function applyPendingMigrations(client: PoolClient, dbDir: string, subdir = 'migrations'): Promise<void> {
+  const migrationsDir = path.join(dbDir, subdir);
   if (!fs.existsSync(migrationsDir)) {
-    console.log('[migrations] No hay directorio de migraciones. Fin.');
+    console.log(`[migrations] No hay directorio ${subdir}. Fin.`);
     return;
   }
 
@@ -128,6 +145,7 @@ export async function runMigrations(): Promise<void> {
     await ensureMigrationsTable(client);
     const dbDir = resolveDbDir();
     await applyBaseSchemaIfNeeded(client, dbDir);
+    await applyLegacyBridgeIfNeeded(client, dbDir);
     await applyPendingMigrations(client, dbDir);
   } finally {
     client.release();

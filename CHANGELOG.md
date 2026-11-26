@@ -90,6 +90,7 @@ Primera versión estable. Resume los cambios desde la 0.0.14: más de 300 PR que
 
 ### Corregido
 
+- **Actualización desde versiones anteriores:** una base creada por las releases 0.0.x vuelve a actualizarse a la 1.0.0 sin perder datos (antes el backend no arrancaba).
 - Las exportaciones fiscales (CSV, RentaWeb, Excel y PDF) y las claves de la casilla 1800 según la AEAT.
 - El valor de mercado se toma en el momento de cada operación, con la zona horaria de Binance.
 - Los traslados entre wallets conservan su parte de la comisión de compra y la comisión de red de los retiros de Binance va aparte.

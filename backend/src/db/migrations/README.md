@@ -22,6 +22,11 @@ El historial completo de cada migración sigue disponible en `git log` /
 `git show` sobre este directorio — nada se pierde, solo deja de ser necesario
 para instalaciones nuevas.
 
+**Corrección (versión 1.0):** sí existían instalaciones que dependían de ellas,
+las de las releases públicas v0.0.1 a v0.0.14, que no podían actualizarse. Las
+migraciones 002-024 vuelven como puente en [`legado/`](legado/README.md), y
+`run-migrations.ts` las aplica solo a bases anteriores al squash.
+
 ## Convención para migraciones futuras
 
 A partir de aquí, cualquier cambio de esquema sobre una base de datos ya

@@ -22,7 +22,11 @@ function maintenanceUrl(): URL {
   return url;
 }
 
-export async function createTestDatabase(): Promise<TestDatabase> {
+/**
+ * `esquema: false` crea la base vacía, sin schema.sql: para simular bases de
+ * versiones anteriores (p. ej. la actualización desde la v0.0.14).
+ */
+export async function createTestDatabase({ esquema = true }: { esquema?: boolean } = {}): Promise<TestDatabase> {
   const dbName = `cryptotracker_test_${randomBytes(4).toString('hex')}`;
   const admin = new Pool({ connectionString: maintenanceUrl().toString() });
   try {
@@ -35,12 +39,14 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   testUrl.pathname = `/${dbName}`;
   const connectionString = testUrl.toString();
 
-  const schemaSql = readFileSync(path.join(__dirname, '../db/schema.sql'), 'utf-8');
-  const setupPool = new Pool({ connectionString });
-  try {
-    await setupPool.query(schemaSql);
-  } finally {
-    await setupPool.end();
+  if (esquema) {
+    const schemaSql = readFileSync(path.join(__dirname, '../db/schema.sql'), 'utf-8');
+    const setupPool = new Pool({ connectionString });
+    try {
+      await setupPool.query(schemaSql);
+    } finally {
+      await setupPool.end();
+    }
   }
 
   return {
