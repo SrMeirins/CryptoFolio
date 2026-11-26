@@ -8,9 +8,17 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # A mano desde Actions (por ejemplo, para pasar el smoke en una rama).
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+# Repositorio privado (cuota de minutos): una ejecución nueva de la misma rama
+# o PR cancela la anterior, que ya no sirve.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -150,6 +158,10 @@ jobs:
 
   smoke-console:
     name: Smoke — consola del navegador
+    # Repositorio privado (cuota de minutos): el smoke (unos 22 minutos) corre
+    # en main y a mano, no en cada PR; antes de cada push ya se pasa la suite
+    # e2e completa en local.
+    if: github.event_name != 'pull_request'
     # Prueba de humo (#201): backend real con datos sintéticos + frontend en
     # modo desarrollo (React solo emite sus avisos ahí) + Playwright, que abre
     # cada vista y falla ante cualquier error o aviso en la consola.
