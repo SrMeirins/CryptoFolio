@@ -1,7 +1,7 @@
 {
   "name": "cryptofolio-frontend",
   "version": "0.0.14",
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "private": true,
   "scripts": {
     "dev": "vite",

@@ -1,7 +1,7 @@
 {
   "name": "cryptotracker-backend",
   "version": "0.0.14",
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "description": "CryptoTracker backend — portfolio y fiscal España",
   "main": "dist/index.js",
   "scripts": {

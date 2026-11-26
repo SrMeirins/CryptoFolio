@@ -13,7 +13,8 @@
 
 <br/>
 
-[![Licencia: propietaria](https://img.shields.io/badge/licencia-propietaria-6b7280?style=flat-square)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/licencia-AGPL--3.0-blue?style=flat-square)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/SrMeirins/CryptoFolio?style=flat-square&color=22c55e&label=release)](https://github.com/SrMeirins/CryptoFolio/releases/latest)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docs.docker.com/get-docker/)
 [![Node](https://img.shields.io/badge/node-20+-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![React](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
@@ -31,7 +32,7 @@
 
 ## ¿Qué es CryptoFolio?
 
-CryptoFolio es una aplicación para gestionar tu portfolio de criptomonedas y calcular tu declaración de la renta en España.
+CryptoFolio es una aplicación **gratuita y open source** para gestionar tu portfolio de criptomonedas y calcular tu declaración de la renta en España.
 
 Diseñada para inversores que quieren **control total** sobre sus datos: se instala en tu propio ordenador con un solo comando, sin crear cuentas, sin enviar tus datos a ningún servidor externo.
 
@@ -67,7 +68,7 @@ Es importante que sepas qué soporta la app **a día de hoy** antes de instalarl
 - [Configuración](#-configuración)
 - [Cómo usar la app](#-cómo-usar-la-app)
 - [Preguntas frecuentes](#-preguntas-frecuentes)
-- [Desarrollo](#-desarrollo)
+- [Contribuir](#-contribuir)
 - [Licencia](#-licencia)
 
 ---
@@ -389,7 +390,7 @@ No. CryptoFolio funciona completamente en tu máquina. Los únicos datos que sal
 <details>
 <summary><b>¿Funciona con Kraken, Coinbase u otros exchanges?</b></summary>
 
-No. Actualmente solo se soporta la importación mediante CSV de Binance y Bitvavo. Otros exchanges requieren parsers específicos que no están implementados todavía.
+No. Actualmente solo se soporta la importación mediante CSV de Binance y Bitvavo. Otros exchanges requieren parsers específicos que no están implementados todavía. Si quieres contribuir añadiendo soporte para otro exchange, abre un issue.
 
 </details>
 
@@ -430,7 +431,16 @@ Si el problema persiste, abre un [issue](https://github.com/SrMeirins/CryptoFoli
 
 ---
 
-## 🔧 Desarrollo
+## 🤝 Contribuir
+
+Las contribuciones son bienvenidas. Áreas donde ayudar:
+
+- 🏦 **Parsers para otros exchanges** (Kraken, Coinbase, KuCoin...)
+- 🌍 **Soporte para otros países** (Portugal, Francia, Alemania...)
+- 🐛 **Reporte de bugs** — abre un [issue](https://github.com/SrMeirins/CryptoFolio/issues)
+- 💡 **Sugerencias** — también via issues
+
+Para cambios grandes, abre primero un issue para discutirlo antes de ponerte a programar.
 
 Los textos de la interfaz siguen la [guía de estilo de textos](docs/guia-estilo-textos.md): tono, puntuación, cifras y cuándo usar cada tipo de aviso.
 
@@ -450,9 +460,9 @@ En el entorno de desarrollo es normal ver durante unos segundos «no puede estab
 
 ## 📄 Licencia
 
-CryptoFolio es software **propietario**: todos los derechos reservados. Consulta las condiciones en [LICENSE](LICENSE).
+CryptoFolio es **gratuito para uso personal self-hosted** bajo la licencia [AGPL-3.0](LICENSE).
 
-Las versiones publicadas hasta la v0.0.14 se distribuyeron bajo AGPL-3.0; la licencia propietaria se aplica a partir de la 1.0.0.
+El uso comercial — ofrecer el software como servicio o integrarlo en un producto de pago — requiere una [licencia comercial](COMMERCIAL_LICENSE.md). Contacto: <marincaserojorge@gmail.com>
 
 ---
 
