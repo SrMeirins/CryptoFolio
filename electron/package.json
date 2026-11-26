@@ -1,7 +1,7 @@
 {
   "name": "cryptofolio-desktop",
   "productName": "CryptoFolio",
-  "version": "0.0.14",
+  "version": "1.0.0",
   "license": "AGPL-3.0-only",
   "description": "Gestión de portfolio y fiscalidad crypto para España — 100% local",
   "author": {

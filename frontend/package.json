@@ -1,6 +1,6 @@
 {
   "name": "cryptofolio-frontend",
-  "version": "0.0.14",
+  "version": "1.0.0",
   "license": "AGPL-3.0-only",
   "private": true,
   "scripts": {
