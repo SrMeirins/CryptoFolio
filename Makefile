@@ -28,7 +28,7 @@ COMPOSE     := docker compose -f $(DEV_COMPOSE_FILE) --env-file $(DEV_ENV)
 BACKUP_DIR  := $(shell eval echo $${BACKUP_HOST_DIR_DEV:-~/.local/share/CryptoFolio/backups-dev})
 
 .DEFAULT_GOAL := help
-.PHONY: help env dev dev-clean rebuild restart tools prod down ps logs logs-backend logs-frontend \
+.PHONY: demo demo-datos demo-down help env dev dev-clean rebuild restart tools prod down ps logs logs-backend logs-frontend \
         urls open version psql sh-backend sh-frontend \
         test test-backend test-frontend test-electron lint lint-md typecheck \
         backup restore clean nuke
@@ -90,6 +90,26 @@ logs-backend: ## Logs solo del backend
 
 logs-frontend: ## Logs solo del frontend
 	@$(COMPOSE) logs -f --tail=100 frontend
+
+# ── Demostración (versión 1.0): stack aparte con una cartera sintética ──────────────
+# Otro fichero de entorno (.env.demo), otro proyecto de Docker (otros volúmenes y
+# puertos libres) y otra carpeta de copias: no toca el entorno de desarrollo.
+DEMO_ENV     := .env.demo
+DEMO_COMPOSE := BACKEND_NET_SUBNET=10.250.20.0/24 FRONTEND_NET_SUBNET=10.250.21.0/24 docker compose -f $(DEV_COMPOSE_FILE) --env-file $(DEMO_ENV)
+DEMO_BACKUPS := $(HOME)/.local/share/CryptoFolio/backups-demo
+
+demo: ## Levantar el stack de demostración vacío (base y puertos propios)
+	@CRYPTOFOLIO_ENV_FILE=$(CURDIR)/$(DEMO_ENV) CRYPTOFOLIO_PROJECT=cryptofolio-demo CRYPTOFOLIO_BACKUP_DIR=$(DEMO_BACKUPS) $(ENV_SH)
+	@mkdir -p "$(DEMO_BACKUPS)"
+	@$(DEMO_COMPOSE) up -d --build postgres backend frontend
+	@echo "  Frontend demo: http://$$( $(DEMO_COMPOSE) port frontend 5173 2>/dev/null)"
+	@echo "  Backend demo:  http://$$( $(DEMO_COMPOSE) port backend 3001 2>/dev/null)"
+
+demo-datos: ## Cargar en la demo la cartera sintética (scripts/demo/)
+	@node scripts/demo/cargar.mjs "http://$$( $(DEMO_COMPOSE) port backend 3001 2>/dev/null)"
+
+demo-down: ## Bajar la demo y BORRAR sus datos (solo los de la demo)
+	@$(DEMO_COMPOSE) down -v --remove-orphans
 
 urls: ## Imprimir las URLs reales (resolviendo puertos asignados)
 	@f=$$( $(COMPOSE) port frontend 5173 2>/dev/null); \
