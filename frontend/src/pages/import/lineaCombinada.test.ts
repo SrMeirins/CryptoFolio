@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lineaCombinada } from './lineaTiempo'
+import { lineaCombinada } from './lineaCombinada'
 import type { CoberturaExchange } from './types'
 
 // Línea de tiempo por carriles (#332). Datos sintéticos.
