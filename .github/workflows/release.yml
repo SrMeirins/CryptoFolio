@@ -1,10 +1,10 @@
 name: Release
 
-# Se dispara cuando se sube un tag con formato v1.2.3
+# Solo a mano, desde Actions eligiendo como referencia una etiqueta v1.2.3.
+# Subir la etiqueta ya no lo dispara: en el repositorio privado, Windows y macOS
+# cuentan x2 y x10 en la cuota de minutos. La 1.0 se compila en local (Linux).
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
 
 # GITHUB_TOKEN necesita permisos de escritura para crear el Release
 permissions:
@@ -25,6 +25,15 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
     steps:
+      # Lanzado a mano: debe hacerse desde una etiqueta v1.2.3, no desde una rama.
+      - name: Comprobar que se lanza desde una etiqueta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" != "tag" || ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Lanza la release desde una etiqueta v1.2.3 (Use workflow from: Tags)."
+            exit 1
+          fi
+
       # Extraer versión del tag (v1.2.3 → 1.2.3) para inyectarla en electron/package.json
       - name: Extract version
         id: version

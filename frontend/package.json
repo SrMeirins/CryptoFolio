@@ -1,6 +1,7 @@
 {
   "name": "cryptofolio-frontend",
   "version": "0.0.14",
+  "license": "UNLICENSED",
   "private": true,
   "scripts": {
     "dev": "vite",
