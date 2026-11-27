@@ -24,7 +24,7 @@ describe('registrarRetiradas', () => {
       '2024-04-01 08:00:00,ETH,ETH,1,0.001,0xSintetica,,Cancelled',
     );
     const r = await registrarRetiradas(c, [{ filename: 'a.csv', buffer: a }]);
-    expect(r).toEqual({ registradas: 1, repetidas: 0 });
+    expect(r).toEqual({ registradas: 1, repetidas: 0, vacias: 0 });
     const params = c.llamadas.mock.calls[0][1];
     expect([params[0], params[2], params[3], params[4]]).toEqual(['a.csv', 2, '2024-03-02', '2024-05-10']);
   });
@@ -33,7 +33,14 @@ describe('registrarRetiradas', () => {
     const c = clienteSimulado();
     const a = csv('2024-05-10 10:00:00,XRP,XRP,10,0.2,rSintetica1,,Completed');
     const r = await registrarRetiradas(c, [{ filename: 'a.csv', buffer: a }, { filename: 'copia.csv', buffer: a }]);
-    expect(r).toEqual({ registradas: 1, repetidas: 1 });
+    expect(r).toEqual({ registradas: 1, repetidas: 1, vacias: 0 });
+  });
+
+  it('un historial sin retiradas completadas no se registra', async () => {
+    const c = clienteSimulado();
+    const r = await registrarRetiradas(c, [{ filename: 'v.csv', buffer: csv('2024-04-01 08:00:00,ETH,ETH,1,0.001,0xSintetica,,Cancelled') }]);
+    expect(r).toEqual({ registradas: 0, repetidas: 0, vacias: 1 });
+    expect(c.llamadas).not.toHaveBeenCalled();
   });
 
   it('rechaza un fichero que no es un historial de retiradas', async () => {

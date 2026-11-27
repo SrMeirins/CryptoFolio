@@ -9,17 +9,20 @@ import { parseHistorialRetiradas } from './historialRetiradas';
 
 export interface ArchivoRetiradas { filename: string; buffer: Buffer }
 
-export interface ResultadoRegistro { registradas: number; repetidas: number }
+export interface ResultadoRegistro { registradas: number; repetidas: number; vacias: number }
 
 const dia = (d: Date): string => d.toISOString().slice(0, 10);
 
 export async function registrarRetiradas(q: Queryable, archivos: readonly ArchivoRetiradas[]): Promise<ResultadoRegistro> {
   let registradas = 0;
+  let vacias = 0;
   for (const a of archivos) {
     const filas = parseHistorialRetiradas(a.buffer);
+    // Sin retiradas completadas no hay nada que registrar: no cubriría ningún periodo.
+    if (filas.length === 0) { vacias++; continue; }
     const tiempos = filas.map(f => f.timestamp.getTime());
-    const desde = tiempos.length > 0 ? dia(new Date(Math.min(...tiempos))) : null;
-    const hasta = tiempos.length > 0 ? dia(new Date(Math.max(...tiempos))) : null;
+    const desde = dia(new Date(tiempos.reduce((a, b) => Math.min(a, b))));
+    const hasta = dia(new Date(tiempos.reduce((a, b) => Math.max(a, b))));
     const hash = createHash('sha256').update(a.buffer).digest('hex');
     const r = await q.query(
       `INSERT INTO csv_imports (filename, file_hash, row_count, exchange, tipo, periodo_desde, periodo_hasta)
@@ -29,5 +32,5 @@ export async function registrarRetiradas(q: Queryable, archivos: readonly Archiv
     );
     registradas += r.rowCount ?? 0;
   }
-  return { registradas, repetidas: archivos.length - registradas };
+  return { registradas, repetidas: archivos.length - registradas - vacias, vacias };
 }

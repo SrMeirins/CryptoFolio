@@ -142,4 +142,17 @@ describe('retiros ya importados (#330)', () => {
     expect(r.status).toBe(400);
     expect((await pool.query(`SELECT count(*)::int AS n FROM csv_imports WHERE filename = 'malo.csv'`)).rows[0].n).toBe(0);
   });
+
+  it('quitar la importación de retiradas no toca el FIFO ni los datos completados, y la cobertura vuelve a avisar (#548)', async () => {
+    const id = (await pool.query(`SELECT id FROM csv_imports WHERE tipo = 'retiradas'`)).rows[0].id;
+    // Su zona horaria no se corrige: va en UTC.
+    const zona = await request(app).post(`/api/imports/${id}/zona-horaria`).send({ desfaseHoras: 2 });
+    expect(zona.status).toBe(400);
+    const antes = (await pool.query(`SELECT counterparty_address FROM transactions WHERE counterparty_address IS NOT NULL`)).rowCount;
+    expect((await request(app).delete(`/api/imports/${id}`)).status).toBe(200);
+    expect((await pool.query(`SELECT count(*)::int AS n FROM csv_imports WHERE tipo = 'retiradas'`)).rows[0].n).toBe(0);
+    expect((await pool.query(`SELECT counterparty_address FROM transactions WHERE counterparty_address IS NOT NULL`)).rowCount).toBe(antes);
+    const cob = (await request(app).get('/api/imports/cobertura')).body as { exchange: string; retiradas: { estado: string } }[];
+    expect(cob.find(c => c.exchange === 'binance')!.retiradas.estado).toBe('falta');
+  });
 });

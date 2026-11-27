@@ -18,8 +18,10 @@ export function desfaseValido(valor: unknown): valor is number {
 }
 
 async function importacion(id: string): Promise<{ exchange: string; desfase: number }> {
-  const r = await db.query('SELECT exchange, desfase_horas FROM csv_imports WHERE id = $1', [id]);
+  const r = await db.query('SELECT exchange, desfase_horas, tipo FROM csv_imports WHERE id = $1', [id]);
   if (r.rows.length === 0) throw new ZonaHorariaError('Importación no encontrada', 404);
+  // El historial de retiradas (#548) va siempre en UTC y no tiene horas que corregir.
+  if (r.rows[0].tipo === 'retiradas') throw new ZonaHorariaError('El historial de retiradas está en UTC: no tiene zona horaria que corregir', 400);
   return { exchange: r.rows[0].exchange as string, desfase: Number(r.rows[0].desfase_horas) };
 }
 
