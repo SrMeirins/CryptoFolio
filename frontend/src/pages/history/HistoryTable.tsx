@@ -109,11 +109,12 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
                     <div className="flex items-baseline gap-2">
                       <span className="text-xs text-fg font-semibold">{fmtDateGroup(g.day)}</span>
                       <span className="text-xs text-fg-subtle">· {g.txs.length} {g.txs.length !== 1 ? 'operaciones' : 'operación'}</span>
-                      <span className="ml-auto flex items-baseline gap-1.5 text-xs text-right" data-testid="total-dia">
-                        <span className="text-fg-subtle">Total</span>
-                        <TextTooltip label="Total del día" tip="Suma del valor de las operaciones del día que están en esta página.">
+                      <span className="ml-auto flex items-baseline gap-1.5 text-xs" data-testid="total-dia">
+                        <span className="text-fg-subtle" aria-hidden="true">Total</span>
+                        {/* Sin parada de Tab por día (la tabla es una sola): el nombre accesible lleva todo el contexto. */}
+                        <TextTooltip label="Total del día" tabIndex={-1} tip="Suma del valor de las operaciones del día que están en esta página.">
+                          <span className="sr-only">Total del día, solo las operaciones de esta página: </span>
                           <span className="font-semibold text-fg tabular-nums">{formatMoney(g.total, currency)}</span>
-                          <span className="sr-only"> (solo las operaciones de esta página)</span>
                         </TextTooltip>
                         {g.sinValor > 0 && <span className="text-fg-subtle">(sin precio: {g.sinValor})</span>}
                       </span>
