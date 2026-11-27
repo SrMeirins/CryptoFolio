@@ -4,12 +4,13 @@ import type { Transaction } from '../../api/portfolio'
 import { CryptoIcon } from '../../components/CryptoIcon'
 import { formatMoney, formatAmount, type Currency } from '../../utils/format'
 import { opMetaOf, type OpLike } from '../../constants/operations'
-import { fmtDate, calcEurValue, formatPriceLine, toDisplayAmount, valuationHint, rowFlowSign, walletFlow, fiatSideNote } from './helpers'
+import { fmtDate, calcEurValue, parDeActivos, formatPriceLine, toDisplayAmount, valuationHint, rowFlowSign, walletFlow, fiatSideNote } from './helpers'
 import { T, alpha, ink } from '../../utils/colors'
 import { iconButtonClasses, Hint, TextTooltip } from '../../components/ui'
 import { DeleteConfirm } from './DeleteConfirm'
 import { FeeCell } from './FeeCell'
 import { BalanceCell } from './balance/BalanceCell'
+import type { ColumnaHistorial } from '../../utils/historialColumnas'
 
 function Highlight({ text, query }: { text: string; query: string }) {
   if (!query.trim()) return <>{text}</>
@@ -39,6 +40,10 @@ function ValuedAmount({ value, hint, currency, className, tabIndex }: {
   )
 }
 
+/** Igualdad sin distinguir mayúsculas ni espacios, para no repetir el nombre de la wallet. */
+const normaliza = (t: string) => t.replace(/\s+/g, '').toLowerCase()
+const mismoTexto = (a: string, b: string) => normaliza(a) === normaliza(b)
+
 function OpChip({ tx }: { tx: OpLike }) {
   const meta = opMetaOf(tx)
   return (
@@ -53,10 +58,14 @@ function OpChip({ tx }: { tx: OpLike }) {
 }
 
 export function TxRow({
-  tx, onDelete, onEdit, onOpen, onPrefetch, isDeleting, searchTerm, currency, selected = false, balance, rowIndex, tabbable = true, onActivate, walletId,
+  tx, onDelete, onEdit, onOpen, onPrefetch, isDeleting, searchTerm, currency, selected = false, balance, rowIndex, tabbable = true, onActivate, walletId, columnas = ['cantidad', 'valor', 'fee', 'wallet'], mostrarFecha = true,
 }: {
   tx: Transaction
   currency: Currency
+  /** Columnas opcionales visibles (#554); Fecha, Tipo y Activo van siempre. */
+  columnas?: readonly ColumnaHistorial[]
+  /** Con la fila bajo la cabecera de su día (#554) solo se muestra la hora. */
+  mostrarFecha?: boolean
   /** Wallet filtrada (#395): da el sentido de las operaciones entre wallets. */
   walletId?: string
   /** Su detalle está abierto en el panel (#373); visible al cargar si viene de un enlace (#237). */
@@ -97,6 +106,8 @@ export function TxRow({
   // Valor en la moneda de visualización, con el tipo de la fecha de la operación (#177).
   const eurValue = toDisplayAmount(calcEurValue(tx), tx, currency)
   const priceLine = formatPriceLine(tx)
+  const par = parDeActivos(tx)
+  const ver = (c: ColumnaHistorial) => columnas.includes(c)
   const valueHint = valuationHint(tx.value_source)
 
   return (
@@ -115,8 +126,8 @@ export function TxRow({
       >
         {/* Fecha */}
         <td className="px-4 py-2.5 whitespace-nowrap align-middle">
-          <div className="text-xs font-medium text-fg">{date}</div>
-          <div className="text-xs text-fg-subtle mono">{time}</div>
+          {mostrarFecha && <div className="text-xs font-medium text-fg">{date}</div>}
+          <div className={mostrarFecha ? 'text-xs text-fg-subtle mono' : 'text-xs font-medium text-fg mono'}>{time}</div>
         </td>
 
         {/* Tipo */}
@@ -134,42 +145,45 @@ export function TxRow({
           {sideNote && <div className="text-[11px] text-fg-subtle mt-0.5">{sideNote}</div>}
         </td>
 
-        {/* Activo + cantidad */}
+        {/* Activo y su par (#554) */}
         <td className="px-3 py-2.5 align-middle">
           <div className="flex items-center gap-2 min-w-0">
             <CryptoIcon symbol={tx.asset} size={26} />
             <div className="min-w-0">
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-bold mono text-sm text-fg">
-                  <Highlight text={tx.asset} query={searchTerm} />
-                </span>
-                <span className={`text-xs mono font-semibold ${amountColor}`}>
-                  {sign}{formatAmount(tx.amount_net, 6)}
-                </span>
+              <div className="font-bold mono text-sm text-fg truncate">
+                <Highlight text={tx.asset} query={searchTerm} />
               </div>
+              {par && <div className="text-xs text-fg-subtle truncate leading-tight">{par}</div>}
               {tx.notes && (
-                <p className="text-xs text-fg-subtle truncate max-w-[200px] leading-tight mt-0.5">{tx.notes}</p>
+                <p className="text-xs text-fg-subtle truncate leading-tight mt-0.5">{tx.notes}</p>
               )}
             </div>
           </div>
         </td>
 
+        {/* Cantidad, a la derecha y con cifras tabulares (#554) */}
+        {ver('cantidad') && (
+          <td className="px-3 py-2.5 text-right align-middle whitespace-nowrap">
+            <span className={`text-sm mono font-semibold ${amountColor}`}>{sign}{formatAmount(tx.amount_net, 6)}</span>
+          </td>
+        )}
+
         {/* Valor en la moneda de visualización */}
-        <td className="px-3 py-2.5 text-right align-middle">
+        {ver('valor') && <td className="px-3 py-2.5 text-right align-middle whitespace-nowrap">
           <div>
             <ValuedAmount value={eurValue} hint={valueHint} currency={currency} tabIndex={tabbable ? undefined : -1}
               className={`text-sm mono font-semibold ${tx.value_source === 'estimado' ? 'text-fg-muted' : 'text-fg'}`} />
           </div>
           {eurValue != null && priceLine && <div className="text-xs text-fg-subtle mono mt-0.5">@ {priceLine}</div>}
-        </td>
+        </td>}
 
         {/* Fee: propia y agrupadas (#371) */}
-        <td className="px-3 py-2.5 align-middle">
+        {ver('fee') && <td className="px-3 py-2.5 align-middle">
           <FeeCell tx={tx} currency={currency} paidElsewhere={flow === 'entrada'} tabIndex={tabbable ? undefined : -1} />
-        </td>
+        </td>}
 
         {/* Wallet */}
-        <td className="px-3 py-2.5 align-middle">
+        {ver('wallet') && <td className="px-3 py-2.5 align-middle">
           {/* Origen y destino en cualquier operación hacia una wallet propia (#395). */}
           {tx.destination_wallet_name ? (
             <div className="flex items-center gap-1 flex-wrap">
@@ -178,6 +192,7 @@ export function TxRow({
                   {flow === 'entrada' ? 'Entrada' : 'Salida'}
                 </span>
               )}
+              <span className="sr-only">de</span>
               <span className="text-xs px-2 py-0.5 rounded-lg font-semibold"
                 style={{ backgroundColor: `${alpha(tx.wallet_color, 9)}`, color: ink(tx.wallet_color) }}>
                 {tx.wallet_name}
@@ -194,10 +209,11 @@ export function TxRow({
                 style={{ backgroundColor: `${alpha(tx.wallet_color, 9)}`, color: ink(tx.wallet_color) }}>
                 {tx.wallet_name}
               </span>
-              {tx.account && <div className="text-xs text-fg-subtle mt-0.5">{tx.account}</div>}
+              {/* Mismo inicio que el texto de la etiqueta (px-2); sin repetir el nombre de la wallet. */}
+              {tx.account && !mismoTexto(tx.account, tx.wallet_name) && <div className="text-xs text-fg-subtle mt-0.5 px-2">{tx.account}</div>}
             </>
           )}
-        </td>
+        </td>}
 
         {/* Saldo del activo filtrado (#380) */}
         {balance && <BalanceCell value={balance.value} asset={balance.asset} tabIndex={tabbable ? undefined : -1} />}

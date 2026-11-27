@@ -1,20 +1,21 @@
 import { Fragment, useMemo, useState, type KeyboardEvent } from 'react'
-import { Calendar } from 'lucide-react'
 import type { Transaction } from '../../api/portfolio'
-import { tableHeadRowClasses, panelSurface } from '../../components/ui'
-import type { Currency } from '../../utils/format'
-import { fmtDateGroup, localDayKey } from './helpers'
+import { tableHeadRowClasses, panelSurface, TextTooltip } from '../../components/ui'
+import { formatMoney, type Currency } from '../../utils/format'
+import { agruparPorDia, fmtDateGroup } from './helpers'
 import { groupsByDay, type SortKey, type SortState } from './sorting'
 import { SortHeader } from './SortHeader'
 import { TxRow } from './TxRow'
 import type { RunningBalanceView } from './balance/useRunningBalance'
 import { nextRowIndex } from './keyboard/shortcutKeys'
 import type { DensidadHistorial } from '../../utils/historialDensidad'
+import type { ColumnaHistorial } from '../../utils/historialColumnas'
 
 // Tabla del Historial (#351): cabeceras ordenables, grupos por día local
-// (solo ordenando por fecha) y filas de transacción.
+// (solo ordenando por fecha, con el total del día) y filas de transacción.
+// Anchos fijos por columna (#554): no cambian al paginar ni al filtrar.
 
-export function HistoryTable({ transactions, sort, onSort, currency, searchTerm, selectedId, deletingId, onOpen, onPrefetch, onDelete, onEdit, skipLink, balance, walletId, densidad = 'comoda' }: {
+export function HistoryTable({ transactions, sort, onSort, currency, searchTerm, selectedId, deletingId, onOpen, onPrefetch, onDelete, onEdit, skipLink, balance, walletId, densidad = 'comoda', columnas = ['cantidad', 'valor', 'fee', 'wallet'] }: {
   transactions: Transaction[]
   sort: SortState
   onSort: (col: SortKey) => void
@@ -29,6 +30,8 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
   onEdit: (tx: Transaction) => void
   /** Enlace «Saltar a la paginación», si hay más de una página. */
   skipLink?: { href: string; onActivate: () => void }
+  /** Columnas opcionales visibles (#554). */
+  columnas?: readonly ColumnaHistorial[]
   /** Densidad de las filas (#552). */
   densidad?: DensidadHistorial
   /** Saldo corrido del activo filtrado (#380): añade la columna «Saldo». */
@@ -36,7 +39,11 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
   /** Wallet filtrada (#395), para el sentido de las operaciones entre wallets. */
   walletId?: string
 }) {
-  const columns = balance ? 8 : 7
+  const ver = (c: ColumnaHistorial) => columnas.includes(c)
+  // Fecha, Tipo, Activo y Acciones van siempre.
+  // Ancho mínimo (rem): las columnas fijas visibles más 12 rem para Activo, que absorbe el resto.
+  const anchoMinimo = 7 + 8.5 + 5 + 12 + (ver('cantidad') ? 8 : 0) + (ver('valor') ? 9 : 0) + (ver('fee') ? 7 : 0) + (ver('wallet') ? 14 : 0) + (balance ? 8 : 0)
+  const columns = 4 + columnas.length + (balance ? 1 : 0)
   // Foco itinerante (#382): la tabla es una sola parada de Tab (la fila activa);
   // flechas arriba/abajo e Inicio/Fin mueven entre filas, Intro abre el detalle.
   const [activeState, setActiveState] = useState<string | null>(null)
@@ -53,17 +60,10 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
     e.currentTarget.querySelector<HTMLElement>(`tr[data-row-index="${next}"]`)?.focus()
   }
   const byDay = groupsByDay(sort)
-  const grouped = useMemo(() => {
-    if (!byDay) return [['', transactions] as [string, Transaction[]]]
-    const map = new Map<string, Transaction[]>()
-    for (const tx of transactions) {
-      // Día local, el mismo de la hora que muestra la fila (no el día UTC).
-      const day = localDayKey(tx.timestamp)
-      if (!map.has(day)) map.set(day, [])
-      map.get(day)!.push(tx)
-    }
-    return [...map.entries()]
-  }, [transactions, byDay])
+  const grouped = useMemo(
+    () => byDay ? agruparPorDia(transactions, currency) : null,
+    [transactions, currency, byDay],
+  )
 
   return (
     <div className={panelSurface('none', 'overflow-hidden relative')}>
@@ -73,37 +73,59 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
           Saltar a la paginación
         </a>
       )}
-      <table className="w-full" data-densidad={densidad}>
+      <div className="overflow-x-auto">
+      <table className="w-full table-fixed" data-densidad={densidad} style={{ minWidth: `${anchoMinimo}rem` }}>
         <caption className="sr-only">Transacciones del historial</caption>
+        <colgroup>
+          <col className="w-28" />
+          <col className="w-[8.5rem]" />
+          <col />
+          {ver('cantidad') && <col className="w-32" />}
+          {ver('valor') && <col className="w-36" />}
+          {ver('fee') && <col className="w-28" />}
+          {ver('wallet') && <col className="w-56" />}
+          {balance && <col className="w-32" />}
+          <col className="w-20" />
+        </colgroup>
         <thead>
           <tr className={tableHeadRowClasses()}>
-            <SortHeader col="fecha" sort={sort} onSort={onSort} className="px-4 py-2.5">Fecha</SortHeader>
+            <SortHeader col="fecha" sort={sort} onSort={onSort} className="px-4 py-2.5">{byDay ? 'Hora' : 'Fecha'}</SortHeader>
             <SortHeader col="tipo" sort={sort} onSort={onSort} className="px-3 py-2.5">Tipo</SortHeader>
             <SortHeader col="activo" sort={sort} onSort={onSort} className="px-3 py-2.5">Activo</SortHeader>
-            <SortHeader col="valor" sort={sort} onSort={onSort} align="right" className="px-3 py-2.5">Valor {currency}</SortHeader>
-            <th scope="col" className="text-left px-3 py-2.5 font-medium">Fee</th>
-            <th scope="col" className="text-left px-3 py-2.5 font-medium">Wallet</th>
+            {ver('cantidad') && <th scope="col" className="text-right px-3 py-2.5 font-medium">Cantidad</th>}
+            {ver('valor') && <SortHeader col="valor" sort={sort} onSort={onSort} align="right" className="px-3 py-2.5">Valor {currency}</SortHeader>}
+            {ver('fee') && <th scope="col" className="text-left px-3 py-2.5 font-medium">Fee</th>}
+            {ver('wallet') && <th scope="col" className="text-left px-3 py-2.5 font-medium">Wallet</th>}
             {balance && <th scope="col" className="text-right px-3 py-2.5 font-medium">Saldo {balance.asset}</th>}
-            <th scope="col" className="px-3 py-2.5 w-16"><span className="sr-only">Acciones</span></th>
+            <th scope="col" className="px-3 py-2.5"><span className="sr-only">Acciones</span></th>
           </tr>
         </thead>
         <tbody onKeyDown={onRowsKeyDown}>
-          {grouped.map(([day, txs]) => (
-            <Fragment key={day || 'todas'}>
-              {byDay && (
+          {(grouped ?? [{ day: '', txs: transactions, total: 0, sinValor: 0 }]).map(g => (
+            <Fragment key={g.day || 'todas'}>
+              {grouped && (
                 <tr className="bg-background-tertiary/25">
                   <th scope="rowgroup" colSpan={columns} className="px-4 py-1.5 text-left font-normal">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={9} aria-hidden="true" className="text-fg-subtle" />
-                      <span className="text-xs text-fg-subtle font-semibold">{fmtDateGroup(day)}</span>
-                      <span className="text-xs text-fg-subtle">· {txs.length} {txs.length !== 1 ? 'operaciones' : 'operación'}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xs text-fg font-semibold">{fmtDateGroup(g.day)}</span>
+                      <span className="text-xs text-fg-subtle">· {g.txs.length} {g.txs.length !== 1 ? 'operaciones' : 'operación'}</span>
+                      <span className="ml-auto flex items-baseline gap-1.5 text-xs" data-testid="total-dia">
+                        <span className="text-fg-subtle" aria-hidden="true">Total</span>
+                        {/* Sin parada de Tab por día (la tabla es una sola): el nombre accesible lleva todo el contexto. */}
+                        <TextTooltip label="Total del día" tabIndex={-1} tip="Suma del valor de las operaciones del día que están en esta página.">
+                          <span className="sr-only">Total del día, solo las operaciones de esta página: </span>
+                          <span className="font-semibold text-fg tabular-nums">{formatMoney(g.total, currency)}</span>
+                        </TextTooltip>
+                        {g.sinValor > 0 && <span className="text-fg-subtle">(sin precio: {g.sinValor})</span>}
+                      </span>
                     </div>
                   </th>
                 </tr>
               )}
-              {txs.map(tx => (
+              {g.txs.map(tx => (
                 <TxRow key={tx.id} tx={tx} onDelete={onDelete} onEdit={onEdit} onOpen={onOpen} onPrefetch={onPrefetch}
                   isDeleting={deletingId === tx.id} searchTerm={searchTerm} currency={currency} selected={tx.id === selectedId}
+                  columnas={columnas} mostrarFecha={!grouped}
                   balance={balance ? { asset: balance.asset, value: balance.byId.get(tx.id) } : undefined}
                   rowIndex={ids.indexOf(tx.id)} tabbable={tx.id === activeId} onActivate={setActiveState} walletId={walletId} />
               ))}
@@ -111,6 +133,7 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

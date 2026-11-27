@@ -2,6 +2,7 @@ import type { Transaction, ValuationSource } from '../../api/portfolio'
 import type { Currency } from '../../utils/format'
 import { formatNumber } from '../../utils/format'
 import { zonedFormat } from '../../utils/zonedFormat'
+import { opMetaOf } from '../../constants/operations'
 
 // Fechas en la zona de la aplicación, no en la del navegador ni en UTC (#346):
 // la hora de la fila y el día en que se agrupa salen del mismo instante local.
@@ -158,4 +159,39 @@ export function feeSummary(
     else { total += v; known++ }
   }
   return { count: items.length, total: known ? total : null, missing, estimated: items.some(i => i.source === 'estimado') }
+}
+
+/** Día del Historial con sus operaciones y el total de su valor (#554). */
+export interface GrupoDia {
+  day: string
+  txs: Transaction[]
+  /** Suma del valor de las filas del día, en la moneda de visualización; solo las que tienen precio. */
+  total: number
+  /** Filas del día sin valor, que no entran en la suma. */
+  sinValor: number
+}
+
+/**
+ * Agrupa por día local, en la zona de la app (el mismo día que la hora que muestra la fila),
+ * conservando el orden recibido. El total suma exactamente el valor que la fila enseña (#554).
+ */
+export function agruparPorDia(txs: readonly Transaction[], currency: Currency): GrupoDia[] {
+  const grupos = new Map<string, GrupoDia>()
+  for (const tx of txs) {
+    const day = localDayKey(tx.timestamp)
+    let g = grupos.get(day)
+    if (!g) { g = { day, txs: [], total: 0, sinValor: 0 }; grupos.set(day, g) }
+    g.txs.push(tx)
+    const v = toDisplayAmount(calcEurValue(tx), tx, currency)
+    if (v === null) g.sinValor += 1
+    else g.total += v
+  }
+  return [...grupos.values()]
+}
+
+/** Par «AAA por EUR» de una compra, venta o permuta; null si no hay activo de contrapartida (#554). */
+export function parDeActivos(tx: Pick<Transaction, 'operation_type' | 'asset' | 'cost_asset' | 'destination_wallet_id' | 'destination_wallet_name'>): string | null {
+  if (!tx.cost_asset || tx.cost_asset === tx.asset) return null
+  const group = opMetaOf(tx).group
+  return group === 'buy' || group === 'sell' ? `${tx.asset} por ${tx.cost_asset}` : null
 }

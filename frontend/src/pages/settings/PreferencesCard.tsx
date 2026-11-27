@@ -2,7 +2,7 @@ import { useState, type KeyboardEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, SlidersHorizontal } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
-import { Dropdown, QueryError, SegmentedControl } from '../../components/ui'
+import { Dropdown, MultiDropdown, QueryError, SegmentedControl } from '../../components/ui'
 import { useToast } from '../../hooks/useToast'
 import { useSettingFeedback } from '../../hooks/useSettingFeedback'
 import { formatNumber } from '../../utils/format'
@@ -16,6 +16,7 @@ import { ColumnasSelector } from '../../components/ColumnasSelector'
 import { PORTFOLIO_COLUMNAS_KEY, portfolioColumnas, serializarColumnas } from '../../utils/portfolioColumns'
 import { GRAFICO_MARCAS_KEY, MARCAS_OPCIONES, marcasGrafico, marcasLabel, type MarcasGrafico } from '../../utils/graficoMarcas'
 import { DENSIDAD_OPCIONES, HISTORIAL_DENSIDAD_KEY, densidadHistorial } from '../../utils/historialDensidad'
+import { COLUMNAS_HISTORIAL, HISTORIAL_COLUMNAS_KEY, columnasHistorial, serializarColumnasHistorial } from '../../utils/historialColumnas'
 import { SavedMark } from './SavedMark'
 import { failure } from '../../utils/queryFailure'
 
@@ -113,7 +114,7 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
   const fallo = failure(configQ)
   return (
     <SettingsCard index={index} icon={SlidersHorizontal} title="Preferencias"
-      status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /><SavedMark stamp={saved} id={CONCENTRACION_KEY} /><SavedMark stamp={saved} id={WALLETS_OTRAS_KEY} /><SavedMark stamp={saved} id={PORTFOLIO_COLUMNAS_KEY} /><SavedMark stamp={saved} id={GRAFICO_MARCAS_KEY} /><SavedMark stamp={saved} id={HISTORIAL_DENSIDAD_KEY} /></>}
+      status={<><SavedMark stamp={saved} id={DUST_THRESHOLD_KEY} /><SavedMark stamp={saved} id={PRIVACY_ON_START_KEY} /><SavedMark stamp={saved} id={START_PAGE_KEY} /><SavedMark stamp={saved} id={CONCENTRACION_KEY} /><SavedMark stamp={saved} id={WALLETS_OTRAS_KEY} /><SavedMark stamp={saved} id={PORTFOLIO_COLUMNAS_KEY} /><SavedMark stamp={saved} id={GRAFICO_MARCAS_KEY} /><SavedMark stamp={saved} id={HISTORIAL_DENSIDAD_KEY} /><SavedMark stamp={saved} id={HISTORIAL_COLUMNAS_KEY} /></>}
       description="Cómo se comporta la app al abrirla, qué posiciones cuentan como saldos residuales y cuándo avisar de una cartera concentrada.">
       {fallo && <QueryError what="tus preferencias" error={fallo.error} onRetry={fallo.retry} className="mb-3 rounded-xl border border-border" />}
       <div>
@@ -204,6 +205,19 @@ export function PreferencesCard({ index = 0 }: { index?: number }) {
               const previous = densidadHistorial(current())
               if (v === previous) return
               void save(HISTORIAL_DENSIDAD_KEY, v, `Historial con densidad ${v === 'compacta' ? 'compacta' : 'cómoda'}`, previous)
+            }} />
+        </Row>
+
+        <Row label="Columnas del Historial"
+          hint="Qué columnas muestra la tabla del Historial, además de fecha, tipo y activo.">
+          <MultiDropdown label="Columnas del Historial" placeholder="Solo fecha, tipo y activo" plural="columnas" searchable={false}
+            values={columnasHistorial(config)} className="w-44" align="end"
+            options={COLUMNAS_HISTORIAL.map(c => ({ value: c.key, label: c.label }))}
+            onChange={cols => {
+              const previous = serializarColumnasHistorial(columnasHistorial(current()))
+              const next = serializarColumnasHistorial(cols)
+              if (next === previous) return
+              void save(HISTORIAL_COLUMNAS_KEY, next, `Historial con ${cols.length} ${cols.length === 1 ? 'columna' : 'columnas'} opcionales`, previous)
             }} />
         </Row>
 

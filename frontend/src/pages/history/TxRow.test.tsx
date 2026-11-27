@@ -8,13 +8,13 @@ import { TxRow } from './TxRow'
 // Render estático (sin DOM ni efectos) de una fila del Historial (#346).
 const tx = makeTx
 
-function render(t: Transaction, currency: 'EUR' | 'USD' = 'EUR', selected = false, walletId?: string): string {
+function render(t: Transaction, currency: 'EUR' | 'USD' = 'EUR', selected = false, walletId?: string, extra: Partial<Parameters<typeof TxRow>[0]> = {}): string {
   const client = new QueryClient()
   return renderToStaticMarkup(
     <QueryClientProvider client={client}>
       <table><tbody>
         <TxRow tx={t} currency={currency} onDelete={() => {}} onEdit={() => {}} onOpen={() => {}} onPrefetch={() => {}}
-          isDeleting={false} searchTerm="" selected={selected} walletId={walletId} />
+          isDeleting={false} searchTerm="" selected={selected} walletId={walletId} {...extra} />
       </tbody></table>
     </QueryClientProvider>,
   )
@@ -152,5 +152,41 @@ describe('TxRow, wallets de origen y destino (#395)', () => {
     const conFee = tx({ ...retiro, fee_asset: 'XRP', fee_amount: '0.1' })
     expect(render(conFee, 'EUR', false, COLD)).toContain('pagada en origen')
     expect(render(conFee, 'EUR', false, conFee.wallet_id)).not.toContain('pagada en origen')
+  })
+})
+
+describe('TxRow, tabla legible (#554)', () => {
+  it('bajo la cabecera de su día solo muestra la hora, sin la fecha', () => {
+    const con = render(tx({}), 'EUR', false, undefined, { mostrarFecha: true })
+    const sin = render(tx({}), 'EUR', false, undefined, { mostrarFecha: false })
+    expect(con).toContain('ene')
+    expect(sin).not.toContain('ene')
+  })
+
+  it('una compra con contrapartida muestra el par «AAA por EUR»', () => {
+    expect(render(tx({ operation_type: 'BUY', asset: 'BTC', cost_asset: 'EUR' }))).toContain('BTC por EUR')
+  })
+
+  it('las columnas ocultas no se pintan', () => {
+    const html = render(tx({}), 'EUR', false, undefined, { columnas: ['valor'] })
+    expect(html.match(/<td/g)?.length).toBe(5)
+    expect(html).not.toContain('−10')
+  })
+
+  it('la cantidad va a la derecha', () => {
+    expect(render(tx({}))).toMatch(/<td[^>]*text-right[^>]*><span[^>]*>−10/)
+  })
+})
+
+describe('TxRow, texto secundario de la wallet (#554)', () => {
+  it('si coincide con el nombre de la wallet (sin mayúsculas ni espacios) no se repite', () => {
+    const html = render(tx({ wallet_name: 'Exchange Uno', account: ' exchange  UNO ' }))
+    expect(html.match(/Exchange Uno/g)).toHaveLength(1)
+    expect(html).not.toContain('exchange  UNO')
+  })
+
+  it('si es distinto se muestra, alineado con el texto de la etiqueta (px-2)', () => {
+    const html = render(tx({ wallet_name: 'Exchange Uno', account: 'Spot' }))
+    expect(html).toMatch(/<div class="text-xs text-fg-subtle mt-0\.5 px-2">Spot<\/div>/)
   })
 })

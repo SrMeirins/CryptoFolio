@@ -10,6 +10,7 @@ import { useToast } from '../hooks/useToast'
 import { PestanasVistas, ID_PESTANAS } from './history/vistas/PestanasVistas'
 import { MenuMas } from './history/MenuMas'
 import { useHistorialDensidad } from '../hooks/useHistorialDensidad'
+import { useHistorialColumnas } from '../hooks/useHistorialColumnas'
 import { tabPanelId } from '../components/ui'
 import { resultAnnouncement } from './history/announce'
 import { PAGE_SIZE, useHistoryFilters } from './history/useHistoryFilters'
@@ -39,6 +40,7 @@ export function History() {
   const [showNewTx, setShowNewTx] = useState(false)
   const openShortcuts = useShortcutsStore(s => s.setOpen)
   const { densidad } = useHistorialDensidad()
+  const { columnas } = useHistorialColumnas()
 
   const f = useHistoryFilters()
   const d = useHistoryData(f.queryParams, f.offset, f.filters.import_id)
@@ -171,7 +173,7 @@ export function History() {
             <HistoryTable transactions={d.transactions} sort={f.sort} onSort={f.toggleSort} currency={currency}
               searchTerm={f.filters.search} selectedId={f.focusTx} deletingId={d.deletingId}
               onOpen={f.openTx} onPrefetch={nav.prefetch} onDelete={id => { void d.deleteTx(id) }} onEdit={setEditingTx}
-              balance={balance} walletId={f.filters.wallet_id || undefined} densidad={densidad}
+              balance={balance} walletId={f.filters.wallet_id || undefined} densidad={densidad} columnas={columnas}
               skipLink={total > PAGE_SIZE ? { href: `#${PAGINATION_ID}`, onActivate: () => paginationRef.current?.focus() } : undefined} />
           )}
         </div>
