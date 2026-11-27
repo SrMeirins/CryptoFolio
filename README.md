@@ -103,6 +103,7 @@ Si usas Binance o Bitvavo y tributas en España, esta aplicación es para ti.
 - CSV de **Binance** (en español o en inglés) y de **Bitvavo**, con más de 60 tipos de operación de Binance: compras, ventas, conversiones, staking, Launchpool, ETH 2.0, airdrops, cashback, bots de Strategy, transferencias internas y margen, entre otros.
 - Vista previa antes de confirmar, sin duplicados al volver a importar el mismo fichero.
 - Revisión de depósitos y retiradas externos: coste de adquisición y wallet de destino.
+- Historial de retiradas de Binance como importación complementaria: completa dirección, red y hash de los retiros sin duplicar operaciones, y la cobertura avisa si falta.
 - Ajuste de zona horaria del fichero y comprobación de cobertura del historial.
 - El motor FIFO se **recalcula solo** tras cada importación.
 

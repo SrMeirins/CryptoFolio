@@ -39,6 +39,18 @@ export interface CoberturaExchange {
   huecos: Hueco[];
   pendiente: Hueco | null;
   meses: { mes: string; n: number }[];
+  /** Retiradas complementarias de Binance (#548); null en otros exchanges o si no hay retiros. */
+  retiradas?: CoberturaRetiradas | null;
+}
+
+export interface ImportacionRetiradas { importId: string; archivo: string; desde: string; hasta: string }
+
+export interface CoberturaRetiradas {
+  /** falta: hay retiros y ningún historial de retiradas; parcial: algunos retiros caen fuera de los historiales. */
+  estado: 'completa' | 'parcial' | 'falta';
+  retiros: number;
+  sinCubrir: number;
+  importaciones: ImportacionRetiradas[];
 }
 
 const DIA = 86_400_000;
@@ -123,4 +135,17 @@ export function compararCobertura(antes: CoberturaExchange | null, despues: Cobe
       : { tipo: 'al_dia', exchange: ex, desde: antes.pendiente.desde, hasta: despues.hasta, dias: 0 });
   }
   return out;
+}
+
+/**
+ * Estado de las retiradas complementarias de Binance (#548): un retiro queda
+ * cubierto si su día cae dentro del periodo de algún historial de retiradas
+ * importado. `diasRetiros` son los días UTC «YYYY-MM-DD» de los retiros ya
+ * importados. Sin retiros no hay nada que cubrir (null).
+ */
+export function calcularRetiradas(diasRetiros: readonly string[], importaciones: readonly ImportacionRetiradas[]): CoberturaRetiradas | null {
+  if (diasRetiros.length === 0) return null;
+  const sinCubrir = diasRetiros.filter(d => !importaciones.some(i => i.desde <= d && d <= i.hasta)).length;
+  const estado = sinCubrir === 0 ? 'completa' : sinCubrir === diasRetiros.length ? 'falta' : 'parcial';
+  return { estado, retiros: diasRetiros.length, sinCubrir, importaciones: [...importaciones] };
 }

@@ -31,6 +31,11 @@ export function retiradasDe(req: Request): Buffer[] {
   return ((req.files ?? {}) as CamposArchivos).withdrawals?.map(f => f.buffer) ?? [];
 }
 
+/** Historiales de retiradas con su nombre de archivo, para registrarlos como importación (#548). */
+export function retiradasArchivosDe(req: Request): { filename: string; buffer: Buffer }[] {
+  return ((req.files ?? {}) as CamposArchivos).withdrawals?.map(f => ({ filename: f.originalname, buffer: f.buffer })) ?? [];
+}
+
 /** Archivos de transacciones: «file» (uno, como siempre) o «files» (lote, #326). */
 export function archivosDe(req: Request): Express.Multer.File[] {
   const campos = (req.files ?? {}) as CamposArchivos;

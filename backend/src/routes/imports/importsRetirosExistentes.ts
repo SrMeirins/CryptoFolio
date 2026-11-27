@@ -5,8 +5,9 @@ import { detectarExchange, type Exchange } from '../../modules/csv/exchanges';
 import { retirosExistentes } from '../../modules/csv/retiradas/existentes';
 import { runFifoEngine } from '../../modules/fifo/engine';
 import { aplicarComisionRetiro } from '../../modules/csv/retiradas/comision';
+import { registrarRetiradas } from '../../modules/csv/retiradas/registro';
 import { verificarEnSegundoPlano } from '../../modules/walletSync/walletSync';
-import { archivosDe, exchangesForzados, retiradasDe, uploadCsv } from './importsValidation';
+import { archivosDe, exchangesForzados, retiradasArchivosDe, retiradasDe, uploadCsv } from './importsValidation';
 
 const router = Router();
 
@@ -89,7 +90,9 @@ router.post('/retiros-existentes', uploadCsv, async (req: Request, res: Response
       // Comisión de red (#335), después de los destinos: solo en los que siguen siendo retiros.
       let comisiones = 0;
       for (const e of existentes) if (await aplicarComisionRetiro(client, e.id, e.destino.fee)) comisiones++;
-      return { direcciones, destinos, comisiones };
+      // Queda registrada como importación complementaria; repetir el fichero no duplica (#548).
+      const registro = await registrarRetiradas(client, retiradasArchivosDe(req));
+      return { direcciones, destinos, comisiones, retiradasRegistradas: registro.registradas };
     });
 
     // Un cambio de destino o de comisión altera lotes y eventos fiscales: se recalcula el FIFO.

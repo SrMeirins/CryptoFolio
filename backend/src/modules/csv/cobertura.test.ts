@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcularCobertura, compararCobertura, type RangoImportacion } from './cobertura';
+import { calcularCobertura, calcularRetiradas, compararCobertura, type RangoImportacion } from './cobertura';
 
 // Cobertura temporal (#328). Datos sintéticos.
 const r = (desde: string, hasta: string, transacciones = 10, nuevo = false): RangoImportacion =>
@@ -72,5 +72,20 @@ describe('avisosCobertura (#328)', () => {
     expect(avisos[1]).toMatchObject({ count: 1 });
     const revisado = { ...c, pendiente: { ...c.pendiente!, revisionId: 'x' }, huecos: c.huecos.map(h => ({ ...h, revisionId: 'y' })) };
     expect(avisosCobertura([revisado])).toEqual([]);
+  });
+});
+
+describe('calcularRetiradas (#548)', () => {
+  const imp = (desde: string, hasta: string) => ({ importId: desde, archivo: `${desde}.csv`, desde, hasta });
+  it('sin retiros no hay nada que cubrir', () => {
+    expect(calcularRetiradas([], [])).toBeNull();
+  });
+  it('falta si hay retiros y ningún historial de retiradas', () => {
+    expect(calcularRetiradas(['2024-05-10', '2024-06-01'], [])).toMatchObject({ estado: 'falta', retiros: 2, sinCubrir: 2 });
+  });
+  it('parcial si algún retiro cae fuera del periodo; completa si todos caben (extremos incluidos)', () => {
+    const i = [imp('2024-05-01', '2024-05-31')];
+    expect(calcularRetiradas(['2024-05-01', '2024-05-31', '2024-06-01'], i)).toMatchObject({ estado: 'parcial', sinCubrir: 1 });
+    expect(calcularRetiradas(['2024-05-01', '2024-05-31'], i)).toMatchObject({ estado: 'completa', sinCubrir: 0 });
   });
 });

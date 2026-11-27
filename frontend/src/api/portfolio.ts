@@ -305,6 +305,8 @@ export interface ImportRecord {
   deposit_count: string
   /** Zona horaria con que se leyó el CSV, en horas respecto de UTC (#599). */
   desfase_horas?: number
+  /** «retiradas»: historial complementario de Binance, sin operaciones propias (#548). */
+  tipo?: 'transacciones' | 'retiradas'
 }
 
 /** Zona horaria de una importación de Binance (#599). */
@@ -717,6 +719,14 @@ export interface CoberturaExchange {
   huecos: HuecoCobertura[]
   pendiente: HuecoCobertura | null
   meses: { mes: string; n: number }[]
+  /** Retiradas complementarias de Binance (#548); null si no hay retiros que cubrir. */
+  retiradas?: CoberturaRetiradas | null
+}
+export interface CoberturaRetiradas {
+  estado: 'completa' | 'parcial' | 'falta'
+  retiros: number
+  sinCubrir: number
+  importaciones: { importId: string; archivo: string; desde: string; hasta: string }[]
 }
 export type TipoEncaje = 'primera' | 'rellena' | 'rellena_parte' | 'deja_hueco' | 'al_dia' | 'avanza'
 export interface CambioEncaje { tipo: TipoEncaje; exchange: 'binance' | 'bitvavo'; desde: string; hasta: string; dias: number }

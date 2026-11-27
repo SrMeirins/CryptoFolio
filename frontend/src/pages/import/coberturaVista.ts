@@ -1,4 +1,4 @@
-import type { CambioEncaje, CoberturaExchange, HuecoCobertura } from './types'
+import type { CambioEncaje, CoberturaExchange, CoberturaRetiradas, HuecoCobertura } from './types'
 import { formatFiscalDate } from '../../utils/fiscalTable'
 
 // Cobertura temporal (#328): geometría de la barra, marcas de año, intensidad
@@ -58,5 +58,16 @@ export function textoEncaje(c: CambioEncaje): string {
     case 'deja_hueco': return `Deja un hueco de ${dias(c.dias)} en ${ex} del ${f(c.desde)} al ${f(c.hasta)}: si operaste entonces, exporta ese tramo.`
     case 'al_dia': return `Pone ${ex} al día hasta el ${f(c.hasta)}.`
     case 'avanza': return `Avanza ${ex}; aún faltan ${dias(c.dias)} desde el ${f(c.desde)} hasta hoy.`
+  }
+}
+
+/** Estado de las retiradas complementarias de Binance (#548), en lenguaje claro; null si no hay nada que decir. */
+export function textoRetiradas(r: CoberturaRetiradas | null | undefined): { ok: boolean; texto: string } | null {
+  if (!r) return null
+  const retiros = `${r.retiros} ${r.retiros === 1 ? 'retiro' : 'retiros'}`
+  switch (r.estado) {
+    case 'completa': return { ok: true, texto: `Retiradas de Binance importadas: cubren tus ${retiros}.` }
+    case 'parcial': return { ok: false, texto: `Retiradas de Binance incompletas: ${r.sinCubrir} de ${retiros} quedan fuera de los historiales importados.` }
+    case 'falta': return { ok: false, texto: `Faltan las retiradas de Binance: sin su historial, a tus ${retiros} pueden faltarles dirección, red y hash. Impórtalo en este paso.` }
   }
 }

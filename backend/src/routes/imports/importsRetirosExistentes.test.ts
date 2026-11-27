@@ -76,7 +76,7 @@ describe('retiros ya importados (#330)', () => {
 
     const ok = await request(app).post('/api/imports/retiros-existentes')
       .field('reasignaciones', JSON.stringify({ [id]: wallet })).attach('withdrawals', retiradas, 'r.csv');
-    expect(ok.body).toEqual({ direcciones: 1, destinos: 1, comisiones: 1, fifo: true });
+    expect(ok.body).toEqual({ direcciones: 1, destinos: 1, comisiones: 1, retiradasRegistradas: 1, fifo: true });
     const fila = (await pool.query(`SELECT counterparty_address, tx_hash, destination_wallet_id, amount::float AS amount, fee_asset, fee_amount::float AS fee FROM transactions WHERE id = $1`, [id])).rows[0];
     // Comisión de red separada (#335): llegan 10 XRP y 0,2 son comisión.
     expect(fila).toEqual({ counterparty_address: 'rSinteticaLedger1', tx_hash: HASH, destination_wallet_id: wallet, amount: 10, fee_asset: 'XRP', fee: 0.2 });
@@ -97,13 +97,49 @@ describe('retiros ya importados (#330)', () => {
     expect(pre.body.existentes).toHaveLength(1);
     expect(pre.body.existentes[0].destino.fee).toBeCloseTo(0.2, 10);
     const r = await request(app).post('/api/imports/retiros-existentes').attach('withdrawals', retiradas, 'r.csv');
-    expect(r.body).toEqual({ direcciones: 0, destinos: 0, comisiones: 1, fifo: true });
+    expect(r.body).toEqual({ direcciones: 0, destinos: 0, comisiones: 1, retiradasRegistradas: 0, fifo: true });
     expect((await pool.query(`SELECT amount::float AS a, fee_amount::float AS f FROM transactions WHERE asset = 'XRP' AND operation_type = 'WITHDRAW'`)).rows[0]).toEqual({ a: 10, f: 0.2 });
   });
 
   it('solo completar direcciones (sin reasignar) no recalcula el FIFO', async () => {
     const r = await request(app).post('/api/imports/retiros-existentes').attach('files', bitvavo, 'bitvavo.csv');
     // Bitvavo ya separaba la comisión en el parser: no hay nada que corregir.
-    expect(r.body).toEqual({ direcciones: 1, destinos: 0, comisiones: 0, fifo: false });
+    expect(r.body).toEqual({ direcciones: 1, destinos: 0, comisiones: 0, retiradasRegistradas: 0, fifo: false });
+  });
+
+  it('la importación de retiradas queda registrada una sola vez y la cobertura de Binance la refleja (#548)', async () => {
+    const filas = (await pool.query(`SELECT filename, tipo, exchange, periodo_desde::text AS desde, periodo_hasta::text AS hasta, row_count FROM csv_imports WHERE tipo = 'retiradas'`)).rows;
+    expect(filas).toEqual([{ filename: 'r.csv', tipo: 'retiradas', exchange: 'binance', desde: '2024-05-10', hasta: '2024-05-10', row_count: 1 }]);
+
+    // Repetir el mismo fichero no cambia nada: ni registro nuevo ni datos.
+    const antes = (await pool.query(`SELECT counterparty_address, tx_hash, amount::text, fee_amount::text FROM transactions ORDER BY id`)).rows;
+    const otra = await request(app).post('/api/imports/retiros-existentes').attach('withdrawals', retiradas, 'otro-nombre.csv');
+    expect(otra.body).toMatchObject({ direcciones: 0, destinos: 0, comisiones: 0, retiradasRegistradas: 0, fifo: false });
+    expect((await pool.query(`SELECT count(*)::int AS n FROM csv_imports WHERE tipo = 'retiradas'`)).rows[0].n).toBe(1);
+    expect((await pool.query(`SELECT counterparty_address, tx_hash, amount::text, fee_amount::text FROM transactions ORDER BY id`)).rows).toEqual(antes);
+
+    // El historial de importaciones la lista con su periodo y sin operaciones.
+    const lista = (await request(app).get('/api/imports')).body as { tipo: string; transaction_count: string; date_from: string }[];
+    const ret = lista.find(i => i.tipo === 'retiradas')!;
+    expect(ret.transaction_count).toBe('0');
+    expect(ret.date_from.slice(0, 10)).toBe('2024-05-10');
+    expect(lista.filter(i => i.tipo === 'transacciones').length).toBeGreaterThan(0);
+
+    // El retiro de Binance (10/05) está cubierto por el historial.
+    const cob = (await request(app).get('/api/imports/cobertura')).body as { exchange: string; retiradas: { estado: string; retiros: number; sinCubrir: number } | null }[];
+    expect(cob.find(c => c.exchange === 'binance')!.retiradas).toMatchObject({ estado: 'completa', retiros: 1, sinCubrir: 0 });
+  });
+
+  it('un retiro fuera del periodo de los historiales de retiradas deja la cobertura en parcial (#548)', async () => {
+    const { importCsvFile } = await import('../../modules/csv/importer');
+    await importCsvFile(Buffer.from([BIN, '1,2024-09-01 09:00:00,Spot,Deposit,XRP,20,', '1,2024-09-15 10:20:00,Spot,Withdraw,XRP,-5,'].join('\n')), 'binance-sep.csv', { XRP: '__external__' }, {}, undefined, undefined, 'binance');
+    const cob = (await request(app).get('/api/imports/cobertura')).body as { exchange: string; retiradas: { estado: string; sinCubrir: number } }[];
+    expect(cob.find(c => c.exchange === 'binance')!.retiradas).toMatchObject({ estado: 'parcial', sinCubrir: 1 });
+  });
+
+  it('rechaza un historial de retiradas con columnas inesperadas y no registra nada (#548)', async () => {
+    const r = await request(app).post('/api/imports/retiros-existentes').attach('withdrawals', Buffer.from('a,b,c\n1,2,3'), 'malo.csv');
+    expect(r.status).toBe(400);
+    expect((await pool.query(`SELECT count(*)::int AS n FROM csv_imports WHERE filename = 'malo.csv'`)).rows[0].n).toBe(0);
   });
 });
