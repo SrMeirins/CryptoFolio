@@ -346,8 +346,11 @@ El auto-updater solo detecta releases **publicadas** en GitHub (no drafts). Publ
 
 ## Cómo añadir una entrada
 
-Antes de hacer un nuevo tag, añade una sección `## [X.Y.Z] - YYYY-MM-DD` encima de la anterior
-con los cambios agrupados en: **Añadido**, **Cambiado**, **Corregido**, **Eliminado**, **Seguridad**.
+Cada PR crea su fragmento `changelog.d/<N>.md` (formato en `changelog.d/README.md`), con las
+subsecciones **Añadido**, **Cambiado**, **Obsoleto**, **Eliminado**, **Corregido** o **Seguridad**.
+No se edita este fichero a mano. Al cerrar la release, `/cerrar-epica` ejecuta
+`node scripts/changelog/juntar.mjs <version> <fecha>`, que añade la sección `## [X.Y.Z] - YYYY-MM-DD`
+encima de la anterior y actualiza los enlaces del pie; después se borran los fragmentos con `git rm`.
 
 [Unreleased]: https://github.com/SrMeirins/CryptoFolio/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/SrMeirins/CryptoFolio/compare/v0.0.14...v1.0.0
