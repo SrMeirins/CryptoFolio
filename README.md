@@ -410,6 +410,8 @@ Las contribuciones son bienvenidas, sobre todo:
 
 Los textos de la interfaz siguen la [guía de estilo de textos](docs/guia-estilo-textos.md).
 
+El proceso de trabajo (de la issue a la PR y a la release) está en [flujo del backlog](docs/desarrollo/flujo-backlog.md). Cada PR describe su cambio para el CHANGELOG con un [fragmento](changelog.d/README.md).
+
 ### Entorno de desarrollo
 
 El `Makefile` gestiona un entorno con recarga en caliente (`make help` lista todos los comandos). Este comando genera `.env.dev` con secretos y puertos libres, levanta los contenedores y muestra las URL:
