@@ -29,27 +29,39 @@ async function anchos(page: Page): Promise<number[]> {
   return page.locator('table thead th').evaluateAll(ths => ths.map(th => Math.round(th.getBoundingClientRect().width)))
 }
 
-test('las columnas no cambian de ancho al paginar', async ({ page }) => {
+test('las columnas no cambian de ancho al paginar ni al filtrar', async ({ page }) => {
   await abrir(page)
   const antes = await anchos(page)
   await page.getByRole('button', { name: 'Página siguiente' }).click()
   await expect(page.getByLabel('Página 2', { exact: false })).toBeVisible()
   expect(await anchos(page)).toEqual(antes)
+  await page.getByRole('button', { name: 'Página anterior' }).click()
+  await page.getByPlaceholder(/Buscar activo/).fill('BTC')
+  await expect(page.getByRole('table')).toBeVisible()
+  await expect.poll(() => anchos(page)).toEqual(antes)
 })
 
 test('el total de cada día es la suma de los valores de sus filas', async ({ page }) => {
   await abrir(page)
-  const grupo = page.locator('tbody tr').filter({ has: page.getByTestId('total-dia') }).first()
-  const total = await grupo.getByTestId('total-dia').innerText()
-  // Filas del día: las que van tras la cabecera hasta la siguiente.
-  const importes = await page.locator('tbody').evaluate(tbody => {
-    const filas = [...tbody.querySelectorAll('tr')]
-    const fin = filas.findIndex((f, i) => i > 0 && f.querySelector('[data-testid="total-dia"]'))
-    return filas.slice(1, fin === -1 ? undefined : fin).map(f => f.querySelectorAll('td')[4]?.textContent ?? '')
+  const num = (t: string) => { const m = t.replace(/\u00a0/g, ' ').match(/(-?[\d.]+,\d{2})/); return m ? Number(m[1].replace(/\./g, '').replace(',', '.')) : 0 }
+  // Posición de la columna «Valor» y filas por grupo, sin depender de las columnas elegidas.
+  const grupos = await page.locator('table').evaluate(tabla => {
+    const col = [...tabla.querySelectorAll('thead th')].findIndex(th => /^Valor/.test(th.textContent ?? ''))
+    const res: { total: string; filas: string[] }[] = []
+    for (const tr of tabla.querySelectorAll('tbody tr')) {
+      const total = tr.querySelector('[data-testid="total-dia"]')
+      if (total) res.push({ total: total.textContent ?? '', filas: [] })
+      else res[res.length - 1]?.filas.push(tr.querySelectorAll('td')[col]?.textContent ?? '')
+    }
+    return res
   })
-  const num = (t: string) => { const m = t.replace(/ /g, ' ').match(/(-?[\d.]+,\d{2})/); return m ? Number(m[1].replace(/\./g, '').replace(',', '.')) : 0 }
-  const suma = importes.reduce((a, t) => a + num(t), 0)
-  expect(Math.abs(num(total) - suma)).toBeLessThan(0.05 * Math.max(1, importes.length))
+  // El primer y el último día pueden estar partidos entre páginas: se comprueban los del medio.
+  const completos = grupos.slice(1, -1)
+  expect(completos.length).toBeGreaterThan(2)
+  for (const g of completos) {
+    const suma = g.filas.reduce((a, t) => a + num(t), 0)
+    expect(Math.abs(num(g.total) - suma)).toBeLessThanOrEqual(0.005 * g.filas.length + 0.01)
+  }
 })
 
 test('densidad y columnas se guardan y sobreviven a la recarga', async ({ page }) => {

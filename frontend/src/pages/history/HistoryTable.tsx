@@ -42,6 +42,8 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
 }) {
   const ver = (c: ColumnaHistorial) => columnas.includes(c)
   // Fecha, Tipo, Activo y Acciones van siempre.
+  // Ancho mínimo (rem): las columnas fijas visibles más 12 rem para Activo, que absorbe el resto.
+  const anchoMinimo = 7 + 8.5 + 5 + 12 + (ver('cantidad') ? 8 : 0) + (ver('valor') ? 9 : 0) + (ver('fee') ? 7 : 0) + (ver('wallet') ? 14 : 0) + (balance ? 8 : 0)
   const columns = 4 + columnas.length + (balance ? 1 : 0)
   // Foco itinerante (#382): la tabla es una sola parada de Tab (la fila activa);
   // flechas arriba/abajo e Inicio/Fin mueven entre filas, Intro abre el detalle.
@@ -73,10 +75,10 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
         </a>
       )}
       <div className="overflow-x-auto">
-      <table className="w-full table-fixed min-w-[62rem]" data-densidad={densidad}>
+      <table className="w-full table-fixed" data-densidad={densidad} style={{ minWidth: `${anchoMinimo}rem` }}>
         <caption className="sr-only">Transacciones del historial</caption>
         <colgroup>
-          <col className="w-20" />
+          <col className="w-28" />
           <col className="w-[8.5rem]" />
           <col />
           {ver('cantidad') && <col className="w-32" />}
@@ -110,7 +112,7 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
                       <span className="text-xs text-fg-subtle font-semibold">{fmtDateGroup(g.day)}</span>
                       <span className="text-xs text-fg-subtle">· {g.txs.length} {g.txs.length !== 1 ? 'operaciones' : 'operación'}</span>
                       <span className="ml-auto text-xs text-fg-subtle mono" data-testid="total-dia">
-                        Total del día {formatMoney(g.total, currency)}
+                        Total del día (en la página) {formatMoney(g.total, currency)}
                         {g.sinValor > 0 && <span> (sin precio: {g.sinValor})</span>}
                       </span>
                     </div>
