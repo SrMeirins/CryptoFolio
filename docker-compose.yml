@@ -102,14 +102,13 @@ services:
       # Zona horaria de la aplicación (#388): vacía, Europe/Madrid; la de Ajustes prevalece.
       APP_TIMEZONE: ${APP_TIMEZONE:-}
       # Copias automáticas cifradas con la clave del equipo (#454), en la
-      # subcarpeta app/ de la carpeta de copias del host. Sin
-      # WALLET_SYNC_ENCRYPTION_KEY no se hacen (nunca en claro).
+      # subcarpeta app/ de la carpeta de copias del host.
       AUTO_BACKUP_DIR: /backups/app
-      # Verificación de saldos on-chain (backend/src/modules/walletSync) —
-      # todo opcional: sin WALLET_SYNC_ENCRYPTION_KEY, el resto de la app
-      # funciona con normalidad; solo falla si intentas guardar una API key
-      # de red on-chain sin haberla definido antes.
-      WALLET_SYNC_ENCRYPTION_KEY: ${WALLET_SYNC_ENCRYPTION_KEY:-}
+      # Clave maestra (obligatoria desde la versión 1.0, como POSTGRES_PASSWORD):
+      # cifra las claves de API de Ajustes, Conexiones y las copias
+      # automáticas. Sin ella no arranca, en vez de funcionar a medias sin
+      # copias. Si la cambias, hay que volver a introducir esas claves.
+      WALLET_SYNC_ENCRYPTION_KEY: "${WALLET_SYNC_ENCRYPTION_KEY:?define WALLET_SYNC_ENCRYPTION_KEY en tu .env (genera una con openssl rand -base64 32)}"
       ETHERSCAN_API_KEY: ${ETHERSCAN_API_KEY:-}
       BLOCKFROST_API_KEY: ${BLOCKFROST_API_KEY:-}
       SUBSCAN_API_KEY: ${SUBSCAN_API_KEY:-}
