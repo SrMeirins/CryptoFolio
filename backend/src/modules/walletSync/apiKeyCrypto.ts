@@ -23,6 +23,16 @@ function loadMasterKey(): Buffer {
   return key;
 }
 
+/** True si hay una clave maestra válida para cifrar y descifrar claves de API. */
+export function claveMaestraDisponible(): boolean {
+  try {
+    loadMasterKey();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // El authTag (16 bytes) se concatena al final del ciphertext — un único
 // campo BYTEA en BD en vez de una tercera columna, sin perder verificación
 // de integridad de GCM.

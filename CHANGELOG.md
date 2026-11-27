@@ -67,6 +67,7 @@ Primera versión estable. Resume los cambios desde la 0.0.14: más de 300 PR que
 - Copias de seguridad automáticas y cifradas, descarga protegida con contraseña, restauración y vuelta atrás.
 - Alertas de precio y de cartera, y avisos silenciables por categoría.
 - Zona horaria, página de inicio, preferencias de exportación y diseño del Dashboard.
+- **Conexiones:** claves de API de Etherscan, Blockfrost, Subscan y CoinGecko (Demo o Pro) en un solo sitio, comprobadas con cada servicio y cifradas; en la aplicación de escritorio, por primera vez también la de CoinGecko. Atajos desde las direcciones de wallet a las que les falta clave.
 
 #### Interfaz
 
@@ -80,6 +81,7 @@ Primera versión estable. Resume los cambios desde la 0.0.14: más de 300 PR que
 
 ### Cambiado
 
+- **Docker: la clave maestra `WALLET_SYNC_ENCRYPTION_KEY` es obligatoria**, como `POSTGRES_PASSWORD`. Sin ella no se hacían copias automáticas ni se podían guardar claves de API. Al actualizar, genera una con `openssl rand -base64 32` y añádela al `.env`.
 - **FIFO global por activo**, según el criterio de la AEAT: cada venta consume las unidades adquiridas primero en cualquier wallet, con su fecha de adquisición original, que se conserva en los traspasos.
 - Airdrops, minería y cashback tributan en la base general; la compensación de pérdidas sigue el art. 49 LIRPF.
 - Las stablecoins se declaran como moneda virtual (clave V).

@@ -41,8 +41,6 @@ export const SYNC_BADGE: Record<'ok' | 'discrepancy' | 'error' | 'pending', { la
   pending:     { label: 'Pendiente',  className: 'bg-overlay/30 text-fg-subtle' },
 }
 
-export const NETWORKS_REQUIRING_KEY = ['Ethereum', 'Cardano', 'Polkadot Asset Hub']
-
 export function getAddressPlaceholder(network: Network | undefined): string {
   if (!network) return 'Pega tu dirección pública...'
   const asset = network.native_asset.toUpperCase()

@@ -1,5 +1,5 @@
 import { db } from '../../db/client';
-import { BASE_URL, enqueueCoinGeckoCall, fetchWithRetry, notifyStatus } from './coingeckoClient';
+import { coinGeckoBaseUrl, enqueueCoinGeckoCall, fetchWithRetry, notifyStatus } from './coingeckoClient';
 import { coinGeckoSearchFailedTransiently, getCoinGeckoId, searchAndSaveCoinGeckoId } from './coingeckoIds';
 import { dedupeByKey, priceKey } from './priceDedup';
 
@@ -61,7 +61,7 @@ async function _getHistoricalPriceEur(
   const price = await enqueueCoinGeckoCall(async () => {
     // Formato fecha CoinGecko: DD-MM-YYYY
     const geckoDate = formatGeckoDate(date);
-    const url = `${BASE_URL}/coins/${geckoId}/history?date=${geckoDate}&localization=false`;
+    const url = `${coinGeckoBaseUrl()}/coins/${geckoId}/history?date=${geckoDate}&localization=false`;
 
     const data = await fetchWithRetry(url) as {
       market_data?: { current_price?: { eur?: number } }
@@ -119,7 +119,7 @@ export async function getCurrentPricesEur(symbols: string[]): Promise<Map<string
   if (toFetch.length === 0) return result;
 
   const ids = toFetch.map(s => getCoinGeckoId(s)).join(',');
-  const url = `${BASE_URL}/simple/price?ids=${ids}&vs_currencies=eur`;
+  const url = `${coinGeckoBaseUrl()}/simple/price?ids=${ids}&vs_currencies=eur`;
 
   try {
     // Encolado para no solaparse con otros fetches (respeta el mismo rate limit)
@@ -203,7 +203,7 @@ export async function prefetchHistoricalPrices(
     notifyStatus(`🔄 ${symbol}: consultando ${datesNeeded.length} fecha${datesNeeded.length > 1 ? 's' : ''} via CoinGecko market_chart/range (1 llamada)...`);
 
     const data = await enqueueCoinGeckoCall(async () => {
-      const url = `${BASE_URL}/coins/${geckoId}/market_chart/range?vs_currency=eur&from=${fromTs}&to=${toTs}`;
+      const url = `${coinGeckoBaseUrl()}/coins/${geckoId}/market_chart/range?vs_currency=eur&from=${fromTs}&to=${toTs}`;
       return await fetchWithRetry(url) as { prices: [number, number][] } | null;
     }).catch((e: Error) => {
       notifyStatus(`⚠ ${symbol}: fallo market_chart/range — ${e.message}`);
@@ -297,7 +297,7 @@ export async function fetchMarketChart(
   }
 
   const data = await enqueueCoinGeckoCall(async () => {
-    const url = `${BASE_URL}/coins/${geckoId}/market_chart?vs_currency=eur&days=${days}`;
+    const url = `${coinGeckoBaseUrl()}/coins/${geckoId}/market_chart?vs_currency=eur&days=${days}`;
     return await fetchWithRetry(url) as { prices: [number, number][] };
   }).catch(e => {
     console.warn(`[PRICES] Market chart ${symbol} falló: ${e.message}`);

@@ -1,5 +1,5 @@
 import { db } from '../../db/client';
-import { BASE_URL, enqueueCoinGeckoCall, fetchWithRetry } from '../prices/coingeckoClient';
+import { coinGeckoBaseUrl, enqueueCoinGeckoCall, fetchWithRetry } from '../prices/coingeckoClient';
 import { fetchWithTimeout } from '../prices/httpTimeout';
 import { PRICE_ALIASES } from '../prices/priceAliases';
 import { FIAT_ICON_SYMBOLS, FLAG_HOST, fiatFlagUrl } from './fiatFlags';
@@ -80,7 +80,7 @@ function localPng(symbol: string): { type: IconContentType; data: Buffer } | nul
  */
 async function resolveIconId(symbol: string): Promise<string | null | undefined> {
   try {
-    const data = await enqueueCoinGeckoCall(() => fetchWithRetry(`${BASE_URL}/search?query=${encodeURIComponent(symbol)}`)) as { coins?: unknown };
+    const data = await enqueueCoinGeckoCall(() => fetchWithRetry(`${coinGeckoBaseUrl()}/search?query=${encodeURIComponent(symbol)}`)) as { coins?: unknown };
     return bestCoinGeckoMatch(data?.coins, symbol);
   } catch {
     return undefined;
@@ -183,7 +183,7 @@ async function syncCoinGeckoIcons(): Promise<void> {
   const ids = [...new Set(pending.map(p => p.id).filter((x): x is string => !!x))];
   for (let i = 0; i < ids.length; i += MARKETS_BATCH) {
     const batch = ids.slice(i, i + MARKETS_BATCH);
-    const url = `${BASE_URL}/coins/markets?${new URLSearchParams({ vs_currency: 'eur', ids: batch.join(','), per_page: String(MARKETS_BATCH) })}`;
+    const url = `${coinGeckoBaseUrl()}/coins/markets?${new URLSearchParams({ vs_currency: 'eur', ids: batch.join(','), per_page: String(MARKETS_BATCH) })}`;
     try {
       const markets = await enqueueCoinGeckoCall(() => fetchWithRetry(url)) as Array<{ id?: unknown; image?: unknown }>;
       for (const m of Array.isArray(markets) ? markets : []) {

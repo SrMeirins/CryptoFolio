@@ -1,5 +1,5 @@
 import { db } from '../../db/client';
-import { BASE_URL, enqueueCoinGeckoCall, fetchWithRetry } from './coingeckoClient';
+import { coinGeckoBaseUrl, enqueueCoinGeckoCall, fetchWithRetry } from './coingeckoClient';
 
 // Mapa symbol → coingecko_id (se carga desde DB al iniciar)
 let coinGeckoIds: Map<string, string> = new Map();
@@ -40,7 +40,7 @@ export async function repairMissingCoinGeckoIds(): Promise<void> {
 export async function searchCoinGeckoBySymbol(
   symbol: string
 ): Promise<{ id: string; price_eur: number } | null> {
-  const url = `${BASE_URL}/search?query=${encodeURIComponent(symbol)}`;
+  const url = `${coinGeckoBaseUrl()}/search?query=${encodeURIComponent(symbol)}`;
   try {
     const data = await enqueueCoinGeckoCall(() => fetchWithRetry(url)) as {
       coins: { id: string; symbol: string; market_cap_rank: number | null }[]
@@ -59,7 +59,7 @@ export async function searchCoinGeckoBySymbol(
 
     const ids = candidates.join(',');
     const prices = await fetchWithRetry(
-      `${BASE_URL}/simple/price?ids=${ids}&vs_currencies=eur`
+      `${coinGeckoBaseUrl()}/simple/price?ids=${ids}&vs_currencies=eur`
     ) as Record<string, { eur: number }>;
 
     for (const id of candidates) {
@@ -104,7 +104,7 @@ export async function searchAndSaveCoinGeckoId(symbol: string): Promise<string |
 }
 
 async function _searchAndSaveCoinGeckoId(symbol: string): Promise<string | null> {
-  const url = `${BASE_URL}/search?query=${encodeURIComponent(symbol)}`;
+  const url = `${coinGeckoBaseUrl()}/search?query=${encodeURIComponent(symbol)}`;
 
   try {
     const data = await enqueueCoinGeckoCall(async () => {
@@ -149,7 +149,7 @@ async function verifyBestCandidateId(candidates: string[]): Promise<string | nul
   try {
     const ids = candidates.join(',');
     const data = await fetchWithRetry(
-      `${BASE_URL}/simple/price?ids=${ids}&vs_currencies=eur`
+      `${coinGeckoBaseUrl()}/simple/price?ids=${ids}&vs_currencies=eur`
     ) as Record<string, { eur: number }>;
 
     for (const id of candidates) {
@@ -180,7 +180,7 @@ export async function updateCoinGeckoId(symbol: string, geckoId: string): Promis
 export async function verifyCoinGeckoId(geckoId: string): Promise<number | null> {
   try {
     const data = await fetchWithRetry(
-      `${BASE_URL}/simple/price?ids=${encodeURIComponent(geckoId)}&vs_currencies=eur`
+      `${coinGeckoBaseUrl()}/simple/price?ids=${encodeURIComponent(geckoId)}&vs_currencies=eur`
     ) as Record<string, { eur: number }>;
     const price = data[geckoId]?.eur;
     return price != null && price > 0 ? price : null;

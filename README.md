@@ -119,6 +119,7 @@ Referencia completa: [operaciones de Binance](docs/operaciones-soportadas.md) y 
 ### Ajustes
 
 - Wallets y activos, con la comprobación on-chain del saldo.
+- **Conexiones:** claves de API de Etherscan, Blockfrost, Subscan y CoinGecko, comprobadas y cifradas.
 - Tramos del IRPF, umbral del Modelo 721 y preferencias de exportación.
 - Alertas de cartera y de precio, y notificaciones.
 - **Copias de seguridad** automáticas y cifradas, descarga con contraseña y restauración.
@@ -252,14 +253,16 @@ Copia la plantilla (en Windows, `Copy-Item .env.example .env`):
 cp .env.example .env
 ```
 
-Abre `.env` con un editor de texto y define la contraseña de la base de datos, el único valor obligatorio:
+Abre `.env` con un editor de texto y define los dos valores obligatorios: la contraseña de la base de datos y la clave maestra, que cifra las claves de API y las copias automáticas. Genera la clave maestra con `openssl rand -base64 32` (en Windows, en Git Bash o WSL) y pégala:
 
 ```env
 # Contraseña de la base de datos (sin espacios ni comillas)
 POSTGRES_PASSWORD=cambia-esta-contraseña
+# Clave maestra: el resultado de openssl rand -base64 32
+WALLET_SYNC_ENCRYPTION_KEY=pega-aquí-la-clave-generada
 ```
 
-Si falta, el arranque se detiene con un aviso en lugar de usar una contraseña por defecto.
+Si falta alguna, el arranque se detiene con un aviso en lugar de usar un valor por defecto. Guarda la clave maestra: si la cambias, tendrás que volver a introducir las claves de API.
 
 ### Paso 4: arranca la aplicación
 
@@ -293,21 +296,29 @@ Las opciones van en el fichero `.env`. La lista completa, comentada, está en [`
 | Variable | Para qué sirve | Por defecto |
 | --- | --- | --- |
 | `POSTGRES_PASSWORD` | Contraseña de la base de datos (**obligatoria**) | Sin valor: el arranque falla si falta |
+| `WALLET_SYNC_ENCRYPTION_KEY` | Clave maestra (**obligatoria**): cifra las claves de API y las copias automáticas. Genérala con `openssl rand -base64 32` | Sin valor: el arranque falla si falta |
 | `FRONTEND_HOST_PORT` | Puerto de la aplicación en tu equipo | `8080` |
 | `APP_TIMEZONE` | Zona horaria del día local, el ejercicio fiscal y el P&L (por ejemplo, `Atlantic/Canary`). La de Ajustes tiene prioridad | `Europe/Madrid` |
-| `COINGECKO_API_KEY` | Clave de CoinGecko (Demo o Pro) para importar más rápido | Vacía (acceso anónimo) |
 | `PRICE_REFRESH_INTERVAL_MS` | Cada cuánto se refrescan los precios, en milisegundos | `60000` |
 | `PRICE_SOURCES_OFFLINE` | Con `true`, no consulta ninguna fuente de precios y usa solo la caché | Sin definir |
 | `RATE_LIMIT_MAX` | Peticiones al backend por ventana de 15 minutos | `5000` |
 | `BACKUP_HOST_DIR` | Carpeta de tu equipo para las copias de la base de datos | `~/.local/share/CryptoFolio/backups` |
 | `BACKUP_RETENTION_COUNT` | Copias semanales que se conservan | `14` |
 | `HOST_UID` / `HOST_GID` | Usuario y grupo dueños de las copias (salida de `id -u` y `id -g`) | `1000` |
-| `WALLET_SYNC_ENCRYPTION_KEY` | Clave que cifra las claves de API de la comprobación on-chain | Vacía |
-| `ETHERSCAN_API_KEY`, `BLOCKFROST_API_KEY`, `SUBSCAN_API_KEY` | Claves de los proveedores on-chain de Ethereum, Cardano y Polkadot. También se pueden poner en Ajustes | Vacías |
+| `ETHERSCAN_API_KEY`, `BLOCKFROST_API_KEY`, `SUBSCAN_API_KEY`, `COINGECKO_API_KEY` | Alternativa a Ajustes, Conexiones para las claves de API. La de Ajustes tiene prioridad | Vacías |
 
 La base de datos y el backend no publican ningún puerto en tu equipo: solo se ven entre sí en la red interna de Docker. El único punto de entrada es el frontend, y solo en `127.0.0.1`.
 
-Si cambias `WALLET_SYNC_ENCRYPTION_KEY` después de usarla, las claves de API on-chain guardadas dejan de poder descifrarse y tendrás que volver a introducirlas en Ajustes. No se pierden operaciones ni datos de la cartera.
+Si cambias `WALLET_SYNC_ENCRYPTION_KEY` después de usarla, las claves de API guardadas dejan de poder descifrarse (Ajustes, Conexiones lo indica) y tendrás que volver a introducirlas; las copias automáticas anteriores solo se abren con la clave antigua. No se pierden operaciones ni datos de la cartera.
+
+### Claves de API
+
+Se ponen en **Ajustes, Conexiones**, que comprueba cada clave con su servicio antes de guardarla cifrada. Todas son gratuitas y opcionales:
+
+- **Etherscan, Blockfrost y Subscan (PubFi):** comprueban el saldo on-chain de tus direcciones de Ethereum, Cardano y Polkadot Asset Hub. Las demás redes no necesitan clave.
+- **CoinGecko (Demo o Pro):** precios e históricos de los activos que no cotizan en Binance. Sin clave funciona, pero unas tres veces más despacio la primera vez.
+
+En la aplicación de escritorio, Ajustes es el único sitio para ponerlas; la clave maestra se genera sola.
 
 ---
 
@@ -365,7 +376,7 @@ Nada: la base de datos persiste entre reinicios. En Docker vive en un volumen qu
 Los errores más habituales:
 
 - **Puerto en uso:** otro programa ocupa el 8080. Cambia `FRONTEND_HOST_PORT` en el `.env`.
-- **«variable is required»:** falta `POSTGRES_PASSWORD` en el `.env`.
+- **«variable is required»:** falta `POSTGRES_PASSWORD` o `WALLET_SYNC_ENCRYPTION_KEY` en el `.env`.
 - **Docker no responde:** abre Docker Desktop y espera a que arranque.
 - **Permisos en Linux:** añade tu usuario al grupo `docker` y vuelve a iniciar sesión.
 

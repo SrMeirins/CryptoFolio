@@ -1,14 +1,46 @@
 import { fetchWithTimeout } from './httpTimeout';
 
-export const BASE_URL = process.env.COINGECKO_BASE_URL || 'https://api.coingecko.com/api/v3';
-const API_KEY = process.env.COINGECKO_API_KEY || '';
-// La cabecera depende del host, no es la misma para ambos planes (confirmado
-// contra la doc oficial): x-cg-demo-api-key contra api.coingecko.com (plan
-// gratuito), x-cg-pro-api-key solo contra pro-api.coingecko.com (plan de
-// pago). Antes se enviaba siempre x-cg-pro-api-key — contra el host gratuito
-// (el que usa esta app por defecto) esa cabecera se ignora en silencio, así
-// que una API key gratuita configurada no tenía ningún efecto real.
-const API_KEY_HEADER = BASE_URL.includes('pro-api.coingecko.com') ? 'x-cg-pro-api-key' : 'x-cg-demo-api-key';
+// Configuración en caliente (versión 1.0): la clave puede venir de Ajustes,
+// Conexiones (guardada cifrada en claves_servicio) o del entorno
+// (COINGECKO_API_KEY, Docker). La de Ajustes manda; sin ninguna, acceso anónimo.
+// La cabecera depende del servidor, no es la misma para ambos planes (doc
+// oficial): x-cg-demo-api-key contra api.coingecko.com (plan gratuito) y
+// x-cg-pro-api-key solo contra pro-api.coingecko.com (plan de pago).
+export type PlanCoinGecko = 'demo' | 'pro';
+const URL_DEMO = 'https://api.coingecko.com/api/v3';
+const URL_PRO = 'https://pro-api.coingecko.com/api/v3';
+
+interface ConfigCoinGecko { clave: string; plan: PlanCoinGecko }
+const planDelEntorno = (): PlanCoinGecko => (process.env.COINGECKO_BASE_URL?.includes('pro-api.coingecko.com') ? 'pro' : 'demo');
+const delEntorno = (): ConfigCoinGecko => ({ clave: process.env.COINGECKO_API_KEY || '', plan: planDelEntorno() });
+let guardada: ConfigCoinGecko | null = null;
+
+/** Fija la clave guardada en Ajustes (null: se vuelve a la del entorno, si la hay). */
+export function configurarCoinGecko(config: ConfigCoinGecko | null): void {
+  guardada = config && config.clave ? config : null;
+}
+
+function configActual(): ConfigCoinGecko {
+  return guardada ?? delEntorno();
+}
+
+/**
+ * Servidor de la API: el del plan. COINGECKO_BASE_URL solo manda si apunta a
+ * otro servidor (un proxy o un entorno de pruebas): los compose la fijan
+ * siempre a la URL gratuita y, si mandara, el plan Pro de Ajustes no tendría
+ * efecto.
+ */
+export function coinGeckoBaseUrl(plan: PlanCoinGecko = configActual().plan): string {
+  const delEnv = process.env.COINGECKO_BASE_URL;
+  if (delEnv && !/^https:\/\/(pro-)?api\.coingecko\.com\//.test(delEnv)) return delEnv;
+  return plan === 'pro' ? URL_PRO : URL_DEMO;
+}
+
+/** Cabeceras de autenticación para una clave y un plan (vacías sin clave). */
+export function cabecerasCoinGecko(clave: string, plan: PlanCoinGecko): Record<string, string> {
+  if (!clave) return {};
+  return { [coinGeckoBaseUrl(plan).includes('pro-api.coingecko.com') ? 'x-cg-pro-api-key' : 'x-cg-demo-api-key']: clave };
+}
 
 // Callback opcional para surfacear eventos de precios (rate limiting, etc.) al caller.
 // `info.esperaSeg` (#324): duración de una espera por rate limit, para la cuenta atrás del cliente.
@@ -26,9 +58,9 @@ export function notifyStatus(msg: string, info?: InfoEstado): void {
 class RateLimitedQueue {
   private queue: Array<() => Promise<unknown>> = [];
   private running = false;
-  private readonly delayMs: number;
+  private readonly delayMs: () => number;
 
-  constructor(delayMs = 6000) {
+  constructor(delayMs: () => number) {
     this.delayMs = delayMs;
   }
 
@@ -52,16 +84,22 @@ class RateLimitedQueue {
       const fn = this.queue.shift()!;
       await fn();
       if (this.queue.length > 0) {
-        await sleep(this.delayMs);
+        await sleep(this.delayMs());
       }
     }
     this.running = false;
   }
 }
 
-// 6.5s entre llamadas, margen de seguridad. Configurable por env (por defecto igual)
-// para permitir tests deterministas sin penalizar el rate limit real en producción.
-const queue = new RateLimitedQueue(Number(process.env.COINGECKO_MIN_INTERVAL_MS ?? 6500));
+// Intervalo entre llamadas, con margen: sin clave el límite anónimo es de unas
+// 10 por minuto (6,5 s); con una clave Demo, 30 por minuto (2,1 s). Se evalúa
+// en cada espera, así que una clave nueva acelera la cola al momento.
+// COINGECKO_MIN_INTERVAL_MS lo fija (tests deterministas).
+const queue = new RateLimitedQueue(() => {
+  const fijo = process.env.COINGECKO_MIN_INTERVAL_MS;
+  if (fijo !== undefined) return Number(fijo);
+  return configActual().clave ? 2100 : 6500;
+});
 
 export function enqueueCoinGeckoCall<T>(fn: () => Promise<T>): Promise<T> {
   return queue.enqueue(fn);
@@ -89,12 +127,8 @@ export async function fetchWithRetry(url: string, retries = 2): Promise<unknown>
     throw new Error(`CoinGecko sigue en rate limit (${waitSec}s restantes de una espera ya conocida) — se reintentará en la próxima sesión`);
   }
 
-  const headers: Record<string, string> = {
-    'Accept': 'application/json',
-  };
-  if (API_KEY) {
-    headers[API_KEY_HEADER] = API_KEY;
-  }
+  const { clave, plan } = configActual();
+  const headers: Record<string, string> = { 'Accept': 'application/json', ...cabecerasCoinGecko(clave, plan) };
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {

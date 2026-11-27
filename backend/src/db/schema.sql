@@ -202,6 +202,20 @@ CREATE TABLE network_api_keys (
 );
 
 -- ============================================================
+-- TABLA: claves_servicio
+-- ============================================================
+-- Claves de API de servicios que no son una red (versión 1.0): hoy, CoinGecko.
+-- Cifradas igual que network_api_keys (AES-256-GCM con la clave maestra
+-- WALLET_SYNC_ENCRYPTION_KEY). `plan` elige servidor y cabecera de CoinGecko.
+CREATE TABLE claves_servicio (
+  servicio           TEXT PRIMARY KEY CHECK (servicio IN ('coingecko')),
+  api_key_encrypted  BYTEA NOT NULL,
+  api_key_iv         BYTEA NOT NULL,
+  plan               TEXT NOT NULL DEFAULT 'demo' CHECK (plan IN ('demo', 'pro')),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+-- ============================================================
 -- TABLA: balance_sync_log
 -- ============================================================
 CREATE TABLE balance_sync_log (

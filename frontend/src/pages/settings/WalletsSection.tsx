@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { CopyButton } from '../../components/CopyButton'
 import { WALLET_TYPE_META, truncateAddress, hayPendientes } from './wallets/helpers'
 import { SyncBadge } from './wallets/SyncBadge'
+import { AvisoClaveRed } from './wallets/ClaveRed'
 import { AddAddressForm } from './wallets/AddAddressForm'
 import { AddWalletForm } from './wallets/AddWalletForm'
 import { WalletEditPanel, type WalletEdit } from './wallets/WalletEditPanel'
@@ -257,6 +258,7 @@ export function WalletsSection({ onWalletCreated }: { onWalletCreated?: () => vo
                               }
                             </div>
                           )}
+                          {!isEditingAddr && addr.address && <AvisoClaveRed red={addr.network_name} />}
                           {!isEditingAddr && addr.address && (
                             <SyncBadge
                               addr={addr}

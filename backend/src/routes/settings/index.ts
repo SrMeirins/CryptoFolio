@@ -5,6 +5,7 @@ import settingsConfigRouter from './settingsConfig';
 import settingsMaintenanceRouter from './settingsMaintenance';
 import settingsBackupRouter from './settingsBackup';
 import settingsAutoBackupRouter from './settingsAutoBackup';
+import settingsConexionesRouter from './settingsConexiones';
 
 // Orquestador puro: monta los sub-routers en /api/settings sin cambiar
 // ninguna ruta externa. Fragmentado desde un único fichero de 580 líneas que
@@ -20,5 +21,6 @@ router.use('/', settingsConfigRouter);
 router.use('/', settingsMaintenanceRouter);
 router.use('/', settingsBackupRouter);
 router.use('/', settingsAutoBackupRouter);
+router.use('/', settingsConexionesRouter);
 
 export default router;

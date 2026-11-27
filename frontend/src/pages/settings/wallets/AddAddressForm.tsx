@@ -3,7 +3,7 @@ import { ExternalLink } from 'lucide-react'
 import type { Network } from '../../../api/portfolio'
 import { OTHER_NETWORK, getAddressPlaceholder, inputClass } from './helpers'
 import { NetworkPicker } from './NetworkPicker'
-import { NetworkApiKeyField } from './NetworkApiKeyField'
+import { EstadoClaveRed } from './ClaveRed'
 import { buttonClasses, fieldClasses } from '../../../components/ui'
 import { explorerLink } from '../../../utils/externalLink'
 
@@ -45,7 +45,7 @@ export function AddAddressForm({ networks, onSave, onCancel }: {
             <ExternalLink size={11} /> Verificar en el explorador
           </a>
         )}
-        {!isCustom && selected && <NetworkApiKeyField networkId={selected} networkName={selectedNetwork?.name ?? ''} />}
+        {!isCustom && selected && <EstadoClaveRed red={selectedNetwork?.name} />}
       </div>
       {isCustom && (
         <>
