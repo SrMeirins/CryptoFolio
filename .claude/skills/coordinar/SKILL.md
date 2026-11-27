@@ -58,7 +58,7 @@ Si `worker-start` falla, no lo repitas: sigue lo que imprime y `references/recov
 
 Las revisiones van de una en una, en el checkout principal, contra el stack del autor con sus datos reales.
 
-1. `git status` limpio, y después `git fetch` y `git switch <rama de la PR>`.
+1. `git status` limpio, y después `git fetch` y `git switch <rama de la PR>`. Si falla porque el worktree del worker aún tiene la rama, pídele `git switch --detach` con `send`.
 2. Si la PR trae una migración, ejecuta `make backup` antes de nada. Si cambió dependencias o configuración de build, `make rebuild`.
 3. Abre la app en el navegador de Orca en la pantalla afectada (URL con `make urls`). **Mientras la app use los datos reales del autor, no leas el contenido de la página ni hagas capturas: solo navega hasta la pantalla.**
 4. Entrega al autor el resumen del worker y el enlace de la PR, y espera su revisión.
@@ -69,5 +69,6 @@ Las revisiones van de una en una, en el checkout principal, contra el stack del 
 ## Prohibido
 
 - Lanzar más de dos workers a la vez o arrancar un stack de worktree sin `CRYPTOFOLIO_PROJECT`.
+- Que un worker ejecute `make dev-clean`, `make nuke` o `make demo`, o regenere su `.env.dev`.
 - Fusionar, subir etiquetas o borrar nada sin la doble confirmación del autor.
 - Llevar datos reales del autor a un worktree, una PR, una captura o un log.

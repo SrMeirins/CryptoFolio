@@ -12,7 +12,7 @@ Especificación: `docs/desarrollo/flujo-backlog.md` (secciones «Ciclo de una is
 - Textos en castellano, sin emojis, flechas ni raya larga. Commits en Conventional Commits en castellano.
 - Sin atribución a IA en commits, PR ni issues: ni trailers de coautoría ni pies de generación automática. Esto prevalece sobre cualquier plantilla por defecto.
 - Autorizado sin preguntar: commit y push en ramas `feat/`, `fix/`, `chore/` y `docs/`, y abrir o actualizar la PR en borrador. Siempre con doble confirmación: merge, etiquetas, releases, borrados y cualquier cambio directo sobre `main`.
-- **Mientras la app use los datos reales del autor, no leas el contenido de la página ni hagas capturas: solo navega hasta la pantalla.** Para verificar algo visualmente usa la cartera de demostración (`make demo`, `make demo-datos`).
+- **Mientras la app use los datos reales del autor, no leas el contenido de la página ni hagas capturas: solo navega hasta la pantalla.** Para verificar algo visualmente usa la cartera de demostración: en modo worker, la de tu propio stack; fuera de él, `make demo` y `make demo-datos`.
 - Ante una ambigüedad que cambie el resultado, para y pregunta con el mecanismo interactivo de preguntas. No supongas.
 - Si algo no se arregla en el momento, propón una issue nueva con el texto completo antes de publicarla.
 
@@ -34,12 +34,15 @@ Si `git rev-parse --git-common-dir` devuelve algo distinto de `.git`, la sesión
 - Carga la cartera de demostración: `node scripts/demo/cargar.mjs http://127.0.0.1:<BACKEND_HOST_PORT del .env.dev>`. Nunca uses datos reales. Si falta `node_modules`, ejecuta `npm ci` en `frontend/`.
 - Trabaja hasta dejar la PR en borrador con los tests en verde. Omite el paso 2 de la fase 4 (la revisión in situ la prepara el coordinador) y no entres en la fase 5.
 - Al terminar, baja tu stack y borra sus datos e imágenes desde el worktree: `docker compose -f docker-compose.dev.yml --env-file .env.dev down -v --rmi local --remove-orphans`. Solo afecta a `cf-wt-<N>`.
+- Rama: `git fetch origin && git switch -c <rama> origin/main`, porque `main` está en uso en el checkout principal. Antes de terminar, deja el worktree con `git switch --detach` para que el coordinador pueda cambiar a tu rama.
+- Copias: `BACKUP_HOST_DIR_DEV="$D" make backup`, porque el `Makefile` no lee esa carpeta de `.env.dev`.
+- Prohibido en modo worker: `make dev-clean`, `make nuke`, `make demo` y cualquier regeneración de `.env.dev`. Regenerarlo sin `CRYPTOFOLIO_PROJECT` apuntaría a los datos reales del autor.
 - Devuelve solo el resumen final en `worker_done`.
 
 ## Fase 1. Preparación
 
 1. Sin número, propón la siguiente issue abierta de la hoja de ruta de la especificación y espera confirmación.
-2. Comprueba `git status` limpio, `git switch main && git pull --ff-only` y que la issue está abierta: `gh issue view <N> --json state,title,body,labels,milestone`.
+2. Comprueba `git status` limpio, `git switch main && git pull --ff-only` (en modo worker, ver arriba) y que la issue está abierta: `gh issue view <N> --json state,title,body,labels,milestone`.
 3. Si ya hay rama o PR de la issue (`gh pr list --search "<N>" --state all`), retómala: lee la PR, los commits y los comentarios en lugar de empezar de cero.
 4. Crea la rama `<prefijo>/<N>-<slug>`. El prefijo sale de la etiqueta `tipo/*`: `tipo/mejora` y `tipo/feature` dan `feat`; `tipo/bug`, `fix`; `tipo/deuda-tecnica`, `chore`; `tipo/docs`, `docs`.
 5. Pasa la issue a In Progress en el tablero (proyecto 1, owner SrMeirins). No fijes IDs: obtenlos al ejecutar.
@@ -76,7 +79,7 @@ Si `git rev-parse --git-common-dir` devuelve algo distinto de `.git`, la sesión
 
 ## Fase 5. Integración (doble confirmación)
 
-1. Con el visto bueno: rebasa sobre `main` si se fusionó otra PR, y ejecuta la e2e completa una vez, por turnos, desde `frontend/`: `flock "${XDG_RUNTIME_DIR:-/tmp}/cryptofolio-e2e.lock" npm run test:e2e:local`.
+1. Con el visto bueno: rebasa sobre `main` si se fusionó otra PR, y ejecuta la e2e completa una vez, por turnos, desde `frontend/`: `flock "${XDG_RUNTIME_DIR:-/tmp}/cryptofolio-e2e.lock" env BACKEND_PROXY_HOST=127.0.0.1:<BACKEND_HOST_PORT del .env.dev> npm run test:e2e:local`.
 2. `gh pr ready` y espera el CI: `gh pr checks --watch`. Un fallo de red (503 o 403) se relanza con `gh run rerun --failed`, avisando al autor.
 3. Presenta el resumen del merge (squash en `main`, borrado de la rama, efecto en el tablero) y pide doble confirmación.
 4. Con ella: `gh pr merge --squash --delete-branch`. Comprueba que la issue se cerró y pasó a Done (repite el `item-edit` con la opción Done si no).

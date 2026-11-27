@@ -58,3 +58,13 @@ test('insertarEnChangelog coloca la sección y actualiza los enlaces', () => {
 test('insertarEnChangelog falla si la versión ya existe', () => {
   assert.throws(() => insertarEnChangelog(BASE, '## [1.0.0] - 2026-12-01\n', '1.0.0', '0.0.14'), /1\.0\.0/)
 })
+
+test('parsearFragmento quita los finales de línea CRLF', () => {
+  const res = parsearFragmento('554.md', '### Añadido\r\n\r\n- Algo nuevo (#554).\r\n')
+  assert.deepEqual(res.get('Añadido'), ['- Algo nuevo (#554).'])
+})
+
+test('insertarEnChangelog falla si [Unreleased] tiene texto escrito a mano', () => {
+  const changelog = '# Changelog\n\n## [Unreleased]\n\n- Entrada suelta\n\n## [1.0.0] - 2026-11-26\n\n- Base\n\n[Unreleased]: https://x/compare/v1.0.0...HEAD\n[1.0.0]: https://x/compare/v0.0.14...v1.0.0\n'
+  assert.throws(() => insertarEnChangelog(changelog, '## [1.1.0] - 2026-12-01\n', '1.1.0', '1.0.0'), /Unreleased/)
+})

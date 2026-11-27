@@ -51,8 +51,11 @@ for d in backend frontend electron; do npm version X.Y.Z --no-git-tag-version --
 ### 3. CHANGELOG
 
 ```bash
-git rm $(node scripts/changelog/juntar.mjs X.Y.Z YYYY-MM-DD)
+# Escribe CHANGELOG.md y guarda la lista de fragmentos consumidos
+node scripts/changelog/juntar.mjs X.Y.Z YYYY-MM-DD > "$SCRATCH/fragmentos.txt"
 ```
+
+Después, con la confirmación del autor: `git rm $(cat "$SCRATCH/fragmentos.txt")`, donde `$SCRATCH` es el scratchpad de la sesión.
 
 El script compone `## [X.Y.Z] - YYYY-MM-DD`, actualiza los enlaces de comparación del pie y escribe `CHANGELOG.md`. Imprime los fragmentos consumidos. Si sale con código 1 no escribe nada: corrige el fragmento que nombra el error. El `git rm` borra, así que va tras la confirmación del autor.
 
@@ -73,7 +76,7 @@ Regenera las capturas afectadas y, al terminar, pregunta antes de `make demo-dow
 
 ```bash
 (cd backend && npm test) && (cd frontend && npm run typecheck && npm test)
-(cd frontend && BACKEND_PROXY_HOST=127.0.0.1:43001 npm run test:e2e:local)  # una sola vez, sin build ni dev en paralelo
+(cd frontend && flock "${XDG_RUNTIME_DIR:-/tmp}/cryptofolio-e2e.lock" env BACKEND_PROXY_HOST=127.0.0.1:<BACKEND_HOST_PORT del .env.dev> npm run test:e2e:local)  # una sola vez y por turnos
 ```
 
 La e2e completa se ejecuta una vez, nunca en bucle (ver `CLAUDE.md`). Los comandos de Playwright van desde `frontend/`.

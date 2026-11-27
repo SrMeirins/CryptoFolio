@@ -27,7 +27,7 @@ function validarVersion(version) {
 export function parsearFragmento(nombre, contenido) {
   const res = new Map()
   let actual = null
-  for (const linea of contenido.split('\n')) {
+  for (const linea of contenido.split(/\r?\n/)) {
     if (linea.trim() === '') continue
     const cabecera = /^### (.+?)\s*$/.exec(linea)
     if (cabecera) {
@@ -80,6 +80,10 @@ export function insertarEnChangelog(changelog, seccion, version, anterior) {
   const m = enlace.exec(changelog)
   if (!m) throw new Error('CHANGELOG.md no tiene el enlace "[Unreleased]:" en el pie')
   const base = m[1]
+  const pendiente = /^## \[Unreleased\][ \t]*\n([\s\S]*?)^## \[/m.exec(changelog)
+  if (pendiente && pendiente[1].trim() !== '') {
+    throw new Error('[Unreleased] tiene texto escrito a mano: pásalo a un fragmento de changelog.d/ antes de juntar')
+  }
   return changelog
     .replace(cabecera, () => `## [Unreleased]\n\n${seccion.trimEnd()}\n\n`)
     .replace(
