@@ -55,6 +55,11 @@ test('el total de cada día es la suma de los valores de sus filas', async ({ pa
     }
     return res
   })
+  // Cabecera limpia: rótulo corto «Total»; la aclaración va como texto para lectores de pantalla.
+  const primero = page.getByTestId('total-dia').first()
+  await expect(primero).toContainText(/^Total/)
+  await expect(primero).toContainText('solo las operaciones de esta página')
+  await expect(primero).not.toContainText('en la página)')
   // El primer y el último día pueden estar partidos entre páginas: se comprueban los del medio.
   const completos = grupos.slice(1, -1)
   expect(completos.length).toBeGreaterThan(2)

@@ -1,7 +1,6 @@
 import { Fragment, useMemo, useState, type KeyboardEvent } from 'react'
-import { Calendar } from 'lucide-react'
 import type { Transaction } from '../../api/portfolio'
-import { tableHeadRowClasses, panelSurface } from '../../components/ui'
+import { tableHeadRowClasses, panelSurface, TextTooltip } from '../../components/ui'
 import { formatMoney, type Currency } from '../../utils/format'
 import { agruparPorDia, fmtDateGroup } from './helpers'
 import { groupsByDay, type SortKey, type SortState } from './sorting'
@@ -107,13 +106,16 @@ export function HistoryTable({ transactions, sort, onSort, currency, searchTerm,
               {grouped && (
                 <tr className="bg-background-tertiary/25">
                   <th scope="rowgroup" colSpan={columns} className="px-4 py-1.5 text-left font-normal">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={9} aria-hidden="true" className="text-fg-subtle" />
-                      <span className="text-xs text-fg-subtle font-semibold">{fmtDateGroup(g.day)}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xs text-fg font-semibold">{fmtDateGroup(g.day)}</span>
                       <span className="text-xs text-fg-subtle">· {g.txs.length} {g.txs.length !== 1 ? 'operaciones' : 'operación'}</span>
-                      <span className="ml-auto text-xs text-fg-subtle mono" data-testid="total-dia">
-                        Total del día (en la página) {formatMoney(g.total, currency)}
-                        {g.sinValor > 0 && <span> (sin precio: {g.sinValor})</span>}
+                      <span className="ml-auto flex items-baseline gap-1.5 text-xs text-right" data-testid="total-dia">
+                        <span className="text-fg-subtle">Total</span>
+                        <TextTooltip label="Total del día" tip="Suma del valor de las operaciones del día que están en esta página.">
+                          <span className="font-semibold text-fg tabular-nums">{formatMoney(g.total, currency)}</span>
+                          <span className="sr-only"> (solo las operaciones de esta página)</span>
+                        </TextTooltip>
+                        {g.sinValor > 0 && <span className="text-fg-subtle">(sin precio: {g.sinValor})</span>}
                       </span>
                     </div>
                   </th>
