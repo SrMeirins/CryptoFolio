@@ -15,7 +15,8 @@ credentials.*
 __pycache__/
 
 # ── Claude Code (config/permisos locales, no compartir entre máquinas) ─────
-.claude/
+.claude/*
+!.claude/skills/
 
 # ── CSVs y datos sensibles ─────────────────────────────────────────────────
 *.csv
