@@ -44,7 +44,8 @@ module.exports = {
       // Migraciones SQL para que el backend las ejecute en modo standalone
       from: '../backend/src/db',
       to:   'backend/src/db',
-      filter: ['*.sql', 'migrations/*.sql'],
+      // legado/: puente para bases anteriores a la versión 1.0 (migrations/legado/README.md)
+      filter: ['*.sql', 'migrations/*.sql', 'migrations/legado/*.sql'],
     },
   ],
 

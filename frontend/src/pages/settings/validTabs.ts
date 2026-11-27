@@ -1,2 +1,2 @@
 // Pestañas válidas de Ajustes (se valida el parámetro de la URL contra esta lista).
-export const VALID_TABS = ['wallets', 'assets', 'fiscal', 'alertas', 'datos', 'general']
+export const VALID_TABS = ['wallets', 'assets', 'fiscal', 'alertas', 'conexiones', 'datos', 'general']

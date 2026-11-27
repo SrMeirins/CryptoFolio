@@ -4,6 +4,8 @@ import { envTimezone } from './modules/time/appTimezone';
 import app from './app';
 import { db, pool } from './db/client';
 import { runMigrations } from './db/run-migrations';
+import { claveMaestraDisponible } from './modules/walletSync/apiKeyCrypto';
+import { cargarClaveCoinGecko } from './modules/conexiones/conexiones';
 import { setupPricesWebSocket } from './routes/prices';
 import { startLivePrices } from './modules/prices/binance';
 import { iniciarAlertas } from './modules/alertas/servicio';
@@ -36,6 +38,14 @@ async function bootstrap() {
     // Docker como en Electron. Idempotente (runMigrations solo aplica lo pendiente,
     // registrado en schema_migrations), así que es seguro correrlo siempre.
     await runMigrations();
+    // Clave maestra (versión 1.0): si está definida pero no es válida, mejor
+    // parar con un mensaje claro que fallar después al cifrar claves o copias.
+    if (process.env.WALLET_SYNC_ENCRYPTION_KEY && !claveMaestraDisponible()) {
+      console.error('[FATAL] WALLET_SYNC_ENCRYPTION_KEY no es válida: debe ser una clave de 32 bytes en base64 (genera una con: openssl rand -base64 32).');
+      process.exit(1);
+    }
+    // Clave de CoinGecko guardada en Ajustes, Conexiones (si no, la del entorno).
+    await cargarClaveCoinGecko().catch(e => console.error('[STARTUP] No se pudo cargar la clave de CoinGecko:', e));
     setupPricesWebSocket(server);
     scheduleWalletSync();
     // Copias automáticas cifradas con la clave del equipo (#454).

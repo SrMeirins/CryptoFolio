@@ -22,7 +22,11 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
-ENV_DEV="$ROOT/.env.dev"
+# Variables opcionales (las usa `make demo`, ver scripts/demo/): otro fichero
+# de entorno, otro proyecto de Docker (otros volúmenes) y otra carpeta de copias.
+ENV_DEV="${CRYPTOFOLIO_ENV_FILE:-$ROOT/.env.dev}"
+PROJECT_NAME="${CRYPTOFOLIO_PROJECT:-cryptofolio}"
+BACKUP_DIR_OVERRIDE="${CRYPTOFOLIO_BACKUP_DIR:-}"
 ENV_USER="$ROOT/.env"
 
 FRESH=0
@@ -150,7 +154,7 @@ cat > "$ENV_DEV" <<EOF
 # Generado por scripts/dev-env.sh — NO commitear (ya está en .gitignore).
 # Secretos aleatorios por proyecto + puertos host libres.
 # Regenerar con: make dev-clean   (o)   scripts/dev-env.sh --fresh
-COMPOSE_PROJECT_NAME=cryptofolio
+COMPOSE_PROJECT_NAME=${PROJECT_NAME}
 NODE_ENV=development
 
 # UID/GID reales del host — para que db-backup corra como este usuario en
@@ -181,6 +185,11 @@ BACKEND_HOST_PORT=${BACKEND_HOST_PORT}
 PG_HOST_PORT=${PG_HOST_PORT}
 PGADMIN_HOST_PORT=${PGADMIN_HOST_PORT}
 EOF
+
+# Carpeta de copias propia (demo): no se mezcla con las del entorno de desarrollo.
+if [[ -n "$BACKUP_DIR_OVERRIDE" ]]; then
+  printf '\n# Carpeta de copias de este entorno\nBACKUP_HOST_DIR_DEV=%s\n' "$BACKUP_DIR_OVERRIDE" >> "$ENV_DEV"
+fi
 
 log "Escrito $(basename "$ENV_DEV") (0600)."
 log "→ Frontend: http://localhost:${FRONTEND_HOST_PORT}"

@@ -27,6 +27,23 @@ describe('copyDbAssets', () => {
     expect(readdirSync(path.join(dist, 'migrations')).sort()).toEqual(['001_a.sql', '002_b.sql']);
   });
 
+  it('copia también el puente de migraciones/legado (versión 1.0), pero no down/', () => {
+    root = mkdtempSync(path.join(tmpdir(), 'cf-db-assets-'));
+    const migrations = path.join(root, 'src', 'db', 'migrations');
+    mkdirSync(path.join(migrations, 'legado'), { recursive: true });
+    mkdirSync(path.join(migrations, 'down'), { recursive: true });
+    writeFileSync(path.join(root, 'src', 'db', 'schema.sql'), 'CREATE TABLE x();');
+    writeFileSync(path.join(migrations, '001_a.sql'), 'SELECT 1;');
+    writeFileSync(path.join(migrations, 'legado', '010_antigua.sql'), 'SELECT 10;');
+    writeFileSync(path.join(migrations, 'legado', 'README.md'), 'no se copia');
+    writeFileSync(path.join(migrations, 'down', '001_a.sql'), 'no se copia');
+
+    expect(copyDbAssets(root)).toBe(2);
+    const dist = path.join(root, 'dist', 'db', 'migrations');
+    expect(readdirSync(path.join(dist, 'legado'))).toEqual(['010_antigua.sql']);
+    expect(readdirSync(dist).sort()).toEqual(['001_a.sql', 'legado']);
+  });
+
   it('es idempotente: se puede ejecutar varias veces sobre el mismo dist/', () => {
     root = mkdtempSync(path.join(tmpdir(), 'cf-db-assets-'));
     mkdirSync(path.join(root, 'src', 'db', 'migrations'), { recursive: true });

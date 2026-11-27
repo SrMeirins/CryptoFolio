@@ -16,7 +16,8 @@ Solo la **última versión publicada** en [Releases](https://github.com/SrMeirin
 La aplicación es local: los datos (operaciones, wallets, copias de seguridad)
 se guardan en el equipo de quien la usa y no se envían a servidores propios.
 Las conexiones externas son consultas de solo lectura a servicios públicos:
-precios y datos de activos (Binance y CoinGecko, también los logos),
+precios y datos de activos (Binance y CoinGecko, también los logos, con
+CoinPaprika y OKX de respaldo),
 banderas de países y, en algunas comprobaciones, exploradores de bloques. Las
 consultas de precios se pueden desactivar con la variable de entorno
 `PRICE_SOURCES_OFFLINE=true`.

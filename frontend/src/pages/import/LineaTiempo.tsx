@@ -1,6 +1,6 @@
 import { DISTINTIVO } from './exchangeColores'
 import { marcasAnio, segmento } from './coberturaVista'
-import { lineaCombinada } from './lineaTiempo'
+import { lineaCombinada } from './lineaCombinada'
 import type { CoberturaExchange } from './types'
 import { formatFiscalDate } from '../../utils/fiscalTable'
 import { formatNumber } from '../../utils/format'

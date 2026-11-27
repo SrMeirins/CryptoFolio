@@ -3,7 +3,8 @@ import type { QueryResult, QueryResultRow } from 'pg';
 // Qué entra en una copia (#453): todo lo que no se puede recalcular. Fuera
 // quedan las cachés de precios y cierres, los logos, los lotes FIFO (se
 // recalculan tras restaurar), el registro de sincronización de saldos y las
-// claves de API de las redes, que son secretos de este equipo.
+// claves de API (de las redes y de servicios como CoinGecko), que son
+// secretos de este equipo.
 //
 // El orden es el de inserción: cada tabla va después de aquellas a las que
 // apunta. La clave ordena las filas para que la copia sea estable.

@@ -11,6 +11,7 @@ import { SetupBanner } from './settings/SetupBanner'
 import { SettingsNav } from './settings/SettingsNav'
 import { VALID_TABS } from './settings/validTabs'
 import { AlertasSection } from './settings/AlertasSection'
+import { ConexionesSection } from './settings/ConexionesSection'
 import { useSetupSeen } from '../hooks/useSetupSeen'
 import { tabId, tabPanelId, PageHeader, SectionHeader } from '../components/ui'
 import { navIcon } from '../constants/navigation'
@@ -19,6 +20,7 @@ import { navIcon } from '../constants/navigation'
 const SECTION_HEADERS = {
   fiscal: { title: 'Fiscal', subtitle: 'Normativa, Modelo 721, tramos del IRPF y comisión de red.' },
   alertas: { title: 'Alertas', subtitle: 'Alertas de precio de cada activo y de cambio de la cartera en 24 h.' },
+  conexiones: { title: 'Conexiones', subtitle: 'Claves de API para comprobar saldos on-chain y para los precios de CoinGecko.' },
   datos: { title: 'Datos', subtitle: 'Copias de seguridad, mantenimiento y borrado de datos.' },
   general: { title: 'General', subtitle: 'Tema, zona horaria, moneda, preferencias y avisos.' },
 } as const
@@ -78,6 +80,7 @@ export function Settings() {
             {/* Cabecera común de sección (#491): un h2 por pestaña. Wallets y Activos llevan la suya con acciones. */}
             {activeTab === 'fiscal'  && <div className={scroll}><SectionHeader className="mb-4" {...SECTION_HEADERS.fiscal} /><FiscalSection /></div>}
             {activeTab === 'alertas' && <div className={scroll}><SectionHeader className="mb-4" {...SECTION_HEADERS.alertas} /><AlertasSection /></div>}
+            {activeTab === 'conexiones' && <div className={scroll}><SectionHeader className="mb-4" {...SECTION_HEADERS.conexiones} /><ConexionesSection /></div>}
             {activeTab === 'datos'   && <div className={scroll}><SectionHeader className="mb-4" {...SECTION_HEADERS.datos} /><DatosSection /></div>}
             {activeTab === 'general' && <div className={scroll}><SectionHeader className="mb-4" {...SECTION_HEADERS.general} /><GeneralSection /></div>}
           </div>

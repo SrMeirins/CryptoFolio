@@ -908,12 +908,6 @@ export const portfolioApi = {
     api.post<Array<{ asset: string; status: string; onchainBalance: number | null; expectedBalance: number; discrepancyPct: number | null }>>(
       `/wallets/${walletId}/addresses/${addressId}/sync`, {}
     ),
-  getNetworkApiKeyStatus: (networkId: string) =>
-    api.get<{ network_id: string; has_key: boolean; updated_at: string | null }>(`/wallets/networks/${networkId}/api-key`),
-  setNetworkApiKey: (networkId: string, apiKey: string) =>
-    api.put<{ success: boolean }>(`/wallets/networks/${networkId}/api-key`, { api_key: apiKey }),
-  deleteNetworkApiKey: (networkId: string) =>
-    api.delete<{ success: boolean }>(`/wallets/networks/${networkId}/api-key`),
   getConfig: () => api.get<Record<string, string>>('/settings/config'),
   /** Zona horaria efectiva (#388, #390): zona, origen y ajuste guardado inválido. */
   getTimezone: () => api.get<TimezoneInfo>('/settings/timezone'),

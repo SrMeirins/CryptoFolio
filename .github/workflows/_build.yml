@@ -41,11 +41,11 @@ jobs:
             backend/package-lock.json
             electron/package-lock.json
 
+      # Sin VITE_WS_URL: el frontend conecta el precio en vivo a su propio
+      # origen, que en Electron es el backend en un puerto dinámico (#56). Un
+      # puerto fijo dejaba la app de escritorio sin precio en vivo (versión 1.0).
       - name: Build frontend
         working-directory: frontend
-        env:
-          VITE_API_URL: http://127.0.0.1:3001
-          VITE_WS_URL: ws://127.0.0.1:3001
         run: |
           npm ci
           npm run build

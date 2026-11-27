@@ -6,19 +6,29 @@
 const fs = require('fs');
 const path = require('path');
 
-/** Copia src/db/schema.sql y src/db/migrations/*.sql (sin subcarpetas) a dist/db/. */
+/** Copia los .sql de primer nivel de `from` a `to` y devuelve cuántos copió. */
+function copySqlFiles(from, to) {
+  if (!fs.existsSync(from)) return 0;
+  fs.mkdirSync(to, { recursive: true });
+  const names = fs.readdirSync(from, { withFileTypes: true })
+    .filter(e => e.isFile() && e.name.endsWith('.sql'))
+    .map(e => e.name);
+  for (const name of names) fs.copyFileSync(path.join(from, name), path.join(to, name));
+  return names.length;
+}
+
+/**
+ * Copia src/db/schema.sql, src/db/migrations/*.sql y el puente de
+ * src/db/migrations/legado/*.sql (versión 1.0) a dist/db/. Las demás
+ * subcarpetas (down/, reversiones a mano) no se copian.
+ */
 function copyDbAssets(root) {
   const src = path.join(root, 'src', 'db');
   const dest = path.join(root, 'dist', 'db');
   fs.mkdirSync(path.join(dest, 'migrations'), { recursive: true });
   fs.copyFileSync(path.join(src, 'schema.sql'), path.join(dest, 'schema.sql'));
-  const migrations = fs.readdirSync(path.join(src, 'migrations'), { withFileTypes: true })
-    .filter(e => e.isFile() && e.name.endsWith('.sql'))
-    .map(e => e.name);
-  for (const name of migrations) {
-    fs.copyFileSync(path.join(src, 'migrations', name), path.join(dest, 'migrations', name));
-  }
-  return migrations.length;
+  return copySqlFiles(path.join(src, 'migrations'), path.join(dest, 'migrations'))
+    + copySqlFiles(path.join(src, 'migrations', 'legado'), path.join(dest, 'migrations', 'legado'));
 }
 
 /** Copia el paquete local de logos (src/assets/crypto-icons, #449) a dist/assets/. */

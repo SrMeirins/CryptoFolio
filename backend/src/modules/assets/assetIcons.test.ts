@@ -7,7 +7,7 @@ import { createTestDatabase, TestDatabase } from '../../test/setup-test-db';
 // CoinGecko y la descarga de cada imagen se simulan.
 const { marketsMock, localIconMock } = vi.hoisted(() => ({ marketsMock: vi.fn(), localIconMock: vi.fn() }));
 vi.mock('../prices/coingeckoClient', () => ({
-  BASE_URL: 'https://api.coingecko.test/api/v3',
+  coinGeckoBaseUrl: () => 'https://api.coingecko.test/api/v3',
   enqueueCoinGeckoCall: (fn: () => Promise<unknown>) => fn(),
   fetchWithRetry: marketsMock,
 }));

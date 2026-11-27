@@ -40,7 +40,13 @@ async function resolveApiKey(networkId: string, networkName: string, client: Poo
     [networkId]
   );
   if (row.rows.length > 0) {
-    return decryptApiKey(row.rows[0].api_key_encrypted, row.rows[0].api_key_iv);
+    try {
+      return decryptApiKey(row.rows[0].api_key_encrypted, row.rows[0].api_key_iv);
+    } catch {
+      // Cifrada con otra clave maestra (versión 1.0): mensaje accionable en vez
+      // del error criptográfico.
+      throw new Error(`la clave de API de ${networkName} no se puede descifrar: vuelve a introducirla en Ajustes, Conexiones`);
+    }
   }
   const envVar = ENV_KEY_BY_NETWORK[networkName];
   return envVar ? process.env[envVar] || undefined : undefined;

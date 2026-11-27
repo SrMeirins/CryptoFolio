@@ -9,28 +9,107 @@ y el proyecto usa [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-26
+
+Primera versión estable. Resume los cambios desde la 0.0.14: más de 300 PR que rehacen la interfaz y completan la parte fiscal.
+
 ### Añadido
 
-- **Importación de Bitvavo** — además de Binance, la app ahora soporta el CSV exportado directamente desde Bitvavo (parser, validador y selector de exchange en la pantalla de Importación).
-- **Verificación automática de saldos on-chain** — para wallets frías, además de introducir el saldo manualmente puedes añadir la dirección pública y la app comprobará el saldo real directamente en la blockchain (XRP Ledger, Hedera, Stellar, Bitcoin, Solana, Ethereum, Cardano y Polkadot Asset Hub), avisando si hay alguna discrepancia. API keys de los proveedores configurables desde Settings → Wallets, cifradas en la base de datos.
-- **Backup automático diario de PostgreSQL** — el stack de Docker incluye ahora un sidecar que hace `pg_dump` comprimido cada día con retención configurable por número de copias.
+#### Dashboard
+
+- Paneles nuevos: últimos 7 días, metas con progreso en vivo, variación por activo, evolución con zoom y comparación con BTC o ETH, rendimiento con medidas de riesgo, P&L diario con calendario y vista anual, distribución, resumen fiscal, actividad reciente e ingresos pasivos.
+- Dashboard personalizable: orden, paneles contraídos u ocultos.
+- Tarjetas de resumen en vivo con su tendencia y la variación de hoy y de 24 h.
+
+#### Portfolio
+
+- Vistas por activo y por wallet, columnas elegibles, precio de equilibrio, antigüedad y exportación a CSV.
+- Detalle de cada activo: gráfico de precio con compras y ventas, lotes explicados, reparto entre wallets, simulación «si vendo» y lista de ventas.
+- Custodia en exchanges frente a wallets propias, saldos residuales y conversión de restos.
+- Moneda de visualización en EUR o USD y modo privacidad, que oculta importes y cantidades.
+
+#### Fiscal
+
+- Menú lateral con resumen del ejercicio, operaciones, Modelo 721 y planificador.
+- «Neto a declarar» con el desglose de la cuota y tramos del IRPF por ejercicio según la escala oficial.
+- Pérdidas pendientes por año de origen, con su caducidad.
+- Modelo 721 por custodia, con regla automática por exchange e histórico.
+- Planificador de ventas de fin de año con plan guardado.
+- Seguimiento de la declaración por pasos, comparando lo declarado con lo actual.
+- Calendario fiscal con recordatorios y exportación a .ics.
+- Exportación del ejercicio en CSV, CSV para RentaWeb, Excel y PDF.
+- Avisos de recompra en los dos meses siguientes (art. 33.5 LIRPF), de permutas de staking de ETH y de pérdidas sin motivo anotado.
+
+#### Historial
+
+- Vistas guardadas en pestañas, con una predeterminada; filtros avanzados con el estado en la URL y buscador con sugerencias.
+- Resumen de lo invertido, retirado, vendido, cobrado y pagado en comisiones, y analítica de actividad sobre lo filtrado.
+- Panel de detalle con la trazabilidad FIFO y el origen de cada operación.
+- Edición de operaciones importadas, con aviso y restauración del original; saldo corrido por activo.
+- Exportación a CSV de todo lo filtrado y atajos de teclado.
+
+#### Importación
+
+- CSV de Bitvavo, además de Binance.
+- Asistente por pasos con detección del exchange y varios ficheros en un mismo lote.
+- Revisión de depósitos y retiradas, con reconocimiento de direcciones de red.
+- Cobertura temporal por exchange, con los huecos y lo pendiente de importar.
+- Filas originales de cada CSV guardadas y ajuste de la zona horaria.
+
+#### Wallets y precios
+
+- Comprobación del saldo on-chain en XRP Ledger, Hedera, Stellar, Bitcoin, Solana, Ethereum, Cardano y Polkadot Asset Hub, con las claves de API cifradas.
+- Fuentes de precios de respaldo (CoinPaprika y OKX) y control de los activos sin precio.
+- Logo para todos los activos.
+
+#### Ajustes
+
+- Copias de seguridad automáticas y cifradas, descarga protegida con contraseña, restauración y vuelta atrás.
+- Alertas de precio y de cartera, y avisos silenciables por categoría.
+- Zona horaria, página de inicio, preferencias de exportación y diseño del Dashboard.
+- **Conexiones:** claves de API de Etherscan, Blockfrost, Subscan y CoinGecko (Demo o Pro) en un solo sitio, comprobadas con cada servicio y cifradas; en la aplicación de escritorio, por primera vez también la de CoinGecko. Atajos desde las direcciones de wallet a las que les falta clave.
+
+#### Interfaz
+
+- Tema claro y oscuro con contraste WCAG 2.2 AA y componentes comunes (tarjetas, tablas, tooltips, modales y estados vacíos).
+- Esqueletos de carga, guía de estilo de textos y explicaciones «Cómo calculamos».
+
+#### Desarrollo
+
+- Cartera de demostración sintética con precios de mercado reales (`make demo` y `make demo-datos`), que alimenta las capturas del README.
+- Prueba de humo del navegador en el CI y build de prueba de los tres instaladores.
 
 ### Cambiado
 
-- **Stack de Docker de producción separado del de desarrollo** — `docker-compose.yml` (para usuarios finales) ahora construye un build de producción real (nginx sirviendo estático, sin dev server) y exige explícitamente la contraseña de la base de datos antes de arrancar. El stack de desarrollo interno vive en `docker-compose.dev.yml`.
-- Documentación de instalación (README) revisada a fondo para reflejar el estado real de la app.
+- **Docker: la clave maestra `WALLET_SYNC_ENCRYPTION_KEY` es obligatoria**, como `POSTGRES_PASSWORD`. Sin ella no se hacían copias automáticas ni se podían guardar claves de API. Al actualizar, genera una con `openssl rand -base64 32` y añádela al `.env`.
+- **FIFO global por activo**, según el criterio de la AEAT: cada venta consume las unidades adquiridas primero en cualquier wallet, con su fecha de adquisición original, que se conserva en los traspasos.
+- Airdrops, minería y cashback tributan en la base general; la compensación de pérdidas sigue el art. 49 LIRPF.
+- Las stablecoins se declaran como moneda virtual (clave V).
+- Ejercicio fiscal, cierres diarios y P&L en la zona horaria de la aplicación (por defecto, Madrid).
+- Stack de Docker de producción separado del de desarrollo: nginx sirve el frontend compilado y la contraseña de la base de datos es obligatoria.
+- Copia semanal de la base de datos fuera del repositorio, también en la aplicación de escritorio.
+- README y documentación revisados a fondo.
 
 ### Corregido
 
-- Varias omisiones silenciosas en el motor de importación de CSV: si Binance incluyera alguna vez una fila de comisión adicional en operaciones de Convert/Small Assets Exchange/ETH 2.0 Staking, ahora el import falla explícito en vez de perder ese dato sin avisar.
-- La app de escritorio ahora puede usar la verificación de saldos on-chain (antes no tenía forma de generar la clave de cifrado necesaria).
+- **Actualización desde versiones anteriores:** una base creada por las releases 0.0.x vuelve a actualizarse a la 1.0.0 sin perder datos (antes el backend no arrancaba).
+- Las exportaciones fiscales (CSV, RentaWeb, Excel y PDF) y las claves de la casilla 1800 según la AEAT.
+- El valor de mercado se toma en el momento de cada operación, con la zona horaria de Binance.
+- Los traslados entre wallets conservan su parte de la comisión de compra y la comisión de red de los retiros de Binance va aparte.
+- Duplicados al reimportar un CSV y filas repetidas dentro del mismo fichero.
+- Precios en vivo con el par más líquido, detección del feed congelado y tiempo máximo en las rutas fiscales.
+- Aplicación de escritorio: puertos dinámicos para el backend y la base de datos embebidos, con el precio en vivo conectado a ese puerto.
 
 ### Seguridad
 
-- Actualizadas dependencias con vulnerabilidades conocidas de denegación de servicio (backend y frontend).
-- Corregida una inyección de fórmulas CSV (CSV Formula Injection) en las exportaciones fiscales y en la exportación del historial de transacciones.
-- Endurecido el stack de Docker: contenedores sin privilegios de kernel innecesarios, redes internas segmentadas, superficie de puertos expuestos reducida al mínimo imprescindible.
-- Corregido que, en modo Electron, el backend aceptaba peticiones de cualquier origen en vez de solo el propio.
+- Validación con Zod en los límites de la API y mensajes de error sin detalles internos.
+- Exportaciones a CSV protegidas contra la inyección de fórmulas.
+- Docker endurecido: redes segmentadas, sin capacidades innecesarias y solo el frontend publicado en `127.0.0.1`.
+- CORS restringido al propio origen en la aplicación de escritorio.
+- Dependencias con vulnerabilidades conocidas actualizadas y auditoría en el CI.
+- Avisos privados de seguridad en GitHub (ver `SECURITY.md`).
+
+---
 
 ## [0.0.14] - 2026-06-17
 
@@ -270,6 +349,7 @@ El auto-updater solo detecta releases **publicadas** en GitHub (no drafts). Publ
 Antes de hacer un nuevo tag, añade una sección `## [X.Y.Z] - YYYY-MM-DD` encima de la anterior
 con los cambios agrupados en: **Añadido**, **Cambiado**, **Corregido**, **Eliminado**, **Seguridad**.
 
-[Unreleased]: https://github.com/SrMeirins/CryptoFolio/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/SrMeirins/CryptoFolio/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/SrMeirins/CryptoFolio/compare/v0.0.14...v1.0.0
 [0.0.2]: https://github.com/SrMeirins/CryptoFolio/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/SrMeirins/CryptoFolio/releases/tag/v0.0.1

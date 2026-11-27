@@ -324,13 +324,15 @@ networks:
   # con muchos stacks Docker el pool de direcciones se agota ("all predefined
   # address pools have been fully subnetted"). 10.250.x.0/24 es un rango alto
   # sin uso conocido en este host — cambia si colisiona con otra red tuya.
+  # Variables BACKEND_NET_SUBNET y FRONTEND_NET_SUBNET: el stack de `make demo`
+  # usa otras (10.250.20-21.x) para convivir con el de desarrollo.
   # Solo el backend puede hablar con Postgres/pgAdmin/el sidecar de backup.
   backend-net:
     ipam:
       config:
-        - subnet: 10.250.10.0/24
+        - subnet: ${BACKEND_NET_SUBNET:-10.250.10.0/24}
   # El frontend solo puede hablar con el backend (nunca con Postgres directo).
   frontend-net:
     ipam:
       config:
-        - subnet: 10.250.11.0/24
+        - subnet: ${FRONTEND_NET_SUBNET:-10.250.11.0/24}
