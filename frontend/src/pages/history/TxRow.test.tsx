@@ -177,3 +177,16 @@ describe('TxRow, tabla legible (#554)', () => {
     expect(render(tx({}))).toMatch(/<td[^>]*text-right[^>]*><span[^>]*>−10/)
   })
 })
+
+describe('TxRow, texto secundario de la wallet (#554)', () => {
+  it('si coincide con el nombre de la wallet (sin mayúsculas ni espacios) no se repite', () => {
+    const html = render(tx({ wallet_name: 'Exchange Uno', account: ' exchange  UNO ' }))
+    expect(html.match(/Exchange Uno/g)).toHaveLength(1)
+    expect(html).not.toContain('exchange  UNO')
+  })
+
+  it('si es distinto se muestra, alineado con el texto de la etiqueta (px-2)', () => {
+    const html = render(tx({ wallet_name: 'Exchange Uno', account: 'Spot' }))
+    expect(html).toMatch(/<div class="text-xs text-fg-subtle mt-0\.5 px-2">Spot<\/div>/)
+  })
+})

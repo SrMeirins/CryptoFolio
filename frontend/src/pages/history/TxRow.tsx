@@ -40,6 +40,10 @@ function ValuedAmount({ value, hint, currency, className, tabIndex }: {
   )
 }
 
+/** Igualdad sin distinguir mayúsculas ni espacios, para no repetir el nombre de la wallet. */
+const normaliza = (t: string) => t.replace(/\s+/g, '').toLowerCase()
+const mismoTexto = (a: string, b: string) => normaliza(a) === normaliza(b)
+
 function OpChip({ tx }: { tx: OpLike }) {
   const meta = opMetaOf(tx)
   return (
@@ -205,7 +209,8 @@ export function TxRow({
                 style={{ backgroundColor: `${alpha(tx.wallet_color, 9)}`, color: ink(tx.wallet_color) }}>
                 {tx.wallet_name}
               </span>
-              {tx.account && <div className="text-xs text-fg-subtle mt-0.5">{tx.account}</div>}
+              {/* Mismo inicio que el texto de la etiqueta (px-2); sin repetir el nombre de la wallet. */}
+              {tx.account && !mismoTexto(tx.account, tx.wallet_name) && <div className="text-xs text-fg-subtle mt-0.5 px-2">{tx.account}</div>}
             </>
           )}
         </td>}
