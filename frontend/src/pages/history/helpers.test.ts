@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { toDisplayAmount, localDayKey, fmtDate, fmtDateGroup, calcEurValue, calcFeeEur, valuationHint, flowSign, feeSummary, walletFlow, rowFlowSign, fiatSideNote } from './helpers'
+import { toDisplayAmount, localDayKey, fmtDate, fmtDateGroup, calcEurValue, calcFeeEur, valuationHint, flowSign, feeSummary, walletFlow, rowFlowSign, fiatSideNote, agruparPorDia, parDeActivos } from './helpers'
+import { makeTx } from '../../test/fixtures/transaction'
 
 describe('toDisplayAmount (#177)', () => {
   it('EUR: el importe tal cual', () => {
@@ -124,5 +125,54 @@ describe('fiatSideNote (#416)', () => {
     expect(fiatSideNote(tx('SELL', 'BTC', 'USDT'))).toBeNull()
     expect(fiatSideNote(tx('SELL', 'EUR', 'USD'))).toBeNull()
     expect(fiatSideNote(tx('DEPOSIT_FIAT', 'EUR', null))).toBeNull()
+  })
+})
+
+// Tabla legible (#554).
+describe('agruparPorDia (#554)', () => {
+  const tx = (id: string, timestamp: string, value_eur: number | null, extra = {}) => makeTx({ id, timestamp, value_eur, usd_per_eur: 2, ...extra })
+
+  it('agrupa por día local de la app y la suma diaria coincide con las filas del día', () => {
+    const txs = [
+      tx('a', '2026-03-10T12:00:00.000Z', 100),
+      tx('b', '2026-03-10T08:00:00.000Z', 50.5),
+      tx('c', '2026-03-09T12:00:00.000Z', 20),
+    ]
+    const grupos = agruparPorDia(txs, 'EUR')
+    expect(grupos.map(g => g.day)).toEqual(['2026-03-10', '2026-03-09'])
+    expect(grupos[0].txs.map(t => t.id)).toEqual(['a', 'b'])
+    expect(grupos[0].total).toBeCloseTo(150.5)
+    expect(grupos[1].total).toBe(20)
+    expect(grupos.flatMap(g => g.txs)).toHaveLength(txs.length)
+  })
+
+  it('el día es el de la zona de la app, no el UTC de la cadena', () => {
+    const t = tx('a', '2026-03-10T23:30:00.000Z', 1)
+    expect(agruparPorDia([t], 'EUR')[0].day).toBe(localDayKey(t.timestamp))
+  })
+
+  it('las filas sin valor no suman y se cuentan aparte', () => {
+    const [g] = agruparPorDia([tx('a', '2026-03-10T12:00:00.000Z', 10), tx('b', '2026-03-10T13:00:00.000Z', null)], 'EUR')
+    expect(g.total).toBe(10)
+    expect(g.sinValor).toBe(1)
+  })
+
+  it('en USD suma lo que enseña cada fila (con su tipo de cambio)', () => {
+    const [g] = agruparPorDia([tx('a', '2026-03-10T12:00:00.000Z', 10), tx('b', '2026-03-10T13:00:00.000Z', 5)], 'USD')
+    expect(g.total).toBe(30)
+  })
+})
+
+describe('parDeActivos (#554)', () => {
+  const par = (operation_type: string, asset: string, cost_asset: string | null) =>
+    parDeActivos({ operation_type, asset, cost_asset, destination_wallet_id: null, destination_wallet_name: null })
+  it('compra y venta con contrapartida dan «AAA por BBB»', () => {
+    expect(par('BUY', 'BTC', 'EUR')).toBe('BTC por EUR')
+    expect(par('SELL', 'ETH', 'USDT')).toBe('ETH por USDT')
+  })
+  it('sin contrapartida, igual al activo o en otros tipos, nada', () => {
+    expect(par('BUY', 'BTC', null)).toBeNull()
+    expect(par('BUY', 'BTC', 'BTC')).toBeNull()
+    expect(par('STAKING_REWARD', 'ETH', 'EUR')).toBeNull()
   })
 })

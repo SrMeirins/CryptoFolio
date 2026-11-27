@@ -144,6 +144,12 @@ describe('routes/settings — config y stats', () => {
       for (const value of ['{"orden":["otro"],"ocultos":[],"contraidos":[]}', '[]', 'x', 1]) expect((await put('dashboard_diseno', value)).status).toBe(400);
     });
 
+    it('columnas del Historial (#554): lista JSON de columnas conocidas sin repetir', async () => {
+      for (const value of ['[]', '["cantidad","wallet"]', '["valor","fee","wallet","cantidad"]']) expect((await put('historial_columnas', value)).status).toBe(200);
+      for (const value of ['["fecha"]', '["fee","fee"]', 'fee', '{"fee":1}', '', 1]) expect((await put('historial_columnas', value)).status).toBe(400);
+      expect((await request(app).get('/api/settings/config')).body.historial_columnas).toBe('["valor","fee","wallet","cantidad"]');
+    });
+
     it('densidad del Historial (#552): cómoda o compacta', async () => {
       for (const value of ['comoda', 'compacta']) expect((await put('historial_densidad', value)).status).toBe(200);
       for (const value of ['Compacta', 'densa', '', 1]) expect((await put('historial_densidad', value)).status).toBe(400);

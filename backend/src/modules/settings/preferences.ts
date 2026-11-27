@@ -26,6 +26,10 @@ export const GRAFICO_MARCAS = ['puntos', 'banderas-arriba', 'banderas-abajo'] as
 export const HISTORIAL_DENSIDAD_KEY = 'historial_densidad';
 export const HISTORIAL_DENSIDADES = ['comoda', 'compacta'] as const;
 
+/** Columnas visibles de la tabla del Historial (#554); Fecha, Tipo y Activo van siempre. */
+export const HISTORIAL_COLUMNAS_KEY = 'historial_columnas';
+export const HISTORIAL_COLUMNAS = ['cantidad', 'valor', 'fee', 'wallet'] as const;
+
 /** Páginas que se pueden elegir como inicio. */
 export const START_PAGES = ['/', '/portfolio', '/fiscal', '/history'] as const;
 
@@ -48,6 +52,13 @@ export const preferenceSchemas: Record<string, z.ZodType<string>> = {
     } catch { return false; }
   }, `${PORTFOLIO_COLUMNAS_KEY}: lista JSON de columnas conocidas sin repetir`),
   [HISTORIAL_DENSIDAD_KEY]: z.enum(HISTORIAL_DENSIDADES, { error: `${HISTORIAL_DENSIDAD_KEY} debe ser comoda o compacta` }),
+  // Columnas del Historial (#554): JSON con una lista sin repetir de columnas conocidas.
+  [HISTORIAL_COLUMNAS_KEY]: z.string().max(200).refine(v => {
+    try {
+      const lista = JSON.parse(v);
+      return z.array(z.enum(HISTORIAL_COLUMNAS)).max(HISTORIAL_COLUMNAS.length).safeParse(lista).success && new Set(lista).size === lista.length;
+    } catch { return false; }
+  }, `${HISTORIAL_COLUMNAS_KEY}: lista JSON de columnas conocidas sin repetir`),
   [GRAFICO_MARCAS_KEY]: z.enum(GRAFICO_MARCAS, { error: `${GRAFICO_MARCAS_KEY} debe ser puntos, banderas-arriba o banderas-abajo` }),
   [WALLETS_OTRAS_KEY]: z.string().regex(/^\d{1,2}$/, `${WALLETS_OTRAS_KEY} debe ser un porcentaje entero`)
     .refine(v => Number(v) <= 20, `${WALLETS_OTRAS_KEY} va de 0 a 20`),
