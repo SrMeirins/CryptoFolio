@@ -35,9 +35,10 @@ router.get('/', async (_req: Request, res: Response) => {
        ci.skipped_count,
        ci.exchange,
        ci.desfase_horas,
+       ci.tipo,
        COUNT(t.id) AS transaction_count,
-       MIN(t.timestamp) AS date_from,
-       MAX(t.timestamp) AS date_to,
+       COALESCE(MIN(t.timestamp), ci.periodo_desde::timestamp AT TIME ZONE 'UTC') AS date_from,
+       COALESCE(MAX(t.timestamp), ci.periodo_hasta::timestamp AT TIME ZONE 'UTC') AS date_to,
        COUNT(CASE WHEN t.operation_type = 'BUY' THEN 1 END) AS buy_count,
        COUNT(CASE WHEN t.operation_type = 'SELL' THEN 1 END) AS sell_count,
        COUNT(CASE WHEN t.operation_type = 'WITHDRAW' THEN 1 END) AS withdraw_count,
@@ -56,7 +57,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
   // Id validado (#316): uno mal formado hacía fallar la consulta con un 500.
   if (!UUID_RE.test(id)) { res.status(400).json({ error: 'Id de importación inválido' }); return; }
 
-  await db.transaction(async (client) => {
+  const habiaOperaciones = await db.transaction(async (client) => {
     const txRes = await client.query(
       'SELECT id FROM transactions WHERE import_id = $1', [id]
     );
@@ -80,6 +81,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await client.query('DELETE FROM raw_transactions WHERE import_id = $1', [id]);
     await client.query('DELETE FROM transactions WHERE import_id = $1', [id]);
     await client.query('DELETE FROM csv_imports WHERE id = $1', [id]);
+    return txIds.length > 0;
   });
 
   // Recalcular FIFO y esperar resultado antes de responder. Si falla, no se traga el
@@ -88,8 +90,9 @@ router.delete('/:id', async (req: Request, res: Response) => {
   // Se recalcula siempre que queden transacciones (#316): antes solo si quedaban
   // importaciones, y con transacciones manuales sus lotes quedaban con cantidades
   // consumidas por ventas ya borradas.
-  const remaining = await db.query('SELECT EXISTS (SELECT 1 FROM transactions) AS hay');
-  if (remaining.rows[0].hay) {
+  // Una importación de retiradas (#548) no tiene operaciones: quitarla no toca el FIFO.
+  const remaining = habiaOperaciones ? await db.query('SELECT EXISTS (SELECT 1 FROM transactions) AS hay') : null;
+  if (remaining?.rows[0].hay) {
     await runFifoEngine();
   }
 

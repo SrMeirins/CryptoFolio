@@ -246,7 +246,13 @@ CREATE TABLE csv_imports (
   exchange      TEXT NOT NULL DEFAULT 'binance' CHECK (exchange IN ('binance', 'bitvavo')),
   notes         TEXT,
   -- Zona horaria del CSV en horas respecto de UTC (#599): Binance no la indica.
-  desfase_horas SMALLINT NOT NULL DEFAULT 0 CONSTRAINT chk_csv_imports_desfase_horas CHECK (desfase_horas BETWEEN -12 AND 14)
+  desfase_horas SMALLINT NOT NULL DEFAULT 0 CONSTRAINT chk_csv_imports_desfase_horas CHECK (desfase_horas BETWEEN -12 AND 14),
+  -- Importación complementaria de retiradas de Binance (#548): no crea operaciones;
+  -- el periodo es el rango de fechas de su historial.
+  tipo          TEXT NOT NULL DEFAULT 'transacciones' CONSTRAINT chk_csv_imports_tipo CHECK (tipo IN ('transacciones', 'retiradas')),
+  periodo_desde DATE,
+  periodo_hasta DATE,
+  CONSTRAINT chk_csv_imports_periodo CHECK (periodo_hasta IS NULL OR periodo_desde IS NULL OR periodo_hasta >= periodo_desde)
 );
 
 -- Revisiones de cobertura (#328): huecos o tramo pendiente marcados como «no operé».

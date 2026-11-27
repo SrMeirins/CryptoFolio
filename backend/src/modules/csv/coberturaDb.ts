@@ -1,5 +1,5 @@
 import { db } from '../../db/client';
-import { calcularCobertura, type CoberturaExchange, type ExchangeCobertura, type RangoImportacion, type Revision } from './cobertura';
+import { calcularCobertura, calcularRetiradas, type ImportacionRetiradas, type CoberturaExchange, type ExchangeCobertura, type RangoImportacion, type Revision } from './cobertura';
 
 // Carga de la cobertura temporal desde la BD (#328). Fechas como días UTC.
 const EXCHANGES: ExchangeCobertura[] = ['binance', 'bitvavo'];
@@ -7,7 +7,7 @@ const EXCHANGES: ExchangeCobertura[] = ['binance', 'bitvavo'];
 export const hoyUtc = (): string => new Date().toISOString().slice(0, 10);
 
 async function cargar() {
-  const [rangos, revisiones, meses] = await Promise.all([
+  const [rangos, revisiones, meses, retiros, retiradas] = await Promise.all([
     db.query(
       `SELECT ci.id, ci.filename, ci.exchange,
               to_char(MIN(t.timestamp) AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS desde,
@@ -22,6 +22,16 @@ async function cargar() {
        FROM transactions t JOIN csv_imports ci ON ci.id = t.import_id
        GROUP BY 1, 2 ORDER BY 2`,
     ),
+    // Retiros de Binance ya importados (#548): su día UTC, para ver si un historial de retiradas los cubre.
+    db.query(
+      `SELECT to_char(t.timestamp AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS dia
+       FROM transactions t JOIN csv_imports ci ON ci.id = t.import_id
+       WHERE ci.exchange = 'binance' AND ci.tipo = 'transacciones' AND t.operation_type IN ('WITHDRAW', 'LOST', 'GIFT_SENT')`,
+    ),
+    db.query(
+      `SELECT id, filename, to_char(periodo_desde, 'YYYY-MM-DD') AS desde, to_char(periodo_hasta, 'YYYY-MM-DD') AS hasta
+       FROM csv_imports WHERE tipo = 'retiradas' AND periodo_desde IS NOT NULL ORDER BY periodo_desde`,
+    ),
   ]);
   return {
     rangos: rangos.rows.map((r: { id: string; filename: string; exchange: string; desde: string; hasta: string; n: number }) =>
@@ -29,6 +39,9 @@ async function cargar() {
     revisiones: revisiones.rows.map((r: { id: string; exchange: string; tipo: Revision['tipo']; desde: string; hasta: string; revisado_en: Date }) =>
       ({ exchange: r.exchange, revision: { id: r.id, tipo: r.tipo, desde: r.desde, hasta: r.hasta, revisadoEn: new Date(r.revisado_en).toISOString() } })),
     meses: meses.rows as { exchange: string; mes: string; n: number }[],
+    diasRetiros: retiros.rows.map((r: { dia: string }) => r.dia),
+    importacionesRetiradas: retiradas.rows.map((r: { id: string; filename: string; desde: string; hasta: string }): ImportacionRetiradas =>
+      ({ importId: r.id, archivo: r.filename, desde: r.desde, hasta: r.hasta })),
   };
 }
 
@@ -42,7 +55,7 @@ export async function coberturaActual(
   /** Actividad mensual de los archivos del lote, que aún no está en la BD. */
   extraMeses: readonly { exchange: ExchangeCobertura; mes: string; n: number }[] = [],
 ): Promise<{ antes: Map<ExchangeCobertura, CoberturaExchange | null>; despues: CoberturaExchange[] }> {
-  const { rangos, revisiones, meses } = await cargar();
+  const { rangos, revisiones, meses, diasRetiros, importacionesRetiradas } = await cargar();
   const antes = new Map<ExchangeCobertura, CoberturaExchange | null>();
   const despues: CoberturaExchange[] = [];
   for (const ex of EXCHANGES) {
@@ -54,7 +67,10 @@ export async function coberturaActual(
     const mConLote = new Map(m.map(x => [x.mes, x.n]));
     for (const e of extraMeses.filter(x => x.exchange === ex)) mConLote.set(e.mes, (mConLote.get(e.mes) ?? 0) + e.n);
     const c = calcularCobertura(ex, conLote, revs, hoy, [...mConLote].sort().map(([mes, n]) => ({ mes, n })));
-    if (c) despues.push(c);
+    if (c) {
+      if (ex === 'binance') c.retiradas = calcularRetiradas(diasRetiros, importacionesRetiradas);
+      despues.push(c);
+    }
   }
   return { antes, despues };
 }

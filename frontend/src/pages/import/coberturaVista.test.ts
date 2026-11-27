@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fechasParaCopiar, marcasAnio, rangoExportar, segmento, textoEncaje } from './coberturaVista'
+import { fechasParaCopiar, marcasAnio, rangoExportar, segmento, textoEncaje, textoRetiradas } from './coberturaVista'
 
 // Cobertura temporal (#328). Datos sintéticos.
 describe('coberturaVista', () => {
@@ -27,5 +27,12 @@ describe('coberturaVista', () => {
     expect(textoEncaje({ tipo: 'primera', exchange: 'binance', desde: '2022-02-15', hasta: '2026-06-16', dias: 126 }))
       .toBe('Primera importación de Binance: del 15 feb 2022 al 16 jun 2026; faltan 126 días hasta hoy.')
     expect(textoEncaje({ tipo: 'al_dia', exchange: 'bitvavo', desde: '2026-09-04', hasta: '2026-10-19', dias: 0 })).toBe('Pone Bitvavo al día hasta el 19 oct 2026.')
+  })
+
+  it('estado de las retiradas de Binance: avisa solo si falta o está incompleta (#548)', () => {
+    expect(textoRetiradas(null)).toBeNull()
+    expect(textoRetiradas({ estado: 'completa', retiros: 1, sinCubrir: 0, importaciones: [] })).toMatchObject({ ok: true })
+    expect(textoRetiradas({ estado: 'falta', retiros: 3, sinCubrir: 3, importaciones: [] })).toMatchObject({ ok: false, texto: expect.stringContaining('Faltan las retiradas de Binance') })
+    expect(textoRetiradas({ estado: 'parcial', retiros: 4, sinCubrir: 1, importaciones: [] })?.texto).toContain('1 de 4 retiros')
   })
 })

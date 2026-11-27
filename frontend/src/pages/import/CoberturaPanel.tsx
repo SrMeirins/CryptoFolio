@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpen, CalendarClock, CalendarRange, Check, Copy, Undo2 } from 'lucide-react'
+import { BookOpen, CalendarClock, CalendarRange, Check, Copy, AlertTriangle, Undo2 } from 'lucide-react'
 import { portfolioApi } from '../../api/portfolio'
 import { cardClasses, QueryError } from '../../components/ui'
 import { formatNumber } from '../../utils/format'
 import { formatFiscalDate } from '../../utils/fiscalTable'
 import { LineaTiempo } from './LineaTiempo'
 import { ExchangeBadge } from './ExchangeBadge'
-import { fechasParaCopiar, rangoExportar } from './coberturaVista'
+import { fechasParaCopiar, rangoExportar, textoRetiradas } from './coberturaVista'
 import type { CoberturaExchange, HuecoCobertura } from './types'
 
 const NOMBRE = { binance: 'Binance', bitvavo: 'Bitvavo' } as const
@@ -90,6 +90,7 @@ export function CoberturaPanel({ onVerGuia }: { onVerGuia: (ex: 'binance' | 'bit
       {data.map(c => {
         const total = c.tramos.reduce((s, t) => s + t.transacciones, 0)
         const items = [...c.huecos.map(h => ({ h, tipo: 'hueco' as const })), ...(c.pendiente ? [{ h: c.pendiente, tipo: 'pendiente' as const }] : [])]
+        const retiradas = textoRetiradas(c.retiradas)
         return (
           <div key={c.exchange} className="space-y-2 border-t border-border pt-3">
             <p className="flex items-center gap-2 text-sm">
@@ -98,6 +99,14 @@ export function CoberturaPanel({ onVerGuia }: { onVerGuia: (ex: 'binance' | 'bit
               <span className="text-xs text-fg-subtle">{formatFiscalDate(c.desde)} – {formatFiscalDate(c.hasta)} · {formatNumber(total, 0)} transacciones</span>
               {items.length === 0 && <span className="ml-auto inline-flex items-center gap-1 text-xs text-positive"><Check size={12} aria-hidden="true" /> Al día</span>}
             </p>
+            {retiradas && (
+              <p className={`flex items-start gap-2 text-xs ${retiradas.ok ? 'text-fg-subtle' : 'text-fg-muted'}`}>
+                {retiradas.ok
+                  ? <Check size={13} className="shrink-0 mt-0.5 text-positive" aria-hidden="true" />
+                  : <AlertTriangle size={13} className="shrink-0 mt-0.5 text-warning" aria-hidden="true" />}
+                {retiradas.texto}
+              </p>
+            )}
             {items.length > 0 && (
               <ul className="space-y-2 pt-1">
                 {items.map(({ h, tipo }) => <Tramo key={`${tipo}-${h.desde}`} c={c} h={h} tipo={tipo} onVerGuia={onVerGuia} />)}

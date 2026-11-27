@@ -146,7 +146,7 @@ export const ACCOUNT_COLORS: Record<string, string> = {
 export { type WizardResult }
 
 // Cobertura temporal por exchange (#328): tipos de la API.
-export type { TramoCobertura, HuecoCobertura, CoberturaExchange, TipoEncaje, CambioEncaje } from '../../api/portfolio'
+export type { TramoCobertura, HuecoCobertura, CoberturaExchange, CoberturaRetiradas, TipoEncaje, CambioEncaje } from '../../api/portfolio'
 
 /** Retiro ya importado que se puede completar con dirección y reasignar (#330). */
 export interface RetiroExistente {

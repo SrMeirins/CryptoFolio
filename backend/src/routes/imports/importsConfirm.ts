@@ -5,11 +5,12 @@ import {
   applyExistingDepositCostUpdates, importTransactionsPhase,
   fetchMissingHistoricalPrices, runFifoPhase, ProgressEmitter,
 } from '../../modules/csv/confirmImport';
-import { archivosDe, desfasesElegidos, exchangesForzados, uploadCsv, parseWithdrawalDestinations, parseDepositCosts, retiradasDe } from './importsValidation';
+import { archivosDe, desfasesElegidos, exchangesForzados, uploadCsv, parseWithdrawalDestinations, parseDepositCosts, retiradasDe, retiradasArchivosDe } from './importsValidation';
 import { cargarAniosFiscales } from '../../modules/fiscal/carryforward';
 import { estadoPreparacion } from '../../modules/pnl/pnlService';
 import { enSegundoPlano } from '../../utils/enSegundoPlano';
 import { verificarEnSegundoPlano } from '../../modules/walletSync/walletSync';
+import { registrarRetiradas } from '../../modules/csv/retiradas/registro';
 import { agruparAvisosFifo, impactoPorEjercicio, type ArchivoImportado } from '../../modules/csv/resumenImportacion';
 import { localYearMonth } from '../../modules/time/localTime';
 import { getAppTimezone } from '../../modules/time/appTimezone';
@@ -110,6 +111,10 @@ router.post('/confirm', uploadCsv, async (req: Request, res: Response) => {
         throw e;
       }
     }
+
+    // Los historiales de retiradas quedan registrados como importación complementaria (#548).
+    const registro = await registrarRetiradas(db, retiradasArchivosDe(req));
+    if (registro.registradas > 0) send('importing', `${registro.registradas} historial(es) de retiradas registrado(s)`);
 
     // FASE 2: Precios históricos
     const precios = await fetchMissingHistoricalPrices(send);
